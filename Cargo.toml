@@ -1,0 +1,6 @@
+[package]
+name = "casper"
+version = "0.0.0"
+authors = ["pZ4 <pz4@getnada.com>"]
+
+[dependencies]
