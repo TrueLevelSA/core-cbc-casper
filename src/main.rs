@@ -1,8 +1,9 @@
 use std::ops::Add;
 use std::hash::{Hash, Hasher};
 use std::collections::{HashSet};
+// use std::iter::FromIterator;
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq)]
 struct Message<'z> {
     estimate: Option<VoteCounter>,
     sender: Sender,
@@ -11,16 +12,31 @@ struct Message<'z> {
 
 type Sender = u32;
 
+//// START double vote prevention
+// this prevents the same sender from voting twice, but its a bit of a hack. the
+// sender id by itself determines whether two messages are the same (because
+// they have the same hash, as the hash is computed using only the sender). if
+// two msgs are considered the same, only one can be in the set, the one added
+// to the set first. should do this more cleanly, although using the same logic
+// of sets. i guess would be best to create a Vote type
+
 impl<'z> Hash for Message<'z> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.estimate.hash(state);
         self.sender.hash(state);
+        // self.estimate.hash(state);
         // self.justifications.hash(state);
     }
 }
 
+impl<'z> PartialEq for Message<'z> {
+    fn eq(&self, other: &Message<'z>) -> bool {
+        self.sender == other.sender
+    }
+}
+//// END double vote prevention
+
 impl<'z> Message<'z> {
-    fn relayer(sender: Sender, justifications: HashSet<&'z Message<'z>>) -> Message<'z> {
+    fn endorser(sender: Sender, justifications: HashSet<&'z Message<'z>>) -> Message<'z> {
         Message {
             estimate: Some(estimator(justifications.clone(), sender)),
             sender,
@@ -31,8 +47,8 @@ impl<'z> Message<'z> {
         let justifications: HashSet<&'z Message<'z>> = HashSet::new();
         Message {
             estimate: match vote {
-                true  => Some(VoteCounter {yes: 1, no: 0, sender}),
-                false => Some(VoteCounter {yes: 0, no: 1, sender}),
+                true  => Some(VoteCounter {yes: 1, no: 0, sender: Some(sender)}),
+                false => Some(VoteCounter {yes: 0, no: 1, sender: Some(sender)}),
             },
             sender,
             justifications,
@@ -74,10 +90,10 @@ fn get_votes<'z>(msg: &'z Message, acc: HashSet<&'z Message<'z>>) -> HashSet<&'z
 }
 
 fn estimator (justifications: HashSet<&Message>, sender: Sender) -> VoteCounter {
-    let msg = Message {estimate: None, sender, justifications }; // stub msg w/ no estimate
+    let msg = Message { estimate: None, sender, justifications }; // stub msg w/ no estimate
     let votes = get_votes(&msg, HashSet::new());
     votes.iter()
-        .fold(VoteCounter{ yes: 0, no: 0, sender }, |acc, vote| {
+        .fold(VoteCounter{ yes: 0, no: 0, sender: Some(sender) }, |acc, vote| {
             match &vote.estimate {
                 Some(estimate) => acc + estimate.clone(),
                 None => acc, // skip counting
@@ -88,31 +104,23 @@ fn estimator (justifications: HashSet<&Message>, sender: Sender) -> VoteCounter 
 fn main () {
     // original votes
     let v0 = Message::voter(0, false);
-    // let v4 = Message::voter(0, true);
+    let v4 = Message::voter(0, true); // double vote
     let v1 = Message::voter(1, true);
     let v2 = Message::voter(2, true);
     let v3 = Message::voter(3, true);
 
-    println!("\nMessage: m0");
-    let m0 = Message::relayer(0, [&v0].iter().cloned().collect());
-    println!("estimate: {:?}", m0.estimate);
+    let m0 = Message::endorser(0, [&v0].iter().cloned().collect());
+    assert!(m0.estimate == Some(VoteCounter {yes: 0, no: 1, sender: None}), "should have 0 yes, and 1 no vote");
 
-    println!("\nMessage: m1");
-    let m1 = Message::relayer(1, [&v1, &m0].iter().cloned().collect());
-    println!("estimate: {:?}", m1.estimate);
+    let m1 = Message::endorser(1, [&v1, &m0, &v4].iter().cloned().collect());
+    assert!(m1.estimate == Some(VoteCounter {yes: 1, no: 1, sender: None}), "should have 1 yes, and 1 no vote");
 
-    println!("\nMessage: m2");
-    let m2 = Message::relayer(2, [&v2, &m0, &m1].iter().cloned().collect());
-    println!("estimate: {:?}", m2.estimate);
+    let m2 = Message::endorser(2, [&v2, &m0, &m1].iter().cloned().collect());
+    assert!(m2.estimate == Some(VoteCounter {yes: 2, no: 1, sender: None}), "should have 2 yes, and 1 no vote");
 
-    println!("\nMessage: m3");
-    let m3 = Message::relayer(0, [&m1, &m2].iter().cloned().collect());
-    println!("estimate: {:?}", m3.estimate);
+    let m3 = Message::endorser(0, [&m1, &m2].iter().cloned().collect());
+    assert!(m3.estimate == Some(VoteCounter {yes: 2, no: 1, sender: None}), "should have 2 yes, and 1 no vote");
 
-    println!("\nMessage: m4");
-    let m4 = Message::relayer(3, [&v3, &m0, &m1, &m2, &m3].iter().cloned().collect());
-    println!("estimate: {:?}", m4.estimate);
-    // let h4 = calc_hash(&m4);
-    // println!("{:?}", h4);
-    // println!("{:?}", estimator(&vec![&m2, &m4]));
+    let m4 = Message::endorser(3, [&v3, &m0, &m1, &m2, &m3].iter().cloned().collect());
+    assert!(m4.estimate == Some(VoteCounter {yes: 3, no: 1, sender: None}), "should have 3 yes, and 1 no vote");
 }
