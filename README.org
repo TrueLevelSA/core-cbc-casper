@@ -1,6 +1,6 @@
 * p2p voting
 :PROPERTIES:
-:MODIFIED: [2018-05-01 Tue 00:06]
+:MODIFIED: [2018-05-01 Tue 01:37]
 :END:
 
 this seemed one of the easiest problems to tackle for understanding consensus
@@ -39,6 +39,8 @@ be loaded from db to mem and resolve the pointer containing the msg
 
 if we do it like that we can do type safe io
 
+create hashset of voters that had their votes counted, so that we can pick up
+when double voting, and rejecting the subsequent votes
 
 ** testing
 - create message emiters: (a) normal and (b) byzantine.
