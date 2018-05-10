@@ -40,37 +40,33 @@ impl<'z> Message<'z> {
     }
 }
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, Hash, Eq)]
 struct VoteCounter {
     yes: u32,
     no: u32,
-    sender: Sender,
+    sender: Option<Sender>,
 }
 
 impl Add for VoteCounter {
     type Output = VoteCounter;
     fn add(self, other: VoteCounter) -> VoteCounter {
-        VoteCounter { yes: self.yes + other.yes, no: self.no + other.no, ..self }
+        VoteCounter { yes: self.yes + other.yes, no: self.no + other.no, sender: None }
     }
 }
 
 impl PartialEq for VoteCounter {
     fn eq(&self, other: &VoteCounter) -> bool {
-        self.sender == other.sender
-            // && self.yes == other.yes
-            // && self.no == other.no
+        self.yes == other.yes && self.no == other.no
     }
 }
-
-impl Eq for VoteCounter { }
 
 fn get_votes<'z>(msg: &'z Message, acc: HashSet<&'z Message<'z>>) -> HashSet<&'z Message<'z>> {
     msg.justifications.iter()
         .fold(acc, |mut acc_new, m| {
             match m.justifications.len() {
                 0 => { // vote found, vote is a message with 0 justifications
-                    acc_new.insert(m); // mutates acc_new
-                    acc_new // return it
+                    acc_new.insert(m);
+                    acc_new
                 },
                 _ => get_votes(m, acc_new),
             }
