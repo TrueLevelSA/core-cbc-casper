@@ -5,20 +5,20 @@ use std::ops::Add;
 // use std::cmp::Ordering;
 // use std::iter::FromIterator;
 
+type Sender = u32;
+
 #[derive(Eq, Ord, PartialOrd)]
 struct Message<'z> {
-    estimate: Option<VoteCounter>,
+    estimate: Option<VoteCount>,
     sender: Sender,
     justifications: Justifications<'z>,
     sequence: Option<u32>, // TODO shouldn't be necessary, but handy
 }
 
-type Sender = u32;
-
 impl<'z> Message<'z> {
     fn endorser(sender: Sender, justifications: Justifications<'z>, sequence: u32) -> Message<'z> {
         Message {
-            estimate: Some(count_votes(justifications.clone(), sender)),
+            estimate: Some(VoteCount::count_votes(justifications.clone(), sender)),
             sender,
             justifications,
             sequence: Some(sequence),
@@ -28,14 +28,8 @@ impl<'z> Message<'z> {
         let justifications: Justifications = Justifications::new();
         Message {
             estimate: match vote {
-                true => Some(VoteCounter {
-                    yes: 1,
-                    no: 0,
-                }),
-                false => Some(VoteCounter {
-                    yes: 0,
-                    no: 1,
-                }),
+                true => Some(VoteCount { yes: 1, no: 0 }),
+                false => Some(VoteCount { yes: 0, no: 1 }),
             },
             sender,
             justifications,
@@ -43,20 +37,23 @@ impl<'z> Message<'z> {
         }
     }
     fn depends(m1: &Self, m2: &Self) -> bool {
-            m1.justifications.latest_msgs.iter().fold(
-                m1.justifications.latest_msgs.contains(m2),
-                // the trick on the following closure is the following: it
-                // short-circuits while descending on the thread. when dealing
-                // with honest validators, this would return very fast.
-                |acc, m1_prime| acc || Self::depends(m1_prime, m2),
-            )
+        m1.justifications.latest_msgs.iter().fold(
+            m1.justifications.latest_msgs.contains(m2),
+            // the trick on the following recursion is the following: it
+            // short-circuits while descending on the thread. when dealing with
+            // honest validators, this would return true very fast. all the new
+            // derived branches of the justification can be evaluated in
+            // parallel.
+            |acc, m1_prime| acc || Self::depends(m1_prime, m2),
+        )
     }
     fn equivocates(m1: &Self, m2: &Self) -> bool {
         // the estimate bit below is necessary due to the definition of equality
         // of messages (the estimate is not a function of the equality). see
         // tests for equality of messages.
-        !(m1 == m2 && m1.estimate == m2.estimate)
-        && m1.sender == m2.sender
+        let equal_msgs = m1 == m2 && m1.estimate == m2.estimate;
+        !equal_msgs
+            && m1.sender == m2.sender
             // && m1.sequence == m2.sequence // this shouldnt be necessary
             && !Self::depends(m1, m2)
             && !Self::depends(m2, m1)
@@ -109,8 +106,8 @@ impl<'z> fmt::Debug for Message<'z> {
     }
 }
 
-
 #[derive(Eq, PartialEq, Hash, PartialOrd, Ord, Clone)]
+// make sure only latest messages can get in the set
 struct Justifications<'z> {
     latest_msgs: BTreeSet<&'z Message<'z>>,
     // prev_msg: Option<&'z Message<'z>>,
@@ -122,7 +119,7 @@ struct Justifications<'z> {
 // impl Hash for Justifications { }
 
 impl<'z> Justifications<'z> {
-    fn new() -> Justifications<'z> {
+    fn new() -> Self {
         Justifications {
             latest_msgs: BTreeSet::new(),
         }
@@ -147,7 +144,7 @@ impl<'z> fmt::Debug for Justifications<'z> {
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialOrd)]
-struct VoteCounter {
+struct VoteCount {
     yes: u32,
     no: u32,
 }
@@ -158,40 +155,71 @@ trait Zero<T> {
     const ZERO: T;
 }
 
-impl Zero<VoteCounter> for VoteCounter {
-    const ZERO: VoteCounter = VoteCounter { yes: 0, no: 0 };
+impl Zero<VoteCount> for VoteCount {
+    const ZERO: Self = Self { yes: 0, no: 0 };
 }
 
-impl Add for VoteCounter {
-    type Output = VoteCounter;
-    fn add(self, other: VoteCounter) -> VoteCounter {
-        VoteCounter {
+impl Add for VoteCount {
+    type Output = Self;
+    fn add(self, other: Self) -> Self {
+        VoteCount {
             yes: self.yes + other.yes,
             no: self.no + other.no,
         }
     }
 }
 
-impl PartialEq for VoteCounter {
-    fn eq(&self, other: &VoteCounter) -> bool {
+impl PartialEq for VoteCount {
+    fn eq(&self, other: &VoteCount) -> bool {
         self.yes == other.yes && self.no == other.no
     }
 }
 
-fn get_votes<'z>(msg: &'z Message, acc: HashSet<&'z Message<'z>>) -> HashSet<&'z Message<'z>> {
-    msg.justifications
-        .latest_msgs
-        .iter()
-        .fold(acc, |mut acc_new, m| {
-            match m.justifications.latest_msgs.len() {
-                0 => {
-                    // vote found, vote is a message with 0 justifications
-                    acc_new.insert(m); // mutates acc_new
-                    acc_new // returns the mutated acc_new
+impl VoteCount {
+    fn get_votes<'z>(msg: &'z Message, acc: HashSet<&'z Message>) -> HashSet<&'z Message<'z>> {
+        msg.justifications
+            .latest_msgs
+            .iter()
+            .fold(acc, |mut acc_new, m| {
+                match m.justifications.latest_msgs.len() {
+                    0 => {
+                        // vote found, vote is a message with 0 justifications
+                        acc_new.insert(m); // mutates acc_new
+                        acc_new // returns the mutated acc_new
+                    }
+                    _ => Self::get_votes(m, acc_new),
                 }
-                _ => get_votes(m, acc_new),
-            }
-        })
+            })
+    }
+    // makes sure nobody adds more than one vote to their unjustified
+    // votecounter. if they did, their vote is invalid and will be ignored
+    fn  valid_vote(vote: &Option<VoteCount>) -> bool {
+        // these two are the only allowed votes (unjustified msgs)
+        vote == &Some(VoteCount { yes: 1, no: 0 })
+            || vote == &Some(VoteCount { yes: 0, no: 1 })
+    }
+    fn count_votes(justifications: Justifications, sender: Sender) -> VoteCount {
+        // stub msg w/ no estimate
+        let msg = Message {
+            estimate: None,
+            sender,
+            justifications,
+            sequence: None,
+        };
+        let votes = Self::get_votes(&msg, HashSet::new());
+        votes.iter()
+            .filter(|v| {
+                // the estimate here is actually the original votes of each of
+                // the voters / validators
+                Self::valid_vote(&v.estimate)
+            })
+            .fold(VoteCount::ZERO, |acc, vote| {
+                match &vote.estimate {
+                    Some(estimate) => acc + estimate.clone(),
+                    None => acc, // skip counting
+                }
+            })
+    }
 }
 
 // // show that each vote was seen by all validators
@@ -211,22 +239,6 @@ fn get_votes<'z>(msg: &'z Message, acc: HashSet<&'z Message<'z>>) -> HashSet<&'z
 //         })
 // }
 
-fn count_votes(justifications: Justifications, sender: Sender) -> VoteCounter {
-    let msg = Message {
-        estimate: None,
-        sender,
-        justifications,
-        sequence: None,
-    }; // stub msg w/ no estimate
-    let votes = get_votes(&msg, HashSet::new());
-    votes.iter().fold(VoteCounter::ZERO, |acc, vote| {
-        match &vote.estimate {
-            Some(estimate) => acc + estimate.clone(),
-            None => acc, // skip counting
-        }
-    })
-}
-
 fn main() {
     let v0 = Message::voter(0, false, 0);
     let v0_prime = Message::voter(0, true, 0); // equivocating vote
@@ -235,9 +247,10 @@ fn main() {
     // enforce that both of them cannot be included in the same set (in a
     // hashset) both v0 and v0_prime should hash to the same value, and should
     // be considered equal, and only one of them could live in the set. To
-    // achieve that, the vote itself doesn't count, just sender and its sequence
-    // nr contribute to the hash (here justification is empty). In the future,
-    // should drop the sequence nr
+    // achieve that, the vote itself doesn't count, just sender and
+    // justification contributes to the hash (here justification is empty).
+    // TODO: What about when a fork happens and the justifications are different
+    // but at the same height, i should handle that.
     assert!(v0 == v0_prime, "v0 and v0_prime should be equal");
     assert!(
         Message::equivocates(&v0, &v0_prime),
@@ -255,16 +268,16 @@ fn main() {
     let m0 = Message::endorser(0, j0, 1);
     assert_eq!(
         m0.estimate,
-        Some(VoteCounter { yes: 0, no: 1 }),
+        Some(VoteCount { yes: 0, no: 1 }),
         "should have 0 yes, and 1 no vote, found {:?}",
         m0.estimate
     );
 
-    assert!(!Message::equivocates(&v0, &v0));
-    assert!(!Message::equivocates(&v1, &m0));
-    assert!(!Message::equivocates(&m0, &v1));
-    assert!(Message::equivocates(&v0, &v0_prime));
-    assert!(Message::equivocates(&m0, &v0_prime));
+    assert!(!Message::equivocates(&v0, &v0), "should be all good");
+    assert!(!Message::equivocates(&v1, &m0), "should be all good");
+    assert!(!Message::equivocates(&m0, &v1), "should be all good");
+    assert!(Message::equivocates(&v0, &v0_prime), "should be a direct equivocation");
+    assert!(Message::equivocates(&m0, &v0_prime), "should be an indirect equivocation, equivocates to m0 through v0");
 
     let mut j1 = Justifications::new();
     assert!(j1.insert(&v1));
@@ -278,7 +291,7 @@ fn main() {
     let m1 = Message::endorser(1, j1, 1);
     assert_eq!(
         m1.estimate,
-        Some(VoteCounter { yes: 1, no: 1 }),
+        Some(VoteCount { yes: 1, no: 1 }),
         "should have 1 yes, and 1 no vote, found {:?}",
         m1.estimate
     );
@@ -303,22 +316,22 @@ fn main() {
     // println!("d: {:?}", m0.justifications.set.is_disjoint(&m1.justifications.set));
 
     // let m1p = Message::endorser(1, [&v1, &v0_prime, &m0].iter().cloned().collect());
-    // assert!(m1p.estimate == Some(VoteCounter {yes: 2, no: 0, sender: None}), "should have 2 yes, and 0 no vote, found {:?}", m1p.estimate);
+    // assert!(m1p.estimate == Some(VoteCount {yes: 2, no: 0, sender: None}), "should have 2 yes, and 0 no vote, found {:?}", m1p.estimate);
 
     // let m2 = Message::endorser(2, [&v2, &m0, &m1].iter().cloned().collect());
-    // assert!(m2.estimate == Some(VoteCounter {yes: 2, no: 1, sender: None}), "should have 2 yes, and 1 no vote, found {:?}", m2.estimate);
+    // assert!(m2.estimate == Some(VoteCount {yes: 2, no: 1, sender: None}), "should have 2 yes, and 1 no vote, found {:?}", m2.estimate);
 
     // let m3 = Message::endorser(0, [&m0, &m1, &m2].iter().cloned().collect());
-    // assert!(m3.estimate == Some(VoteCounter {yes: 2, no: 1, sender: None}), "should have 2 yes, and 1 no vote, found {:?}", m3.estimate);
+    // assert!(m3.estimate == Some(VoteCount {yes: 2, no: 1, sender: None}), "should have 2 yes, and 1 no vote, found {:?}", m3.estimate);
 
     // let m4 = Message::endorser(3, [&v3, &m0, &m1, &m2, &m3].iter().cloned().collect());
-    // assert!(m4.estimate == Some(VoteCounter {yes: 3, no: 1, sender: None}), "should have 3 yes, and 1 no vote, found {:?}", m4.estimate);
+    // assert!(m4.estimate == Some(VoteCount {yes: 3, no: 1, sender: None}), "should have 3 yes, and 1 no vote, found {:?}", m4.estimate);
 
     // let m5 = Message::endorser(0, [&m0, &m1, &m2, &m3, &m4].iter().cloned().collect());
-    // assert!(m5.estimate == Some(VoteCounter {yes: 3, no: 1, sender: None}), "should have 3 yes, and 1 no vote, found {:?}", m5.estimate);
+    // assert!(m5.estimate == Some(VoteCount {yes: 3, no: 1, sender: None}), "should have 3 yes, and 1 no vote, found {:?}", m5.estimate);
 
     // let m6 = Message::endorser(0, [&m5].iter().cloned().collect());
-    // assert!(m6.estimate == Some(VoteCounter {yes: 3, no: 1, sender: None}), "should have 3 yes, and 1 no vote, found {:?}", m6.estimate);
+    // assert!(m6.estimate == Some(VoteCount {yes: 3, no: 1, sender: None}), "should have 3 yes, and 1 no vote, found {:?}", m6.estimate);
 
     // println!("m0: {:?}", m0.justifications.len());
     // println!("m1: {:?}", m1.justifications.len());
