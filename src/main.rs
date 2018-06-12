@@ -14,20 +14,17 @@ struct Message<'z, T: 'z + Hash + Eq + Ord> {
     estimate: Option<T>,
     sender: Sender,
     justifications: Justifications<'z, T>,
-    sequence: Option<u32>, // TODO shouldn't be necessary, but handy
 }
 
 impl<'z, T> Message<'z, T> where T: Estimator + Clone + Eq + Ord + Hash {
     fn new(
         sender: Sender,
         justifications: Justifications<'z, T>,
-        sequence: u32,
     ) -> Message<'z, T> {
         Message {
             estimate: Some(T::estimator(justifications.clone(), sender)),
             sender,
             justifications,
-            sequence: Some(sequence),
         }
     }
     fn depends(m1: &Self, m2: &Self) -> bool {
@@ -64,7 +61,7 @@ impl<'z, T: Hash + Ord> Hash for Message<'z, T> {
         self.sender.hash(state);
         // self.sequence.hash(state);
         self.justifications.hash(state);
-        self.estimate.hash(state); // the hash of the msg does NOT depend on the estimate
+        // self.estimate.hash(state); // the hash of the msg does NOT depend on the estimate
     }
 }
 
@@ -73,7 +70,7 @@ impl<'z, T: Hash + Ord> PartialEq for Message<'z, T> {
         self.sender == other.sender
         // && self.sequence == other.sequence
             && self.justifications == other.justifications
-            && self.estimate == other.estimate
+            // && self.estimate == other.estimate
     }
 }
 
@@ -81,9 +78,8 @@ impl<'z, T: Hash + Ord> fmt::Debug for Message<'z, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "Message {{ sender: {}, sequence: {} }} -> {:?}",
+            "Message {{ sender: {}}} -> {:?}",
             self.sender,
-            self.sequence.unwrap_or(0),
             self.justifications
         )
     }
@@ -222,7 +218,6 @@ impl Estimator for VoteCount {
             estimate: None,
             sender,
             justifications,
-            sequence: None,
         };
         let state = Self::get_votes(&msg, HashSet::new());
         state
@@ -243,7 +238,7 @@ impl Estimator for VoteCount {
 }
 
 impl VoteCount {
-    fn voter<'z>(sender: Sender, vote: bool, sequence: u32) -> Message<'z, Self> {
+    fn voter<'z>(sender: Sender, vote: bool) -> Message<'z, Self> {
         let justifications: Justifications<Self> = Justifications::new();
         Message {
             estimate: match vote {
@@ -252,7 +247,6 @@ impl VoteCount {
             },
             sender,
             justifications,
-            sequence: Some(sequence),
         }
     }
 
@@ -293,8 +287,8 @@ impl VoteCount {
 // }
 
 fn main() {
-    let v0 = VoteCount::voter(0, false, 0);
-    let v0_prime = VoteCount::voter(0, true, 0); // equivocating vote
+    let v0 = VoteCount::voter(0, false);
+    let v0_prime = VoteCount::voter(0, true); // equivocating vote
 
     //// START NOT TRUE
     // v0 and v0_prime are equivocating messages (first child of a fork). To
@@ -307,10 +301,9 @@ fn main() {
     // but at the same height, i should handle that.
     //// END NOT TRUE
 
-    // i included again the estimate field when calculating equality
-    assert!(v0 != v0_prime, "v0 and v0_prime should not be equal");
+    assert!(v0 == v0_prime, "v0 and v0_prime should be equal");
 
-    let v1 = VoteCount::voter(1, true, 0);
+    let v1 = VoteCount::voter(1, true);
     assert!(v0 != v1);
 
     // let v2 = VoteCount::voter(2, true, 0);
@@ -327,7 +320,7 @@ fn main() {
             }
         ).success
     );
-    let m0 = Message::new(0, j0, 1);
+    let m0 = Message::new(0, j0);
     assert_eq!(
         m0.estimate,
         Some(VoteCount { yes: 0, no: 1 }),
@@ -453,7 +446,7 @@ fn main() {
         "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the thr doesnt get crossed for the set"
     );
 
-    let m1 = Message::new(1, j1, 1);
+    let m1 = Message::new(1, j1);
     assert_eq!(
         m1.estimate,
         Some(VoteCount { yes: 1, no: 1 }),
