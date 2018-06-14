@@ -4,15 +4,13 @@ use std::collections::{BTreeSet, HashSet};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::Add;
-// use std::cmp::Ordering;
-// use std::iter::FromIterator;
 
 type Sender = u32;
 
 #[derive(Eq, Ord, PartialOrd)]
 struct Message<'m, E: 'm + Hash + Ord> {
     estimate: Option<E>,
-    sender: Sender,
+    sender: Option<Sender>,
     justifications: Justifications<'m, E>,
 }
 
@@ -22,11 +20,12 @@ where
 {
     fn new(sender: Sender, justifications: Justifications<'m, E>) -> Message<'m, E> {
         Message {
-            estimate: Some(E::estimator(justifications.clone(), sender)),
-            sender,
+            estimate: Some(E::estimator(justifications.clone())),
+            sender: Some(sender),
             justifications,
         }
     }
+    // does m1 depend on m2
     fn depends(m1: &Self, m2: &Self) -> bool {
         m1.justifications.latest_msgs.iter().fold(
             m1.justifications.latest_msgs.contains(m2),
@@ -34,10 +33,11 @@ where
             // short-circuits while descending on the dependecy tree. when
             // dealing with honest validators, this would return true very fast.
             // all the new derived branches of the justification can be
-            // evaluated in parallel.
+            // evaluated in parallel, when using par_iter() instead of iter().
             |acc, m1_prime| acc || Self::depends(m1_prime, m2),
         )
     }
+    // does m1 equivocates with m2
     fn equivocates(m1: &Self, m2: &Self) -> bool {
         // the estimate bit below is necessary due to the definition of equality
         // of messages (the estimate is not a function of the equality). see
@@ -50,7 +50,9 @@ where
 // what happens if in the justification of one of the messages theres a message
 // that is newer than the one referred to in the current justification?
 
-// what happens if a sender does not reference his latest message
+// what happens if a sender does not reference his latest message, but
+// references a msg that references his last message (this wouldnt be an
+// equivocation)
 
 impl<'m, E: Hash + Ord> Hash for Message<'m, E> {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -72,7 +74,7 @@ impl<'m, E: Hash + Ord> fmt::Debug for Message<'m, E> {
         write!(
             f,
             "Message {{ sender: {}}} -> {:?}",
-            self.sender, self.justifications
+            self.sender.unwrap_or(Sender::max_value()), self.justifications
         )
     }
 }
@@ -165,7 +167,7 @@ impl<'m, E: Hash + Ord> fmt::Debug for Justifications<'m, E> {
 }
 
 trait Estimate: Hash + Ord + Sized {
-    fn estimator(justifications: Justifications<Self>, sender: Sender) -> Self;
+    fn estimator(justifications: Justifications<Self>) -> Self;
     fn is_valid(i: &Option<Self>) -> bool;
 }
 
@@ -176,15 +178,15 @@ impl Estimate for VoteCount {
         // these two are the only allowed votes (unjustified msgs)
         vote == &Some(VoteCount { yes: 1, no: 0 }) || vote == &Some(VoteCount { yes: 0, no: 1 })
     }
-    fn estimator(justifications: Justifications<Self>, sender: Sender) -> Self {
-        // stub msg w/ no estimate
+    fn estimator(justifications: Justifications<Self>) -> Self {
+        // stub msg w/ no estimate and no sender
         let msg = Message {
             estimate: None,
-            sender,
+            sender: None,
             justifications,
         };
-        let state = Self::get_votes(&msg, HashSet::new());
-        state
+        let votes = Self::get_vote_msgs(&msg, HashSet::new());
+        votes
             .iter()
             .filter(|v| {
                 // the estimate here is actually the original votes of each of
@@ -200,11 +202,11 @@ impl Estimate for VoteCount {
     }
 }
 
-// the value (m) that, when added to other value (x) of same tyoe, returns the
-// other value (x): $x + m = x$
-trait Zero<E: PartialEq> {
-    const ZERO: E;
-    fn is_zero(val: &E) -> bool {
+// the value $z$ that, when added to other value $x$ of same type, returns the
+// other value x: $x + z = x$
+trait Zero<T: PartialEq> {
+    const ZERO: T;
+    fn is_zero(val: &T) -> bool {
         val == &Self::ZERO
     }
 }
@@ -243,12 +245,12 @@ impl VoteCount {
                 true => Some(VoteCount { yes: 1, no: 0 }),
                 false => Some(VoteCount { yes: 0, no: 1 }),
             },
-            sender,
+            sender: Some(sender),
             justifications,
         }
     }
 
-    fn get_votes<'m>(
+    fn get_vote_msgs<'m>(
         msg: &'m Message<Self>,
         acc: HashSet<&'m Message<Self>>,
     ) -> HashSet<&'m Message<'m, Self>> {
@@ -262,7 +264,7 @@ impl VoteCount {
                         acc_new.insert(m); // mutates acc_new
                         acc_new // returns it
                     },
-                    _ => Self::get_votes(m, acc_new),
+                    _ => Self::get_vote_msgs(m, acc_new),
                 }
             })
     }
@@ -283,7 +285,6 @@ impl VoteCount {
 //             }
 //         })
 // }
-
 fn main() {
     let v0 = VoteCount::create_vote_msg(0, false);
     let v0_prime = VoteCount::create_vote_msg(0, true); // equivocating vote
@@ -345,7 +346,7 @@ fn main() {
             Weights {
                 sender_weight: 1.0,
                 fault_weight: 0.0,
-                thr: 0.0
+                thr: 0.0,
             }
         ).success
     );
@@ -355,7 +356,7 @@ fn main() {
             Weights {
                 sender_weight: 1.0,
                 fault_weight: 0.0,
-                thr: 0.0
+                thr: 0.0,
             }
         ).success
     );
@@ -398,7 +399,7 @@ fn main() {
             )
             .weights.fault_weight,
         1.0,
-        "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as the fault threshold gets crossed for the set, and thus the fault_weight should be incremented"
+        "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set, and thus the fault_weight should be incremented to 1.0"
     );
 
     assert!(
