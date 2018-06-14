@@ -137,11 +137,11 @@ where
         sender_weights: &HashMap<Sender, WeightUnit>,
     ) -> WeightUnit {
         self.latest_msgs.iter().fold(0.0, |acc, m| {
-            acc + if Message::equivocates(m, msg) {
-                sender_weights[&m.sender.unwrap_or(Sender::max_value())]
+            if Message::equivocates(m, msg) {
+                acc + sender_weights[&m.sender.unwrap_or(Sender::max_value())]
             }
             else {
-                0.0
+                acc
             }
         })
     }
@@ -163,20 +163,20 @@ where
     ) -> FaultyInsertResult {
         let msg_fault_weight =
             self.msg_fault_weight(msg, &weights.sender_weights);
-        let fault_weight = weights.fault_weight + msg_fault_weight;
+        let new_fault_weight = weights.fault_weight + msg_fault_weight;
         match msg_fault_weight {
             // no conflicts, msg added to the set
-            n if n < f32::EPSILON => FaultyInsertResult {
+            w if w < f32::EPSILON => FaultyInsertResult {
                 success: self.latest_msgs.insert(msg),
                 weights,
             },
-            _ if fault_weight <= weights.thr => {
+            _ if new_fault_weight <= weights.thr => {
                 if self.latest_msgs.insert(msg) {
                     // conflicting message added to the set, update fault_weight of set
                     FaultyInsertResult {
                         success: true,
                         weights: Weights {
-                            fault_weight,
+                            fault_weight: new_fault_weight,
                             ..weights
                         },
                     }
