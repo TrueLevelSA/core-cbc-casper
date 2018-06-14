@@ -3,7 +3,7 @@
 use std::collections::{BTreeSet, HashSet};
 use std::fmt;
 use std::hash::{Hash, Hasher};
-use std::ops::Add;
+use std::ops::{Add};
 
 type Sender = u32;
 
@@ -74,7 +74,8 @@ impl<'m, E: Hash + Ord> fmt::Debug for Message<'m, E> {
         write!(
             f,
             "Message {{ sender: {}}} -> {:?}",
-            self.sender.unwrap_or(Sender::max_value()), self.justifications
+            self.sender.unwrap_or(Sender::max_value()),
+            self.justifications
         )
     }
 }
@@ -91,15 +92,17 @@ struct Justifications<'m, E: 'm + Hash + Ord> {
 
 // impl Hash for Justifications { }
 
-struct FaultyInsertResult<W> {
+struct FaultyInsertResult {
     success: bool,
-    weights: Weights<W>,
+    weights: Weights,
 }
 
-struct Weights<W> {
-    fault_weight: W,
-    sender_weight: W,
-    thr: W,
+type WeightUnit = f64;
+
+struct Weights {
+    fault_weight: WeightUnit,
+    sender_weight: WeightUnit,
+    thr: WeightUnit,
 }
 
 impl<'m, E> Justifications<'m, E>
@@ -114,37 +117,30 @@ where
 
     // insert msgs to the Justification, accepting up to $thr$ faults by sender's
     // weight
-    fn faulty_insert<W>(
-        &mut self,
-        msg: &'m Message<'m, E>,
-        weights: Weights<W>,
-    ) -> FaultyInsertResult<W>
-    where
-        W: PartialOrd + Add<Output = W> + Copy,
-    {
-        let no_fault: bool = self
-            .latest_msgs
-            .iter()
-            .all(|m| !Message::equivocates(m, msg));
-        match no_fault {
+    fn faulty_insert(&mut self, msg: &'m Message<'m, E>, weights: Weights) -> FaultyInsertResult {
+        let fault_count = self.latest_msgs.iter().fold(0, |acc, m| {
+            acc + if Message::equivocates(m, msg) { 1 } else { 0 }
+        });
+        let fault_weight = weights.fault_weight + weights.sender_weight * fault_count as WeightUnit;
+        match fault_count {
             // no conflicts, msg added to the set
-            true => FaultyInsertResult {
+            0 => FaultyInsertResult {
                 success: self.latest_msgs.insert(msg),
                 weights,
             },
-            false if weights.fault_weight + weights.sender_weight <= weights.thr => {
+            _ if fault_weight <= weights.thr => {
                 if self.latest_msgs.insert(msg) {
                     // conflicting message added to the set, update fault_weight of set
                     FaultyInsertResult {
                         success: true,
                         weights: Weights {
-                            fault_weight: weights.fault_weight + weights.sender_weight,
+                            fault_weight,
                             ..weights
                         },
                     }
                 }
                 else {
-                    // conflicting message NOT added to the set
+                    // conflicting message NOT added to the set, return previous weights
                     FaultyInsertResult {
                         success: false,
                         weights,
@@ -152,7 +148,7 @@ where
                 }
             },
             // conflicting message NOT added to the set
-            false => FaultyInsertResult {
+            _ => FaultyInsertResult {
                 success: false,
                 weights,
             },
