@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
-use std::collections::{BTreeSet, HashSet};
+use std::f32;
+use std::collections::{BTreeSet, HashSet, HashMap};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::{Add};
@@ -18,7 +19,10 @@ impl<'m, E> Message<'m, E>
 where
     E: Estimate + Clone,
 {
-    fn new(sender: Sender, justifications: Justifications<'m, E>) -> Message<'m, E> {
+    fn new(
+        sender: Sender,
+        justifications: Justifications<'m, E>,
+    ) -> Message<'m, E> {
         Message {
             estimate: Some(E::estimator(justifications.clone())),
             sender: Some(sender),
@@ -43,7 +47,10 @@ where
         // of messages (the estimate is not a function of the equality). see
         // tests for equality of messages.
         let equal_msgs = m1 == m2 && m1.estimate == m2.estimate;
-        !equal_msgs && m1.sender == m2.sender && !Self::depends(m1, m2) && !Self::depends(m2, m1)
+        !equal_msgs
+            && m1.sender == m2.sender
+            && !Self::depends(m1, m2)
+            && !Self::depends(m2, m1)
     }
 }
 
@@ -64,7 +71,8 @@ impl<'m, E: Hash + Ord> Hash for Message<'m, E> {
 
 impl<'m, E: Hash + Ord> PartialEq for Message<'m, E> {
     fn eq(&self, other: &Message<'m, E>) -> bool {
-        self.sender == other.sender && self.justifications == other.justifications
+        self.sender == other.sender
+            && self.justifications == other.justifications
         // && self.estimate == other.estimate
     }
 }
@@ -92,16 +100,18 @@ struct Justifications<'m, E: 'm + Hash + Ord> {
 
 // impl Hash for Justifications { }
 
-struct FaultyInsertResult {
+struct FaultyInsertResult<'w> {
     success: bool,
-    weights: Weights,
+    weights: Weights<'w>,
 }
 
-type WeightUnit = f64;
+type WeightUnit = f32;
 
-struct Weights {
+#[derive(Debug)]
+struct Weights<'w> {
     fault_weight: WeightUnit,
-    sender_weight: WeightUnit,
+    sender_weights: &'w HashMap<Sender, WeightUnit>,
+    // equivocations including all validators
     thr: WeightUnit,
 }
 
@@ -115,16 +125,48 @@ where
         }
     }
 
-    // insert msgs to the Justification, accepting up to $thr$ faults by sender's
-    // weight
-    fn faulty_insert(&mut self, msg: &'m Message<'m, E>, weights: Weights) -> FaultyInsertResult {
-        let fault_count = self.latest_msgs.iter().fold(0, |acc, m| {
+    // fn equivocates(&self, msg: &'m Message<'m, E>) -> bool {
+    //     self.latest_msgs
+    //         .iter()
+    //         .fold(false, |acc, m| acc || Message::equivocates(m, msg))
+    // }
+
+    fn msg_fault_weight(
+        &self,
+        msg: &'m Message<'m, E>,
+        sender_weights: &HashMap<Sender, WeightUnit>,
+    ) -> WeightUnit {
+        self.latest_msgs.iter().fold(0.0, |acc, m| {
+            acc + if Message::equivocates(m, msg) {
+                sender_weights[&m.sender.unwrap_or(Sender::max_value())]
+            }
+            else {
+                0.0
+            }
+        })
+    }
+
+    fn count_faults(&self, msg: &'m Message<'m, E>) -> usize {
+        let res = self.latest_msgs.iter().fold(0, |acc, m| {
             acc + if Message::equivocates(m, msg) { 1 } else { 0 }
         });
-        let fault_weight = weights.fault_weight + weights.sender_weight * fault_count as WeightUnit;
-        match fault_count {
+        println!("{:?}", res);
+        res
+    }
+
+    // insert msgs to the Justification, accepting up to $thr$ faults by sender's
+    // weight
+    fn faulty_insert(
+        &mut self,
+        msg: &'m Message<'m, E>,
+        weights: Weights<'m>, // not sure about this lifetime
+    ) -> FaultyInsertResult {
+        let msg_fault_weight =
+            self.msg_fault_weight(msg, &weights.sender_weights);
+        let fault_weight = weights.fault_weight + msg_fault_weight;
+        match msg_fault_weight {
             // no conflicts, msg added to the set
-            0 => FaultyInsertResult {
+            n if n < f32::EPSILON => FaultyInsertResult {
                 success: self.latest_msgs.insert(msg),
                 weights,
             },
@@ -172,7 +214,8 @@ impl Estimate for VoteCount {
     // object. if they did, their vote is invalid and will be ignored
     fn is_valid(vote: &Option<Self>) -> bool {
         // these two are the only allowed votes (unjustified msgs)
-        vote == &Some(VoteCount { yes: 1, no: 0 }) || vote == &Some(VoteCount { yes: 0, no: 1 })
+        vote == &Some(VoteCount { yes: 1, no: 0 })
+            || vote == &Some(VoteCount { yes: 0, no: 1 })
     }
     fn estimator(justifications: Justifications<Self>) -> Self {
         // stub msg w/ no estimate and no sender
@@ -285,7 +328,6 @@ fn main() {
     let v0 = VoteCount::create_vote_msg(0, false);
     let v0_prime = VoteCount::create_vote_msg(0, true); // equivocating vote
 
-    //// START NOT TRUE
     // v0 and v0_prime are equivocating messages (first child of a fork). To
     // enforce that both of them cannot be included in the same set (in a
     // hashset) both v0 and v0_prime should hash to the same value, and should
@@ -294,22 +336,25 @@ fn main() {
     // justification contributes to the hash (here justification is empty).
     // TODO: What about when a fork happens and the justifications are different
     // but at the same height, i should handle that.
-    //// END NOT TRUE
 
     assert!(v0 == v0_prime, "v0 and v0_prime should be equal");
 
     let v1 = VoteCount::create_vote_msg(1, true);
     assert!(v0 != v1);
+    // let v1_prime = VoteCount::create_vote_msg(1, false);
 
     // let v2 = VoteCount::create_vote_msg(2, true, 0);
     // let v3 = VoteCount::create_vote_msg(3, true, 0);
+
+    let sender_weights =
+        [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect();
 
     let mut j0 = Justifications::new();
     assert!(
         j0.faulty_insert(
             &v0,
             Weights {
-                sender_weight: 1.0,
+                sender_weights: &sender_weights,
                 fault_weight: 0.0,
                 thr: 0.0,
             }
@@ -340,7 +385,7 @@ fn main() {
         j1.faulty_insert(
             &v1,
             Weights {
-                sender_weight: 1.0,
+                sender_weights: &sender_weights,
                 fault_weight: 0.0,
                 thr: 0.0,
             }
@@ -350,7 +395,7 @@ fn main() {
         j1.faulty_insert(
             &m0,
             Weights {
-                sender_weight: 1.0,
+                sender_weights: &sender_weights,
                 fault_weight: 0.0,
                 thr: 0.0,
             }
@@ -361,7 +406,7 @@ fn main() {
         !j1.faulty_insert(
             &v0_prime,
             Weights {
-                sender_weight: 1.0,
+                sender_weights: &sender_weights,
                 fault_weight: 0.0,
                 thr: 0.0
             }
@@ -374,7 +419,7 @@ fn main() {
             .faulty_insert(
                 &v0_prime,
                 Weights {
-                    sender_weight: 1.0,
+                    sender_weights: &sender_weights,
                     fault_weight: 0.0,
                     thr: 1.0
                 }
@@ -388,7 +433,7 @@ fn main() {
             .faulty_insert(
                 &v0_prime,
                 Weights {
-                    sender_weight: 1.0,
+                    sender_weights: &sender_weights,
                     fault_weight: 0.0,
                     thr: 1.0
                 }
@@ -403,7 +448,7 @@ fn main() {
             .faulty_insert(
                 &v0_prime,
                 Weights {
-                    sender_weight: 1.0,
+                    sender_weights: &sender_weights,
                     fault_weight: 0.1,
                     thr: 1.0
                 }
@@ -417,7 +462,7 @@ fn main() {
             .faulty_insert(
                 &v0_prime,
                 Weights {
-                    sender_weight: 1.0,
+                    sender_weights: &sender_weights,
                     fault_weight: 0.1,
                     thr: 1.0
                 }
@@ -432,7 +477,7 @@ fn main() {
             .faulty_insert(
                 &v0_prime,
                 Weights {
-                    sender_weight: 1.0,
+                    sender_weights: &sender_weights,
                     fault_weight: 1.0,
                     thr: 2.0
                 }
@@ -450,6 +495,47 @@ fn main() {
     );
     assert!(Message::depends(&m1, &v0), "m1 depends on v0 through m0");
     assert!(Message::depends(&m0, &v0), "m0 depends on v0 directly");
+
+    // println!();
+    // let mut j2 = Justifications::new();
+    // let FaultyInsertResult {
+    //     weights: Weights { fault_weight, .. },
+    //     ..
+    // } = j2.faulty_insert(
+    //     &m0,
+    //     Weights {
+    //         sender_weights: &sender_weights,
+    //         fault_weight: 0.0,
+    //         thr: 3.0,
+    //     },
+    // );
+    // println!("{:?}a", fault_weight);
+
+    // let FaultyInsertResult {
+    //     weights: Weights { fault_weight, .. },
+    //     ..
+    // } = j2.faulty_insert(
+    //     &v1_prime,
+    //     Weights {
+    //         sender_weights: &sender_weights,
+    //         fault_weight,
+    //         thr: 3.0,
+    //     },
+    // );
+    // println!("{:?}b", fault_weight);
+
+    // let FaultyInsertResult {
+    //     weights: Weights { fault_weight, .. },
+    //     ..
+    // } = j2.faulty_insert(
+    //     &v0_prime,
+    //     Weights {
+    //         sender_weights: &sender_weights,
+    //         fault_weight,
+    //         thr: 3.0,
+    //     },
+    // );
+    // println!("{:?}c", fault_weight);
 
     // assert!(Message::depends(&m0, &m0), "m0 depends on m0 directly");
 
