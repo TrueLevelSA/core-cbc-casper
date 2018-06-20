@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::f32;
+use std::f64;
 use std::collections::{BTreeSet, HashSet, HashMap};
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -8,6 +8,8 @@ use std::ops::{Add};
 
 type Sender = u32;
 
+// the options in message below r now used to initiate some recursions w/ stub
+// msgs
 #[derive(Eq, Ord, PartialOrd)]
 struct Message<'m, E: 'm + Hash + Ord> {
     estimate: Option<E>,
@@ -29,19 +31,20 @@ where
             justifications,
         }
     }
-    // does m1 depend on m2
+    // does m1 depend on m2?
     fn depends(m1: &Self, m2: &Self) -> bool {
         m1.justifications.latest_msgs.iter().fold(
             m1.justifications.latest_msgs.contains(m2),
-            // the trick on the following recursion is the following: it
-            // short-circuits while descending on the dependecy tree. when
+            // although this recursion ends supposedly only at genesis message,
+            // the trick is the following: it short-circuits while descending on
+            // the dependency tree, if it finds a dependent message. when
             // dealing with honest validators, this would return true very fast.
             // all the new derived branches of the justification can be
             // evaluated in parallel, when using par_iter() instead of iter().
             |acc, m1_prime| acc || Self::depends(m1_prime, m2),
         )
     }
-    // does m1 equivocates with m2
+    // does m1 equivocates with m2?
     fn equivocates(m1: &Self, m2: &Self) -> bool {
         // the estimate bit below is necessary due to the definition of equality
         // of messages (the estimate is not a function of the equality). see
@@ -105,13 +108,12 @@ struct FaultyInsertResult<'w> {
     weights: Weights<'w>,
 }
 
-type WeightUnit = f32;
+type WeightUnit = f64;
 
 #[derive(Debug)]
 struct Weights<'w> {
     fault_weight: WeightUnit,
     sender_weights: &'w HashMap<Sender, WeightUnit>,
-    // equivocations including all validators
     thr: WeightUnit,
 }
 
@@ -131,7 +133,9 @@ where
     //         .fold(false, |acc, m| acc || Message::equivocates(m, msg))
     // }
 
-    fn msg_fault_weight(
+    // get the additional fault weight to be added to the state when inserting
+    // msg to the state / justification
+    fn get_msg_fault_weight(
         &self,
         msg: &'m Message<'m, E>,
         sender_weights: &HashMap<Sender, WeightUnit>,
@@ -146,54 +150,45 @@ where
         })
     }
 
-    fn count_faults(&self, msg: &'m Message<'m, E>) -> usize {
-        let res = self.latest_msgs.iter().fold(0, |acc, m| {
-            acc + if Message::equivocates(m, msg) { 1 } else { 0 }
-        });
-        println!("{:?}", res);
-        res
-    }
-
     // insert msgs to the Justification, accepting up to $thr$ faults by sender's
     // weight
     fn faulty_insert(
         &mut self,
         msg: &'m Message<'m, E>,
-        weights: Weights<'m>, // not sure about this lifetime
+        // FIXME: not sure about the following lifetime, i believe it can be shorter
+        weights: Weights<'m>,
     ) -> FaultyInsertResult {
         let msg_fault_weight =
-            self.msg_fault_weight(msg, &weights.sender_weights);
+            self.get_msg_fault_weight(msg, &weights.sender_weights);
         let new_fault_weight = weights.fault_weight + msg_fault_weight;
-        match msg_fault_weight {
-            // no conflicts, msg added to the set
-            w if w < f32::EPSILON => FaultyInsertResult {
+        // no conflicts, msg added to the set
+        if msg_fault_weight < f64::EPSILON {
+            FaultyInsertResult {
                 success: self.latest_msgs.insert(msg),
                 weights,
-            },
-            _ if new_fault_weight <= weights.thr => {
-                if self.latest_msgs.insert(msg) {
-                    // conflicting message added to the set, update fault_weight of set
-                    FaultyInsertResult {
-                        success: true,
-                        weights: Weights {
-                            fault_weight: new_fault_weight,
-                            ..weights
-                        },
-                    }
+            }
+        }
+        else if new_fault_weight <= weights.thr {
+            let success = self.latest_msgs.insert(msg);
+            let weights = if success {
+                Weights {
+                    fault_weight: new_fault_weight,
+                    ..weights
                 }
-                else {
-                    // conflicting message NOT added to the set, return previous weights
-                    FaultyInsertResult {
-                        success: false,
-                        weights,
-                    }
-                }
-            },
-            // conflicting message NOT added to the set
-            _ => FaultyInsertResult {
+            }
+            else {
+                weights
+            };
+
+            FaultyInsertResult { success, weights }
+        }
+        // conflicting message NOT added to the set as it crosses the fault
+        // weight thr
+        else {
+            FaultyInsertResult {
                 success: false,
                 weights,
-            },
+            }
         }
     }
 }
@@ -217,6 +212,8 @@ impl Estimate for VoteCount {
         vote == &Some(VoteCount { yes: 1, no: 0 })
             || vote == &Some(VoteCount { yes: 0, no: 1 })
     }
+    // the estimator just counts votes, which in this case are the unjustified
+    // msgs
     fn estimator(justifications: Justifications<Self>) -> Self {
         // stub msg w/ no estimate and no sender
         let msg = Message {
