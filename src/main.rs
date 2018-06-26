@@ -1,29 +1,28 @@
-#![allow(dead_code)]
-
+// external
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::f64;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::Add;
-
-type Sender = u32;
+use std::fmt::Display;
 
 // the options in message below r now used to initiate some recursions (the last
 // leave of a tree) w/ stub msgs
 #[derive(Eq, Ord, PartialOrd, Clone)]
-struct Message<'m, E: 'm + Hash + Ord> {
+struct Message<'m, E: 'm + Hash + Ord, S: 'm + Ord + Hash + Clone> {
     estimate: Option<E>,
-    sender: Option<Sender>,
-    justifications: Justifications<'m, E>,
+    sender: Option<S>,
+    justifications: Justifications<'m, E, S>,
 }
 
-impl<'m, E> Message<'m, E>
+impl<'m, E, S> Message<'m, E, S>
 where
     E: Estimate + Clone,
+    S: Ord + Hash + Clone,
 {
-    fn new(sender: Sender, justifications: Justifications<'m, E>) -> Message<'m, E> {
-        Message {
-            estimate: Some(E::estimator(justifications.clone())),
+    fn new(sender: S, justifications: Justifications<'m, E, S>) -> Self {
+        Self {
+            estimate: Some(E::estimator(&justifications)),
             sender: Some(sender),
             justifications,
         }
@@ -43,7 +42,10 @@ where
     }
     // does m1 equivocate with m2?
     fn equivocates(m1: &Self, m2: &Self) -> bool {
-        m1 != m2 && m1.sender == m2.sender && !Self::depends(m1, m2) && !Self::depends(m2, m1)
+        m1 != m2
+            && m1.sender == m2.sender
+            && !Self::depends(m1, m2)
+            && !Self::depends(m2, m1)
     }
 }
 
@@ -54,7 +56,11 @@ where
 // references a msg that references his last message (this wouldnt be an
 // equivocation)
 
-impl<'m, E: Hash + Ord> Hash for Message<'m, E> {
+impl<'m, E, S> Hash for Message<'m, E, S>
+where
+    E: Hash + Ord,
+    S: Ord + Hash + Clone,
+{
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.sender.hash(state);
         self.justifications.hash(state);
@@ -62,20 +68,28 @@ impl<'m, E: Hash + Ord> Hash for Message<'m, E> {
     }
 }
 
-impl<'m, E: Hash + Ord> PartialEq for Message<'m, E> {
-    fn eq(&self, other: &Message<'m, E>) -> bool {
+impl<'m, E, S> PartialEq for Message<'m, E, S>
+where
+    E: Hash + Ord,
+    S: Ord + Hash + Clone,
+{
+    fn eq(&self, other: &Message<'m, E, S>) -> bool {
         self.sender == other.sender
             && self.justifications == other.justifications
             && self.estimate == other.estimate
     }
 }
 
-impl<'m, E: Hash + Ord> fmt::Debug for Message<'m, E> {
+impl<'m, E, S> fmt::Debug for Message<'m, E, S>
+where
+    E: Hash + Ord,
+    S: Ord + Hash + Default + Display + Clone,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
             "Message {{ sender: {}}} -> {:?}",
-            self.sender.unwrap_or(Sender::max_value()), // TODO: handle this
+            self.sender.clone().expect("Sender is a None"), // TODO: handle this
             self.justifications
         )
     }
@@ -83,8 +97,12 @@ impl<'m, E: Hash + Ord> fmt::Debug for Message<'m, E> {
 
 // make sure only latest messages can get in the set
 #[derive(Eq, PartialEq, Hash, PartialOrd, Ord, Clone)]
-struct Justifications<'m, E: 'm + Hash + Ord> {
-    latest_msgs: BTreeSet<&'m Message<'m, E>>,
+struct Justifications<'m, E, S>
+where
+    E: 'm + Hash + Ord,
+    S: 'm + Ord + Hash + Clone,
+{
+    latest_msgs: BTreeSet<&'m Message<'m, E, S>>,
 }
 // prev_msg: Option<&'m Message<'m>>,
 
@@ -102,27 +120,23 @@ impl Zero<WeightUnit> for WeightUnit {
     }
 }
 
-struct FaultyInsertResult<'w> {
+struct FaultyInsertResult<'w, S: 'w + Hash + Eq> {
     success: bool,
     msg_fault_weight: WeightUnit,
-    weights: Weights<'w>,
-}
-
-struct FaultyInsert<'w> {
-    msg_fault_weight: WeightUnit,
-    weights: Weights<'w>,
+    weights: Weights<'w, S>,
 }
 
 #[derive(Debug, Clone)]
-struct Weights<'w> {
+struct Weights<'w, S: 'w + Hash + Eq> {
     state_fault_weight: WeightUnit,
-    senders_weights: &'w HashMap<Sender, WeightUnit>,
+    senders_weights: &'w HashMap<S, WeightUnit>,
     thr: WeightUnit,
 }
 
-impl<'m, E> Justifications<'m, E>
+impl<'m, E, S> Justifications<'m, E, S>
 where
     E: Estimate + Clone,
+    S: Ord + Hash + Default + Display + Clone,
 {
     fn new() -> Self {
         Justifications {
@@ -140,17 +154,21 @@ where
     // msg to the state / justification
     fn get_msg_fault_weight_overhead(
         &self,
-        msg: &'m Message<'m, E>,
-        senders_weights: &HashMap<Sender, WeightUnit>,
+        msg: &'m Message<'m, E, S>,
+        senders_weights: &HashMap<S, WeightUnit>,
     ) -> Option<WeightUnit> {
         self.latest_msgs
             .iter()
             .fold(Some(WeightUnit::ZERO), |acc, m| {
                 if Message::equivocates(m, msg) {
                     m.sender
+                        .clone()
                         .and_then(|sender| senders_weights.get(&sender))
-                        .and_then(|weight| acc.and_then(|acc| Some(acc + weight)))
-                } else {
+                        .and_then(|weight| {
+                            acc.and_then(|acc| Some(acc + weight))
+                        })
+                }
+                else {
                     acc
                 }
             })
@@ -159,17 +177,20 @@ where
     // weight
     fn faulty_insert(
         &mut self,
-        msg: &'m Message<'m, E>,
+        msg: &'m Message<'m, E, S>,
         // FIXME: not sure about the following lifetime, i believe it can be shorter
-        weights: Weights<'m>,
-    ) -> FaultyInsertResult {
+        weights: Weights<'m, S>,
+    ) -> FaultyInsertResult<S> {
         // if it fails to unwrap, nan ends up in the else branch
         let msg_fault_weight = self
             .get_msg_fault_weight_overhead(msg, &weights.senders_weights)
             .unwrap_or(f64::NAN);
 
-        if msg_fault_weight.is_nan() {
-            println!("msg overhead failed")
+        if f64::is_nan(msg_fault_weight) {
+            println!(
+                "get_msg_fault_weight_overhead failed for message {:?}",
+                msg
+            )
         }
 
         let new_fault_weight = weights.state_fault_weight + msg_fault_weight;
@@ -181,14 +202,16 @@ where
                 msg_fault_weight,
                 weights,
             }
-        } else if new_fault_weight <= weights.thr {
+        }
+        else if new_fault_weight <= weights.thr {
             let success = self.latest_msgs.insert(msg);
             let weights = if success {
                 Weights {
                     state_fault_weight: new_fault_weight,
                     ..weights
                 }
-            } else {
+            }
+            else {
                 weights
             };
 
@@ -210,26 +233,33 @@ where
     }
 }
 
-impl<'m, E: Hash + Ord> fmt::Debug for Justifications<'m, E> {
+impl<'m, E, S> fmt::Debug for Justifications<'m, E, S>
+where
+    E: Hash + Ord,
+    S: Ord + Hash + Display + Default + Clone,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self.latest_msgs)
     }
 }
 
 trait Estimate: Hash + Ord + Sized {
-    fn estimator(justifications: Justifications<Self>) -> Self;
-    // fn is_valid(i: &Option<Self>) -> bool;
+    fn estimator<S: Ord + Hash + Clone>(
+        justifications: &Justifications<Self, S>,
+    ) -> Self; // fn is_valid(i: &Option<Self>) -> bool;
 }
 
 impl Estimate for VoteCount {
     // the estimator just counts votes, which in this case are the unjustified
     // msgs
-    fn estimator(justifications: Justifications<Self>) -> Self {
+    fn estimator<S: Ord + Hash + Clone>(
+        justifications: &Justifications<Self, S>,
+    ) -> Self {
         // stub msg w/ no estimate and no sender
         let msg = Message {
             estimate: None,
             sender: None,
-            justifications,
+            justifications: justifications.clone(),
         };
         // the estimates are actually the original votes of each of the voters /
         // validators
@@ -283,22 +313,28 @@ impl VoteCount {
     // object. if they did, their vote is invalid and will be ignored
     fn is_valid_vote(vote: &Option<Self>) -> bool {
         // these two are the only allowed votes (unjustified msgs)
-        vote == &Some(VoteCount { yes: 1, no: 0 }) || vote == &Some(VoteCount { yes: 0, no: 1 })
+        vote == &Some(VoteCount { yes: 1, no: 0 })
+            || vote == &Some(VoteCount { yes: 0, no: 1 })
     }
 
     // used to create an equivocation vote
     fn toggle_vote(vote: &Option<Self>) -> Option<Self> {
         // these two are the only allowed votes (unjustified msgs)
         match vote {
-            Some(VoteCount { yes: 1, no: 0 }) => Some(VoteCount { yes: 0, no: 1 }),
-            Some(VoteCount { yes: 0, no: 1 }) => Some(VoteCount { yes: 1, no: 0 }),
+            Some(VoteCount { yes: 1, no: 0 }) =>
+                Some(VoteCount { yes: 0, no: 1 }),
+            Some(VoteCount { yes: 0, no: 1 }) =>
+                Some(VoteCount { yes: 1, no: 0 }),
             Some(VoteCount { yes: _, no: _ }) => None,
             None => None,
         }
     }
 
-    fn create_vote_msg<'m>(sender: Sender, vote: bool) -> Message<'m, Self> {
-        let justifications: Justifications<Self> = Justifications::new();
+    fn create_vote_msg<'m, S>(sender: S, vote: bool) -> Message<'m, Self, S>
+    where
+        S: Ord + Hash + Display + Default + Clone,
+    {
+        let justifications: Justifications<Self, S> = Justifications::new();
         Message {
             estimate: match vote {
                 true => Some(VoteCount { yes: 1, no: 0 }),
@@ -309,10 +345,10 @@ impl VoteCount {
         }
     }
 
-    fn get_vote_msgs<'m>(
-        msg: &'m Message<Self>,
-        acc: HashSet<&'m Message<Self>>,
-    ) -> HashSet<&'m Message<'m, Self>> {
+    fn get_vote_msgs<'m, S: Ord + Hash + Clone>(
+        msg: &'m Message<Self, S>,
+        acc: HashSet<&'m Message<Self, S>>,
+    ) -> HashSet<&'m Message<'m, Self, S>> {
         msg.justifications
             .latest_msgs
             .iter()
@@ -336,7 +372,7 @@ impl VoteCount {
                             };
                         }
                         acc_new // returns it
-                    }
+                    },
                     _ => Self::get_vote_msgs(m, acc_new),
                 }
             })
@@ -376,7 +412,8 @@ mod main {
         assert!(v0 != v0_prime, "v0 and v0_prime should NOT be equal");
         assert!(v0 != v1, "v0 and v1 should NOT be equal");
 
-        let senders_weights = [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect();
+        let senders_weights =
+            [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect();
         let mut j0 = Justifications::new();
         assert!(
             j0.faulty_insert(
@@ -424,7 +461,8 @@ mod main {
         let v0 = VoteCount::create_vote_msg(0, false);
         let v0_prime = VoteCount::create_vote_msg(0, true); // equivocating vote
 
-        let senders_weights = [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect();
+        let senders_weights =
+            [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect();
 
         let mut j0 = Justifications::new();
         assert!(
@@ -499,7 +537,8 @@ mod main {
         let v0_prime = VoteCount::create_vote_msg(0, true); // equivocating vote
         let v1 = VoteCount::create_vote_msg(1, true);
 
-        let senders_weights = [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect();
+        let senders_weights =
+            [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect();
 
         let mut j0 = Justifications::new();
         assert!(
@@ -534,7 +573,8 @@ mod main {
 
     #[test]
     fn faulty_inserts() {
-        let senders_weights = [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect();
+        let senders_weights =
+            [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect();
         let v0 = VoteCount::create_vote_msg(0, false);
         let v0_prime = VoteCount::create_vote_msg(0, true); // equivocating vote
         let v1 = VoteCount::create_vote_msg(1, true);
@@ -686,7 +726,8 @@ mod main {
 
     #[test]
     fn count_votes() {
-        let senders_weights = [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect();
+        let senders_weights =
+            [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect();
         let v0 = VoteCount::create_vote_msg(0, false);
         let v0_prime = VoteCount::create_vote_msg(0, true); // equivocating vote
         let v1 = VoteCount::create_vote_msg(1, true);
