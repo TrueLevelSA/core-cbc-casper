@@ -2,9 +2,16 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::collections::btree_set::{Iter};
 use std::{f64};
 use std::hash::{Hash, Hasher};
-use std::ops::{Add};
+use std::ops::{Add, Fn};
 use std::fmt::{Display, Debug, Formatter, Result};
 use std::sync::{Arc};
+use std::io::{Error};
+
+extern crate rayon;
+use rayon::prelude::*;
+use rayon::collections::btree_set;
+extern crate futures;
+use futures::{Future, Poll};
 
 // the options in message below r now used to initiate some recursions (the base
 // case) w/ stub msgs
@@ -17,6 +24,21 @@ where
     estimate: Option<E>,
     sender: Option<S>,
     justification: Justification<Message<E, S>>,
+}
+
+enum MsgStatus {
+    Unchecked,
+    Valid,
+    Invalid,
+}
+
+struct Msg<E, S>
+where
+    E: Estimate,
+    S: Sender,
+{
+    status: MsgStatus,
+    msg: Future<Item = Arc<Message<E, S>>, Error = Error>,
 }
 
 impl<E, S> Message<E, S>
@@ -33,7 +55,9 @@ where
     }
 }
 
-pub trait AbstractMsg: Hash + Ord + Clone + Debug + Default + Eq {
+pub trait AbstractMsg:
+    Hash + Ord + Clone + Debug + Default + Eq + Sync + Send
+{
     type E: Estimate;
     type S: Sender;
     fn get_sender(Arc<Self>) -> Option<Self::S>;
@@ -46,16 +70,23 @@ pub trait AbstractMsg: Hash + Ord + Clone + Debug + Default + Eq {
             && !Self::depends(m2.clone(), m1.clone())
     }
     fn depends(m1: Arc<Self>, m2: Arc<Self>) -> bool {
-        Self::get_justifications(m1.clone()).iter().fold(
-            Self::get_justifications(m1.clone()).contains(m2.clone()),
-            // although this recursion ends supposedly only at genesis message,
-            // the trick is the following: it short-circuits while descending on
-            // the dependency tree, if it finds a dependent message. when
-            // dealing with honest validators, this would return true very fast.
-            // all the new derived branches of the justification can be
-            // evaluated in parallel, when using par_iter() instead of iter().
-            |acc, msg| acc || Self::depends(msg.clone(), m2.clone()),
-        )
+        // although the recursion ends supposedly only at genesis message, the
+        // trick is the following: it short-circuits while descending on the
+        // dependency tree, if it finds a dependent message. when dealing with
+        // honest validators, this would return true very fast. all the new
+        // derived branches of the justification will be evaluated in parallel.
+        // say if a msg is justified by 2 other msgs, then the 2 other msgs will
+        // be processed on different threads. this applies recursively, if each
+        // of the 2 msgs have say 3 justifications, then each of the 2 threads
+        // will spawn 3 new threads to process each of the messages. thus,
+        // highly parallelizable. when it shortcuts because in one thread it
+        // finds a dependency and returns true, all the computation on the other
+        // threads will be cancelled.
+        let justifications = Self::get_justifications(m1.clone());
+        justifications.contains(m2.clone())
+            || justifications
+                .par_iter()
+                .any(|m1_prime| Self::depends(m1_prime.clone(), m2.clone()))
     }
 }
 
@@ -76,13 +107,6 @@ where
         m.justification.clone()
     }
 }
-
-// what happens if in the justification of one of the messages theres a message
-// that is newer than the one referred to in the current justification?
-
-// what happens if a sender does not reference his latest message, but
-// references a msg that references his last message (this wouldnt be an
-// equivocation)
 
 impl<E, S> Hash for Message<E, S>
 where
@@ -123,7 +147,10 @@ where
     }
 }
 
-pub trait Sender: Hash + Clone + Ord + Eq + Default + Display + Debug {}
+pub trait Sender:
+    Hash + Clone + Ord + Eq + Default + Display + Debug + Send + Sync
+{
+}
 
 // prev_msg: Option<&'m Message<'m>>,
 
@@ -163,6 +190,13 @@ impl<M: AbstractMsg> Justification<M> {
     }
     fn iter(&self) -> Iter<Arc<M>> {
         self.0.iter()
+    }
+    fn par_iter(&self) -> btree_set::Iter<Arc<M>> {
+        self.0.par_iter()
+    }
+
+    fn into_par_iter(&self) -> btree_set::IntoIter<Arc<M>> {
+        self.0.clone().into_par_iter()
     }
     fn insert(&mut self, msg: Arc<M>) -> bool {
         self.0.insert(msg.clone())
@@ -253,7 +287,7 @@ impl<M: AbstractMsg> Debug for Justification<M> {
     }
 }
 
-pub trait Estimate: Hash + Clone + Ord + Default + Sized {
+pub trait Estimate: Hash + Clone + Ord + Default + Sized + Send + Sync {
     type M: AbstractMsg<E = Self>;
     // TODO: this estimator is good only if there's no external dependency, not
     // good for blockchain concensus
