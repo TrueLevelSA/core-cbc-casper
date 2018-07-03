@@ -2,14 +2,14 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::collections::btree_set::{Iter};
 use std::{f64};
 use std::hash::{Hash, Hasher};
-use std::ops::{Add, Fn};
+use std::ops::{Add};
 use std::fmt::{Display, Debug, Formatter, Result};
 use std::sync::{Arc};
 use std::io::{Error};
 
 extern crate rayon;
 use rayon::prelude::*;
-use rayon::collections::btree_set;
+
 extern crate futures;
 use futures::{Future, Poll};
 
@@ -62,7 +62,7 @@ pub trait AbstractMsg:
     type S: Sender;
     fn get_sender(Arc<Self>) -> Option<Self::S>;
     fn get_estimate(Arc<Self>) -> Option<Self::E>;
-    fn get_justifications(Arc<Self>) -> Justification<Self>;
+    fn get_justification(Arc<Self>) -> Justification<Self>;
     fn equivocates(m1: Arc<Self>, m2: Arc<Self>) -> bool {
         m1.clone() != m2.clone()
             && Self::get_sender(m1.clone()) == Self::get_sender(m2.clone())
@@ -82,9 +82,9 @@ pub trait AbstractMsg:
         // highly parallelizable. when it shortcuts because in one thread it
         // finds a dependency and returns true, all the computation on the other
         // threads will be cancelled.
-        let justifications = Self::get_justifications(m1.clone());
-        justifications.contains(m2.clone())
-            || justifications
+        let justification = Self::get_justification(m1.clone());
+        justification.contains(m2.clone())
+            || justification
                 .par_iter()
                 .any(|m1_prime| Self::depends(m1_prime.clone(), m2.clone()))
     }
@@ -103,7 +103,7 @@ where
     fn get_estimate(m: Arc<Self>) -> Option<Self::E> {
         m.estimate.clone()
     }
-    fn get_justifications(m: Arc<Self>) -> Justification<Self> {
+    fn get_justification(m: Arc<Self>) -> Justification<Self> {
         m.justification.clone()
     }
 }
@@ -152,8 +152,6 @@ pub trait Sender:
 {
 }
 
-// prev_msg: Option<&'m Message<'m>>,
-
 // TODO: BTreeSet is ordered, but all nodes should be able to compute the same
 // ordered set based on the content of the message and not memory addresses
 
@@ -184,20 +182,17 @@ struct Weights<S: Sender> {
 pub struct Justification<M: AbstractMsg>(BTreeSet<Arc<M>>);
 
 impl<M: AbstractMsg> Justification<M> {
-    // Re-exports from BTreeSet
+    // Re-exports from BTreeSet wrapping M
     fn new() -> Self {
         Justification(BTreeSet::new())
     }
     fn iter(&self) -> Iter<Arc<M>> {
         self.0.iter()
     }
-    fn par_iter(&self) -> btree_set::Iter<Arc<M>> {
+    fn par_iter(&self) -> rayon::collections::btree_set::Iter<Arc<M>> {
         self.0.par_iter()
     }
 
-    fn into_par_iter(&self) -> btree_set::IntoIter<Arc<M>> {
-        self.0.clone().into_par_iter()
-    }
     fn insert(&mut self, msg: Arc<M>) -> bool {
         self.0.insert(msg.clone())
     }
@@ -208,30 +203,28 @@ impl<M: AbstractMsg> Justification<M> {
         self.0.len()
     }
 
-    // Custom
-    // fn equivocates(&self, msg: &'m Message<'m, E>) -> bool {
-    //     self.latest_msgs
-    //         .iter()
-    //         .fold(false, |acc, m| acc || Message::equivocates(m, msg))
-    // }
+    // Custom functions
 
     // get the additional fault weight to be added to the state when inserting
-    // msg to the state / justification
+    // msg to the state
     fn get_msg_fault_weight_overhead(
         &self,
         msg: Arc<M>,
         senders_weights: Arc<HashMap<M::S, WeightUnit>>,
-    ) -> Option<WeightUnit> {
-        self.iter().fold(Some(WeightUnit::ZERO), |acc, m| {
-            if M::equivocates(m.clone(), msg.clone()) {
-                M::get_sender(m.clone())
+    ) -> WeightUnit {
+        let weight_overheads = self.par_iter().map(|msg_prime| {
+            if M::equivocates(msg_prime.clone(), msg.clone()) {
+                M::get_sender(msg_prime.clone())
                     .and_then(|sender| senders_weights.get(&sender))
-                    .and_then(|weight| acc.and_then(|acc| Some(acc + weight)))
+                    .unwrap_or(&f64::NAN)
             }
             else {
-                acc
+                // no equivocation
+                &0.0 as &WeightUnit
             }
-        })
+        });
+
+        weight_overheads.sum()
     }
     // insert msgs to the Justification, accepting up to $thr$ faults by sender's
     // weight
@@ -240,12 +233,10 @@ impl<M: AbstractMsg> Justification<M> {
         msg: Arc<M>,
         weights: Weights<M::S>,
     ) -> FaultyInsertResult<M::S> {
-        // if it fails to unwrap, nan ends up in the else branch
-        let msg_fault_weight =
-            self.get_msg_fault_weight_overhead(
-                msg.clone(),
-                weights.senders_weights.clone(),
-            ).unwrap_or(f64::NAN);
+        let msg_fault_weight = self.get_msg_fault_weight_overhead(
+            msg.clone(),
+            weights.senders_weights.clone(),
+        );
 
         let new_fault_weight = weights.state_fault_weight + msg_fault_weight;
 
@@ -271,7 +262,7 @@ impl<M: AbstractMsg> Justification<M> {
             FaultyInsertResult { success, weights }
         }
         // conflicting message NOT added to the set as it crosses the fault
-        // weight thr OR get_msg_fault_weight_overhead returned None
+        // weight thr OR get_msg_fault_weight_overhead returned NAN
         else {
             FaultyInsertResult {
                 success: false,
@@ -290,7 +281,7 @@ impl<M: AbstractMsg> Debug for Justification<M> {
 pub trait Estimate: Hash + Clone + Ord + Default + Sized + Send + Sync {
     type M: AbstractMsg<E = Self>;
     // TODO: this estimator is good only if there's no external dependency, not
-    // good for blockchain concensus
+    // good for blockchain consensus
     fn estimator(justification: &Justification<Self::M>) -> Self;
 }
 
@@ -349,19 +340,16 @@ impl Add for VoteCount {
     }
 }
 
-// impl PartialEq for VoteCount {
-//     fn eq(&self, other: &VoteCount) -> bool {
-//         self.yes == other.yes && self.no == other.no
-//     }
-// }
-
 impl VoteCount {
     // makes sure nobody adds more than one vote to their unjustified VoteCount
     // object. if they did, their vote is invalid and will be ignored
     fn is_valid_vote(vote: &Option<Self>) -> bool {
         // these two are the only allowed votes (unjustified msgs)
-        vote == &Some(VoteCount { yes: 1, no: 0 })
-            || vote == &Some(VoteCount { yes: 0, no: 1 })
+        match vote {
+            Some(VoteCount { yes: 1, no: 0 }) => true,
+            Some(VoteCount { yes: 0, no: 1 }) => true,
+            _ => false,
+        }
     }
 
     // used to create an equivocation vote
@@ -376,7 +364,7 @@ impl VoteCount {
         }
     }
 
-    fn create_vote_msg<'m, S>(sender: S, vote: bool) -> Arc<Message<Self, S>>
+    fn create_vote_msg<S>(sender: S, vote: bool) -> Arc<Message<Self, S>>
     where
         S: Sender,
     {
