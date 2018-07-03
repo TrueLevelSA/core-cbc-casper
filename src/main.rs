@@ -1,4 +1,3 @@
-// external
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::collections::btree_set::{Iter};
 use std::{f64};
@@ -6,6 +5,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::{Add};
 use std::fmt::{Display, Debug, Formatter, Result};
 use std::sync::{Arc};
+
 // the options in message below r now used to initiate some recursions (the base
 // case) w/ stub msgs
 #[derive(Eq, Ord, PartialOrd, Clone, Default)]
@@ -16,7 +16,7 @@ where
 {
     estimate: Option<E>,
     sender: Option<S>,
-    justifications: Justification<Message<E, S>>,
+    justification: Justification<Message<E, S>>,
 }
 
 impl<E, S> Message<E, S>
@@ -24,11 +24,11 @@ where
     E: Estimate<M = Self>,
     S: Sender,
 {
-    fn new(sender: S, justifications: Justification<Self>) -> Arc<Self> {
+    fn new(sender: S, justification: Justification<Self>) -> Arc<Self> {
         Arc::new(Self {
-            estimate: Some(E::estimator(&justifications)),
+            estimate: Some(E::estimator(&justification)),
             sender: Some(sender),
-            justifications,
+            justification,
         })
     }
 }
@@ -73,7 +73,7 @@ where
         m.estimate.clone()
     }
     fn get_justifications(m: Arc<Self>) -> Justification<Self> {
-        m.justifications.clone()
+        m.justification.clone()
     }
 }
 
@@ -91,7 +91,7 @@ where
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.sender.hash(state);
-        self.justifications.hash(state);
+        self.justification.hash(state);
         self.estimate.hash(state); // the hash of the msg does NOT depend on the estimate
     }
 }
@@ -103,7 +103,7 @@ where
 {
     fn eq(&self, other: &Message<E, S>) -> bool {
         self.sender == other.sender
-            && self.justifications == other.justifications
+            && self.justification == other.justification
             && self.estimate == other.estimate
     }
 }
@@ -118,7 +118,7 @@ where
             f,
             "Message {{ sender: {}}} -> {:?}",
             self.sender.clone().expect("Sender is a None"), // TODO: handle this
-            self.justifications
+            self.justification
         )
     }
 }
@@ -143,7 +143,6 @@ impl Zero<WeightUnit> for WeightUnit {
 
 struct FaultyInsertResult<S: Sender> {
     success: bool,
-    msg_fault_weight: WeightUnit,
     weights: Weights<S>,
 }
 
@@ -158,7 +157,7 @@ struct Weights<S: Sender> {
 pub struct Justification<M: AbstractMsg>(BTreeSet<Arc<M>>);
 
 impl<M: AbstractMsg> Justification<M> {
-    // re-exports from BTreeSet
+    // Re-exports from BTreeSet
     fn new() -> Self {
         Justification(BTreeSet::new())
     }
@@ -171,17 +170,11 @@ impl<M: AbstractMsg> Justification<M> {
     fn contains(&self, msg: Arc<M>) -> bool {
         self.0.contains(&msg.clone())
     }
-    fn remove(&mut self, msg: Arc<M>) -> bool {
-        self.0.remove(&msg.clone())
-    }
     fn len(&self) -> usize {
         self.0.len()
     }
 
-    // custom
-}
-
-impl<M: AbstractMsg> Justification<M> {
+    // Custom
     // fn equivocates(&self, msg: &'m Message<'m, E>) -> bool {
     //     self.latest_msgs
     //         .iter()
@@ -211,7 +204,6 @@ impl<M: AbstractMsg> Justification<M> {
     fn faulty_insert(
         &mut self,
         msg: Arc<M>,
-        // FIXME: not sure about the following lifetime, i believe it can be shorter
         weights: Weights<M::S>,
     ) -> FaultyInsertResult<M::S> {
         // if it fails to unwrap, nan ends up in the else branch
@@ -227,13 +219,11 @@ impl<M: AbstractMsg> Justification<M> {
         if WeightUnit::is_zero(&msg_fault_weight) {
             FaultyInsertResult {
                 success: self.insert(msg),
-                msg_fault_weight,
                 weights,
             }
         }
         else if new_fault_weight <= weights.thr {
             let success = self.insert(msg);
-            println!("passed 1");
             let weights = if success {
                 Weights {
                     state_fault_weight: new_fault_weight,
@@ -244,18 +234,13 @@ impl<M: AbstractMsg> Justification<M> {
                 weights
             };
 
-            FaultyInsertResult {
-                success,
-                msg_fault_weight,
-                weights,
-            }
+            FaultyInsertResult { success, weights }
         }
         // conflicting message NOT added to the set as it crosses the fault
         // weight thr OR get_msg_fault_weight_overhead returned None
         else {
             FaultyInsertResult {
                 success: false,
-                msg_fault_weight,
                 weights,
             }
         }
@@ -270,7 +255,9 @@ impl<M: AbstractMsg> Debug for Justification<M> {
 
 pub trait Estimate: Hash + Clone + Ord + Default + Sized {
     type M: AbstractMsg<E = Self>;
-    fn estimator(justifications: &Justification<Self::M>) -> Self;
+    // TODO: this estimator is good only if there's no external dependency, not
+    // good for blockchain concensus
+    fn estimator(justification: &Justification<Self::M>) -> Self;
 }
 
 impl Sender for u32 {}
@@ -279,13 +266,13 @@ impl Estimate for VoteCount {
     // the estimator just counts votes, which in this case are the unjustified
     // msgs
     type M = Message<Self, u32>;
-    fn estimator(justifications: &Justification<Self::M>) -> Self {
+    fn estimator(justification: &Justification<Self::M>) -> Self {
         // stub msg w/ no estimate and no sender
 
         let msg = Message {
             estimate: None,
             sender: None,
-            justifications: justifications.clone(),
+            justification: justification.clone(),
         };
         // the estimates are actually the original votes of each of the voters /
         // validators
@@ -359,7 +346,7 @@ impl VoteCount {
     where
         S: Sender,
     {
-        let justifications: Justification<Message<Self, S>> =
+        let justification: Justification<Message<Self, S>> =
             Justification::new();
         Arc::new(Message {
             estimate: match vote {
@@ -367,7 +354,7 @@ impl VoteCount {
                 false => Some(VoteCount { yes: 0, no: 1 }),
             },
             sender: Some(sender),
-            justifications,
+            justification,
         })
     }
 
@@ -378,15 +365,15 @@ impl VoteCount {
     where
         S: Sender,
     {
-        msg.justifications.iter().fold(acc, |mut acc_new, m| {
-            match m.justifications.len() {
+        msg.justification.iter().fold(acc, |mut acc_new, m| {
+            match m.justification.len() {
                 0 => {
-                    // vote found, vote is a message with 0 justifications
+                    // vote found, vote is a message with 0 justification
                     // TODO: prevent double vote
                     if Self::is_valid_vote(&m.estimate) {
                         let equivocation = Message {
                             estimate: Self::toggle_vote(&m.estimate),
-                            ..(**m).clone() // FIXME: is this OK?
+                            ..(**m).clone() // FIXME: is this OK? why 2 levels of indirection?
                         };
                         // search for the equivocation of the current msg
                         match acc_new.get(&equivocation) {
@@ -394,7 +381,7 @@ impl VoteCount {
                             // will stay on the set
                             Some(_) => acc_new.remove(&equivocation),
                             // add the vote
-                            None => acc_new.insert((**m).clone()),
+                            None => acc_new.insert((**m).clone()), // FIXME: is this OK?
                         };
                     }
                     acc_new // returns it
@@ -414,7 +401,6 @@ mod main {
     use std::collections::{HashMap};
 
     #[test]
-
     fn msg_equality() {
         // v0 and v0_prime are equivocating messages (first child of a fork).
         let v0 = VoteCount::create_vote_msg(0, false);
