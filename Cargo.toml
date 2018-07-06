@@ -4,5 +4,4 @@ version = "0.0.0"
 authors = ["pZ4 <pz4@getnada.com>"]
 
 [dependencies]
-futures = "0.1.21"
-rayon = "1.0.1"
+rayon = "*"

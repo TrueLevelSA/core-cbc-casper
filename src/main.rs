@@ -3,61 +3,13 @@ use std::collections::btree_set::{Iter};
 use std::{f64};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add};
-use std::fmt::{Display, Debug, Formatter, Result};
+use std::fmt::{Debug, Formatter, Result};
 use std::sync::{Arc};
-use std::io::{Error};
-
+// use std::io::{Error};
 extern crate rayon;
 use rayon::prelude::*;
 
-extern crate futures;
-use futures::{Future, Poll};
-
-// the options in message below r now used to initiate some recursions (the base
-// case) w/ stub msgs
-#[derive(Eq, Ord, PartialOrd, Clone, Default)]
-pub struct Message<E, S>
-where
-    E: Estimate,
-    S: Sender,
-{
-    estimate: Option<E>,
-    sender: Option<S>,
-    justification: Justification<Message<E, S>>,
-}
-
-enum MsgStatus {
-    Unchecked,
-    Valid,
-    Invalid,
-}
-
-struct Msg<E, S>
-where
-    E: Estimate,
-    S: Sender,
-{
-    status: MsgStatus,
-    msg: Future<Item = Arc<Message<E, S>>, Error = Error>,
-}
-
-impl<E, S> Message<E, S>
-where
-    E: Estimate<M = Self>,
-    S: Sender,
-{
-    fn new(sender: S, justification: Justification<Self>) -> Arc<Self> {
-        Arc::new(Self {
-            estimate: Some(E::estimator(&justification)),
-            sender: Some(sender),
-            justification,
-        })
-    }
-}
-
-pub trait AbstractMsg:
-    Hash + Ord + Clone + Debug + Default + Eq + Sync + Send
-{
+pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send {
     type E: Estimate;
     type S: Sender;
     fn get_sender(Arc<Self>) -> Option<Self::S>;
@@ -76,17 +28,117 @@ pub trait AbstractMsg:
         // honest validators, this would return true very fast. all the new
         // derived branches of the justification will be evaluated in parallel.
         // say if a msg is justified by 2 other msgs, then the 2 other msgs will
-        // be processed on different threads. this applies recursively, if each
-        // of the 2 msgs have say 3 justifications, then each of the 2 threads
-        // will spawn 3 new threads to process each of the messages. thus,
-        // highly parallelizable. when it shortcuts because in one thread it
-        // finds a dependency and returns true, all the computation on the other
-        // threads will be cancelled.
-        let justification = Self::get_justification(m1.clone());
-        justification.contains(m2.clone())
+        // be processed on different threads. this applies recursively, so if
+        // each of the 2 msgs have say 3 justifications, then each of the 2
+        // threads will spawn 3 new threads to process each of the messages.
+        // thus, highly parallelizable. when it shortcuts, because in one thread
+        // a dependency was found, all the computation on the other threads will
+        // be cancelled, and the function returns true.
+        let justification = Self::get_justification(m1);
+        justification.contains(&m2.clone())
             || justification
                 .par_iter()
                 .any(|m1_prime| Self::depends(m1_prime.clone(), m2.clone()))
+    }
+
+    /// returns the dag tip-most safe messages. a safe message is defined as one
+    /// that was seen by all senders (with non-zero weight in senders_weights)
+    /// and all senders saw each other seeing each other messages. the recursion
+    /// should be started with an empty HashSets for senders_referred and
+    /// safe_msgs. there cant be more new safe messages than senders (for a
+    /// constant set of senders)
+
+    // FIXME: this won't work, it has to be a breath first impl and i did deepth
+    // first
+    fn get_safe_msgs(
+        m: Arc<Self>,
+        senders: &HashSet<Self::S>,
+        mut senders_referred: HashSet<Self::S>,
+        safe_ms: HashSet<Arc<Self>>,
+    ) -> HashSet<Arc<Self>> {
+        Self::get_justification(m.clone())
+            .iter().fold(
+            safe_ms,
+            |mut safe_ms_prime, m_prime| {
+                // base case
+                if &senders_referred == senders {
+                    let _ = safe_ms_prime.insert(m.clone());
+                    safe_ms_prime
+                }
+                else {
+                    let _ = Self::get_sender(m_prime.clone())
+                        .map(|sender| senders_referred.insert(sender));
+                    Self::get_safe_msgs(
+                        m_prime.clone(),
+                        senders,
+                        senders_referred.clone(),
+                        safe_ms_prime,
+                    )
+                }
+            },
+        )
+    }
+}
+// the options in message below r now used to initiate some recursions (the base
+// case) w/ stub msgs
+#[derive(Eq, Ord, PartialOrd, Clone, Default)]
+pub struct Message<E, S>
+where
+    E: Estimate,
+    S: Sender,
+{
+    estimate: Option<E>,
+    sender: Option<S>,
+    justification: Justification<Message<E, S>>,
+}
+
+/*
+// TODO start we should make messages lazy. continue this after async-await is better
+// documented
+
+enum MsgStatus {
+    Unchecked,
+    Valid,
+    Invalid,
+}
+
+struct Msg<E, S>
+where
+    E: Estimate,
+    S: Sender,
+{
+    status: MsgStatus,
+    msg: Future<Item = Arc<Message<E, S>>, Error = Error>,
+}
+// TODO end
+*/
+
+impl<E, S> Message<E, S>
+where
+    E: Estimate<M = Self>,
+    S: Sender,
+{
+    fn new(sender: S, justification: Justification<Self>) -> Arc<Self> {
+        Arc::new(Self {
+            estimate: Some(E::estimator(&justification)),
+            sender: Some(sender),
+            justification,
+        })
+    }
+    fn from_msgs(
+        sender: S,
+        msgs: Vec<&Arc<Self>>,
+        weights: &Weights<S>,
+    ) -> Arc<Self> {
+        let mut justification = Justification::new();
+        for m in msgs {
+            assert!(
+                justification
+                    .faulty_insert(m.clone(), weights.clone())
+                    .success
+            );
+        }
+        Self::new(sender, justification)
     }
 }
 
@@ -114,9 +166,9 @@ where
     S: Sender,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.sender.hash(state);
-        self.justification.hash(state);
-        self.estimate.hash(state); // the hash of the msg does NOT depend on the estimate
+        let _ = self.sender.hash(state);
+        let _ = self.justification.hash(state);
+        let _ = self.estimate.hash(state); // the hash of the msg does NOT depend on the estimate
     }
 }
 
@@ -138,18 +190,28 @@ where
     S: Sender,
 {
     fn fmt(&self, f: &mut Formatter) -> Result {
+        let estimate = self.estimate.clone().unwrap();
         write!(
             f,
-            "Message {{ sender: {}}} -> {:?}",
+            "M{:?}({:?}) -> {:?}",
             self.sender.clone().expect("Sender is a None"), // TODO: handle this
+            estimate,
             self.justification
         )
     }
 }
 
-pub trait Sender:
-    Hash + Clone + Ord + Eq + Default + Display + Debug + Send + Sync
-{
+pub trait Sender: Hash + Clone + Ord + Eq + Send + Sync + Debug {
+    /// helper to picks senders with positive weights
+    fn get_senders(
+        senders_weights: &Arc<HashMap<Self, WeightUnit>>,
+    ) -> HashSet<Self> {
+        senders_weights
+            .iter()
+            .filter(|(_, &weight)| weight > WeightUnit::ZERO)
+            .map(|(sender, _)| sender.clone())
+            .collect()
+    }
 }
 
 // TODO: BTreeSet is ordered, but all nodes should be able to compute the same
@@ -196,8 +258,8 @@ impl<M: AbstractMsg> Justification<M> {
     fn insert(&mut self, msg: Arc<M>) -> bool {
         self.0.insert(msg.clone())
     }
-    fn contains(&self, msg: Arc<M>) -> bool {
-        self.0.contains(&msg.clone())
+    fn contains(&self, msg: &Arc<M>) -> bool {
+        self.0.contains(msg)
     }
     fn len(&self) -> usize {
         self.0.len()
@@ -205,8 +267,8 @@ impl<M: AbstractMsg> Justification<M> {
 
     // Custom functions
 
-    // get the additional fault weight to be added to the state when inserting
-    // msg to the state
+    /// get the additional fault weight to be added to the state when inserting
+    /// msg to the state
     fn get_msg_fault_weight_overhead(
         &self,
         msg: Arc<M>,
@@ -219,15 +281,14 @@ impl<M: AbstractMsg> Justification<M> {
                     .unwrap_or(&f64::NAN)
             }
             else {
-                // no equivocation
-                &0.0 as &WeightUnit
+                &WeightUnit::ZERO
             }
         });
 
         weight_overheads.sum()
     }
-    // insert msgs to the Justification, accepting up to $thr$ faults by sender's
-    // weight
+    /// insert msgs to the Justification, accepting up to $thr$ faults by
+    /// sender's weight
     fn faulty_insert(
         &mut self,
         msg: Arc<M>,
@@ -272,13 +333,17 @@ impl<M: AbstractMsg> Justification<M> {
     }
 }
 
-impl<M: AbstractMsg> Debug for Justification<M> {
+impl<E, S> Debug for Justification<Message<E, S>>
+where
+    E: Estimate,
+    S: Sender,
+{
     fn fmt(&self, f: &mut Formatter) -> Result {
-        write!(f, "{:?}", self)
+        write!(f, "{:?}", self.0)
     }
 }
 
-pub trait Estimate: Hash + Clone + Ord + Default + Sized + Send + Sync {
+pub trait Estimate: Hash + Clone + Ord + Send + Sync + Debug {
     type M: AbstractMsg<E = Self>;
     // TODO: this estimator is good only if there's no external dependency, not
     // good for blockchain consensus
@@ -311,8 +376,8 @@ impl Estimate for VoteCount {
     }
 }
 
-// the value $z$ that, when added to other value $x$ of same type, returns the
-// other value x: $z + x = x$
+/// the value $z$ that, when added to other value $x$ of same type, returns the
+/// other value x: $z + x = x$
 trait Zero<T: PartialEq> {
     const ZERO: T;
     fn is_zero(val: &T) -> bool {
@@ -320,7 +385,7 @@ trait Zero<T: PartialEq> {
     }
 }
 
-#[derive(Clone, Debug, Eq, Ord, PartialOrd, PartialEq, Hash, Default)]
+#[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default)]
 pub struct VoteCount {
     yes: u32,
     no: u32,
@@ -337,6 +402,12 @@ impl Add for VoteCount {
             yes: self.yes + other.yes,
             no: self.no + other.no,
         }
+    }
+}
+
+impl Debug for VoteCount {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        write!(f, "y{:?}/n{:?}", self.yes, self.no)
     }
 }
 
@@ -414,13 +485,16 @@ impl VoteCount {
     }
 }
 
-fn main() {}
+fn main() {
+    let v0 = VoteCount::create_vote_msg(0, false);
+    println!("{:?}", v0);
+}
 
 #[cfg(test)]
 mod main {
     use std::sync::{Arc};
-    use {Justification, Message, AbstractMsg, VoteCount, Weights, WeightUnit};
     use std::collections::{HashMap};
+    use super::*;
 
     #[test]
     fn msg_equality() {
@@ -615,6 +689,125 @@ mod main {
     }
 
     #[test]
+    fn msg_safe() {
+        // setup
+        use AbstractMsg;
+        let sender0 = 0;
+        let sender1 = 1;
+        let senders_weights: Arc<HashMap<u32, WeightUnit>> = Arc::new(
+            [(sender0, 1.0), (sender1, 1.0)].iter().cloned().collect(),
+        );
+        let weights = Weights {
+            senders_weights: senders_weights.clone(),
+            state_fault_weight: 0.0,
+            thr: 0.0,
+        };
+        let senders = &Sender::get_senders(&senders_weights);
+
+        // sender0       v0-----m0         m2
+        //                       \        /
+        // sender1                \--m1--/
+        let v0 = VoteCount::create_vote_msg(sender0, false);
+        let safe_msgs = AbstractMsg::get_safe_msgs(
+            v0.clone(),
+            senders,
+            HashSet::new(),
+            HashSet::new(),
+        );
+        assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0");
+
+        let m0 = Message::from_msgs(sender0, vec![&v0], &weights);
+        let safe_msgs = AbstractMsg::get_safe_msgs(
+            m0.clone(),
+            senders,
+            HashSet::new(),
+            HashSet::new(),
+        );
+        assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0 and m0");
+
+        let m1 = Message::from_msgs(sender1, vec![&m0], &weights);
+        let safe_msgs = AbstractMsg::get_safe_msgs(
+            m1.clone(),
+            senders,
+            HashSet::new(),
+            HashSet::new(),
+        );
+        assert_eq!(
+            safe_msgs.len(),
+            0,
+            "both sender0 and sender1 saw v0 and m0, but sender0 hasn't
+necessarly seen sender1 seeing v0 and m0, thus not yet safe"
+        );
+
+        let m2 = Message::from_msgs(sender0, vec![&m1], &weights);
+        let safe_msgs = AbstractMsg::get_safe_msgs(
+            m2.clone(),
+            senders,
+            HashSet::new(),
+            HashSet::new(),
+        );
+        assert_eq!(
+            safe_msgs,
+            [m0.clone()].iter().cloned().collect(),
+            "both sender0 and sender1 saw v0 and m0, and additionally both
+parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
+        );
+
+
+
+
+
+
+        // 2-lane dag
+        let v0 = VoteCount::create_vote_msg(sender0, false);
+        let v1 = VoteCount::create_vote_msg(sender1, false);
+        let m0 = Message::from_msgs(sender0, vec![&v0, &v1], &weights);
+        let safe_msgs = AbstractMsg::get_safe_msgs(
+            m0.clone(),
+            senders,
+            HashSet::new(),
+            HashSet::new(),
+        );
+        assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0, v1 and m0");
+
+        let m1 = Message::from_msgs(sender1, vec![&m0], &weights);
+        let safe_msgs = AbstractMsg::get_safe_msgs(
+            m1.clone(),
+            senders,
+            HashSet::new(),
+            HashSet::new(),
+        );
+        assert_ne!(safe_msgs.len(), 0);
+
+        assert_eq!(
+            safe_msgs,
+            [v1].iter().cloned().collect(),
+            "both sender0 and sender1 saw v0, v1 and m0, but sender0 hasn't
+necessarly seen sender1 seeing v0 and m0, just v1 is safe"
+        );
+
+        let m2 = Message::from_msgs(sender0, vec![&m1], &weights);
+        let safe_msgs = AbstractMsg::get_safe_msgs(
+            m2.clone(),
+            senders,
+            HashSet::new(),
+            HashSet::new(),
+        );
+        assert_eq!(
+            safe_msgs,
+            [m1].iter().cloned().collect(),
+            "both sender0 and sender1 saw v0 and m0, and additionally both
+parties saw each other seing v0 and m0, safe"
+        );
+    }
+
+    #[test]
+    fn debug() {
+        let v0 = VoteCount::create_vote_msg(0, false);
+        println!("{:?}", v0);
+    }
+
+    #[test]
     fn faulty_inserts() {
         let senders_weights: Arc<HashMap<u32, WeightUnit>> =
             Arc::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
@@ -689,9 +882,12 @@ mod main {
                         thr: 1.0
                     }
                 )
-                .weights.state_fault_weight,
+                .weights
+                .state_fault_weight,
             1.0,
-            "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set, and thus the state_fault_weight should be incremented to 1.0"
+            "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept
+this fault as it doesnt cross the fault threshold for the set, and thus the
+state_fault_weight should be incremented to 1.0"
         );
 
         assert!(
@@ -797,7 +993,7 @@ mod main {
             m1.estimate
         );
 
-        assert!(j1.faulty_insert(v0_prime, weights.clone()).success,);
+        assert!(j1.faulty_insert(v0_prime, weights.clone()).success);
         let m1_prime = Message::new(1, j1.clone());
         assert_eq!(
             m1_prime.estimate.clone().unwrap(),
@@ -805,5 +1001,55 @@ mod main {
             "should have 1 yes, and 0 no vote, found {:?}, the equivocation vote should cancels out the normal vote",
             m1.estimate
         )
+    }
+    #[test]
+    fn get_senders() {
+        let senders_weights: Arc<HashMap<u32, WeightUnit>> =
+            Arc::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+        assert_eq!(
+            Sender::get_senders(&senders_weights),
+            [0, 1, 2].iter().cloned().collect(),
+            "should include senders with valid, positive weight"
+        );
+
+        let senders_weights: Arc<HashMap<u32, WeightUnit>> =
+            Arc::new([(0, 0.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+        assert_eq!(
+            Sender::get_senders(&senders_weights),
+            [1, 2].iter().cloned().collect(),
+            "should exclude senders with 0 weight"
+        );
+
+        let senders_weights: Arc<HashMap<u32, WeightUnit>> =
+            Arc::new([(0, 1.0), (1, -1.0), (2, 1.0)].iter().cloned().collect());
+        assert_eq!(
+            Sender::get_senders(&senders_weights),
+            [0, 2].iter().cloned().collect(),
+            "should exclude senders with negative weight"
+        );
+
+        let senders_weights: Arc<HashMap<u32, WeightUnit>> = Arc::new(
+            [(0, f64::NAN), (1, 1.0), (2, 1.0)]
+                .iter()
+                .cloned()
+                .collect(),
+        );
+        assert_eq!(
+            Sender::get_senders(&senders_weights),
+            [1, 2].iter().cloned().collect(),
+            "should exclude senders with NAN weight"
+        );
+
+        let senders_weights: Arc<HashMap<u32, WeightUnit>> = Arc::new(
+            [(0, f64::INFINITY), (1, 1.0), (2, 1.0)]
+                .iter()
+                .cloned()
+                .collect(),
+        );
+        assert_eq!(
+            Sender::get_senders(&senders_weights),
+            [0, 1, 2].iter().cloned().collect(),
+            "should include senders with INFINITY weight"
+        );
     }
 }
