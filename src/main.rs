@@ -43,10 +43,8 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
 
     /// returns the dag tip-most safe messages. a safe message is defined as one
     /// that was seen by all senders (with non-zero weight in senders_weights)
-    /// and all senders saw each other seeing each other messages. the recursion
-    /// should be started with an empty HashSets for senders_referred and
-    /// safe_msgs. there cant be more new safe messages than senders (for a
-    /// constant set of senders)
+    /// and all senders saw each other seeing each other messages. there cant be
+    /// more new safe messages than senders (for a constant set of senders)
     fn get_safe_msgs_by_validator(
         m: &Arc<Self>,
         all_senders: &HashSet<Self::S>,
@@ -217,7 +215,7 @@ where
                 success: true,
             },
             |acc, &m| {
-                let res = justification.faulty_insert(m.clone(), acc.weights);
+                let res = justification.faulty_insert(m, acc.weights);
                 assert!(
                     res.success,
                     "Could not add message {:?} to justification!",
@@ -376,8 +374,8 @@ impl<M: AbstractMsg> Justification<M> {
     /// msg to the state
     fn get_msg_fault_weight_overhead(
         &self,
-        msg: Arc<M>,
-        senders_weights: Arc<HashMap<M::S, WeightUnit>>,
+        msg: &Arc<M>,
+        senders_weights: &Arc<HashMap<M::S, WeightUnit>>,
     ) -> WeightUnit {
         let weight_overheads = self.par_iter().map(|msg_prime| {
             if M::equivocates(&msg_prime, &msg) {
@@ -388,19 +386,19 @@ impl<M: AbstractMsg> Justification<M> {
                 &WeightUnit::ZERO
             }
         });
-
         weight_overheads.sum()
     }
+
     /// insert msgs to the Justification, accepting up to $thr$ faults by
     /// sender's weight
     fn faulty_insert(
         &mut self,
-        msg: Arc<M>,
+        msg: &Arc<M>,
         weights: Weights<M::S>,
     ) -> FaultyInsertResult<M::S> {
         let msg_fault_weight = self.get_msg_fault_weight_overhead(
-            msg.clone(),
-            weights.senders_weights.clone(),
+            msg,
+            &weights.senders_weights,
         );
 
         let new_fault_weight = weights.state_fault_weight + msg_fault_weight;
@@ -408,12 +406,12 @@ impl<M: AbstractMsg> Justification<M> {
         // no conflicts, msg added to the set
         if WeightUnit::is_zero(&msg_fault_weight) {
             FaultyInsertResult {
-                success: self.insert(msg),
+                success: self.insert(msg.clone()),
                 weights,
             }
         }
         else if new_fault_weight <= weights.thr {
-            let success = self.insert(msg);
+            let success = self.insert(msg.clone());
             let weights = if success {
                 Weights {
                     state_fault_weight: new_fault_weight,
@@ -614,10 +612,10 @@ mod main {
     #[test]
     fn msg_equality() {
         // v0 and v0_prime are equivocating messages (first child of a fork).
-        let v0 = VoteCount::create_vote_msg(0, false);
-        let v1 = VoteCount::create_vote_msg(1, true);
-        let v0_prime = VoteCount::create_vote_msg(0, true); // equivocating vote
-        let v0_idem = VoteCount::create_vote_msg(0, false);
+        let v0 = &VoteCount::create_vote_msg(0, false);
+        let v1 = &VoteCount::create_vote_msg(1, true);
+        let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
+        let v0_idem = &VoteCount::create_vote_msg(0, false);
         assert!(v0 == v0_idem, "v0 and v0_idem should be equal");
         assert!(v0 != v0_prime, "v0 and v0_prime should NOT be equal");
         assert!(v0 != v1, "v0 and v1 should NOT be equal");
@@ -627,7 +625,7 @@ mod main {
         let mut j0 = Justification::new();
         assert!(
             j0.faulty_insert(
-                v0.clone(),
+                v0,
                 Weights {
                     senders_weights: senders_weights.clone(),
                     state_fault_weight: 0.0,
@@ -635,12 +633,12 @@ mod main {
                 }
             ).success
         );
-        let m0 = Message::new(0, j0.clone());
+        let m0 = &Message::new(0, j0.clone());
 
         let mut j1 = Justification::new();
         assert!(
             j1.faulty_insert(
-                v0.clone(),
+                v0,
                 Weights {
                     senders_weights: senders_weights.clone(),
                     state_fault_weight: 0.0,
@@ -651,7 +649,7 @@ mod main {
 
         assert!(
             j1.faulty_insert(
-                m0.clone(),
+                m0,
                 Weights {
                     senders_weights: senders_weights.clone(),
                     state_fault_weight: 0.0,
@@ -677,7 +675,7 @@ mod main {
         let mut j0 = Justification::new();
         assert!(
             j0.faulty_insert(
-                v0.clone(),
+                v0,
                 Weights {
                     senders_weights: senders_weights.clone(),
                     state_fault_weight: 0.0,
@@ -700,7 +698,7 @@ mod main {
         let mut j0 = Justification::new();
         assert!(
             j0.faulty_insert(
-                v0.clone(),
+                v0,
                 Weights {
                     senders_weights: senders_weights.clone(),
                     state_fault_weight: 0.0,
@@ -713,7 +711,7 @@ mod main {
         let mut j1 = Justification::new();
         assert!(
             j1.faulty_insert(
-                v0.clone(),
+                v0,
                 Weights {
                     senders_weights: senders_weights.clone(),
                     state_fault_weight: 0.0,
@@ -724,7 +722,7 @@ mod main {
 
         assert!(
             j1.faulty_insert(
-                m0.clone(),
+                m0,
                 Weights {
                     senders_weights: senders_weights.clone(),
                     state_fault_weight: 0.0,
@@ -751,7 +749,7 @@ mod main {
         let mut j0 = Justification::new();
         assert!(
             j0.faulty_insert(
-                v0.clone(),
+                v0,
                 Weights {
                     senders_weights,
                     state_fault_weight: 0.0,
@@ -928,13 +926,13 @@ parties saw each other seing v0 and m0, safe"
     fn faulty_inserts() {
         let senders_weights: Arc<HashMap<u32, WeightUnit>> =
             Arc::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
-        let v0 = VoteCount::create_vote_msg(0, false);
-        let v0_prime = VoteCount::create_vote_msg(0, true); // equivocating vote
-        let v1 = VoteCount::create_vote_msg(1, true);
+        let v0 = &VoteCount::create_vote_msg(0, false);
+        let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
+        let v1 = &VoteCount::create_vote_msg(1, true);
         let mut j0 = Justification::new();
         assert!(
             j0.faulty_insert(
-                v0.clone(),
+                v0,
                 Weights {
                     senders_weights: senders_weights.clone(),
                     state_fault_weight: 0.0,
@@ -942,11 +940,11 @@ parties saw each other seing v0 and m0, safe"
                 }
             ).success
         );
-        let m0 = Message::new(0, j0);
+        let m0 = &Message::new(0, j0);
         let mut j1 = Justification::new();
         assert!(
             j1.faulty_insert(
-                v1.clone(),
+                v1,
                 Weights {
                     senders_weights: senders_weights.clone(),
                     state_fault_weight: 0.0,
@@ -956,7 +954,7 @@ parties saw each other seing v0 and m0, safe"
         );
         assert!(
             j1.faulty_insert(
-                m0.clone(),
+                m0,
                 Weights {
                     senders_weights: senders_weights.clone(),
                     state_fault_weight: 0.0,
@@ -966,7 +964,7 @@ parties saw each other seing v0 and m0, safe"
         );
         assert!(
             !j1.faulty_insert(
-                v0_prime.clone(),
+                v0_prime,
                 Weights {
                     senders_weights: senders_weights.clone(),
                     state_fault_weight: 0.0,
@@ -978,7 +976,7 @@ parties saw each other seing v0 and m0, safe"
         assert!(
             j1.clone()
                 .faulty_insert(
-                    v0_prime.clone(),
+                    v0_prime,
                     Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 0.0,
@@ -992,7 +990,7 @@ parties saw each other seing v0 and m0, safe"
         assert_eq!(
             j1.clone()
                 .faulty_insert(
-                    v0_prime.clone(),
+                    v0_prime,
                     Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 0.0,
@@ -1010,7 +1008,7 @@ state_fault_weight should be incremented to 1.0"
         assert!(
             !j1.clone()
                 .faulty_insert(
-                    v0_prime.clone(),
+                    v0_prime,
                     Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 0.1,
@@ -1024,7 +1022,7 @@ state_fault_weight should be incremented to 1.0"
         assert_eq!(
             j1.clone()
                 .faulty_insert(
-                    v0_prime.clone(),
+                    v0_prime,
                     Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 0.1,
@@ -1039,7 +1037,7 @@ state_fault_weight should be incremented to 1.0"
         assert!(
             j1.clone()
                 .faulty_insert(
-                    v0_prime.clone(),
+                    v0_prime,
                     Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 1.0,
@@ -1056,7 +1054,7 @@ state_fault_weight should be incremented to 1.0"
         assert!(
             !j1.clone()
                 .faulty_insert(
-                    v0_prime.clone(),
+                    v0_prime,
                     Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 1.0,
@@ -1070,7 +1068,7 @@ state_fault_weight should be incremented to 1.0"
         assert_eq!(
             j1.clone()
                 .faulty_insert(
-                    v0_prime.clone(),
+                    v0_prime,
                     Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 1.0,
@@ -1087,9 +1085,9 @@ state_fault_weight should be incremented to 1.0"
     fn count_votes() {
         let senders_weights =
             Arc::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
-        let v0 = VoteCount::create_vote_msg(0, false);
-        let v0_prime = VoteCount::create_vote_msg(0, true); // equivocating vote
-        let v1 = VoteCount::create_vote_msg(1, true);
+        let v0 = &VoteCount::create_vote_msg(0, false);
+        let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
+        let v1 = &VoteCount::create_vote_msg(1, true);
         let mut j0 = Justification::new();
         let weights = Weights {
             senders_weights,
@@ -1097,7 +1095,7 @@ state_fault_weight should be incremented to 1.0"
             thr: 2.0,
         };
         assert!(j0.faulty_insert(v0, weights.clone()).success);
-        let m0 = Message::new(0, j0);
+        let m0 = &Message::new(0, j0);
         let mut j1 = Justification::new();
         assert!(j1.faulty_insert(v1, weights.clone()).success);
         assert!(j1.faulty_insert(m0, weights.clone()).success);
