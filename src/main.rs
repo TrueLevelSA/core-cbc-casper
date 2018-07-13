@@ -403,14 +403,7 @@ impl<M: AbstractMsg> Justification<M> {
 
         let new_fault_weight = weights.state_fault_weight + msg_fault_weight;
 
-        // no conflicts, msg added to the set
-        if WeightUnit::is_zero(&msg_fault_weight) {
-            FaultyInsertResult {
-                success: self.insert(msg.clone()),
-                weights,
-            }
-        }
-        else if new_fault_weight <= weights.thr {
+        if new_fault_weight <= weights.thr {
             let success = self.insert(msg.clone());
             let weights = if success {
                 Weights {
