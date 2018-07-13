@@ -217,15 +217,15 @@ where
                 success: true,
             },
             |acc, &m| {
-                if acc.success {
-                    justification.faulty_insert(m.clone(), acc.weights)
-                }
-                else {
-                    panic!("Could not add message {:?} to justification!", m)
-                }
+                let res = justification.faulty_insert(m.clone(), acc.weights);
+                assert!(
+                    res.success,
+                    "Could not add message {:?} to justification!",
+                    m
+                );
+                res
             },
         );
-
         Self::new(sender, justification)
     }
 }
@@ -564,7 +564,9 @@ impl VoteCount {
         })
     }
 
-    fn get_vote_msgs<S>(msg: &Arc<Message<Self, S>>) -> HashSet<Message<Self, S>>
+    fn get_vote_msgs<S>(
+        msg: &Arc<Message<Self, S>>,
+    ) -> HashSet<Message<Self, S>>
     where
         S: Sender,
     {
