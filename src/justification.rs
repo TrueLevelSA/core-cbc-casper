@@ -1,7 +1,5 @@
-
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::collections::btree_set::{Iter};
-use std::{f64};
 use std::fmt::{Debug, Formatter, Result};
 use std::sync::{Arc};
 // use std::io::{Error};
@@ -12,6 +10,7 @@ use sender::{Sender};
 use estimate::{Estimate};
 use weight_unit::{WeightUnit};
 use zero::{Zero};
+use sender_weight::SenderWeight;
 
 #[derive(Eq, Ord, PartialOrd, PartialEq, Clone, Default, Hash)]
 pub struct Justification<M: AbstractMsg>(BTreeSet<Arc<M>>);
@@ -138,48 +137,6 @@ impl<S: Sender> Weights<S> {
             senders_weights,
             thr,
         }
-    }
-}
-
-struct SenderWeight<S: Sender>(Arc<HashMap<S, WeightUnit>>);
-
-impl<S: Sender> SenderWeight<S> {
-    /// picks senders with positive weights
-    fn get_senders(
-        senders_weights: &Arc<HashMap<S, WeightUnit>>,
-    ) -> HashSet<S> {
-        senders_weights
-            .iter()
-            .filter(|(_, &weight)| weight > WeightUnit::ZERO)
-            .map(|(sender, _)| sender.clone())
-            .collect()
-    }
-
-    fn get_weight(
-        senders_weights: &Arc<HashMap<S, WeightUnit>>,
-        sender: &S,
-    ) -> WeightUnit {
-        senders_weights.get(sender).unwrap_or(&f64::NAN).clone()
-    }
-
-    fn into_relative_weights(
-        senders_weights: &Arc<HashMap<S, WeightUnit>>,
-    ) -> Arc<HashMap<S, WeightUnit>> {
-        let iterator = senders_weights
-            .iter()
-            .filter(|(_, &weight)| weight > WeightUnit::ZERO);
-
-        let total_weight: WeightUnit = iterator
-            .clone()
-            .fold(WeightUnit::ZERO, |acc, (_, weight)| acc + weight);
-
-        Arc::new(
-            iterator
-                .map(|(sender, weight)| {
-                    (sender.clone(), weight.clone() / total_weight)
-                })
-                .collect(),
-        )
     }
 }
 
