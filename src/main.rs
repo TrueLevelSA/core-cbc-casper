@@ -33,7 +33,7 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         // threads will spawn 3 new threads to process each of the messages.
         // thus, highly parallelizable. when it shortcuts, because in one thread
         // a dependency was found, the function returns true and all the
-        // computation on the other threads will be cancelled.
+        // computation on the other threads will be canceled.
         let justification = Self::get_justification(&m1);
         justification.contains(&m2)
             || justification
@@ -278,20 +278,30 @@ where
     }
 }
 
-pub trait Sender: Hash + Clone + Ord + Eq + Send + Sync + Debug {
+struct SenderWeight<S: Sender>(Arc<HashMap<S, WeightUnit>>);
+
+impl<S: Sender> SenderWeight<S> {
     /// picks senders with positive weights
     fn get_senders(
-        senders_weights: &Arc<HashMap<Self, WeightUnit>>,
-    ) -> HashSet<Self> {
+        senders_weights: &Arc<HashMap<S, WeightUnit>>,
+    ) -> HashSet<S> {
         senders_weights
             .iter()
             .filter(|(_, &weight)| weight > WeightUnit::ZERO)
             .map(|(sender, _)| sender.clone())
             .collect()
     }
+
+    fn get_weight(
+        senders_weights: &Arc<HashMap<S, WeightUnit>>,
+        sender: &S,
+    ) -> WeightUnit {
+        senders_weights.get(sender).unwrap_or(&f64::NAN).clone()
+    }
+
     fn into_relative_weights(
-        senders_weights: &Arc<HashMap<Self, WeightUnit>>,
-    ) -> Arc<HashMap<Self, WeightUnit>> {
+        senders_weights: &Arc<HashMap<S, WeightUnit>>,
+    ) -> Arc<HashMap<S, WeightUnit>> {
         let iterator = senders_weights
             .iter()
             .filter(|(_, &weight)| weight > WeightUnit::ZERO);
@@ -309,6 +319,8 @@ pub trait Sender: Hash + Clone + Ord + Eq + Send + Sync + Debug {
         )
     }
 }
+
+pub trait Sender: Hash + Clone + Ord + Eq + Send + Sync + Debug {}
 
 // TODO: BTreeSet is ordered, but all nodes should be able to compute the same
 // ordered set based on the content of the message and not memory addresses
@@ -364,13 +376,16 @@ impl<M: AbstractMsg> Justification<M> {
 
     // Custom functions
 
-    /// get the additional equivocators upon insertion of msg to the state
+    /// get the additional equivocators upon insertion of msg to the state. note
+    /// that if equivocator is a recurrent equivocator, it will be found again
+    /// here. i believe the weight of an equivocator has to be set to ZERO
+    /// immediately upon finding an equivocation
     fn get_equivocators(&self, msg_new: &Arc<M>) -> HashSet<M::S> {
         self.par_iter()
             .filter_map(|msg_old| {
                 if M::equivocates(&msg_old, &msg_new) {
-                    let sender = M::get_sender(&msg_old);
-                    Some(sender.clone())
+                    let equivocator = M::get_sender(&msg_old);
+                    Some(equivocator.clone())
                 }
                 else {
                     None
@@ -389,10 +404,7 @@ impl<M: AbstractMsg> Justification<M> {
         let msg_fault_weight_overhead = equivocators.iter().fold(
             WeightUnit::ZERO,
             |acc, equivocator| {
-                acc + weights
-                    .senders_weights
-                    .get(equivocator)
-                    .unwrap_or(&f64::NAN)
+                acc + SenderWeight::get_weight(&weights.senders_weights, equivocator)
             },
         );
 
@@ -779,7 +791,7 @@ mod main {
         );
 
         let relative_senders_weights =
-            &Sender::into_relative_weights(senders_weights);
+            &SenderWeight::into_relative_weights(senders_weights);
 
         let weights = Weights {
             senders_weights: senders_weights.clone(),
@@ -848,7 +860,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
             state_fault_weight: 0.0,
             thr: 0.0,
         };
-        let senders = &Sender::get_senders(&senders_weights);
+        let senders = &SenderWeight::get_senders(&senders_weights);
 
         // sender0        v0---m0        m2---
         // sender1               \--m1--/
@@ -1116,7 +1128,7 @@ state_fault_weight should be incremented to 1.0"
         let senders_weights: Arc<HashMap<u32, WeightUnit>> =
             Arc::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
         assert_eq!(
-            Sender::get_senders(&senders_weights),
+            SenderWeight::get_senders(&senders_weights),
             [0, 1, 2].iter().cloned().collect(),
             "should include senders with valid, positive weight"
         );
@@ -1124,7 +1136,7 @@ state_fault_weight should be incremented to 1.0"
         let senders_weights: Arc<HashMap<u32, WeightUnit>> =
             Arc::new([(0, 0.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
         assert_eq!(
-            Sender::get_senders(&senders_weights),
+            SenderWeight::get_senders(&senders_weights),
             [1, 2].iter().cloned().collect(),
             "should exclude senders with 0 weight"
         );
@@ -1132,7 +1144,7 @@ state_fault_weight should be incremented to 1.0"
         let senders_weights: Arc<HashMap<u32, WeightUnit>> =
             Arc::new([(0, 1.0), (1, -1.0), (2, 1.0)].iter().cloned().collect());
         assert_eq!(
-            Sender::get_senders(&senders_weights),
+            SenderWeight::get_senders(&senders_weights),
             [0, 2].iter().cloned().collect(),
             "should exclude senders with negative weight"
         );
@@ -1144,7 +1156,7 @@ state_fault_weight should be incremented to 1.0"
                 .collect(),
         );
         assert_eq!(
-            Sender::get_senders(&senders_weights),
+            SenderWeight::get_senders(&senders_weights),
             [1, 2].iter().cloned().collect(),
             "should exclude senders with NAN weight"
         );
@@ -1156,7 +1168,7 @@ state_fault_weight should be incremented to 1.0"
                 .collect(),
         );
         assert_eq!(
-            Sender::get_senders(&senders_weights),
+            SenderWeight::get_senders(&senders_weights),
             [0, 1, 2].iter().cloned().collect(),
             "should include senders with INFINITY weight"
         );
