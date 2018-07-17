@@ -43,8 +43,7 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
 
     /// returns the dag tip-most safe messages. a safe message is defined as one
     /// that was seen by all senders (with non-zero weight in senders_weights)
-    /// and all senders saw each other seeing each other messages. there cant be
-    /// more new safe messages than senders (for a constant set of senders)
+    /// and all senders saw each other seeing each other messages.
     fn get_safe_msgs_by_validator(
         m: &Arc<Self>,
         all_senders: &HashSet<Self::S>,
@@ -209,21 +208,15 @@ where
         weights: &Weights<S>,
     ) -> Arc<Self> {
         let mut justification = Justification::new();
-        let _ = msgs.iter().fold(
-            FaultyInsertResult {
-                weights: weights.clone(),
-                success: true,
-            },
-            |acc, &m| {
-                let res = justification.faulty_insert(m, acc.weights);
-                assert!(
-                    res.success,
-                    "Could not add message {:?} to justification!",
-                    m
-                );
-                res
-            },
-        );
+        let _ = msgs.iter().fold(weights.clone(), |weights, &m| {
+            let res = justification.faulty_insert(m, weights);
+            assert!(
+                res.success,
+                "Could not add message {:?} to justification!",
+                m
+            );
+            res.weights
+        });
         Self::new(sender, justification)
     }
 }
@@ -334,6 +327,7 @@ impl Zero<WeightUnit> for WeightUnit {
 struct FaultyInsertResult<S: Sender> {
     success: bool,
     weights: Weights<S>,
+    equivocators: HashSet<S>,
 }
 
 #[derive(Debug, Clone)]
@@ -359,7 +353,7 @@ impl<M: AbstractMsg> Justification<M> {
     }
 
     fn insert(&mut self, msg: Arc<M>) -> bool {
-        self.0.insert(msg.clone())
+        self.0.insert(msg)
     }
     fn contains(&self, msg: &Arc<M>) -> bool {
         self.0.contains(msg)
@@ -370,38 +364,40 @@ impl<M: AbstractMsg> Justification<M> {
 
     // Custom functions
 
-    /// get the additional fault weight to be added to the state when inserting
-    /// msg to the state
-    fn get_msg_fault_weight_overhead(
-        &self,
-        msg: &Arc<M>,
-        senders_weights: &Arc<HashMap<M::S, WeightUnit>>,
-    ) -> WeightUnit {
-        let weight_overheads = self.par_iter().map(|msg_prime| {
-            if M::equivocates(&msg_prime, &msg) {
-                let sender = M::get_sender(&msg_prime);
-                senders_weights.get(&sender).unwrap_or(&f64::NAN)
-            }
-            else {
-                &WeightUnit::ZERO
-            }
-        });
-        weight_overheads.sum()
+    /// get the additional equivocators upon insertion of msg to the state
+    fn get_equivocators(&self, msg_new: &Arc<M>) -> HashSet<M::S> {
+        self.par_iter()
+            .filter_map(|msg_old| {
+                if M::equivocates(&msg_old, &msg_new) {
+                    let sender = M::get_sender(&msg_old);
+                    Some(sender.clone())
+                }
+                else {
+                    None
+                }
+            })
+            .collect()
     }
 
-    /// insert msgs to the Justification, accepting up to $thr$ faults by
-    /// sender's weight
+    /// insert msgs to the Justification, accepting up to $thr$ faults by weight
     fn faulty_insert(
         &mut self,
         msg: &Arc<M>,
         weights: Weights<M::S>,
     ) -> FaultyInsertResult<M::S> {
-        let msg_fault_weight = self.get_msg_fault_weight_overhead(
-            msg,
-            &weights.senders_weights,
+        let equivocators = self.get_equivocators(msg);
+        let msg_fault_weight_overhead = equivocators.iter().fold(
+            WeightUnit::ZERO,
+            |acc, equivocator| {
+                acc + weights
+                    .senders_weights
+                    .get(equivocator)
+                    .unwrap_or(&f64::NAN)
+            },
         );
 
-        let new_fault_weight = weights.state_fault_weight + msg_fault_weight;
+        let new_fault_weight =
+            weights.state_fault_weight + msg_fault_weight_overhead;
 
         if new_fault_weight <= weights.thr {
             let success = self.insert(msg.clone());
@@ -415,14 +411,19 @@ impl<M: AbstractMsg> Justification<M> {
                 weights
             };
 
-            FaultyInsertResult { success, weights }
+            FaultyInsertResult {
+                success,
+                weights,
+                equivocators,
+            }
         }
         // conflicting message NOT added to the set as it crosses the fault
-        // weight thr OR get_msg_fault_weight_overhead returned NAN
+        // weight thr OR msg_fault_weight is NAN (from the unwrap)
         else {
             FaultyInsertResult {
                 success: false,
                 weights,
+                equivocators,
             }
         }
     }
