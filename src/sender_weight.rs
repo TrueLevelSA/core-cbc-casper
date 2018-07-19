@@ -1,19 +1,30 @@
-
 use sender::Sender;
 use weight_unit::WeightUnit;
 use std::collections::{HashMap, HashSet};
 use zero::{Zero};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, PoisonError, RwLockReadGuard};
 
 type SenderW<S> = Arc<RwLock<HashMap<S, WeightUnit>>>; // FIXME: remove this after
                                                        // after SenderWeight is fully implemented
 
 // RwLock locks only before writing, while Mutex locks to both read and write
+#[derive(Clone, Default, Debug)]
 pub struct SenderWeight<S: Sender>(Arc<RwLock<HashMap<S, WeightUnit>>>);
 
 impl<S: Sender> SenderWeight<S> {
+    pub fn new(senders_weight: HashMap<S, WeightUnit>) -> Self {
+        SenderWeight(Arc::new(RwLock::new(senders_weight)))
+    }
+    fn read(
+        &self,
+    ) -> Result<
+        RwLockReadGuard<HashMap<S, f64>>,
+        PoisonError<RwLockReadGuard<HashMap<S, f64>>>,
+    > {
+        self.0.read()
+    }
     /// picks senders with positive weights
-    pub fn get_senders(senders_weights: &SenderW<S>) -> HashSet<S> {
+    pub fn get_senders(senders_weights: &Self) -> HashSet<S> {
         senders_weights
             .read()
             .unwrap()
@@ -23,7 +34,11 @@ impl<S: Sender> SenderWeight<S> {
             .collect()
     }
 
-    pub fn get_weight(senders_weights: &SenderW<S>, sender: &S, base_value: WeightUnit) -> WeightUnit {
+    pub fn get_weight(
+        senders_weights: &Self,
+        sender: &S,
+        base_value: WeightUnit,
+    ) -> WeightUnit {
         senders_weights
             .read()
             .unwrap()
@@ -32,10 +47,8 @@ impl<S: Sender> SenderWeight<S> {
             .clone()
     }
 
-    pub fn into_relative_weights(senders_weights: &SenderW<S>) -> SenderW<S> {
-        let senders_weights = senders_weights
-            .read()
-            .unwrap();
+    pub fn into_relative_weights(senders_weights: &Self) -> Self {
+        let senders_weights = senders_weights.read().unwrap();
 
         let iterator = senders_weights
             .iter()
@@ -45,13 +58,13 @@ impl<S: Sender> SenderWeight<S> {
             .clone()
             .fold(WeightUnit::ZERO, |acc, (_, weight)| acc + weight);
 
-        Arc::new(RwLock::new(
+        SenderWeight::new(
             iterator
                 .map(|(sender, weight)| {
                     (sender.clone(), weight.clone() / total_weight)
                 })
                 .collect(),
-        ))
+        )
     }
 }
 
@@ -61,50 +74,51 @@ mod sender_weight {
 
     #[test]
     fn get_senders() {
-        let senders_weights = Arc::new(RwLock::new(
+        let senders_weights = SenderWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
-        ));
+        );
         assert_eq!(
             SenderWeight::get_senders(&senders_weights),
             [0, 1, 2].iter().cloned().collect(),
             "should include senders with valid, positive weight"
         );
 
-        let senders_weights = Arc::new(RwLock::new(
+        let senders_weights = SenderWeight::new(
             [(0, 0.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
-        ));
+        );
         assert_eq!(
             SenderWeight::get_senders(&senders_weights),
             [1, 2].iter().cloned().collect(),
             "should exclude senders with 0 weight"
         );
 
-        let senders_weights =
-            Arc::new(RwLock::new([(0, 1.0), (1, -1.0), (2, 1.0)].iter().cloned().collect()));
+        let senders_weights = SenderWeight::new(
+            [(0, 1.0), (1, -1.0), (2, 1.0)].iter().cloned().collect(),
+        );
         assert_eq!(
             SenderWeight::get_senders(&senders_weights),
             [0, 2].iter().cloned().collect(),
             "should exclude senders with negative weight"
         );
 
-        let senders_weights = Arc::new(RwLock::new(
+        let senders_weights = SenderWeight::new(
             [(0, ::std::f64::NAN), (1, 1.0), (2, 1.0)]
                 .iter()
                 .cloned()
                 .collect(),
-        ));
+        );
         assert_eq!(
             SenderWeight::get_senders(&senders_weights),
             [1, 2].iter().cloned().collect(),
             "should exclude senders with NAN weight"
         );
 
-        let senders_weights = Arc::new(RwLock::new(
+        let senders_weights = SenderWeight::new(
             [(0, ::std::f64::INFINITY), (1, 1.0), (2, 1.0)]
                 .iter()
                 .cloned()
                 .collect(),
-        ));
+        );
         assert_eq!(
             SenderWeight::get_senders(&senders_weights),
             [0, 1, 2].iter().cloned().collect(),

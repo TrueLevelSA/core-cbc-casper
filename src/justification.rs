@@ -125,13 +125,14 @@ pub struct FaultyInsertResult<S: Sender> {
 
 #[derive(Debug, Clone)]
 pub struct Weights<S: Sender> {
-    senders_weights: Arc<RwLock<HashMap<S, WeightUnit>>>,
+    senders_weights: SenderWeight<S>,
     state_fault_weight: WeightUnit,
     thr: WeightUnit,
 }
+
 impl<S: Sender> Weights<S> {
     pub fn new(
-        senders_weights: Arc<RwLock<HashMap<S, WeightUnit>>>,
+        senders_weights: SenderWeight<S>,
         state_fault_weight: WeightUnit,
         thr: WeightUnit,
     ) -> Self {
@@ -149,10 +150,9 @@ mod justification {
     use super::*;
     #[test]
     fn faulty_inserts() {
-        let senders_weights: Arc<RwLock<HashMap<u32, WeightUnit>>> =
-            Arc::new(RwLock::new(
-                [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
-            ));
+        let senders_weights = SenderWeight::new(
+            [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
+        );
         let v0 = &VoteCount::create_vote_msg(0, false);
         let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
         let v1 = &VoteCount::create_vote_msg(1, true);
@@ -276,8 +276,7 @@ state_fault_weight should be incremented to 1.0"
             "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the thr doesnt get crossed for the set"
         );
 
-        let senders_weights: Arc<RwLock<HashMap<u32, WeightUnit>>> =
-            Arc::new(RwLock::new([].iter().cloned().collect()));
+        let senders_weights = SenderWeight::new([].iter().cloned().collect());
         // bug found
         assert!(
             !j1.clone()

@@ -8,6 +8,7 @@ use message::{Message, AbstractMsg};
 use sender::{Sender};
 use estimate::{Estimate};
 use justification::{Justification};
+use sender_weight::{SenderWeight};
 
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default)]
 pub struct VoteCount {
@@ -150,9 +151,9 @@ mod count_votes {
 
     #[test]
     fn count_votes() {
-        let senders_weights = Arc::new(RwLock::new(
+        let senders_weights = SenderWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
-        ));
+        );
         let v0 = &VoteCount::create_vote_msg(0, false);
         let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
         let v1 = &VoteCount::create_vote_msg(1, true);

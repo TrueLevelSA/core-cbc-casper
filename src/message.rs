@@ -2,9 +2,8 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::fmt::{Debug, Formatter, Result};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
 // use std::io::{Error};
-
 
 use rayon::prelude::*;
 use estimate::{Estimate};
@@ -99,12 +98,12 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     /// that was seen by more than a given thr of total weight units.
     fn get_safe_msgs_by_weight(
         m: &Arc<Self>,
-        senders_weights: &Arc<RwLock<HashMap<Self::S, WeightUnit>>>,
+        senders_weights: &SenderWeight<Self::S>,
         thr: &WeightUnit,
     ) -> HashMap<Arc<Self>, WeightUnit> {
         fn recursor<M>(
             m: &Arc<M>,
-            senders_weights: &Arc<RwLock<HashMap<M::S, WeightUnit>>>,
+            senders_weights: &SenderWeight<M::S>,
             mut senders_referred: HashSet<M::S>,
             weight_referred: WeightUnit,
             thr: &WeightUnit,
@@ -127,7 +126,11 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
                             .insert(sender_current.clone())
                         {
                             weight_referred
-                                + SenderWeight::get_weight(&senders_weights, sender_current, WeightUnit::ZERO) // TODO: replace NAN per ZERO
+                                + SenderWeight::get_weight(
+                                    &senders_weights,
+                                    sender_current,
+                                    WeightUnit::ZERO,
+                                ) // TODO: replace NAN per ZERO
                         }
                         else {
                             weight_referred
@@ -317,10 +320,9 @@ mod message {
         assert!(v0 != v0_prime, "v0 and v0_prime should NOT be equal");
         assert!(v0 != v1, "v0 and v1 should NOT be equal");
 
-        let senders_weights: Arc<RwLock<HashMap<u32, WeightUnit>>> =
-            Arc::new(RwLock::new(
-                [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
-            ));
+        let senders_weights = SenderWeight::new(
+            [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
+        );
         let mut j0 = Justification::new();
         assert!(
             j0.faulty_insert(
@@ -357,10 +359,10 @@ mod message {
         let v0 = &VoteCount::create_vote_msg(0, false);
         let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
 
-        let senders_weights: Arc<RwLock<HashMap<u32, WeightUnit>>> =
-            Arc::new(RwLock::new(
+        let senders_weights =
+            SenderWeight::new(
                 [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
-            ));
+            );
 
         let mut j0 = Justification::new();
         assert!(
@@ -416,9 +418,9 @@ mod message {
         let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
         let v1 = &VoteCount::create_vote_msg(1, true);
 
-        let senders_weights = Arc::new(RwLock::new(
+        let senders_weights = SenderWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
-        ));
+        );
 
         let mut j0 = Justification::new();
         assert!(
@@ -442,12 +444,12 @@ mod message {
     fn msg_safe_by_weight() {
         let sender0 = 0;
         let sender1 = 1;
-        let senders_weights = &Arc::new(RwLock::new(
+        let senders_weights = &SenderWeight::new(
             [(sender0, 1.0), (sender1, 1.0)].iter().cloned().collect(),
-        ));
+        );
 
         let relative_senders_weights =
-            &SenderWeight::into_relative_weights(&senders_weights);
+            &SenderWeight::into_relative_weights(senders_weights);
 
         let weights = Weights::new(senders_weights.clone(), 0.0, 0.0);
 
@@ -503,9 +505,9 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         // setup
         let sender0 = 0;
         let sender1 = 1;
-        let senders_weights = Arc::new(RwLock::new(
+        let senders_weights = SenderWeight::new(
             [(sender0, 1.0), (sender1, 1.0)].iter().cloned().collect(),
-        ));
+        );
         let weights = Weights::new(senders_weights.clone(), 0.0, 0.0);
         let senders = &SenderWeight::get_senders(&senders_weights);
 
