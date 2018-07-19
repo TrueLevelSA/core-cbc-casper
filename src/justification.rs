@@ -10,7 +10,7 @@ use sender::{Sender};
 use estimate::{Estimate};
 use weight_unit::{WeightUnit};
 use zero::{Zero};
-use sender_weight::SenderWeight;
+use sender_weight::SendersWeight;
 
 #[derive(Eq, Ord, PartialOrd, PartialEq, Clone, Default, Hash)]
 pub struct Justification<M: AbstractMsg>(BTreeSet<Arc<M>>);
@@ -66,7 +66,7 @@ impl<M: AbstractMsg> Justification<M> {
         let msg_fault_weight_overhead = equivocators.iter().fold(
             WeightUnit::ZERO,
             |acc, equivocator| {
-                acc + SenderWeight::get_weight(
+                acc + SendersWeight::get_weight(
                     &weights.senders_weights,
                     equivocator,
                     ::std::f64::NAN,
@@ -125,14 +125,14 @@ pub struct FaultyInsertResult<S: Sender> {
 
 #[derive(Debug, Clone)]
 pub struct Weights<S: Sender> {
-    senders_weights: SenderWeight<S>,
+    senders_weights: SendersWeight<S>,
     state_fault_weight: WeightUnit,
     thr: WeightUnit,
 }
 
 impl<S: Sender> Weights<S> {
     pub fn new(
-        senders_weights: SenderWeight<S>,
+        senders_weights: SendersWeight<S>,
         state_fault_weight: WeightUnit,
         thr: WeightUnit,
     ) -> Self {
@@ -150,7 +150,7 @@ mod justification {
     use super::*;
     #[test]
     fn faulty_inserts() {
-        let senders_weights = SenderWeight::new(
+        let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
         let v0 = &VoteCount::create_vote_msg(0, false);
@@ -276,7 +276,7 @@ state_fault_weight should be incremented to 1.0"
             "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the thr doesnt get crossed for the set"
         );
 
-        let senders_weights = SenderWeight::new([].iter().cloned().collect());
+        let senders_weights = SendersWeight::new([].iter().cloned().collect());
         // bug found
         assert!(
             !j1.clone()

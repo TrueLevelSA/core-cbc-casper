@@ -11,7 +11,7 @@ use sender::{Sender};
 use justification::{Justification, Weights};
 use weight_unit::{WeightUnit};
 use zero::{Zero};
-use sender_weight::SenderWeight;
+use sender_weight::SendersWeight;
 
 pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     type E: Estimate;
@@ -98,12 +98,12 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     /// that was seen by more than a given thr of total weight units.
     fn get_safe_msgs_by_weight(
         m: &Arc<Self>,
-        senders_weights: &SenderWeight<Self::S>,
+        senders_weights: &SendersWeight<Self::S>,
         thr: &WeightUnit,
     ) -> HashMap<Arc<Self>, WeightUnit> {
         fn recursor<M>(
             m: &Arc<M>,
-            senders_weights: &SenderWeight<M::S>,
+            senders_weights: &SendersWeight<M::S>,
             mut senders_referred: HashSet<M::S>,
             weight_referred: WeightUnit,
             thr: &WeightUnit,
@@ -126,7 +126,7 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
                             .insert(sender_current.clone())
                         {
                             weight_referred
-                                + SenderWeight::get_weight(
+                                + SendersWeight::get_weight(
                                     &senders_weights,
                                     sender_current,
                                     WeightUnit::ZERO,
@@ -291,7 +291,7 @@ where
 #[cfg(test)]
 mod message {
     use vote_count::{VoteCount};
-    use sender_weight::{SenderWeight};
+    use sender_weight::{SendersWeight};
 
     use std::{f64};
     use super::*;
@@ -320,7 +320,7 @@ mod message {
         assert!(v0 != v0_prime, "v0 and v0_prime should NOT be equal");
         assert!(v0 != v1, "v0 and v1 should NOT be equal");
 
-        let senders_weights = SenderWeight::new(
+        let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
         let mut j0 = Justification::new();
@@ -360,7 +360,7 @@ mod message {
         let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
 
         let senders_weights =
-            SenderWeight::new(
+            SendersWeight::new(
                 [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
             );
 
@@ -418,7 +418,7 @@ mod message {
         let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
         let v1 = &VoteCount::create_vote_msg(1, true);
 
-        let senders_weights = SenderWeight::new(
+        let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
 
@@ -444,12 +444,12 @@ mod message {
     fn msg_safe_by_weight() {
         let sender0 = 0;
         let sender1 = 1;
-        let senders_weights = &SenderWeight::new(
+        let senders_weights = &SendersWeight::new(
             [(sender0, 1.0), (sender1, 1.0)].iter().cloned().collect(),
         );
 
         let relative_senders_weights =
-            &SenderWeight::into_relative_weights(senders_weights);
+            &SendersWeight::into_relative_weights(senders_weights);
 
         let weights = Weights::new(senders_weights.clone(), 0.0, 0.0);
 
@@ -505,11 +505,11 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         // setup
         let sender0 = 0;
         let sender1 = 1;
-        let senders_weights = SenderWeight::new(
+        let senders_weights = SendersWeight::new(
             [(sender0, 1.0), (sender1, 1.0)].iter().cloned().collect(),
         );
         let weights = Weights::new(senders_weights.clone(), 0.0, 0.0);
-        let senders = &SenderWeight::get_senders(&senders_weights);
+        let senders = &SendersWeight::get_senders(&senders_weights);
 
         // sender0        v0---m0        m2---
         // sender1               \--m1--/

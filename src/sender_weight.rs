@@ -2,23 +2,32 @@ use sender::Sender;
 use weight_unit::WeightUnit;
 use std::collections::{HashMap, HashSet};
 use zero::{Zero};
-use std::sync::{Arc, RwLock, PoisonError, RwLockReadGuard};
+use std::sync::{Arc, RwLock, PoisonError, RwLockReadGuard, RwLockWriteGuard};
 
 // RwLock locks only before writing, while Mutex locks to both read and write
 #[derive(Clone, Default, Debug)]
-pub struct SenderWeight<S: Sender>(Arc<RwLock<HashMap<S, WeightUnit>>>);
+pub struct SendersWeight<S: Sender>(Arc<RwLock<HashMap<S, WeightUnit>>>);
 
-impl<S: Sender> SenderWeight<S> {
+impl<S: Sender> SendersWeight<S> {
     pub fn new(senders_weight: HashMap<S, WeightUnit>) -> Self {
-        SenderWeight(Arc::new(RwLock::new(senders_weight)))
+        SendersWeight(Arc::new(RwLock::new(senders_weight)))
     }
     fn read(
         &self,
     ) -> Result<
-        RwLockReadGuard<HashMap<S, f64>>,
-        PoisonError<RwLockReadGuard<HashMap<S, f64>>>,
+        RwLockReadGuard<HashMap<S, WeightUnit>>,
+        PoisonError<RwLockReadGuard<HashMap<S, WeightUnit>>>,
     > {
         self.0.read()
+    }
+
+    fn write(
+        &self,
+    ) -> Result<
+        RwLockWriteGuard<HashMap<S, WeightUnit>>,
+        PoisonError<RwLockWriteGuard<HashMap<S, WeightUnit>>>,
+    > {
+        self.0.write()
     }
     /// picks senders with positive weights
     pub fn get_senders(senders_weights: &Self) -> HashSet<S> {
@@ -55,7 +64,7 @@ impl<S: Sender> SenderWeight<S> {
             .clone()
             .fold(WeightUnit::ZERO, |acc, (_, weight)| acc + weight);
 
-        SenderWeight::new(
+        SendersWeight::new(
             iterator
                 .map(|(sender, weight)| {
                     (sender.clone(), weight.clone() / total_weight)
@@ -71,53 +80,53 @@ mod sender_weight {
 
     #[test]
     fn get_senders() {
-        let senders_weights = SenderWeight::new(
+        let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
         assert_eq!(
-            SenderWeight::get_senders(&senders_weights),
+            SendersWeight::get_senders(&senders_weights),
             [0, 1, 2].iter().cloned().collect(),
             "should include senders with valid, positive weight"
         );
 
-        let senders_weights = SenderWeight::new(
+        let senders_weights = SendersWeight::new(
             [(0, 0.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
         assert_eq!(
-            SenderWeight::get_senders(&senders_weights),
+            SendersWeight::get_senders(&senders_weights),
             [1, 2].iter().cloned().collect(),
             "should exclude senders with 0 weight"
         );
 
-        let senders_weights = SenderWeight::new(
+        let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, -1.0), (2, 1.0)].iter().cloned().collect(),
         );
         assert_eq!(
-            SenderWeight::get_senders(&senders_weights),
+            SendersWeight::get_senders(&senders_weights),
             [0, 2].iter().cloned().collect(),
             "should exclude senders with negative weight"
         );
 
-        let senders_weights = SenderWeight::new(
+        let senders_weights = SendersWeight::new(
             [(0, ::std::f64::NAN), (1, 1.0), (2, 1.0)]
                 .iter()
                 .cloned()
                 .collect(),
         );
         assert_eq!(
-            SenderWeight::get_senders(&senders_weights),
+            SendersWeight::get_senders(&senders_weights),
             [1, 2].iter().cloned().collect(),
             "should exclude senders with NAN weight"
         );
 
-        let senders_weights = SenderWeight::new(
+        let senders_weights = SendersWeight::new(
             [(0, ::std::f64::INFINITY), (1, 1.0), (2, 1.0)]
                 .iter()
                 .cloned()
                 .collect(),
         );
         assert_eq!(
-            SenderWeight::get_senders(&senders_weights),
+            SendersWeight::get_senders(&senders_weights),
             [0, 1, 2].iter().cloned().collect(),
             "should include senders with INFINITY weight"
         );
