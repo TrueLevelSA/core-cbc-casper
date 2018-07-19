@@ -1,7 +1,7 @@
 use weight_unit::WeightUnit;
 use std::collections::{HashMap, HashSet};
 use traits::{Zero, Sender};
-use std::sync::{Arc, RwLock, PoisonError, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, LockResult};
 
 // RwLock locks only before writing, while Mutex locks to both read and write
 #[derive(Clone, Default, Debug)]
@@ -11,49 +11,41 @@ impl<S: Sender> SendersWeight<S> {
     pub fn new(senders_weight: HashMap<S, WeightUnit>) -> Self {
         SendersWeight(Arc::new(RwLock::new(senders_weight)))
     }
-    fn read(
-        &self,
-    ) -> Result<
-        RwLockReadGuard<HashMap<S, WeightUnit>>,
-        PoisonError<RwLockReadGuard<HashMap<S, WeightUnit>>>,
-    > {
+
+    fn read(&self) -> LockResult<RwLockReadGuard<HashMap<S, WeightUnit>>> {
         self.0.read()
     }
 
-    fn write(
-        &self,
-    ) -> Result<
-        RwLockWriteGuard<HashMap<S, WeightUnit>>,
-        PoisonError<RwLockWriteGuard<HashMap<S, WeightUnit>>>,
-    > {
+    fn write(&self) -> LockResult<RwLockWriteGuard<HashMap<S, WeightUnit>>> {
         self.0.write()
     }
+
     /// picks senders with positive weights
-    pub fn get_senders(senders_weights: &Self) -> HashSet<S> {
-        senders_weights
-            .read()
+    pub fn get_senders(&self) -> HashSet<S> {
+        self.read()
             .unwrap()
             .iter()
-            .filter(|(_, &weight)| weight > WeightUnit::ZERO)
-            .map(|(sender, _)| sender.clone())
+            .filter_map(|(sender, &weight)| {
+                if weight > WeightUnit::ZERO {
+                    Some(sender.clone())
+                }
+                else {
+                    None
+                }
+            })
             .collect()
     }
 
-    pub fn get_weight(
-        senders_weights: &Self,
-        sender: &S,
-        base_value: WeightUnit,
-    ) -> WeightUnit {
-        senders_weights
-            .read()
+    pub fn get_weight(&self, sender: &S, base_value: WeightUnit) -> WeightUnit {
+        self.read()
             .unwrap()
             .get(sender)
             .unwrap_or(&base_value)
             .clone()
     }
 
-    pub fn into_relative_weights(senders_weights: &Self) -> Self {
-        let senders_weights = senders_weights.read().unwrap();
+    pub fn into_relative_weights(&self) -> Self {
+        let senders_weights = self.read().unwrap();
 
         let iterator = senders_weights
             .iter()
