@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::collections::btree_set::{Iter};
 use std::fmt::{Debug, Formatter, Result};
-use std::sync::{Arc};
+use std::sync::{Arc, RwLock};
 // use std::io::{Error};
 use message::{AbstractMsg, Message};
 use rayon::collections::btree_set::Iter as ParIter;
@@ -66,7 +66,11 @@ impl<M: AbstractMsg> Justification<M> {
         let msg_fault_weight_overhead = equivocators.iter().fold(
             WeightUnit::ZERO,
             |acc, equivocator| {
-                acc + SenderWeight::get_weight(&weights.senders_weights, equivocator)
+                acc + SenderWeight::get_weight(
+                    weights.senders_weights.clone(),
+                    equivocator,
+                    ::std::f64::NAN,
+                )
             },
         );
 
@@ -113,7 +117,6 @@ where
     }
 }
 
-
 pub struct FaultyInsertResult<S: Sender> {
     pub success: bool,
     pub weights: Weights<S>,
@@ -122,13 +125,13 @@ pub struct FaultyInsertResult<S: Sender> {
 
 #[derive(Debug, Clone)]
 pub struct Weights<S: Sender> {
-    senders_weights: Arc<HashMap<S, WeightUnit>>,
+    senders_weights: Arc<RwLock<HashMap<S, WeightUnit>>>,
     state_fault_weight: WeightUnit,
     thr: WeightUnit,
 }
 impl<S: Sender> Weights<S> {
     pub fn new(
-        senders_weights: Arc<HashMap<S, WeightUnit>>,
+        senders_weights: Arc<RwLock<HashMap<S, WeightUnit>>>,
         state_fault_weight: WeightUnit,
         thr: WeightUnit,
     ) -> Self {
@@ -141,13 +144,15 @@ impl<S: Sender> Weights<S> {
 }
 
 #[cfg(test)]
-mod message {
+mod justification {
     use vote_count::{VoteCount};
     use super::*;
     #[test]
     fn faulty_inserts() {
-        let senders_weights: Arc<HashMap<u32, WeightUnit>> =
-            Arc::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+        let senders_weights: Arc<RwLock<HashMap<u32, WeightUnit>>> =
+            Arc::new(RwLock::new(
+                [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
+            ));
         let v0 = &VoteCount::create_vote_msg(0, false);
         let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
         let v1 = &VoteCount::create_vote_msg(1, true);
@@ -271,8 +276,8 @@ state_fault_weight should be incremented to 1.0"
             "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the thr doesnt get crossed for the set"
         );
 
-        let senders_weights: Arc<HashMap<u32, WeightUnit>> =
-            Arc::new([].iter().cloned().collect());
+        let senders_weights: Arc<RwLock<HashMap<u32, WeightUnit>>> =
+            Arc::new(RwLock::new([].iter().cloned().collect()));
         // bug found
         assert!(
             !j1.clone()

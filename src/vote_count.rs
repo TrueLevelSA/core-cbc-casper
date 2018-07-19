@@ -1,3 +1,4 @@
+
 use std::collections::{HashSet};
 use std::ops::{Add};
 use std::fmt::{Debug, Formatter, Result};
@@ -8,6 +9,7 @@ use message::{Message, AbstractMsg};
 use sender::{Sender};
 use estimate::{Estimate};
 use justification::{Justification};
+
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default)]
 pub struct VoteCount {
     yes: u32,
@@ -61,8 +63,7 @@ impl VoteCount {
     }
 
     pub fn create_vote_msg(sender: u32, vote: bool) -> Arc<Message<Self, u32>> {
-        let justification: Justification<Message<Self, u32>> =
-            Justification::new();
+        let justification = Justification::new();
         let estimate = match vote {
             true => Some(VoteCount { yes: 1, no: 0 }),
             false => Some(VoteCount { yes: 0, no: 1 }),
@@ -117,10 +118,10 @@ impl Estimate for VoteCount {
     // msgs
     type M = Message<Self, Voter>;
     fn estimator(justification: &Justification<Self::M>) -> Self {
-        // stub msg w/ no estimate and no sender
-
+        // stub msg w/ no estimate and no sender that will be dropped on the
+        // pattern matching below
         let msg = Message::new(
-            ::std::u32::MAX, // sender, will be droped on the pattern matching below
+            ::std::u32::MAX, // sender,
             justification.clone(),
             None, // estimate, will be droped on the pattern matching below
         );
@@ -139,6 +140,7 @@ impl Estimate for VoteCount {
 mod count_votes {
     use super::*;
     use justification::{Weights};
+    use std::sync::{RwLock};
     fn new_msg(
         sender: u32,
         justifications: Justification<Message<VoteCount, u32>>,
@@ -150,7 +152,7 @@ mod count_votes {
     #[test]
     fn count_votes() {
         let senders_weights =
-            Arc::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+            Arc::new(RwLock::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect()));
         let v0 = &VoteCount::create_vote_msg(0, false);
         let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
         let v1 = &VoteCount::create_vote_msg(1, true);
