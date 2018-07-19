@@ -1,7 +1,7 @@
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashSet};
 use std::collections::btree_set::{Iter};
 use std::fmt::{Debug, Formatter, Result};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
 // use std::io::{Error};
 use message::{AbstractMsg, Message};
 use rayon::collections::btree_set::Iter as ParIter;

@@ -8,7 +8,6 @@ use message::{Message, AbstractMsg};
 use sender::{Sender};
 use estimate::{Estimate};
 use justification::{Justification};
-use sender_weight::{SenderWeight};
 
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default)]
 pub struct VoteCount {
@@ -139,8 +138,6 @@ impl Estimate for VoteCount {
 
 mod count_votes {
     use super::*;
-    use justification::{Weights};
-    use std::sync::{RwLock};
     fn new_msg(
         sender: u32,
         justifications: Justification<Message<VoteCount, u32>>,
@@ -151,6 +148,8 @@ mod count_votes {
 
     #[test]
     fn count_votes() {
+        use justification::{Weights};
+        use sender_weight::{SenderWeight};
         let senders_weights = SenderWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );

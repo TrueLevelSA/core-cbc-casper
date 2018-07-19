@@ -4,9 +4,6 @@ use std::collections::{HashMap, HashSet};
 use zero::{Zero};
 use std::sync::{Arc, RwLock, PoisonError, RwLockReadGuard};
 
-type SenderW<S> = Arc<RwLock<HashMap<S, WeightUnit>>>; // FIXME: remove this after
-                                                       // after SenderWeight is fully implemented
-
 // RwLock locks only before writing, while Mutex locks to both read and write
 #[derive(Clone, Default, Debug)]
 pub struct SenderWeight<S: Sender>(Arc<RwLock<HashMap<S, WeightUnit>>>);
