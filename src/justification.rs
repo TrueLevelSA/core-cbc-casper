@@ -6,10 +6,8 @@ use std::sync::{Arc};
 use message::{AbstractMsg, Message};
 use rayon::collections::btree_set::Iter as ParIter;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use sender::{Sender};
-use estimate::{Estimate};
 use weight_unit::{WeightUnit};
-use zero::{Zero};
+use traits::{Zero, Sender, Estimate};
 use sender_weight::SendersWeight;
 
 #[derive(Eq, Ord, PartialOrd, PartialEq, Clone, Default, Hash)]

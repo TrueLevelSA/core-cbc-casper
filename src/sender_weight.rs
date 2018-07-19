@@ -1,7 +1,6 @@
-use sender::Sender;
 use weight_unit::WeightUnit;
 use std::collections::{HashMap, HashSet};
-use zero::{Zero};
+use traits::{Zero, Sender};
 use std::sync::{Arc, RwLock, PoisonError, RwLockReadGuard, RwLockWriteGuard};
 
 // RwLock locks only before writing, while Mutex locks to both read and write

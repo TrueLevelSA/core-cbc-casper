@@ -3,10 +3,8 @@ use std::ops::{Add};
 use std::fmt::{Debug, Formatter, Result};
 use std::sync::{Arc};
 
-use zero::{Zero};
+use traits::{Zero, Estimate, Sender};
 use message::{Message, AbstractMsg};
-use sender::{Sender};
-use estimate::{Estimate};
 use justification::{Justification};
 
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default)]

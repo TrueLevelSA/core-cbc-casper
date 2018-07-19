@@ -6,11 +6,9 @@ use std::sync::{Arc};
 // use std::io::{Error};
 
 use rayon::prelude::*;
-use estimate::{Estimate};
-use sender::{Sender};
+use traits::{Estimate, Zero, Sender};
 use justification::{Justification, Weights};
 use weight_unit::{WeightUnit};
-use zero::{Zero};
 use sender_weight::SendersWeight;
 
 pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
