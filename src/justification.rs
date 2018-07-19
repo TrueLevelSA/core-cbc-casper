@@ -67,7 +67,7 @@ impl<M: AbstractMsg> Justification<M> {
             WeightUnit::ZERO,
             |acc, equivocator| {
                 acc + SenderWeight::get_weight(
-                    weights.senders_weights.clone(),
+                    &weights.senders_weights,
                     equivocator,
                     ::std::f64::NAN,
                 )

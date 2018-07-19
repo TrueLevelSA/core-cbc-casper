@@ -1,4 +1,3 @@
-
 use std::collections::{HashSet};
 use std::ops::{Add};
 use std::fmt::{Debug, Formatter, Result};
@@ -151,8 +150,9 @@ mod count_votes {
 
     #[test]
     fn count_votes() {
-        let senders_weights =
-            Arc::new(RwLock::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect()));
+        let senders_weights = Arc::new(RwLock::new(
+            [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
+        ));
         let v0 = &VoteCount::create_vote_msg(0, false);
         let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
         let v1 = &VoteCount::create_vote_msg(1, true);

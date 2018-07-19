@@ -13,7 +13,7 @@ pub struct SenderWeight<S: Sender>(Arc<RwLock<HashMap<S, WeightUnit>>>);
 
 impl<S: Sender> SenderWeight<S> {
     /// picks senders with positive weights
-    pub fn get_senders(senders_weights: SenderW<S>) -> HashSet<S> {
+    pub fn get_senders(senders_weights: &SenderW<S>) -> HashSet<S> {
         senders_weights
             .read()
             .unwrap()
@@ -23,7 +23,7 @@ impl<S: Sender> SenderWeight<S> {
             .collect()
     }
 
-    pub fn get_weight(senders_weights: SenderW<S>, sender: &S, base_value: WeightUnit) -> WeightUnit {
+    pub fn get_weight(senders_weights: &SenderW<S>, sender: &S, base_value: WeightUnit) -> WeightUnit {
         senders_weights
             .read()
             .unwrap()
@@ -32,7 +32,7 @@ impl<S: Sender> SenderWeight<S> {
             .clone()
     }
 
-    pub fn into_relative_weights(senders_weights: SenderW<S>) -> SenderW<S> {
+    pub fn into_relative_weights(senders_weights: &SenderW<S>) -> SenderW<S> {
         let senders_weights = senders_weights
             .read()
             .unwrap();
@@ -65,7 +65,7 @@ mod sender_weight {
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         ));
         assert_eq!(
-            SenderWeight::get_senders(senders_weights.clone()),
+            SenderWeight::get_senders(&senders_weights),
             [0, 1, 2].iter().cloned().collect(),
             "should include senders with valid, positive weight"
         );
@@ -74,7 +74,7 @@ mod sender_weight {
             [(0, 0.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         ));
         assert_eq!(
-            SenderWeight::get_senders(senders_weights.clone()),
+            SenderWeight::get_senders(&senders_weights),
             [1, 2].iter().cloned().collect(),
             "should exclude senders with 0 weight"
         );
@@ -82,7 +82,7 @@ mod sender_weight {
         let senders_weights =
             Arc::new(RwLock::new([(0, 1.0), (1, -1.0), (2, 1.0)].iter().cloned().collect()));
         assert_eq!(
-            SenderWeight::get_senders(senders_weights.clone()),
+            SenderWeight::get_senders(&senders_weights),
             [0, 2].iter().cloned().collect(),
             "should exclude senders with negative weight"
         );
@@ -94,7 +94,7 @@ mod sender_weight {
                 .collect(),
         ));
         assert_eq!(
-            SenderWeight::get_senders(senders_weights.clone()),
+            SenderWeight::get_senders(&senders_weights),
             [1, 2].iter().cloned().collect(),
             "should exclude senders with NAN weight"
         );
@@ -106,7 +106,7 @@ mod sender_weight {
                 .collect(),
         ));
         assert_eq!(
-            SenderWeight::get_senders(senders_weights.clone()),
+            SenderWeight::get_senders(&senders_weights),
             [0, 1, 2].iter().cloned().collect(),
             "should include senders with INFINITY weight"
         );

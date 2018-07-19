@@ -127,7 +127,7 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
                             .insert(sender_current.clone())
                         {
                             weight_referred
-                                + SenderWeight::get_weight(senders_weights.clone(), sender_current, WeightUnit::ZERO) // TODO: replace NAN per ZERO
+                                + SenderWeight::get_weight(&senders_weights, sender_current, WeightUnit::ZERO) // TODO: replace NAN per ZERO
                         }
                         else {
                             weight_referred
@@ -447,7 +447,7 @@ mod message {
         ));
 
         let relative_senders_weights =
-            &SenderWeight::into_relative_weights(senders_weights.clone());
+            &SenderWeight::into_relative_weights(&senders_weights);
 
         let weights = Weights::new(senders_weights.clone(), 0.0, 0.0);
 
@@ -507,7 +507,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
             [(sender0, 1.0), (sender1, 1.0)].iter().cloned().collect(),
         ));
         let weights = Weights::new(senders_weights.clone(), 0.0, 0.0);
-        let senders = &SenderWeight::get_senders(senders_weights.clone());
+        let senders = &SenderWeight::get_senders(&senders_weights);
 
         // sender0        v0---m0        m2---
         // sender1               \--m1--/
