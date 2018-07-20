@@ -7,7 +7,7 @@ use rayon::collections::btree_set::Iter as ParIter;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use weight_unit::{WeightUnit};
 use traits::{Zero, Sender, Estimate};
-use sender_weight::SendersWeight;
+use senders_weight::SendersWeight;
 
 #[derive(Eq, Ord, PartialOrd, PartialEq, Clone, Default, Hash)]
 pub struct Justification<M: AbstractMsg>(BTreeSet<M>);

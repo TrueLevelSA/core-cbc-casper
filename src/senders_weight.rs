@@ -4,6 +4,7 @@ use traits::{Zero, Sender};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, LockResult};
 
 // RwLock locks only before writing, while Mutex locks to both read and write
+
 #[derive(Clone, Default, Debug)]
 pub struct SendersWeight<S: Sender>(Arc<RwLock<HashMap<S, WeightUnit>>>);
 
@@ -40,7 +41,7 @@ impl<S: Sender> SendersWeight<S> {
         self.read()
             .unwrap()
             .get(sender)
-            .and_then(|val| Some(val.clone()))
+            .and_then(|weight| Some(weight.clone()))
     }
 
     pub fn into_relative_weights(&self) -> Self {

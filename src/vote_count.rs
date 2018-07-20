@@ -146,7 +146,7 @@ mod count_votes {
     #[test]
     fn count_votes() {
         use justification::{Weights};
-        use sender_weight::{SendersWeight};
+        use senders_weight::{SendersWeight};
         let senders_weights = SendersWeight::new(
            [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );

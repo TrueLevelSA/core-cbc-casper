@@ -8,7 +8,7 @@ use rayon::prelude::*;
 use traits::{Estimate, Zero, Sender};
 use justification::{Justification, Weights};
 use weight_unit::{WeightUnit};
-use sender_weight::SendersWeight;
+use senders_weight::SendersWeight;
 
 pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     type E: Estimate;
@@ -291,7 +291,7 @@ where
 #[cfg(test)]
 mod message {
     use vote_count::{VoteCount};
-    use sender_weight::{SendersWeight};
+    use senders_weight::{SendersWeight};
 
     use std::{f64};
     use super::*;
