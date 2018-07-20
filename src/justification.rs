@@ -42,8 +42,8 @@ impl<M: AbstractMsg> Justification<M> {
     fn get_equivocators(&self, msg_new: &M) -> HashSet<M::S> {
         self.par_iter()
             .filter_map(|msg_old| {
-                if M::equivocates(&msg_old, &msg_new) {
-                    let equivocator = M::get_sender(&msg_old);
+                if msg_old.equivocates(&msg_new) {
+                    let equivocator = msg_old.get_sender();
                     Some(equivocator.clone())
                 }
                 else {
@@ -63,10 +63,10 @@ impl<M: AbstractMsg> Justification<M> {
         let msg_fault_weight_overhead = equivocators.iter().fold(
             WeightUnit::ZERO,
             |acc, equivocator| {
-                acc + SendersWeight::get_weight(
-                    &weights.senders_weights,
-                    equivocator,
-                ).unwrap_or(::std::f64::NAN)
+                acc + weights
+                    .senders_weights
+                    .get_weight(equivocator)
+                    .unwrap_or(::std::f64::NAN)
             },
         );
 

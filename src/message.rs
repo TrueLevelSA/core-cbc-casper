@@ -16,14 +16,13 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     fn get_sender(&self) -> &Self::S;
     fn get_estimate(&self) -> &Option<Self::E>;
     fn get_justification<'z>(&'z self) -> &'z Justification<Self>;
-    fn equivocates(&self, m2: &Self) -> bool {
-        let m1 = self;
-        self != m2
-            && Self::get_sender(m1) == Self::get_sender(m2)
-            && !Self::depends(m1, m2)
-            && !Self::depends(m2, m1)
+    fn equivocates(&self, rhs: &Self) -> bool {
+        self != rhs
+            && self.get_sender() == rhs.get_sender()
+            && !self.depends(rhs)
+            && !rhs.depends(self)
     }
-    fn depends(&self, m2: &Self) -> bool {
+    fn depends(&self, rhs: &Self) -> bool {
         // although the recursion ends supposedly only at genesis message, the
         // trick is the following: it short-circuits while descending on the
         // dependency tree, if it finds a dependent message. when dealing with
@@ -36,12 +35,11 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         // thus, highly parallelizable. when it shortcuts, because in one thread
         // a dependency was found, the function returns true and all the
         // computation on the other threads will be canceled.
-        let m1 = self;
-        let justification = Self::get_justification(&m1);
-        justification.contains(m2)
+        let justification = Self::get_justification(&self);
+        justification.contains(rhs)
             || justification
                 .par_iter()
-                .any(|m1_prime| Self::depends(m1_prime, m2))
+                .any(|self_prime| self_prime.depends(rhs))
     }
 
     /// returns the dag tip-most safe messages. a safe message is defined as one
@@ -61,19 +59,19 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         where
             M: AbstractMsg,
         {
-            M::get_justification(&m).iter().fold(
+            m.get_justification().iter().fold(
                 safe_ms,
                 |mut safe_ms_prime, m_prime| {
                     // base case
                     if &senders_referred == all_senders
-                        && M::get_sender(&m_prime) == original_sender
+                        && m_prime.get_sender() == original_sender
                     {
                         let _ = safe_ms_prime.insert(m_prime.clone());
                         safe_ms_prime
                     }
                     else {
                         let _ = senders_referred
-                            .insert(M::get_sender(&m_prime).clone());
+                            .insert(m_prime.get_sender().clone());
                         recursor(
                             m_prime,
                             all_senders,
@@ -86,12 +84,17 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
             )
         };
         // initial state, trigger recursion
-        let m = self;
-        let original_sender = Self::get_sender(&m);
+        let original_sender = self.get_sender();
         let senders_refered =
             [original_sender.clone()].iter().cloned().collect();
         let safe_msgs = HashSet::new();
-        recursor(m, all_senders, senders_refered, safe_msgs, original_sender)
+        recursor(
+            self,
+            all_senders,
+            senders_refered,
+            safe_msgs,
+            original_sender,
+        )
     }
 
     /// returns the dag tip-most safe messages. a safe message is defined as one
@@ -112,7 +115,7 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         where
             M: AbstractMsg,
         {
-            M::get_justification(&m).iter().fold(
+            m.get_justification().iter().fold(
                 safe_msg_weight,
                 |mut safe_prime, m_prime| {
                     // base case
@@ -121,15 +124,14 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
                         safe_prime
                     }
                     else {
-                        let sender_current = M::get_sender(&m_prime);
+                        let sender_current = m_prime.get_sender();
                         let weight_referred = if senders_referred
                             .insert(sender_current.clone())
                         {
                             weight_referred
-                                + SendersWeight::get_weight(
-                                    &senders_weights,
-                                    sender_current,
-                                ).unwrap_or(WeightUnit::ZERO)
+                                + senders_weights
+                                    .get_weight(sender_current)
+                                    .unwrap_or(WeightUnit::ZERO)
                         }
                         else {
                             weight_referred
@@ -148,12 +150,11 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
             )
         };
         // initial state, trigger recursion
-        let m = self;
         let senders_referred = [].iter().cloned().collect();
         let weight_referred = WeightUnit::ZERO;
         let safe_msg_weight = HashMap::new();
         recursor(
-            m,
+            self,
             senders_weights,
             senders_referred,
             weight_referred,
@@ -277,12 +278,11 @@ where
     S: Sender,
 {
     fn fmt(&self, f: &mut Formatter) -> Result {
-        let estimate = self.get_estimate().clone().unwrap();
         write!(
             f,
             "M{:?}({:?}) -> {:?}",
             self.get_sender(),
-            estimate,
+            self.get_estimate().clone().unwrap(),
             self.get_justification()
         )
     }
@@ -373,15 +373,15 @@ mod message {
         );
         let m0 = &new_msg(0, j0);
         assert!(
-            !Message::depends(v0, v0_prime),
+            !v0.depends(v0_prime),
             "v0 does NOT depends on v0_prime as they are equivocating"
         );
         assert!(
-            !Message::depends(m0, m0),
+            !m0.depends(m0),
             "m0 does NOT depends on itself directly, by our impl choice"
         );
-        assert!(!Message::depends(m0, v0_prime), "m0 depends on v0 directly");
-        assert!(Message::depends(m0, v0), "m0 depends on v0 directly");
+        assert!(!m0.depends(v0_prime), "m0 depends on v0 directly");
+        assert!(m0.depends(v0), "m0 depends on v0 directly");
 
         let mut j0 = Justification::new();
         assert!(
@@ -407,9 +407,9 @@ mod message {
             ).success
         );
         let m1 = &new_msg(0, j1.clone());
-        assert!(Message::depends(m1, m0), "m1 DOES depent on m0");
-        assert!(!Message::depends(m0, m1), "but m0 does NOT depend on m1");
-        assert!(Message::depends(m1, v0), "m1 depends on v0 through m0");
+        assert!(m1.depends(m0), "m1 DOES depent on m0");
+        assert!(!m0.depends(m1), "but m0 does NOT depend on m1");
+        assert!(m1.depends(v0), "m1 depends on v0 through m0");
     }
 
     #[test]
@@ -428,15 +428,12 @@ mod message {
                 .success
         );
         let m0 = &new_msg(0, j0);
-        assert!(!Message::equivocates(v0, v0), "should be all good");
-        assert!(!Message::equivocates(v1, m0), "should be all good");
-        assert!(!Message::equivocates(m0, v1), "should be all good");
+        assert!(!v0.equivocates(v0), "should be all good");
+        assert!(!v1.equivocates(m0), "should be all good");
+        assert!(!m0.equivocates(v1), "should be all good");
+        assert!(v0.equivocates(v0_prime), "should be a direct equivocation");
         assert!(
-            Message::equivocates(v0, v0_prime),
-            "should be a direct equivocation"
-        );
-        assert!(
-            Message::equivocates(m0, v0_prime),
+            m0.equivocates(v0_prime),
             "should be an indirect equivocation, equivocates to m0 through v0"
         );
     }
@@ -448,36 +445,25 @@ mod message {
             [(sender0, 1.0), (sender1, 1.0)].iter().cloned().collect(),
         );
 
-        let relative_senders_weights =
-            &SendersWeight::into_relative_weights(senders_weights);
-
+        let relative_senders_weights = &senders_weights.into_relative_weights();
         let weights = Weights::new(senders_weights.clone(), 0.0, 0.0);
 
         let thr = &0.5;
         // sender0        v0---m0        m2---
         // sender1               \--m1--/
         let v0 = &VoteCount::create_vote_msg(sender0, false);
-        let safe_msgs = AbstractMsg::get_safe_msgs_by_weight(
-            v0,
-            relative_senders_weights,
-            thr,
-        );
+        let safe_msgs =
+            v0.get_safe_msgs_by_weight(relative_senders_weights, thr);
         assert_eq!(safe_msgs.len(), 0, "only 0.5 of weight saw v0");
 
         let m0 = &Message::from_msgs(sender0, vec![&v0], &weights);
-        let safe_msgs = AbstractMsg::get_safe_msgs_by_weight(
-            m0,
-            relative_senders_weights,
-            thr,
-        );
+        let safe_msgs =
+            m0.get_safe_msgs_by_weight(relative_senders_weights, thr);
         assert_eq!(safe_msgs.len(), 0, "only 0.5 of weight saw v0 and m0");
 
         let m1 = &Message::from_msgs(sender1, vec![&m0], &weights);
-        let safe_msgs = AbstractMsg::get_safe_msgs_by_weight(
-            m1,
-            relative_senders_weights,
-            thr,
-        );
+        let safe_msgs =
+            m1.get_safe_msgs_by_weight(relative_senders_weights, thr);
         assert_eq!(
             safe_msgs.len(),
             0,
@@ -486,11 +472,8 @@ necessarly seen sender1 seeing v0 and m0, thus not yet safe"
         );
 
         let m2 = &Message::from_msgs(sender0, vec![&m1], &weights);
-        let safe_msgs = AbstractMsg::get_safe_msgs_by_weight(
-            m2,
-            relative_senders_weights,
-            thr,
-        );
+        let safe_msgs =
+            m2.get_safe_msgs_by_weight(relative_senders_weights, thr);
         assert_eq!(
             safe_msgs.get(m0).unwrap_or(&f64::NAN),
             &1.0,
@@ -509,20 +492,20 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
             [(sender0, 1.0), (sender1, 1.0)].iter().cloned().collect(),
         );
         let weights = Weights::new(senders_weights.clone(), 0.0, 0.0);
-        let senders = &SendersWeight::get_senders(&senders_weights);
+        let senders = &senders_weights.get_senders();
 
         // sender0        v0---m0        m2---
         // sender1               \--m1--/
         let v0 = &VoteCount::create_vote_msg(sender0, false);
-        let safe_msgs = AbstractMsg::get_safe_msgs_by_validator(v0, senders);
+        let safe_msgs = v0.get_safe_msgs_by_validator(senders);
         assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0");
 
         let m0 = &Message::from_msgs(sender0, vec![v0], &weights);
-        let safe_msgs = AbstractMsg::get_safe_msgs_by_validator(m0, senders);
+        let safe_msgs = m0.get_safe_msgs_by_validator(senders);
         assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0 and m0");
 
         let m1 = &Message::from_msgs(sender1, vec![m0], &weights);
-        let safe_msgs = AbstractMsg::get_safe_msgs_by_validator(m1, senders);
+        let safe_msgs = m1.get_safe_msgs_by_validator(senders);
         assert_eq!(
             safe_msgs.len(),
             0,
@@ -531,7 +514,7 @@ necessarly seen sender1 seeing v0 and m0, thus not yet safe"
         );
 
         let m2 = &Message::from_msgs(sender0, vec![m1], &weights);
-        let safe_msgs = AbstractMsg::get_safe_msgs_by_validator(m2, senders);
+        let safe_msgs = m2.get_safe_msgs_by_validator(senders);
         assert_eq!(
             safe_msgs,
             [m0.clone()].iter().cloned().collect(),
@@ -544,7 +527,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         let v0 = &VoteCount::create_vote_msg(sender0, false);
         let v1 = &VoteCount::create_vote_msg(sender1, false);
         let m0 = &Message::from_msgs(sender0, vec![v0, v1], &weights);
-        let safe_msgs = AbstractMsg::get_safe_msgs_by_validator(m0, senders);
+        let safe_msgs = m0.get_safe_msgs_by_validator(senders);
         assert_eq!(
             safe_msgs.len(),
             0,
@@ -552,7 +535,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         );
 
         let m1 = &Message::from_msgs(sender1, vec![m0], &weights);
-        let safe_msgs = AbstractMsg::get_safe_msgs_by_validator(m1, senders);
+        let safe_msgs = m1.get_safe_msgs_by_validator(senders);
 
         assert_eq!(
             safe_msgs,
@@ -562,7 +545,7 @@ necessarly seen sender1 seeing v0 and m0, just v1 is safe"
         );
 
         let m2 = &Message::from_msgs(sender0, vec![m1], &weights);
-        let safe_msgs = AbstractMsg::get_safe_msgs_by_validator(m2, senders);
+        let safe_msgs = m2.get_safe_msgs_by_validator(senders);
         assert_eq!(
             safe_msgs,
             [m0.clone()].iter().cloned().collect(),
