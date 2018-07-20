@@ -36,12 +36,11 @@ impl<S: Sender> SendersWeight<S> {
             .collect()
     }
 
-    pub fn get_weight(&self, sender: &S, base_value: WeightUnit) -> WeightUnit {
+    pub fn get_weight(&self, sender: &S) -> Option<WeightUnit> {
         self.read()
             .unwrap()
             .get(sender)
-            .unwrap_or(&base_value)
-            .clone()
+            .and_then(|val| Some(val.clone()))
     }
 
     pub fn into_relative_weights(&self) -> Self {

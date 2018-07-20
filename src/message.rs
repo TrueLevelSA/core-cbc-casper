@@ -129,8 +129,7 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
                                 + SendersWeight::get_weight(
                                     &senders_weights,
                                     sender_current,
-                                    WeightUnit::ZERO,
-                                ) // TODO: replace NAN per ZERO
+                                ).unwrap_or(WeightUnit::ZERO)
                         }
                         else {
                             weight_referred
@@ -214,11 +213,7 @@ where
             estimate,
         }))
     }
-    fn from_msgs(
-        sender: S,
-        msgs: Vec<&Self>,
-        weights: &Weights<S>,
-    ) -> Self {
+    fn from_msgs(sender: S, msgs: Vec<&Self>, weights: &Weights<S>) -> Self {
         let mut justification = Justification::new();
         let _ = msgs.iter().fold(weights.clone(), |weights, &m| {
             let res = justification.faulty_insert(m, weights);
@@ -286,7 +281,9 @@ where
         write!(
             f,
             "M{:?}({:?}) -> {:?}",
-            self.get_sender(), estimate, self.get_justification()
+            self.get_sender(),
+            estimate,
+            self.get_justification()
         )
     }
 }
