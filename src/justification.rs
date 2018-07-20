@@ -1,7 +1,6 @@
 use std::collections::{BTreeSet, HashSet};
 use std::collections::btree_set::{Iter};
 use std::fmt::{Debug, Formatter, Result};
-use std::sync::{Arc};
 // use std::io::{Error};
 use message::{AbstractMsg, Message};
 use rayon::collections::btree_set::Iter as ParIter;
@@ -11,26 +10,26 @@ use traits::{Zero, Sender, Estimate};
 use sender_weight::SendersWeight;
 
 #[derive(Eq, Ord, PartialOrd, PartialEq, Clone, Default, Hash)]
-pub struct Justification<M: AbstractMsg>(BTreeSet<Arc<M>>);
+pub struct Justification<M: AbstractMsg>(BTreeSet<M>);
 
 impl<M: AbstractMsg> Justification<M> {
     // Re-exports from BTreeSet wrapping M
     pub fn new() -> Self {
         Justification(BTreeSet::new())
     }
-    pub fn iter(&self) -> Iter<Arc<M>> {
+    pub fn iter(&self) -> Iter<M> {
         self.0.iter()
     }
-    pub fn par_iter(&self) -> ParIter<Arc<M>> {
+    pub fn par_iter(&self) -> ParIter<M> {
         self.0.par_iter()
     }
-    pub fn contains(&self, msg: &Arc<M>) -> bool {
+    pub fn contains(&self, msg: &M) -> bool {
         self.0.contains(msg)
     }
     pub fn len(&self) -> usize {
         self.0.len()
     }
-    fn insert(&mut self, msg: Arc<M>) -> bool {
+    fn insert(&mut self, msg: M) -> bool {
         self.0.insert(msg)
     }
 
@@ -40,7 +39,7 @@ impl<M: AbstractMsg> Justification<M> {
     /// that if equivocator is a recurrent equivocator, it will be found again
     /// here. i believe the weight of an equivocator has to be set to ZERO
     /// immediately upon finding an equivocation
-    fn get_equivocators(&self, msg_new: &Arc<M>) -> HashSet<M::S> {
+    fn get_equivocators(&self, msg_new: &M) -> HashSet<M::S> {
         self.par_iter()
             .filter_map(|msg_old| {
                 if M::equivocates(&msg_old, &msg_new) {
@@ -57,7 +56,7 @@ impl<M: AbstractMsg> Justification<M> {
     /// insert msgs to the Justification, accepting up to $thr$ faults by weight
     pub fn faulty_insert(
         &mut self,
-        msg: &Arc<M>,
+        msg: &M,
         weights: Weights<M::S>,
     ) -> FaultyInsertResult<M::S> {
         let equivocators = self.get_equivocators(msg);
