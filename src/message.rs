@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::fmt::{Debug, Formatter, Result};
 use std::sync::{Arc};
+
 // use std::io::{Error};
 
 use rayon::prelude::*;
@@ -17,10 +18,13 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     fn get_estimate(&self) -> &Option<Self::E>;
     fn get_justification<'z>(&'z self) -> &'z Justification<Self>;
     fn equivocates(&self, rhs: &Self) -> bool {
-        self != rhs
-            && self.get_sender() == rhs.get_sender()
-            && !self.depends(rhs)
-            && !rhs.depends(self)
+        [
+            self != rhs,
+            self.get_sender() == rhs.get_sender(),
+            !self.depends(rhs),
+            !rhs.depends(self),
+        ].par_iter()
+            .all(|&predicate| predicate)
     }
     fn depends(&self, rhs: &Self) -> bool {
         // although the recursion ends supposedly only at genesis message, the
@@ -35,7 +39,7 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         // thus, highly parallelizable. when it shortcuts, because in one thread
         // a dependency was found, the function returns true and all the
         // computation on the other threads will be canceled.
-        let justification = Self::get_justification(&self);
+        let justification = self.get_justification();
         justification.contains(rhs)
             || justification
                 .par_iter()
@@ -193,7 +197,7 @@ where
     S: Sender,
 {
     status: MsgStatus,
-    msg: Future<Item = Arc<Message<E, S>>, Error = Error>,
+    msg: Future<Item = Message<E, S>, Error = Error>,
 }
 // TODO end
 */
@@ -265,10 +269,10 @@ where
     E: Estimate,
     S: Sender,
 {
-    fn eq(&self, other: &Message<E, S>) -> bool {
-        self.get_sender() == other.get_sender()
-            && self.get_justification() == other.get_justification()
-            && self.get_estimate() == other.get_estimate()
+    fn eq(&self, rhs: &Self) -> bool {
+        self.get_sender() == rhs.get_sender()
+            && self.get_justification() == rhs.get_justification()
+            && self.get_estimate() == rhs.get_estimate()
     }
 }
 

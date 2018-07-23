@@ -75,16 +75,16 @@ impl VoteCount {
             msg: &Message<VoteCount, Voter>,
             acc: HashSet<Message<VoteCount, Voter>>,
         ) -> HashSet<Message<VoteCount, Voter>> {
-            let justification = Message::get_justification(msg);
+            let justification = msg.get_justification();
             justification.iter().fold(acc, |mut acc_prime, m| {
                 match justification.len() {
                     0 => {
                         // vote found, vote is a message with 0 justification
-                        let estimate = Message::get_estimate(m);
+                        let estimate = m.get_estimate();
                         if VoteCount::is_valid_vote(estimate) {
                             let equivocation = Message::new(
-                                Message::get_sender(m).clone(),
-                                Message::get_justification(m).clone(),
+                                m.get_sender().clone(),
+                                m.get_justification().clone(),
                                 VoteCount::toggle_vote(estimate),
                             );
                             // search for the equivocation of the current msg
@@ -125,7 +125,7 @@ impl Estimate for VoteCount {
         // validators
         let votes = Self::get_vote_msgs(&msg);
         votes.iter().fold(Self::ZERO, |acc, vote| {
-            match Message::get_estimate(vote) {
+            match vote.get_estimate() {
                 Some(estimate) => acc + estimate.clone(),
                 None => acc, // skip counting
             }

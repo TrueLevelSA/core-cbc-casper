@@ -92,7 +92,7 @@ impl<M: AbstractMsg> Justification<M> {
             }
         }
         // conflicting message NOT added to the set as it crosses the fault
-        // weight thr OR msg_fault_weight is NAN (from the unwrap)
+        // weight thr OR msg_fault_weight_overhead is NAN (from the unwrap)
         else {
             FaultyInsertResult {
                 success: false,
@@ -133,8 +133,8 @@ impl<S: Sender> Weights<S> {
         thr: WeightUnit,
     ) -> Self {
         Weights {
-            state_fault_weight,
             senders_weights,
+            state_fault_weight,
             thr,
         }
     }
