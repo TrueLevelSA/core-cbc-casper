@@ -18,13 +18,10 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     fn get_estimate(&self) -> &Option<Self::E>;
     fn get_justification<'z>(&'z self) -> &'z Justification<Self>;
     fn equivocates(&self, rhs: &Self) -> bool {
-        [
-            self != rhs,
-            self.get_sender() == rhs.get_sender(),
-            !self.depends(rhs),
-            !rhs.depends(self),
-        ].par_iter()
-            .all(|&predicate| predicate)
+        self != rhs && self.get_sender() == rhs.get_sender()
+            && [!self.depends(rhs), !rhs.depends(self)]
+                .par_iter()
+                .all(|&predicate| predicate)
     }
     fn depends(&self, rhs: &Self) -> bool {
         // although the recursion ends supposedly only at genesis message, the
