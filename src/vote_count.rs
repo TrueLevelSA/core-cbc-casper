@@ -75,34 +75,33 @@ impl VoteCount {
             msg: &Message<VoteCount, Voter>,
             acc: HashSet<Message<VoteCount, Voter>>,
         ) -> HashSet<Message<VoteCount, Voter>> {
-            let justification = msg.get_justification();
-            justification.iter().fold(acc, |mut acc_prime, m| {
-                match m.get_justification().len() {
-                    0 => {
-                        // vote found, vote is a message with 0 justification
-                        let estimate = m.get_estimate();
-                        if VoteCount::is_valid_vote(estimate) {
-                            let equivocation = Message::new(
-                                m.get_sender().clone(),
-                                m.get_justification().clone(),
-                                VoteCount::toggle_vote(estimate),
-                            );
-                            // search for the equivocation of the current msg
-                            match acc_prime.get(&equivocation) {
-                                // remove the equivoted vote, none of the pair
-                                // will stay on the set
-                                Some(_) => acc_prime.remove(&equivocation),
-                                // add the vote
-                                None => acc_prime.insert((*m).clone()),
-                            };
-                        }
-                        acc_prime // returns it
-                    },
-                    _ => {
-                        recursor(&m, acc_prime)
-                    },
-                }
-            })
+            msg.get_justification()
+                .iter()
+                .fold(acc, |mut acc_prime, m| {
+                    match m.get_justification().len() {
+                        0 => {
+                            // vote found, vote is a message with 0 justification
+                            let estimate = m.get_estimate();
+                            if VoteCount::is_valid_vote(estimate) {
+                                let equivocation = Message::new(
+                                    m.get_sender().clone(),
+                                    m.get_justification().clone(),
+                                    VoteCount::toggle_vote(estimate),
+                                );
+                                // search for the equivocation of the current msg
+                                match acc_prime.get(&equivocation) {
+                                    // remove the equivoted vote, none of the pair
+                                    // will stay on the set
+                                    Some(_) => acc_prime.remove(&equivocation),
+                                    // add the vote
+                                    None => acc_prime.insert((*m).clone()),
+                                };
+                            }
+                            acc_prime // returns it
+                        },
+                        _ => recursor(&m, acc_prime),
+                    }
+                })
         }
         // start recursion
         recursor(msg, HashSet::new())
