@@ -80,6 +80,7 @@ impl VoteCount {
                 match justification.len() {
                     0 => {
                         // vote found, vote is a message with 0 justification
+                        println!("reached");
                         let estimate = m.get_estimate();
                         if VoteCount::is_valid_vote(estimate) {
                             let equivocation = Message::new(
@@ -124,6 +125,7 @@ impl Estimate for VoteCount {
         // the estimates are actually the original votes of each of the voters /
         // validators
         let votes = Self::get_vote_msgs(&msg);
+        println!("votes: {:?}", votes);
         votes.iter().fold(Self::ZERO, |acc, vote| {
             match vote.get_estimate() {
                 Some(estimate) => acc + estimate.clone(),
@@ -139,7 +141,9 @@ mod count_votes {
         sender: u32,
         justifications: Justification<Message<VoteCount, u32>>,
     ) -> Message<VoteCount, u32> {
+        println!("justification: {:?}", justifications);
         let estimate = VoteCount::estimator(&justifications);
+        println!("estimate: {:?}", estimate);
         Message::new(sender, justifications, Some(estimate))
     }
 
@@ -156,12 +160,16 @@ mod count_votes {
         let mut j0 = Justification::new();
         let weights = Weights::new(senders_weights, 0.0, 2.0);
         assert!(j0.faulty_insert(v0, weights.clone()).success);
-        let m0 = &new_msg(0, j0);
+        let m0 = &new_msg(0, j0.clone());
+        println!("j0: {:?}", j0);
+        println!("m0: {:?}", m0);
         let mut j1 = Justification::new();
         assert!(j1.faulty_insert(v1, weights.clone()).success);
         assert!(j1.faulty_insert(m0, weights.clone()).success);
 
         let m1 = &new_msg(1, j1.clone());
+        println!("j1: {:?}", j1);
+        println!("m1: {:?}", m1);
         assert_eq!(
             Message::get_estimate(m1).clone().unwrap(),
             VoteCount { yes: 1, no: 1 },

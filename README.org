@@ -1,47 +1,29 @@
-* p2p voting
+* consensus state
 :PROPERTIES:
-:MODIFIED: [2018-05-01 Tue 01:37]
+:MODIFIED: [2018-07-26 Thu 15:41]
 :END:
 
-this seemed one of the easiest problems to tackle for understanding consensus
+minimal message and safe state creation and maintenance
+based on https://github.com/ethereum/research/blob/master/papers/CasperTFG/CasperTFG.pdf
 
 ** focus
 - keep it simple stupid, such that we focus only on consensus
-- nodes should agree on the outcome of a voting
+- nodes should agree on the outcome of a voting (this is just an example
+  estimate, but all the rest of the protocol is generic)
 - perform only one full round until result converges or it explodes
-- understand when safety is achieved and the vote is over
+- understand when safety of a message is achieved, and the vote is over
 
 ** general scheme
 - assume no sybil attack
 - no stake, no proof of work (maybe small one to publish msgs), just signatures of the known voters' set
-- a voter is a node
-- a vote is a msg with no justification (should be a msg pointing to a genesis msg that all peers point to)
-- each voter originally publish their own vote
-- any voters relay vote counting msgs which are justified by all votes they've seen, and other vote counting msgs from other voters
-- any voters count all votes on the gossiping network
+- voter = sender = validator = node
+- as of now a vote is a msg with no justification and a vote_counter that, when
+  combined with other votes, will increment the vote_counter by 1.
+- any voters relay vote counting msgs which are justified by all votes they've
+  seen, and other vote counting msgs from other voters
+- any voters count all votes
 
-** add contraints to msg validity
-- constraint justification validity to msgs that only reference same threat
-  once, that is, they reference what the node believes to be the latest message
-  from another peer
-- the first msg in the justification should reference to previous message from same node and then reference other msgs
-
-** ideas
-view is a Hashset of msgs
-
-msg hashes are shared on the p2p network, if u havent got the msg correspoding
-to a given hash, u ask for it
-
-H(msg) -> Future<pointer> // make it lazy, such that msgs get loaded only when needed
-
-even if H(msg) is not in memory, the Future<pointer> is, and if needed (lazy) it will
-be loaded from db to mem and resolve the pointer containing the msg
-
-if we do it like that we can do type safe io
-
-create hashset of voters that had their votes counted, so that we can pick up
-when double voting, and rejecting the subsequent votes
-
-** testing
-- create message emiters: (a) normal and (b) byzantine.
-- create 1000 nodes
+** TODO
+- H(msg) -> Future<pointer> // make it lazy, such that msgs get loaded only when needed
+- use quickcheck as a pseudo-theorem prover to prove properties of the
+  implementation (and not of the protocol per se)

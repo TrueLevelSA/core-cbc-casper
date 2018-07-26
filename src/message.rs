@@ -19,9 +19,9 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     fn get_justification<'z>(&'z self) -> &'z Justification<Self>;
     fn equivocates(&self, rhs: &Self) -> bool {
         self != rhs && self.get_sender() == rhs.get_sender()
-            && [!self.depends(rhs), !rhs.depends(self)]
+            && [!rhs.depends(self), !self.depends(rhs)] // FIXME: these should be closures, but couldnt get par_iter to work with closures
                 .par_iter()
-                .all(|&predicate| predicate)
+                .all(|&predicate| predicate) // FIXME: should evoke the closures
     }
     fn depends(&self, rhs: &Self) -> bool {
         // although the recursion ends supposedly only at genesis message, the
