@@ -215,7 +215,12 @@ where
             estimate,
         }))
     }
-    fn from_msgs(sender: S, msgs: Vec<&Self>, weights: &Weights<S>) -> Self {
+    fn from_msgs(
+        sender: S,
+        msgs: Vec<&Self>,
+        weights: &Weights<S>,
+        external_data: Option<<<Self as AbstractMsg>::E as Estimate>::D>,
+    ) -> Self {
         let mut justification = Justification::new();
         let _ = msgs.iter().fold(weights.clone(), |weights, &m| {
             let res = justification.faulty_insert(m, weights);
@@ -226,7 +231,7 @@ where
             );
             res.weights
         });
-        let estimate = Some(E::mk_estimate(&justification, None)); // FIXME
+        let estimate = <E as Estimate>::mk_estimate(&justification, external_data);
         Self::new(sender, justification, estimate)
     }
 }
@@ -301,7 +306,7 @@ mod message {
         justifications: Justification<Message<VoteCount, u32>>,
     ) -> Message<VoteCount, u32> {
         let estimate = VoteCount::mk_estimate(&justifications, None);
-        Message::new(sender, justifications, Some(estimate))
+        Message::new(sender, justifications, estimate)
     }
 
     #[test]
@@ -333,7 +338,7 @@ mod message {
             ).success
         );
         let estimate = VoteCount::mk_estimate(&j0, None);
-        let m0 = &Message::new(0, j0.clone(), Some(estimate));
+        let m0 = &Message::new(0, j0.clone(), estimate);
 
         let mut j1 = Justification::new();
         assert!(
@@ -457,12 +462,12 @@ mod message {
             v0.get_safe_msgs_by_weight(relative_senders_weights, thr);
         assert_eq!(safe_msgs.len(), 0, "only 0.5 of weight saw v0");
 
-        let m0 = &Message::from_msgs(sender0, vec![&v0], &weights);
+        let m0 = &Message::from_msgs(sender0, vec![&v0], &weights, None);
         let safe_msgs =
             m0.get_safe_msgs_by_weight(relative_senders_weights, thr);
         assert_eq!(safe_msgs.len(), 0, "only 0.5 of weight saw v0 and m0");
 
-        let m1 = &Message::from_msgs(sender1, vec![&m0], &weights);
+        let m1 = &Message::from_msgs(sender1, vec![&m0], &weights, None);
         let safe_msgs =
             m1.get_safe_msgs_by_weight(relative_senders_weights, thr);
         assert_eq!(
@@ -472,7 +477,7 @@ mod message {
 necessarly seen sender1 seeing v0 and m0, thus not yet safe"
         );
 
-        let m2 = &Message::from_msgs(sender0, vec![&m1], &weights);
+        let m2 = &Message::from_msgs(sender0, vec![&m1], &weights, None);
         let safe_msgs =
             m2.get_safe_msgs_by_weight(relative_senders_weights, thr);
         assert_eq!(
@@ -501,11 +506,11 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         let safe_msgs = v0.get_safe_msgs_by_validator(senders);
         assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0");
 
-        let m0 = &Message::from_msgs(sender0, vec![v0], &weights);
+        let m0 = &Message::from_msgs(sender0, vec![v0], &weights, None);
         let safe_msgs = m0.get_safe_msgs_by_validator(senders);
         assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0 and m0");
 
-        let m1 = &Message::from_msgs(sender1, vec![m0], &weights);
+        let m1 = &Message::from_msgs(sender1, vec![m0], &weights, None);
         let safe_msgs = m1.get_safe_msgs_by_validator(senders);
         assert_eq!(
             safe_msgs.len(),
@@ -514,7 +519,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
 necessarly seen sender1 seeing v0 and m0, thus not yet safe"
         );
 
-        let m2 = &Message::from_msgs(sender0, vec![m1], &weights);
+        let m2 = &Message::from_msgs(sender0, vec![m1], &weights, None);
         let safe_msgs = m2.get_safe_msgs_by_validator(senders);
         assert_eq!(
             safe_msgs,
@@ -527,7 +532,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         // sender1        v1--/   \--m1--/
         let v0 = &VoteCount::create_vote_msg(sender0, false);
         let v1 = &VoteCount::create_vote_msg(sender1, false);
-        let m0 = &Message::from_msgs(sender0, vec![v0, v1], &weights);
+        let m0 = &Message::from_msgs(sender0, vec![v0, v1], &weights, None);
         let safe_msgs = m0.get_safe_msgs_by_validator(senders);
         assert_eq!(
             safe_msgs.len(),
@@ -535,7 +540,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
             "sender0 saw v0, v1 and m0, and sender1 saw only v1"
         );
 
-        let m1 = &Message::from_msgs(sender1, vec![m0], &weights);
+        let m1 = &Message::from_msgs(sender1, vec![m0], &weights, None);
         let safe_msgs = m1.get_safe_msgs_by_validator(senders);
 
         assert_eq!(
@@ -545,7 +550,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
 necessarly seen sender1 seeing v0 and m0, just v1 is safe"
         );
 
-        let m2 = &Message::from_msgs(sender0, vec![m1], &weights);
+        let m2 = &Message::from_msgs(sender0, vec![m1], &weights, None);
         let safe_msgs = m2.get_safe_msgs_by_validator(senders);
         assert_eq!(
             safe_msgs,

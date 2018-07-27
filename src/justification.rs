@@ -164,7 +164,7 @@ mod justification {
             ).success
         );
         let estimate = VoteCount::mk_estimate(&j0, None);
-        let m0 = &Message::new(0, j0, Some(estimate));
+        let m0 = &Message::new(0, j0, estimate);
         let mut j1 = Justification::new();
         assert!(
             j1.faulty_insert(

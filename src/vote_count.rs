@@ -114,8 +114,8 @@ impl Estimate for VoteCount {
     // the estimator just counts votes, which in this case are the unjustified
     // msgs
     type M = Message<Self, Voter>;
-    type D = u32;
-    fn mk_estimate(justification: &Justification<Self::M>, _external_data: Option<Self::D>) -> Self {
+    type D = u32; // could be anything
+    fn mk_estimate(justification: &Justification<Self::M>, _external_data: Option<Self::D>) -> Option<Self> {
         // stub msg w/ no estimate and no valid sender that will be dropped on
         // the pattern matching below
         let msg = Message::new(
@@ -126,12 +126,13 @@ impl Estimate for VoteCount {
         // the estimates are actually the original votes of each of the voters /
         // validators
         let votes = Self::get_vote_msgs(&msg);
-        votes.iter().fold(Self::ZERO, |acc, vote| {
+        let res = votes.iter().fold(Self::ZERO, |acc, vote| {
             match vote.get_estimate() {
                 Some(estimate) => acc + estimate.clone(),
                 None => acc, // skip counting
             }
-        })
+        });
+        Some(res)
     }
 }
 
@@ -142,7 +143,7 @@ mod count_votes {
         justifications: Justification<Message<VoteCount, u32>>,
     ) -> Message<VoteCount, u32> {
         let estimate = VoteCount::mk_estimate(&justifications, None);
-        Message::new(sender, justifications, Some(estimate))
+        Message::new(sender, justifications, estimate)
     }
 
     #[test]
