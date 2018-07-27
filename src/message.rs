@@ -226,7 +226,7 @@ where
             );
             res.weights
         });
-        let estimate = Some(E::estimator(&justification)); // FIXME
+        let estimate = Some(E::mk_estimate(&justification, None)); // FIXME
         Self::new(sender, justification, estimate)
     }
 }
@@ -300,7 +300,7 @@ mod message {
         sender: u32,
         justifications: Justification<Message<VoteCount, u32>>,
     ) -> Message<VoteCount, u32> {
-        let estimate = VoteCount::estimator(&justifications);
+        let estimate = VoteCount::mk_estimate(&justifications, None);
         Message::new(sender, justifications, Some(estimate))
     }
 
@@ -332,7 +332,7 @@ mod message {
                 Weights::new(senders_weights.clone(), 0.0, 0.0,)
             ).success
         );
-        let estimate = VoteCount::estimator(&j0);
+        let estimate = VoteCount::mk_estimate(&j0, None);
         let m0 = &Message::new(0, j0.clone(), Some(estimate));
 
         let mut j1 = Justification::new();

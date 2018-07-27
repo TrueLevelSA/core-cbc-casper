@@ -163,7 +163,7 @@ mod justification {
                 }
             ).success
         );
-        let estimate = VoteCount::estimator(&j0);
+        let estimate = VoteCount::mk_estimate(&j0, None);
         let m0 = &Message::new(0, j0, Some(estimate));
         let mut j1 = Justification::new();
         assert!(
