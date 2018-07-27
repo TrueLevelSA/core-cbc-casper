@@ -12,10 +12,10 @@ use weight_unit::{WeightUnit};
 use senders_weight::SendersWeight;
 
 pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
-    type E: Estimate;
-    type S: Sender;
-    fn get_sender(&self) -> &Self::S;
-    fn get_estimate(&self) -> &Option<Self::E>;
+    type Estimate: Estimate;
+    type Sender: Sender;
+    fn get_sender(&self) -> &Self::Sender;
+    fn get_estimate(&self) -> &Option<Self::Estimate>;
     fn get_justification<'z>(&'z self) -> &'z Justification<Self>;
     fn equivocates(&self, rhs: &Self) -> bool {
         self != rhs
@@ -48,14 +48,14 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     /// and all senders saw each other seeing each other messages.
     fn get_safe_msgs_by_validator(
         &self,
-        all_senders: &HashSet<Self::S>,
+        all_senders: &HashSet<Self::Sender>,
     ) -> HashSet<Self> {
         fn recursor<M>(
             m: &M,
-            all_senders: &HashSet<M::S>,
-            mut senders_referred: HashSet<M::S>,
+            all_senders: &HashSet<M::Sender>,
+            mut senders_referred: HashSet<M::Sender>,
             safe_ms: HashSet<M>,
-            original_sender: &M::S,
+            original_sender: &M::Sender,
         ) -> HashSet<M>
         where
             M: AbstractMsg,
@@ -102,13 +102,13 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     /// that was seen by more than a given thr of total weight units.
     fn get_safe_msgs_by_weight(
         &self,
-        senders_weights: &SendersWeight<Self::S>,
+        senders_weights: &SendersWeight<Self::Sender>,
         thr: &WeightUnit,
     ) -> HashMap<Self, WeightUnit> {
         fn recursor<M>(
             m: &M,
-            senders_weights: &SendersWeight<M::S>,
-            mut senders_referred: HashSet<M::S>,
+            senders_weights: &SendersWeight<M::Sender>,
+            mut senders_referred: HashSet<M::Sender>,
             weight_referred: WeightUnit,
             thr: &WeightUnit,
             safe_msg_weight: HashMap<M, WeightUnit>,
@@ -219,7 +219,7 @@ where
         sender: S,
         msgs: Vec<&Self>,
         weights: &Weights<S>,
-        external_data: Option<<<Self as AbstractMsg>::E as Estimate>::D>,
+        external_data: Option<<<Self as AbstractMsg>::Estimate as Estimate>::Data>,
     ) -> Self {
         let mut justification = Justification::new();
         let _ = msgs.iter().fold(weights.clone(), |weights, &m| {
@@ -241,12 +241,12 @@ where
     E: Estimate,
     S: Sender,
 {
-    type E = E;
-    type S = S;
-    fn get_sender(&self) -> &Self::S {
+    type Estimate = E;
+    type Sender = S;
+    fn get_sender(&self) -> &Self::Sender {
         &self.0.sender
     }
-    fn get_estimate(&self) -> &Option<Self::E> {
+    fn get_estimate(&self) -> &Option<Self::Estimate> {
         &self.0.estimate
     }
     fn get_justification<'z>(&'z self) -> &'z Justification<Self> {

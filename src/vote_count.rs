@@ -114,8 +114,8 @@ impl Estimate for VoteCount {
     // the estimator just counts votes, which in this case are the unjustified
     // msgs
     type M = Message<Self, Voter>;
-    type D = u32; // could be anything
-    fn mk_estimate(justification: &Justification<Self::M>, _external_data: Option<Self::D>) -> Option<Self> {
+    type Data = u32; // could be anything
+    fn mk_estimate(justification: &Justification<Self::M>, _external_data: Option<Self::Data>) -> Option<Self> {
         // stub msg w/ no estimate and no valid sender that will be dropped on
         // the pattern matching below
         let msg = Message::new(

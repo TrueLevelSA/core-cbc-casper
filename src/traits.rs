@@ -4,11 +4,11 @@ use message::{AbstractMsg};
 use justification::{Justification};
 
 pub trait Estimate: Hash + Clone + Ord + Send + Sync + Debug {
-    type M: AbstractMsg<E = Self>;
-    type D;
+    type M: AbstractMsg<Estimate = Self>;
+    type Data;
     fn mk_estimate(
         justification: &Justification<Self::M>,
-        external_data: Option<Self::D>,
+        external_data: Option<Self::Data>,
     ) -> Option<Self>;
 }
 

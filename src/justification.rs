@@ -39,7 +39,7 @@ impl<M: AbstractMsg> Justification<M> {
     /// that if equivocator is a recurrent equivocator, it will be found again
     /// here. i believe the weight of an equivocator has to be set to ZERO
     /// immediately upon finding an equivocation
-    fn get_equivocators(&self, msg_new: &M) -> HashSet<M::S> {
+    fn get_equivocators(&self, msg_new: &M) -> HashSet<M::Sender> {
         self.par_iter()
             .filter_map(|msg_old| {
                 if msg_old.equivocates(&msg_new) {
@@ -57,8 +57,8 @@ impl<M: AbstractMsg> Justification<M> {
     pub fn faulty_insert(
         &mut self,
         msg: &M,
-        weights: Weights<M::S>,
-    ) -> FaultyInsertResult<M::S> {
+        weights: Weights<M::Sender>,
+    ) -> FaultyInsertResult<M::Sender> {
         let equivocators = self.get_equivocators(msg);
         let msg_fault_weight_overhead = equivocators.iter().fold(
             WeightUnit::ZERO,
