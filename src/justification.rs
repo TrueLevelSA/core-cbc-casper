@@ -57,8 +57,9 @@ impl<M: AbstractMsg> Justification<M> {
     pub fn faulty_insert(
         &mut self,
         msg: &M,
-        weights: Weights<M::Sender>,
+        weights: &Weights<M::Sender>,
     ) -> FaultyInsertResult<M::Sender> {
+        let weights = weights.clone();
         let equivocators = self.get_equivocators(msg);
         let msg_fault_weight_overhead = equivocators.iter().fold(
             WeightUnit::ZERO,
@@ -153,23 +154,20 @@ mod justification {
         let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
         let v1 = &VoteCount::create_vote_msg(1, true);
         let mut j0 = Justification::new();
-        assert!(
-            j0.faulty_insert(
-                v0,
-                Weights {
-                    senders_weights: senders_weights.clone(),
-                    state_fault_weight: 0.0,
-                    thr: 0.0,
-                }
-            ).success
-        );
-        let estimate = VoteCount::mk_estimate(&j0, None);
-        let m0 = &Message::new(0, j0, estimate);
+        let weights = Weights {
+            senders_weights: senders_weights.clone(),
+            state_fault_weight: 0.0,
+            thr: 0.0,
+        };
+        assert!(j0.faulty_insert(v0, &weights).success);
+        let (estimate, justification, weights) =
+            VoteCount::mk_estimate(vec![v0], &weights, None);
+        let m0 = &Message::new(0, justification, estimate);
         let mut j1 = Justification::new();
         assert!(
             j1.faulty_insert(
                 v1,
-                Weights {
+                &Weights {
                     senders_weights: senders_weights.clone(),
                     state_fault_weight: 0.0,
                     thr: 0.0,
@@ -179,7 +177,7 @@ mod justification {
         assert!(
             j1.faulty_insert(
                 m0,
-                Weights {
+                &Weights {
                     senders_weights: senders_weights.clone(),
                     state_fault_weight: 0.0,
                     thr: 0.0,
@@ -189,7 +187,7 @@ mod justification {
         assert!(
             !j1.faulty_insert(
                 v0_prime,
-                Weights {
+                &Weights {
                     senders_weights: senders_weights.clone(),
                     state_fault_weight: 0.0,
                     thr: 0.0
@@ -201,7 +199,7 @@ mod justification {
             j1.clone()
                 .faulty_insert(
                     v0_prime,
-                    Weights {
+                    &Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 0.0,
                         thr: 1.0
@@ -215,7 +213,7 @@ mod justification {
             j1.clone()
                 .faulty_insert(
                     v0_prime,
-                    Weights {
+                    &Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 0.0,
                         thr: 1.0
@@ -233,7 +231,7 @@ state_fault_weight should be incremented to 1.0"
             !j1.clone()
                 .faulty_insert(
                     v0_prime,
-                    Weights {
+                    &Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 0.1,
                         thr: 1.0
@@ -247,7 +245,7 @@ state_fault_weight should be incremented to 1.0"
             j1.clone()
                 .faulty_insert(
                     v0_prime,
-                    Weights {
+                    &Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 0.1,
                         thr: 1.0
@@ -262,7 +260,7 @@ state_fault_weight should be incremented to 1.0"
             j1.clone()
                 .faulty_insert(
                     v0_prime,
-                    Weights {
+                    &Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 1.0,
                         thr: 2.0
@@ -278,7 +276,7 @@ state_fault_weight should be incremented to 1.0"
             !j1.clone()
                 .faulty_insert(
                     v0_prime,
-                    Weights {
+                    &Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 1.0,
                         thr: 2.0
@@ -292,7 +290,7 @@ state_fault_weight should be incremented to 1.0"
             j1.clone()
                 .faulty_insert(
                     v0_prime,
-                    Weights {
+                    &Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 1.0,
                         thr: 2.0

@@ -4,7 +4,7 @@ use std::fmt::{Debug, Formatter, Result};
 
 use traits::{Zero, Estimate, Sender};
 use message::{Message, AbstractMsg};
-use justification::{Justification};
+use justification::{Justification, Weights};
 
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default)]
 pub struct VoteCount {
@@ -115,9 +115,27 @@ impl Estimate for VoteCount {
     // msgs
     type M = Message<Self, Voter>;
     type Data = u32; // could be anything
-    fn mk_estimate(justification: &Justification<Self::M>, _external_data: Option<Self::Data>) -> Option<Self> {
+
+    fn mk_estimate(
+        latest_msgs: Vec<&Self::M>,
+        weights: &Weights<Voter>,
+        _external_data: Option<Self::Data>,
+    ) -> (Option<Self>, Justification<Self::M>, Weights<Voter>) {
         // stub msg w/ no estimate and no valid sender that will be dropped on
         // the pattern matching below
+
+        let mut justification = Justification::new();
+        let weights =
+            latest_msgs.iter().fold(weights.clone(), |weights, &m| {
+                let res = justification.faulty_insert(m, &weights);
+                assert!(
+                    res.success,
+                    "Could not add message {:?} to justification!",
+                    m
+                );
+                res.weights
+            });
+
         let msg = Message::new(
             ::std::u32::MAX, // sender,
             justification.clone(),
@@ -132,7 +150,7 @@ impl Estimate for VoteCount {
                 None => acc, // skip counting
             }
         });
-        Some(res)
+        (Some(res), justification, weights)
     }
 }
 
@@ -140,10 +158,12 @@ mod count_votes {
     use super::*;
     fn new_msg(
         sender: u32,
-        justifications: Justification<Message<VoteCount, u32>>,
+        latest_msgs: Vec<&Message<VoteCount, u32>>,
+        weights: &Weights<u32>,
     ) -> Message<VoteCount, u32> {
-        let estimate = VoteCount::mk_estimate(&justifications, None);
-        Message::new(sender, justifications, estimate)
+        let (estimate, justification, weights) =
+            VoteCount::mk_estimate(latest_msgs, weights, None);
+        Message::new(sender, justification, estimate)
     }
 
     #[test]
@@ -158,13 +178,13 @@ mod count_votes {
         let v1 = &VoteCount::create_vote_msg(1, true);
         let mut j0 = Justification::new();
         let weights = Weights::new(senders_weights, 0.0, 2.0);
-        assert!(j0.faulty_insert(v0, weights.clone()).success);
-        let m0 = &new_msg(0, j0.clone());
+        assert!(j0.faulty_insert(v0, &weights).success);
+        let m0 = &new_msg(0, vec![v0], &weights);
         let mut j1 = Justification::new();
-        assert!(j1.faulty_insert(v1, weights.clone()).success);
-        assert!(j1.faulty_insert(m0, weights.clone()).success);
+        assert!(j1.faulty_insert(v1, &weights).success);
+        assert!(j1.faulty_insert(m0, &weights).success);
 
-        let m1 = &new_msg(1, j1.clone());
+        let m1 = &new_msg(1, vec![v1, m0], &weights);
         assert_eq!(
             Message::get_estimate(m1).clone().unwrap(),
             VoteCount { yes: 1, no: 1 },
@@ -172,8 +192,8 @@ mod count_votes {
             Message::get_estimate(m1).clone().unwrap(),
         );
 
-        assert!(j1.faulty_insert(v0_prime, weights.clone()).success);
-        let m1_prime = &new_msg(1, j1.clone());
+        assert!(j1.faulty_insert(v0_prime, &weights).success);
+        let m1_prime = &new_msg(1, vec![v1, m0, v0_prime], &weights);
         assert_eq!(
             Message::get_estimate(m1_prime).clone().unwrap(),
             VoteCount { yes: 1, no: 0 },

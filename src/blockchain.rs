@@ -3,8 +3,8 @@ use std::hash::{Hash};
 use std::fmt::{Debug};
 
 use traits::{Estimate};
-use message::{Message};
-use justification::{Justification};
+use message::{Message, AbstractMsg};
+use justification::{Justification, Weights};
 
 type Miner = u32;
 type BlockHash = u128;
@@ -28,13 +28,14 @@ impl Estimate for BlockChain<BlockHash> {
     type M = Message<Self, Miner>;
     type Data = HashSet<Tx>;
     fn mk_estimate(
-        justification: &Justification<Self::M>,
-        external_data: Option<Self::Data>,
-    ) -> Option<Self> {
+        justification: Vec<&Self::M>,
+        weights: &Weights<Miner>,
+        external_data: Option<Self::Data>, // mempool
+    ) -> (Option<Self>, Justification<Self::M>, Weights<Miner>) {
         unimplemented!()
     }
 }
 
 struct Tx {
-    txid: TxHash,
+    tx_hash: TxHash,
 }
