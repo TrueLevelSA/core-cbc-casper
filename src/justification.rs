@@ -29,10 +29,12 @@ impl<M: AbstractMsg> Justification<M> {
     pub fn len(&self) -> usize {
         self.0.len()
     }
-    fn insert(&mut self, msg: M) -> bool {
+    pub fn insert(&mut self, msg: M) -> bool {
         self.0.insert(msg)
     }
-
+    fn head(&self) -> Option<&M> {
+        self.0.iter().next()
+    }
     // Custom functions
 
     /// get the additional equivocators upon insertion of msg to the state. note
@@ -104,10 +106,7 @@ impl<M: AbstractMsg> Justification<M> {
     }
 }
 
-impl<E, S> Debug for Justification<Message<E, S>>
-where
-    E: Estimate,
-    S: Sender,
+impl<M: AbstractMsg> Debug for Justification<M>
 {
     fn fmt(&self, f: &mut Formatter) -> Result {
         write!(f, "{:?}", self.0)
@@ -160,8 +159,8 @@ mod justification {
             thr: 0.0,
         };
         assert!(j0.faulty_insert(v0, &weights).success);
-        let (estimate, justification, weights) =
-            VoteCount::mk_estimate(vec![v0], &weights, None);
+        let (estimate, justification, _weights) =
+            VoteCount::mk_estimate(vec![v0], &weights, None as Option<VoteCount>);
         let m0 = &Message::new(0, justification, estimate);
         let mut j1 = Justification::new();
         assert!(

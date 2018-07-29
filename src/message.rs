@@ -2,21 +2,39 @@ use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::fmt::{Debug, Formatter, Result};
 use std::sync::{Arc};
-
 // use std::io::{Error};
 
 use rayon::prelude::*;
-use traits::{Estimate, Zero, Sender};
+use traits::{Estimate, Zero, Sender, Data};
 use justification::{Justification, Weights};
 use weight_unit::{WeightUnit};
 use senders_weight::SendersWeight;
 
 pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
-    type Estimate: Estimate;
+    // To be implemented on concrete struct
+    type Estimate: Estimate<M = Self, Sender = Self::Sender>;
     type Sender: Sender;
-    fn get_sender(&self) -> &Self::Sender;
-    fn get_estimate(&self) -> &Option<Self::Estimate>;
+    fn get_sender(&self) -> Self::Sender;
+    fn get_estimate(&self) -> Option<Self::Estimate>;
     fn get_justification<'z>(&'z self) -> &'z Justification<Self>;
+    fn new(
+        sender: Self::Sender,
+        justification: Justification<Self>,
+        estimate: Option<Self::Estimate>,
+    ) -> Self;
+
+    // Following methods are actual implementations
+    fn from_msgs<D: Data>(
+        sender: Self::Sender,
+        latest_msgs: Vec<&Self>,
+        weights: &Weights<Self::Sender>,
+        external_data: Option<D>,
+    ) -> (Self, Weights<Self::Sender>) {
+        let (estimate, justification, weights) =
+            Self::Estimate::mk_estimate(latest_msgs, weights, external_data);
+        (Self::new(sender, justification, estimate), weights)
+    }
+
     fn equivocates(&self, rhs: &Self) -> bool {
         self != rhs
             && self.get_sender() == rhs.get_sender()
@@ -65,7 +83,7 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
                 |mut safe_ms_prime, m_prime| {
                     // base case
                     if &senders_referred == all_senders
-                        && m_prime.get_sender() == original_sender
+                        && original_sender == &m_prime.get_sender()
                     {
                         let _ = safe_ms_prime.insert(m_prime.clone());
                         safe_ms_prime
@@ -94,7 +112,7 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
             all_senders,
             senders_refered,
             safe_msgs,
-            original_sender,
+            &original_sender,
         )
     }
 
@@ -131,7 +149,7 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
                         {
                             weight_referred
                                 + senders_weights
-                                    .get_weight(sender_current)
+                                    .get_weight(&sender_current)
                                     .unwrap_or(WeightUnit::ZERO)
                         }
                         else {
@@ -168,7 +186,7 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
 #[derive(Clone, Default, Eq, PartialEq, PartialOrd, Ord)]
 struct ProtoMessage<E, S>
 where
-    E: Estimate,
+    E: Estimate<Sender = S, M = Message<E, S>>,
     S: Sender,
 {
     estimate: Option<E>,
@@ -177,7 +195,9 @@ where
 }
 
 #[derive(Eq, Ord, PartialOrd, Clone, Default)]
-pub struct Message<E: Estimate, S: Sender>(Arc<ProtoMessage<E, S>>);
+pub struct Message<E: Estimate<Sender = S, M = Message<E, S>>, S: Sender>(
+    Arc<ProtoMessage<E, S>>,
+);
 /*
 // TODO start we should make messages lazy. continue this after async-await is better
 // documented
@@ -188,23 +208,36 @@ enum MsgStatus {
     Invalid,
 }
 
-struct Msg<E, S>
+struct Msg<E, S, D>
 where
     E: Estimate,
     S: Sender,
 {
     status: MsgStatus,
-    msg: Future<Item = Message<E, S>, Error = Error>,
+    msg: Future<Item = Message<E, S, D>, Error = Error>,
 }
 // TODO end
 */
 
-impl<E, S> Message<E, S>
+impl<E, S> AbstractMsg for Message<E, S>
 where
-    E: Estimate<M = Self>,
+    E: Estimate<M = Self, Sender = S>,
     S: Sender,
 {
-    pub fn new(
+    type Estimate = E;
+    type Sender = S;
+
+    fn get_sender(&self) -> Self::Sender {
+        self.0.sender.clone()
+    }
+    fn get_estimate(&self) -> Option<Self::Estimate> {
+        self.0.estimate.clone()
+    }
+    fn get_justification<'z>(&'z self) -> &'z Justification<Self> {
+        &self.0.justification
+    }
+
+    fn new(
         sender: S,
         justification: Justification<Self>,
         estimate: Option<E>,
@@ -215,41 +248,11 @@ where
             estimate,
         }))
     }
-    fn from_msgs(
-        sender: S,
-        latest_msgs: Vec<&Self>,
-        weights: &Weights<S>,
-        external_data: Option<
-            <<Self as AbstractMsg>::Estimate as Estimate>::Data,
-        >,
-    ) -> (Self, Weights<S>) {
-        let (estimate, justification, weights) =
-            <E as Estimate>::mk_estimate(latest_msgs, weights, external_data);
-        (Self::new(sender, justification, estimate), weights)
-    }
-}
-
-impl<E, S> AbstractMsg for Message<E, S>
-where
-    E: Estimate,
-    S: Sender,
-{
-    type Estimate = E;
-    type Sender = S;
-    fn get_sender(&self) -> &Self::Sender {
-        &self.0.sender
-    }
-    fn get_estimate(&self) -> &Option<Self::Estimate> {
-        &self.0.estimate
-    }
-    fn get_justification<'z>(&'z self) -> &'z Justification<Self> {
-        &self.0.justification
-    }
 }
 
 impl<E, S> Hash for Message<E, S>
 where
-    E: Estimate,
+    E: Estimate<M = Self, Sender = S>,
     S: Sender,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -261,7 +264,7 @@ where
 
 impl<E, S> PartialEq for Message<E, S>
 where
-    E: Estimate,
+    E: Estimate<M = Self, Sender = S>,
     S: Sender,
 {
     fn eq(&self, rhs: &Self) -> bool {
@@ -273,7 +276,7 @@ where
 
 impl<E, S> Debug for Message<E, S>
 where
-    E: Estimate,
+    E: Estimate<M = Self, Sender = S>,
     S: Sender,
 {
     fn fmt(&self, f: &mut Formatter) -> Result {
@@ -299,8 +302,9 @@ mod message {
         latest_msgs: Vec<&Message<VoteCount, u32>>,
         weights: &Weights<u32>,
     ) -> Message<VoteCount, u32> {
+        let external_data: Option<VoteCount> = None;
         let (estimate, justification, _weights) =
-            VoteCount::mk_estimate(latest_msgs, weights, None);
+            VoteCount::mk_estimate(latest_msgs, weights, external_data);
         Message::new(sender, justification, estimate)
     }
 
@@ -327,8 +331,10 @@ mod message {
         let weights = Weights::new(senders_weights, 0.0, 0.0);
         let mut j0 = Justification::new();
         assert!(j0.faulty_insert(v0, &weights).success);
+
+        let external_data: Option<VoteCount> = None;
         let (estimate, justification, weights) =
-            VoteCount::mk_estimate(vec![v0], &weights, None);
+            VoteCount::mk_estimate(vec![v0], &weights, external_data);
         let m0 = &Message::new(0, justification, estimate);
 
         let mut j1 = Justification::new();
@@ -424,12 +430,22 @@ mod message {
             v0.get_safe_msgs_by_weight(relative_senders_weights, thr);
         assert_eq!(safe_msgs.len(), 0, "only 0.5 of weight saw v0");
 
-        let (m0, _) = &Message::from_msgs(sender0, vec![&v0], &weights, None);
+        let (m0, _) = &Message::from_msgs(
+            sender0,
+            vec![&v0],
+            &weights,
+            None as Option<VoteCount>,
+        );
         let safe_msgs =
             m0.get_safe_msgs_by_weight(relative_senders_weights, thr);
         assert_eq!(safe_msgs.len(), 0, "only 0.5 of weight saw v0 and m0");
 
-        let (m1, _) = &Message::from_msgs(sender1, vec![&m0], &weights, None);
+        let (m1, _) = &Message::from_msgs(
+            sender1,
+            vec![&m0],
+            &weights,
+            None as Option<VoteCount>,
+        );
         let safe_msgs =
             m1.get_safe_msgs_by_weight(relative_senders_weights, thr);
         assert_eq!(
@@ -439,7 +455,12 @@ mod message {
 necessarly seen sender1 seeing v0 and m0, thus not yet safe"
         );
 
-        let (m2, _) = &Message::from_msgs(sender0, vec![&m1], &weights, None);
+        let (m2, _) = &Message::from_msgs(
+            sender0,
+            vec![&m1],
+            &weights,
+            None as Option<VoteCount>,
+        );
         let safe_msgs =
             m2.get_safe_msgs_by_weight(relative_senders_weights, thr);
         assert_eq!(
@@ -468,11 +489,21 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         let safe_msgs = v0.get_safe_msgs_by_validator(senders);
         assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0");
 
-        let (m0, weights) = &Message::from_msgs(sender0, vec![v0], &weights, None);
+        let (m0, weights) = &Message::from_msgs(
+            sender0,
+            vec![v0],
+            &weights,
+            None as Option<VoteCount>,
+        );
         let safe_msgs = m0.get_safe_msgs_by_validator(senders);
         assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0 and m0");
 
-        let (m1, weights) = &Message::from_msgs(sender1, vec![m0], &weights, None);
+        let (m1, weights) = &Message::from_msgs(
+            sender1,
+            vec![m0],
+            &weights,
+            None as Option<VoteCount>,
+        );
         let safe_msgs = m1.get_safe_msgs_by_validator(senders);
         assert_eq!(
             safe_msgs.len(),
@@ -481,7 +512,12 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
 necessarly seen sender1 seeing v0 and m0, thus not yet safe"
         );
 
-        let (m2, weights) = &Message::from_msgs(sender0, vec![m1], &weights, None);
+        let (m2, weights) = &Message::from_msgs(
+            sender0,
+            vec![m1],
+            &weights,
+            None as Option<VoteCount>,
+        );
         let safe_msgs = m2.get_safe_msgs_by_validator(senders);
         assert_eq!(
             safe_msgs,
@@ -494,7 +530,12 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         // sender1        v1--/   \--m1--/
         let v0 = &VoteCount::create_vote_msg(sender0, false);
         let v1 = &VoteCount::create_vote_msg(sender1, false);
-        let (m0, weights) = &Message::from_msgs(sender0, vec![v0, v1], &weights, None);
+        let (m0, weights) = &Message::from_msgs(
+            sender0,
+            vec![v0, v1],
+            &weights,
+            None as Option<VoteCount>,
+        );
         let safe_msgs = m0.get_safe_msgs_by_validator(senders);
         assert_eq!(
             safe_msgs.len(),
@@ -502,7 +543,12 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
             "sender0 saw v0, v1 and m0, and sender1 saw only v1"
         );
 
-        let (m1, weights) = &Message::from_msgs(sender1, vec![m0], &weights, None);
+        let (m1, weights) = &Message::from_msgs(
+            sender1,
+            vec![m0],
+            &weights,
+            None as Option<VoteCount>,
+        );
         let safe_msgs = m1.get_safe_msgs_by_validator(senders);
 
         assert_eq!(
@@ -512,7 +558,12 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
 necessarly seen sender1 seeing v0 and m0, just v1 is safe"
         );
 
-        let (m2, _weights) = &Message::from_msgs(sender0, vec![m1], &weights, None);
+        let (m2, _weights) = &Message::from_msgs(
+            sender0,
+            vec![m1],
+            &weights,
+            None as Option<VoteCount>,
+        );
         let safe_msgs = m2.get_safe_msgs_by_validator(senders);
         assert_eq!(
             safe_msgs,

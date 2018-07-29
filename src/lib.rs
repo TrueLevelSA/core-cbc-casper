@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![feature(associated_type_defaults)]
 mod message;
 mod justification;
 mod weight_unit;

@@ -2,9 +2,11 @@ use std::collections::{HashSet};
 use std::ops::{Add};
 use std::fmt::{Debug, Formatter, Result};
 
-use traits::{Zero, Estimate, Sender};
+use traits::{Zero, Estimate, Sender, Data};
 use message::{Message, AbstractMsg};
 use justification::{Justification, Weights};
+
+
 
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default)]
 pub struct VoteCount {
@@ -31,8 +33,6 @@ impl Debug for VoteCount {
         write!(f, "y{:?}/n{:?}", self.yes, self.no)
     }
 }
-
-impl Sender for u32 {}
 
 impl VoteCount {
     // makes sure nobody adds more than one vote to their unjustified VoteCount
@@ -81,12 +81,14 @@ impl VoteCount {
                     match m.get_justification().len() {
                         0 => {
                             // vote found, vote is a message with 0 justification
-                            let estimate = m.get_estimate();
-                            if VoteCount::is_valid_vote(estimate) {
+                            let estimate = m
+                                .get_estimate()
+                                .and_then(|estimate| Some(estimate.clone()));
+                            if VoteCount::is_valid_vote(&estimate) {
                                 let equivocation = Message::new(
                                     m.get_sender().clone(),
                                     m.get_justification().clone(),
-                                    VoteCount::toggle_vote(estimate),
+                                    VoteCount::toggle_vote(&estimate),
                                 );
                                 // search for the equivocation of the current msg
                                 match acc_prime.get(&equivocation) {
@@ -109,17 +111,21 @@ impl VoteCount {
 }
 
 type Voter = u32;
+impl Sender for Voter {}
+impl Data for VoteCount {}
+
 
 impl Estimate for VoteCount {
     // the estimator just counts votes, which in this case are the unjustified
     // msgs
     type M = Message<Self, Voter>;
-    type Data = u32; // could be anything
+    // type Data = Self; // could be anything
+    type Sender = Voter;
 
-    fn mk_estimate(
+    fn mk_estimate<D: Data>(
         latest_msgs: Vec<&Self::M>,
         weights: &Weights<Voter>,
-        _external_data: Option<Self::Data>,
+        _external_data: Option<D>,
     ) -> (Option<Self>, Justification<Self::M>, Weights<Voter>) {
         // stub msg w/ no estimate and no valid sender that will be dropped on
         // the pattern matching below
@@ -161,8 +167,9 @@ mod count_votes {
         latest_msgs: Vec<&Message<VoteCount, u32>>,
         weights: &Weights<u32>,
     ) -> Message<VoteCount, u32> {
+        let external_data: Option<VoteCount> = None;
         let (estimate, justification, weights) =
-            VoteCount::mk_estimate(latest_msgs, weights, None);
+            VoteCount::mk_estimate(latest_msgs, weights, external_data);
         Message::new(sender, justification, estimate)
     }
 
@@ -198,7 +205,6 @@ mod count_votes {
             Message::get_estimate(m1_prime).clone().unwrap(),
             VoteCount { yes: 1, no: 0 },
             "should have 1 yes, and 0 no vote, found {:?}, the equivocation vote should cancels out the normal vote",
-            Message::get_estimate(&m1_prime).clone().unwrap(),
-        )
+            Message::get_estimate(&m1_prime).clone().unwrap(),)
     }
 }
