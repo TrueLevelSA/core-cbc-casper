@@ -5,3 +5,6 @@ authors = ["pZ4 <pz4@getnada.com>"]
 
 [dependencies]
 rayon = "*"
+
+[dev-dependencies]
+quickcheck = "*"

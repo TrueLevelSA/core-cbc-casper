@@ -6,8 +6,6 @@ use traits::{Zero, Estimate, Sender, Data};
 use message::{Message, AbstractMsg};
 use justification::{Justification, Weights};
 
-
-
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default)]
 pub struct VoteCount {
     yes: u32,
@@ -114,37 +112,26 @@ type Voter = u32;
 impl Sender for Voter {}
 impl Data for VoteCount {}
 
-
 impl Estimate for VoteCount {
     // the estimator just counts votes, which in this case are the unjustified
     // msgs
     type M = Message<Self, Voter>;
-    // type Data = Self; // could be anything
     type Sender = Voter;
 
-    fn mk_estimate<D: Data>(
-        latest_msgs: Vec<&Self::M>,
-        weights: &Weights<Voter>,
-        _external_data: Option<D>,
-    ) -> (Option<Self>, Justification<Self::M>, Weights<Voter>) {
+    // Data could be anything, as it will not be used, will just pass None to
+    // mk_estimate, as it takes an Option
+    type Data = Self;
+
+    fn mk_estimate(
+        latest_msgs: &Justification<Self::M>,
+        _weights: &Weights<Voter>, // all voters have same weight
+        _external_data: Option<Self::Data>,
+    ) -> Option<Self> {
         // stub msg w/ no estimate and no valid sender that will be dropped on
         // the pattern matching below
-
-        let mut justification = Justification::new();
-        let weights =
-            latest_msgs.iter().fold(weights.clone(), |weights, &m| {
-                let res = justification.faulty_insert(m, &weights);
-                assert!(
-                    res.success,
-                    "Could not add message {:?} to justification!",
-                    m
-                );
-                res.weights
-            });
-
         let msg = Message::new(
             ::std::u32::MAX, // sender,
-            justification.clone(),
+            latest_msgs.clone(),
             None, // estimate, will be droped on the pattern matching below
         );
         // the estimates are actually the original votes of each of the voters /
@@ -156,23 +143,12 @@ impl Estimate for VoteCount {
                 None => acc, // skip counting
             }
         });
-        (Some(res), justification, weights)
+        Some(res)
     }
 }
 
 mod count_votes {
     use super::*;
-    fn new_msg(
-        sender: u32,
-        latest_msgs: Vec<&Message<VoteCount, u32>>,
-        weights: &Weights<u32>,
-    ) -> Message<VoteCount, u32> {
-        let external_data: Option<VoteCount> = None;
-        let (estimate, justification, weights) =
-            VoteCount::mk_estimate(latest_msgs, weights, external_data);
-        Message::new(sender, justification, estimate)
-    }
-
     #[test]
     fn count_votes() {
         use justification::{Weights};
@@ -185,13 +161,13 @@ mod count_votes {
         let v1 = &VoteCount::create_vote_msg(1, true);
         let mut j0 = Justification::new();
         let weights = Weights::new(senders_weights, 0.0, 2.0);
-        assert!(j0.faulty_insert(v0, &weights).success);
-        let m0 = &new_msg(0, vec![v0], &weights);
+        assert!(j0.faulty_insert(vec![v0], &weights).success);
+        let (m0, _) = &Message::from_msgs(0, vec![v0], &weights, None);
         let mut j1 = Justification::new();
-        assert!(j1.faulty_insert(v1, &weights).success);
-        assert!(j1.faulty_insert(m0, &weights).success);
+        assert!(j1.faulty_insert(vec![v1], &weights).success);
+        assert!(j1.faulty_insert(vec![m0], &weights).success);
 
-        let m1 = &new_msg(1, vec![v1, m0], &weights);
+        let (m1, _) = &Message::from_msgs(1, vec![v1, m0], &weights, None);
         assert_eq!(
             Message::get_estimate(m1).clone().unwrap(),
             VoteCount { yes: 1, no: 1 },
@@ -199,8 +175,8 @@ mod count_votes {
             Message::get_estimate(m1).clone().unwrap(),
         );
 
-        assert!(j1.faulty_insert(v0_prime, &weights).success);
-        let m1_prime = &new_msg(1, vec![v1, m0, v0_prime], &weights);
+        assert!(j1.faulty_insert(vec![v0_prime], &weights).success);
+        let (m1_prime, _) = &Message::from_msgs(1, vec![v1, m0, v0_prime], &weights, None);
         assert_eq!(
             Message::get_estimate(m1_prime).clone().unwrap(),
             VoteCount { yes: 1, no: 0 },

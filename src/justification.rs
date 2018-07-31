@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashSet, HashMap};
 use std::collections::btree_set::{Iter};
 use std::fmt::{Debug, Formatter, Result};
 // use std::io::{Error};
@@ -58,56 +58,121 @@ impl<M: AbstractMsg> Justification<M> {
     /// insert msgs to the Justification, accepting up to $thr$ faults by weight
     pub fn faulty_insert(
         &mut self,
-        msg: &M,
+        msgs: Vec<&M>,
         weights: &Weights<M::Sender>,
     ) -> FaultyInsertResult<M::Sender> {
-        let weights = weights.clone();
-        let equivocators = self.get_equivocators(msg);
-        let msg_fault_weight_overhead = equivocators.iter().fold(
-            WeightUnit::ZERO,
-            |acc, equivocator| {
-                acc + weights
-                    .senders_weights
-                    .get_weight(equivocator)
-                    .unwrap_or(::std::f64::NAN)
-            },
-        );
+        fn inserter<M: AbstractMsg>(
+            justification: &mut Justification<M>,
+            msg: &M,
+            msg_fault_weight_overhead: &WeightUnit,
+            equivocators: HashSet<M::Sender>,
+            weights: &Weights<M::Sender>,
+        ) -> FaultyInsertResult<M::Sender> {
+            let weights = weights.clone();
+            let new_fault_weight =
+                weights.state_fault_weight + msg_fault_weight_overhead;
+            if new_fault_weight <= weights.thr {
+                let success = justification.insert(msg.clone());
+                let (weights, equivocators) = if success {
+                    (
+                        Weights {
+                            state_fault_weight: new_fault_weight,
+                            ..weights
+                        },
+                        equivocators
+                            .iter()
+                            .chain(equivocators.iter())
+                            .cloned()
+                            .collect(),
+                    )
+                }
+                else {
+                    (weights, equivocators)
+                };
 
-        let new_fault_weight =
-            weights.state_fault_weight + msg_fault_weight_overhead;
-
-        if new_fault_weight <= weights.thr {
-            let success = self.insert(msg.clone());
-            let weights = if success {
-                Weights {
-                    state_fault_weight: new_fault_weight,
-                    ..weights
+                FaultyInsertResult {
+                    success,
+                    weights,
+                    equivocators,
                 }
             }
+            // conflicting message NOT added to the set as it crosses the fault
+            // weight thr
             else {
-                weights
-            };
-
-            FaultyInsertResult {
-                success,
-                weights,
-                equivocators,
+                FaultyInsertResult {
+                    success: false,
+                    weights,
+                    equivocators,
+                }
             }
         }
-        // conflicting message NOT added to the set as it crosses the fault
-        // weight thr OR msg_fault_weight_overhead is NAN (from the unwrap)
-        else {
+        fn sorter<'z, M: AbstractMsg>(
+            justification: &Justification<M>,
+            msgs: &Vec<&'z M>,
+            weights: &Weights<M::Sender>,
+        ) -> Vec<(&'z M, WeightUnit, HashSet<M::Sender>)> {
+            // let justification = self.clone();
+            let mut msgs_faultws_eqvcts: Vec<(
+                &M,
+                WeightUnit,
+                HashSet<M::Sender>,
+            )> = msgs
+                .iter()
+                .map(|&msg| {
+                    let weights = weights.clone();
+                    let msg_eqvcts = justification.get_equivocators(msg);
+                    let msg_faultw = msg_eqvcts.iter().fold(
+                        WeightUnit::ZERO,
+                        |acc, equivocator| {
+                            acc + weights
+                                .senders_weights
+                                .get_weight(equivocator)
+                                .unwrap_or(::std::f64::NAN)
+                        },
+                    );
+                    (msg, msg_faultw, msg_eqvcts)
+                })
+                // is_finite() gets rid of NAN and INFINITE
+                .filter(|(_, msg_faultw, _)| msg_faultw.is_finite())
+                .collect();
+
+            // sort msg by weight_overhead
+            let _ = msgs_faultws_eqvcts.sort_unstable_by(
+                |(_, w0, _), (_, w1, _)| w0.partial_cmp(w1).unwrap(),
+            );
+            msgs_faultws_eqvcts
+        }
+
+        let msgs_faultws_eqvcts = sorter(self, &msgs, weights);
+        msgs_faultws_eqvcts.iter().fold(
             FaultyInsertResult {
                 success: false,
-                weights,
-                equivocators,
-            }
-        }
+                weights: weights.clone(),
+                equivocators: HashSet::new(),
+            },
+            |acc, (msg, msg_faultw, msg_eqvcts)| {
+                let FaultyInsertResult {
+                    success,
+                    weights,
+                    equivocators,
+                } = inserter(
+                    self,
+                    msg,
+                    msg_faultw,
+                    msg_eqvcts.clone(),
+                    &acc.weights,
+                );
+                FaultyInsertResult {
+                    success,
+                    weights,
+                    equivocators,
+                }
+            },
+        )
     }
 }
 
-impl<M: AbstractMsg> Debug for Justification<M>
-{
+impl<M: AbstractMsg> Debug for Justification<M> {
     fn fmt(&self, f: &mut Formatter) -> Result {
         write!(f, "{:?}", self.0)
     }
@@ -158,14 +223,18 @@ mod justification {
             state_fault_weight: 0.0,
             thr: 0.0,
         };
-        assert!(j0.faulty_insert(v0, &weights).success);
-        let (estimate, justification, _weights) =
-            VoteCount::mk_estimate(vec![v0], &weights, None as Option<VoteCount>);
-        let m0 = &Message::new(0, justification, estimate);
+        assert!(j0.faulty_insert(vec![v0], &weights).success);
+        let (m0, _weights) = &Message::from_msgs(
+            0,
+            vec![v0],
+            &weights,
+            None as Option<VoteCount>,
+        );
+        // let m0 = &Message::new(0, justification, estimate);
         let mut j1 = Justification::new();
         assert!(
             j1.faulty_insert(
-                v1,
+                vec![v1],
                 &Weights {
                     senders_weights: senders_weights.clone(),
                     state_fault_weight: 0.0,
@@ -175,7 +244,7 @@ mod justification {
         );
         assert!(
             j1.faulty_insert(
-                m0,
+                vec![m0],
                 &Weights {
                     senders_weights: senders_weights.clone(),
                     state_fault_weight: 0.0,
@@ -185,7 +254,7 @@ mod justification {
         );
         assert!(
             !j1.faulty_insert(
-                v0_prime,
+                vec![v0_prime],
                 &Weights {
                     senders_weights: senders_weights.clone(),
                     state_fault_weight: 0.0,
@@ -197,7 +266,7 @@ mod justification {
         assert!(
             j1.clone()
                 .faulty_insert(
-                    v0_prime,
+                    vec![v0_prime],
                     &Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 0.0,
@@ -211,11 +280,11 @@ mod justification {
         assert_eq!(
             j1.clone()
                 .faulty_insert(
-                    v0_prime,
+                    vec![v0_prime],
                     &Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 0.0,
-                        thr: 1.0
+                        thr: 1.0,
                     }
                 )
                 .weights
@@ -229,7 +298,7 @@ state_fault_weight should be incremented to 1.0"
         assert!(
             !j1.clone()
                 .faulty_insert(
-                    v0_prime,
+                    vec![v0_prime],
                     &Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 0.1,
@@ -243,7 +312,7 @@ state_fault_weight should be incremented to 1.0"
         assert_eq!(
             j1.clone()
                 .faulty_insert(
-                    v0_prime,
+                    vec![v0_prime],
                     &Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 0.1,
@@ -258,7 +327,7 @@ state_fault_weight should be incremented to 1.0"
         assert!(
             j1.clone()
                 .faulty_insert(
-                    v0_prime,
+                    vec![v0_prime],
                     &Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 1.0,
@@ -274,7 +343,7 @@ state_fault_weight should be incremented to 1.0"
         assert!(
             !j1.clone()
                 .faulty_insert(
-                    v0_prime,
+                    vec![v0_prime],
                     &Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 1.0,
@@ -288,7 +357,7 @@ state_fault_weight should be incremented to 1.0"
         assert_eq!(
             j1.clone()
                 .faulty_insert(
-                    v0_prime,
+                    vec![v0_prime],
                     &Weights {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 1.0,

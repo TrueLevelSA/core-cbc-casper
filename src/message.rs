@@ -1,3 +1,4 @@
+#[macro_use]
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::fmt::{Debug, Formatter, Result};
@@ -5,15 +6,15 @@ use std::sync::{Arc};
 // use std::io::{Error};
 
 use rayon::prelude::*;
-use traits::{Estimate, Zero, Sender, Data};
+use traits::{Estimate, Zero, Sender};
 use justification::{Justification, Weights};
 use weight_unit::{WeightUnit};
 use senders_weight::SendersWeight;
 
 pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     // To be implemented on concrete struct
-    type Estimate: Estimate<M = Self, Sender = Self::Sender>;
     type Sender: Sender;
+    type Estimate: Estimate<M = Self, Sender = Self::Sender>;
     fn get_sender(&self) -> Self::Sender;
     fn get_estimate(&self) -> Option<Self::Estimate>;
     fn get_justification<'z>(&'z self) -> &'z Justification<Self>;
@@ -24,14 +25,31 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     ) -> Self;
 
     // Following methods are actual implementations
-    fn from_msgs<D: Data>(
+    fn from_msgs(
         sender: Self::Sender,
         latest_msgs: Vec<&Self>,
         weights: &Weights<Self::Sender>,
-        external_data: Option<D>,
+        external_data: Option<
+            <<Self as AbstractMsg>::Estimate as Estimate>::Data,
+        >,
     ) -> (Self, Weights<Self::Sender>) {
-        let (estimate, justification, weights) =
-            Self::Estimate::mk_estimate(latest_msgs, weights, external_data);
+        let mut justification = Justification::new();
+        let weights =
+            latest_msgs.iter().fold(weights.clone(), |weights, &m| {
+                let res = justification.faulty_insert(vec![m], &weights);
+                assert!(
+                    res.success,
+                    "Could not add message {:?} to justification!",
+                    m
+                );
+                res.weights
+            });
+
+        let estimate = Self::Estimate::mk_estimate(
+            &justification,
+            &weights,
+            external_data,
+        );
         (Self::new(sender, justification, estimate), weights)
     }
 
@@ -297,16 +315,6 @@ mod message {
 
     use std::{f64};
     use super::*;
-    fn new_msg(
-        sender: u32,
-        latest_msgs: Vec<&Message<VoteCount, u32>>,
-        weights: &Weights<u32>,
-    ) -> Message<VoteCount, u32> {
-        let external_data: Option<VoteCount> = None;
-        let (estimate, justification, _weights) =
-            VoteCount::mk_estimate(latest_msgs, weights, external_data);
-        Message::new(sender, justification, estimate)
-    }
 
     #[test]
     fn debug() {
@@ -330,23 +338,23 @@ mod message {
         );
         let weights = Weights::new(senders_weights, 0.0, 0.0);
         let mut j0 = Justification::new();
-        assert!(j0.faulty_insert(v0, &weights).success);
+        assert!(j0.faulty_insert(vec![v0], &weights).success);
 
         let external_data: Option<VoteCount> = None;
-        let (estimate, justification, weights) =
-            VoteCount::mk_estimate(vec![v0], &weights, external_data);
-        let m0 = &Message::new(0, justification, estimate);
+        let (m0, _) =
+            &Message::from_msgs(0, vec![v0], &weights, external_data);
+        // let m0 = &Message::new(0, justification, estimate);
 
         let mut j1 = Justification::new();
-        assert!(j1.faulty_insert(v0, &weights).success);
-        assert!(j1.faulty_insert(m0, &weights).success);
+        assert!(j1.faulty_insert(vec![v0], &weights).success);
+        assert!(j1.faulty_insert(vec![m0], &weights).success);
         assert!(
-            new_msg(0, vec![v0], &weights) == new_msg(0, vec![v0], &weights),
+            Message::from_msgs(0, vec![v0], &weights, None).0 == Message::from_msgs(0, vec![v0], &weights, None).0,
             "messages should be equal"
         );
         assert!(
-            new_msg(0, vec![v0], &weights)
-                != new_msg(0, vec![v0, m0], &weights)
+            Message::from_msgs(0, vec![v0], &weights, None).0
+                != Message::from_msgs(0, vec![v0, m0], &weights, None).0
         );
     }
 
@@ -361,8 +369,8 @@ mod message {
         let weights = Weights::new(senders_weights, 0.0, 0.0);
 
         let mut j0 = Justification::new();
-        assert!(j0.faulty_insert(v0, &weights).success);
-        let m0 = &new_msg(0, vec![v0], &weights);
+        assert!(j0.faulty_insert(vec![v0], &weights).success);
+        let (m0, _) = &Message::from_msgs(0, vec![v0], &weights, None);
         assert!(
             !v0.depends(v0_prime),
             "v0 does NOT depends on v0_prime as they are equivocating"
@@ -375,14 +383,14 @@ mod message {
         assert!(m0.depends(v0), "m0 depends on v0 directly");
 
         let mut j0 = Justification::new();
-        assert!(j0.faulty_insert(v0, &weights).success);
-        let m0 = &new_msg(0, vec![v0], &weights);
+        assert!(j0.faulty_insert(vec![v0], &weights).success);
+        let (m0, _) = &Message::from_msgs(0, vec![v0], &weights, None);
 
         let mut j1 = Justification::new();
-        assert!(j1.faulty_insert(v0, &weights).success);
-        assert!(j1.faulty_insert(m0, &weights).success);
+        assert!(j1.faulty_insert(vec![v0], &weights).success);
+        assert!(j1.faulty_insert(vec![m0], &weights).success);
 
-        let m1 = &new_msg(0, vec![v0, m0], &weights);
+        let (m1, _) = &Message::from_msgs(0, vec![v0, m0], &weights, None);
         assert!(m1.depends(m0), "m1 DOES depent on m0");
         assert!(!m0.depends(m1), "but m0 does NOT depend on m1");
         assert!(m1.depends(v0), "m1 depends on v0 through m0");
@@ -400,8 +408,8 @@ mod message {
         let weights = Weights::new(senders_weights, 0.0, 0.0);
 
         let mut j0 = Justification::new();
-        assert!(j0.faulty_insert(v0, &weights).success);
-        let m0 = &new_msg(0, vec![v0], &weights);
+        assert!(j0.faulty_insert(vec![v0], &weights).success);
+        let (m0, _) = &Message::from_msgs(0, vec![v0], &weights, None);
         assert!(!v0.equivocates(v0), "should be all good");
         assert!(!v1.equivocates(m0), "should be all good");
         assert!(!m0.equivocates(v1), "should be all good");
