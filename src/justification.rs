@@ -61,6 +61,7 @@ impl<M: AbstractMsg> Justification<M> {
         msgs: Vec<&M>,
         weights: &Weights<M::Sender>,
     ) -> FaultyInsertResult<M::Sender> {
+        /// do the actual insertions to the state
         fn inserter<M: AbstractMsg>(
             justification: &mut Justification<M>,
             msg: &M,
@@ -71,101 +72,81 @@ impl<M: AbstractMsg> Justification<M> {
             let weights = weights.clone();
             let new_fault_weight =
                 weights.state_fault_weight + msg_fault_weight_overhead;
-            if new_fault_weight <= weights.thr {
-                let success = justification.insert(msg.clone());
-                let (weights, equivocators) = if success {
-                    (
-                        Weights {
-                            state_fault_weight: new_fault_weight,
-                            ..weights
-                        },
-                        equivocators
-                            .iter()
-                            .chain(equivocators.iter())
-                            .cloned()
-                            .collect(),
-                    )
+            let success = justification.insert(msg.clone());
+
+            // FIXME: if equivocator already in, dont count again
+            let (weights, equivocators) = if success {
+                (
+                    Weights {
+                        state_fault_weight: new_fault_weight,
+                        ..weights
+                    },
+                    equivocators
+                        .iter()
+                        .chain(equivocators.iter())
+                        .cloned()
+                        .collect(),
+                )
+            }
+            else {
+                (weights, equivocators)
+            };
+
+            FaultyInsertResult {
+                success,
+                weights,
+                equivocators,
+            }
+        }
+        let mut msgs_faultws_eqvctrss_sorted: Vec<(
+            &M,
+            WeightUnit,
+            HashSet<M::Sender>,
+        )> = msgs
+            .iter()
+            .filter_map(|&msg| {
+                let msg_equivocators = self.get_equivocators(msg);
+                let msg_faultweight = weights
+                    .senders_weights
+                    .sum_weight_senders(&msg_equivocators);
+                if msg_faultweight.is_nan() {
+                    None
                 }
                 else {
-                    (weights, equivocators)
-                };
-
-                FaultyInsertResult {
-                    success,
-                    weights,
-                    equivocators,
+                    Some((msg, msg_faultweight, msg_equivocators))
                 }
-            }
-            // conflicting message NOT added to the set as it crosses the fault
-            // weight thr
-            else {
-                FaultyInsertResult {
-                    success: false,
-                    weights,
-                    equivocators,
-                }
-            }
-        }
-        fn sorter<'z, M: AbstractMsg>(
-            justification: &Justification<M>,
-            msgs: &Vec<&'z M>,
-            weights: &Weights<M::Sender>,
-        ) -> Vec<(&'z M, WeightUnit, HashSet<M::Sender>)> {
-            // let justification = self.clone();
-            let mut msgs_faultws_eqvcts: Vec<(
-                &M,
-                WeightUnit,
-                HashSet<M::Sender>,
-            )> = msgs
-                .iter()
-                .map(|&msg| {
-                    let weights = weights.clone();
-                    let msg_eqvcts = justification.get_equivocators(msg);
-                    let msg_faultw = msg_eqvcts.iter().fold(
-                        WeightUnit::ZERO,
-                        |acc, equivocator| {
-                            acc + weights
-                                .senders_weights
-                                .get_weight(equivocator)
-                                .unwrap_or(::std::f64::NAN)
-                        },
-                    );
-                    (msg, msg_faultw, msg_eqvcts)
-                })
-                // is_finite() gets rid of NAN and INFINITE
-                .filter(|(_, msg_faultw, _)| msg_faultw.is_finite())
-                .collect();
+            })
+            .collect();
+        let _ = msgs_faultws_eqvctrss_sorted.sort_unstable_by(
+            |(_, w0, _), (_, w1, _)| w0.partial_cmp(w1).unwrap(),
+        );
+        let msgs_faultws_eqvctrss_sorted = /*mut*/ msgs_faultws_eqvctrss_sorted;
 
-            // sort msg by weight_overhead
-            let _ = msgs_faultws_eqvcts.sort_unstable_by(
-                |(_, w0, _), (_, w1, _)| w0.partial_cmp(w1).unwrap(),
-            );
-            msgs_faultws_eqvcts
-        }
-
-        let msgs_faultws_eqvcts = sorter(self, &msgs, weights);
-        msgs_faultws_eqvcts.iter().fold(
+        msgs_faultws_eqvctrss_sorted.iter().fold(
             FaultyInsertResult {
                 success: false,
                 weights: weights.clone(),
-                equivocators: HashSet::new(),
+                equivocators: HashSet::new(), // TODO: should probably take equivocators in parent fn
             },
-            |acc, (msg, msg_faultw, msg_eqvcts)| {
-                let FaultyInsertResult {
-                    success,
-                    weights,
-                    equivocators,
-                } = inserter(
-                    self,
-                    msg,
-                    msg_faultw,
-                    msg_eqvcts.clone(),
-                    &acc.weights,
-                );
-                FaultyInsertResult {
-                    success,
-                    weights,
-                    equivocators,
+            |acc, (msg, msg_faultweight, msg_equivocators)| {
+                let new_fault_weight = weights.state_fault_weight + msg_faultweight;
+                if new_fault_weight <= weights.thr {
+                    inserter(
+                        self,
+                        msg,
+                        msg_faultweight,
+                        msg_equivocators.clone(),
+                        &acc.weights,
+                    )
+                }
+                // conflicting message NOT added to the set as it crosses the fault
+                // weight thr
+                else {
+                    FaultyInsertResult {
+                        success: false,
+                        weights: weights.clone(),
+                        equivocators: msg_equivocators.clone(),
+                    }
                 }
             },
         )
@@ -178,6 +159,9 @@ impl<M: AbstractMsg> Debug for Justification<M> {
     }
 }
 
+// FIXME: success should probably be out of this struct, as this struct can be
+// used to keep track of state cummulatively and success is related to a single
+// insertion
 pub struct FaultyInsertResult<S: Sender> {
     pub success: bool,
     pub weights: Weights<S>,
@@ -187,6 +171,7 @@ pub struct FaultyInsertResult<S: Sender> {
 #[derive(Debug, Clone)]
 pub struct Weights<S: Sender> {
     senders_weights: SendersWeight<S>,
+    // equivocators: HashSet<S>,
     state_fault_weight: WeightUnit,
     thr: WeightUnit,
 }

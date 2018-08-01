@@ -63,6 +63,15 @@ impl<S: Sender> SendersWeight<S> {
                 .collect(),
         )
     }
+    pub fn sum_weight_senders(&self, senders: &HashSet<S>) -> WeightUnit {
+        senders.iter().fold(
+            WeightUnit::ZERO,
+            |acc, equivocator| {
+                acc + self
+                    .get_weight(equivocator)
+                    .unwrap_or(::std::f64::NAN)
+            })
+    }
 }
 
 #[cfg(test)]
