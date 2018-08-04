@@ -124,6 +124,7 @@ impl Estimate for VoteCount {
 
     fn mk_estimate(
         latest_msgs: &Justification<Self::M>,
+        finalized_msg: Option<&Self::M>,
         _weights: &Weights<Voter>, // all voters have same weight
         _external_data: Option<Self::Data>,
     ) -> Option<Self> {
@@ -160,14 +161,24 @@ mod count_votes {
         let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
         let v1 = &VoteCount::create_vote_msg(1, true);
         let mut j0 = Justification::new();
-        let weights = Weights::new(senders_weights, 0.0, 2.0);
-        assert!(j0.faulty_insert(vec![v0], &weights).success);
-        let (m0, _) = &Message::from_msgs(0, vec![v0], &weights, None);
+        let weights = Weights::new(senders_weights, 0.0, 2.0, HashSet::new());
+        assert!(
+            j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
+                .success
+        );
+        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, None);
         let mut j1 = Justification::new();
-        assert!(j1.faulty_insert(vec![v1], &weights).success);
-        assert!(j1.faulty_insert(vec![m0], &weights).success);
+        assert!(
+            j1.faulty_inserts(vec![v1].iter().cloned().collect(), &weights)
+                .success
+        );
+        assert!(
+            j1.faulty_inserts(vec![m0].iter().cloned().collect(), &weights)
+                .success
+        );
 
-        let (m1, _) = &Message::from_msgs(1, vec![v1, m0], &weights, None);
+        let (m1, _) =
+            &Message::from_msgs(1, vec![v1, m0], None, &weights, None);
         assert_eq!(
             Message::get_estimate(m1).clone().unwrap(),
             VoteCount { yes: 1, no: 1 },
@@ -175,8 +186,19 @@ mod count_votes {
             Message::get_estimate(m1).clone().unwrap(),
         );
 
-        assert!(j1.faulty_insert(vec![v0_prime], &weights).success);
-        let (m1_prime, _) = &Message::from_msgs(1, vec![v1, m0, v0_prime], &weights, None);
+        assert!(
+            j1.faulty_inserts(
+                vec![v0_prime].iter().cloned().collect(),
+                &weights
+            ).success
+        );
+        let (m1_prime, _) = &Message::from_msgs(
+            1,
+            vec![v1, m0, v0_prime].iter().cloned().collect(),
+            None,
+            &weights,
+            None,
+        );
         assert_eq!(
             Message::get_estimate(m1_prime).clone().unwrap(),
             VoteCount { yes: 1, no: 0 },

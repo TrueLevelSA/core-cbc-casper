@@ -9,8 +9,9 @@ pub trait Estimate: Hash + Clone + Ord + Send + Sync + Debug {
     type Data: Data;
     fn mk_estimate(
         latest_msgs: &Justification<Self::M>,
+        finalized_msg: Option<&Self::M>,
         weights: &Weights<Self::Sender>,
-        external_data: Option<Self::Data>,
+        external_data: Option<Self::Data>, // TODO, i think should go to AbstractMsg
     ) ->  Option<Self>;
 }
 

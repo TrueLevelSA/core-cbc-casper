@@ -7,7 +7,7 @@ use std::sync::{Arc};
 
 use rayon::prelude::*;
 use traits::{Estimate, Zero, Sender};
-use justification::{Justification, Weights};
+use justification::{Justification, Weights, FaultyInsertResult};
 use weight_unit::{WeightUnit};
 use senders_weight::SendersWeight;
 
@@ -28,31 +28,33 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     fn from_msgs(
         sender: Self::Sender,
         latest_msgs: Vec<&Self>,
+        finalized_msg: Option<&Self>,
         weights: &Weights<Self::Sender>,
         external_data: Option<
             <<Self as AbstractMsg>::Estimate as Estimate>::Data,
         >,
     ) -> (Self, Weights<Self::Sender>) {
-        let mut justification = Justification::new();
-        let weights =
-            latest_msgs.iter().fold(weights.clone(), |weights, &m| {
-                let res = justification.faulty_insert(vec![m], &weights);
-                assert!(
-                    res.success,
-                    "Could not add message {:?} to justification!",
-                    m
-                );
-                res.weights
-            });
+        // // TODO eventually comment out these lines, and FIXME tests
+        // // check whether two messages from same sender
+        // let mut senders = HashSet::new();
+        // let dup_senders = latest_msgs.iter().any(|msg| !senders.insert(msg.get_sender()));
+        // assert!(!dup_senders, "A sender can only have one, and only one, latest message");
 
+        // dedup by putting msgs into a hashset
+        let latest_msgs: HashSet<_> = latest_msgs.iter().cloned().collect();
+
+        let mut justification = Justification::new();
+        let FaultyInsertResult { success, weights } =
+            justification.faulty_inserts(latest_msgs, &weights);
+        assert!(success, "None of the messages could be added to the state!");
         let estimate = Self::Estimate::mk_estimate(
             &justification,
+            finalized_msg,
             &weights,
             external_data,
         );
         (Self::new(sender, justification, estimate), weights)
     }
-
     fn equivocates(&self, rhs: &Self) -> bool {
         self != rhs
             && self.get_sender() == rhs.get_sender()
@@ -78,11 +80,14 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
                 .par_iter()
                 .any(|self_prime| self_prime.depends(rhs))
     }
+    fn is_circular(&self, rhs: &Self) -> bool {
+        rhs.depends(self) && self.depends(rhs)
+    }
 
     /// returns the dag tip-most safe messages. a safe message is defined as one
     /// that was seen by all senders (with non-zero weight in senders_weights)
     /// and all senders saw each other seeing each other messages.
-    fn get_safe_msgs_by_validator(
+    fn get_finalized_msgs(
         &self,
         all_senders: &HashSet<Self::Sender>,
     ) -> HashSet<Self> {
@@ -315,7 +320,6 @@ mod message {
 
     use std::{f64};
     use super::*;
-
     #[test]
     fn debug() {
         let v0 = VoteCount::create_vote_msg(0, false);
@@ -336,25 +340,40 @@ mod message {
         let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
-        let weights = Weights::new(senders_weights, 0.0, 0.0);
+        let weights = Weights::new(senders_weights, 0.0, 0.0, HashSet::new());
         let mut j0 = Justification::new();
-        assert!(j0.faulty_insert(vec![v0], &weights).success);
+        assert!(
+            j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
+                .success
+        );
 
         let external_data: Option<VoteCount> = None;
-        let (m0, _) =
-            &Message::from_msgs(0, vec![v0], &weights, external_data);
+        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, external_data);
         // let m0 = &Message::new(0, justification, estimate);
 
         let mut j1 = Justification::new();
-        assert!(j1.faulty_insert(vec![v0], &weights).success);
-        assert!(j1.faulty_insert(vec![m0], &weights).success);
         assert!(
-            Message::from_msgs(0, vec![v0], &weights, None).0 == Message::from_msgs(0, vec![v0], &weights, None).0,
+            j1.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
+                .success
+        );
+        assert!(
+            j1.faulty_inserts(vec![m0].iter().cloned().collect(), &weights)
+                .success
+        );
+        assert!(
+            Message::from_msgs(
+                0,
+                vec![v0].iter().cloned().collect(),
+                None,
+                &weights,
+                None,
+            ).0
+                == Message::from_msgs(0, vec![v0], None, &weights, None).0,
             "messages should be equal"
         );
         assert!(
-            Message::from_msgs(0, vec![v0], &weights, None).0
-                != Message::from_msgs(0, vec![v0, m0], &weights, None).0
+            Message::from_msgs(0, vec![v0], None, &weights, None).0
+                != Message::from_msgs(0, vec![v0, m0], None, &weights, None).0
         );
     }
 
@@ -366,11 +385,14 @@ mod message {
         let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
-        let weights = Weights::new(senders_weights, 0.0, 0.0);
+        let weights = Weights::new(senders_weights, 0.0, 0.0, HashSet::new());
 
         let mut j0 = Justification::new();
-        assert!(j0.faulty_insert(vec![v0], &weights).success);
-        let (m0, _) = &Message::from_msgs(0, vec![v0], &weights, None);
+        assert!(
+            j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
+                .success
+        );
+        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, None);
         assert!(
             !v0.depends(v0_prime),
             "v0 does NOT depends on v0_prime as they are equivocating"
@@ -383,14 +405,23 @@ mod message {
         assert!(m0.depends(v0), "m0 depends on v0 directly");
 
         let mut j0 = Justification::new();
-        assert!(j0.faulty_insert(vec![v0], &weights).success);
-        let (m0, _) = &Message::from_msgs(0, vec![v0], &weights, None);
+        assert!(
+            j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
+                .success
+        );
+        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, None);
 
         let mut j1 = Justification::new();
-        assert!(j1.faulty_insert(vec![v0], &weights).success);
-        assert!(j1.faulty_insert(vec![m0], &weights).success);
+        assert!(
+            j1.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
+                .success
+        );
+        assert!(
+            j1.faulty_inserts(vec![m0].iter().cloned().collect(), &weights)
+                .success
+        );
 
-        let (m1, _) = &Message::from_msgs(0, vec![v0, m0], &weights, None);
+        let (m1, _) = &Message::from_msgs(0, vec![v0, m0], None, &weights, None);
         assert!(m1.depends(m0), "m1 DOES depent on m0");
         assert!(!m0.depends(m1), "but m0 does NOT depend on m1");
         assert!(m1.depends(v0), "m1 depends on v0 through m0");
@@ -405,11 +436,14 @@ mod message {
         let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
-        let weights = Weights::new(senders_weights, 0.0, 0.0);
+        let weights = Weights::new(senders_weights, 0.0, 0.0, HashSet::new());
 
         let mut j0 = Justification::new();
-        assert!(j0.faulty_insert(vec![v0], &weights).success);
-        let (m0, _) = &Message::from_msgs(0, vec![v0], &weights, None);
+        assert!(
+            j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
+                .success
+        );
+        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, None);
         assert!(!v0.equivocates(v0), "should be all good");
         assert!(!v1.equivocates(m0), "should be all good");
         assert!(!m0.equivocates(v1), "should be all good");
@@ -428,7 +462,8 @@ mod message {
         );
 
         let relative_senders_weights = &senders_weights.into_relative_weights();
-        let weights = Weights::new(senders_weights.clone(), 0.0, 0.0);
+        let weights =
+            Weights::new(senders_weights.clone(), 0.0, 0.0, HashSet::new());
 
         let thr = &0.5;
         // sender0        v0---m0        m2---
@@ -441,6 +476,7 @@ mod message {
         let (m0, _) = &Message::from_msgs(
             sender0,
             vec![&v0],
+            None,
             &weights,
             None as Option<VoteCount>,
         );
@@ -451,6 +487,7 @@ mod message {
         let (m1, _) = &Message::from_msgs(
             sender1,
             vec![&m0],
+            None,
             &weights,
             None as Option<VoteCount>,
         );
@@ -466,6 +503,7 @@ necessarly seen sender1 seeing v0 and m0, thus not yet safe"
         let (m2, _) = &Message::from_msgs(
             sender0,
             vec![&m1],
+            None,
             &weights,
             None as Option<VoteCount>,
         );
@@ -488,31 +526,34 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         let senders_weights = SendersWeight::new(
             [(sender0, 1.0), (sender1, 1.0)].iter().cloned().collect(),
         );
-        let weights = Weights::new(senders_weights.clone(), 0.0, 0.0);
+        let weights =
+            Weights::new(senders_weights.clone(), 0.0, 0.0, HashSet::new());
         let senders = &senders_weights.get_senders();
 
         // sender0        v0---m0        m2---
         // sender1               \--m1--/
         let v0 = &VoteCount::create_vote_msg(sender0, false);
-        let safe_msgs = v0.get_safe_msgs_by_validator(senders);
+        let safe_msgs = v0.get_finalized_msgs(senders);
         assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0");
 
         let (m0, weights) = &Message::from_msgs(
             sender0,
             vec![v0],
+            None,
             &weights,
             None as Option<VoteCount>,
         );
-        let safe_msgs = m0.get_safe_msgs_by_validator(senders);
+        let safe_msgs = m0.get_finalized_msgs(senders);
         assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0 and m0");
 
         let (m1, weights) = &Message::from_msgs(
             sender1,
             vec![m0],
+            None,
             &weights,
             None as Option<VoteCount>,
         );
-        let safe_msgs = m1.get_safe_msgs_by_validator(senders);
+        let safe_msgs = m1.get_finalized_msgs(senders);
         assert_eq!(
             safe_msgs.len(),
             0,
@@ -523,10 +564,11 @@ necessarly seen sender1 seeing v0 and m0, thus not yet safe"
         let (m2, weights) = &Message::from_msgs(
             sender0,
             vec![m1],
+            None,
             &weights,
             None as Option<VoteCount>,
         );
-        let safe_msgs = m2.get_safe_msgs_by_validator(senders);
+        let safe_msgs = m2.get_finalized_msgs(senders);
         assert_eq!(
             safe_msgs,
             [m0.clone()].iter().cloned().collect(),
@@ -541,10 +583,11 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         let (m0, weights) = &Message::from_msgs(
             sender0,
             vec![v0, v1],
+            None,
             &weights,
             None as Option<VoteCount>,
         );
-        let safe_msgs = m0.get_safe_msgs_by_validator(senders);
+        let safe_msgs = m0.get_finalized_msgs(senders);
         assert_eq!(
             safe_msgs.len(),
             0,
@@ -554,10 +597,11 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         let (m1, weights) = &Message::from_msgs(
             sender1,
             vec![m0],
+            None,
             &weights,
             None as Option<VoteCount>,
         );
-        let safe_msgs = m1.get_safe_msgs_by_validator(senders);
+        let safe_msgs = m1.get_finalized_msgs(senders);
 
         assert_eq!(
             safe_msgs,
@@ -569,10 +613,11 @@ necessarly seen sender1 seeing v0 and m0, just v1 is safe"
         let (m2, _weights) = &Message::from_msgs(
             sender0,
             vec![m1],
+            None,
             &weights,
             None as Option<VoteCount>,
         );
-        let safe_msgs = m2.get_safe_msgs_by_validator(senders);
+        let safe_msgs = m2.get_finalized_msgs(senders);
         assert_eq!(
             safe_msgs,
             [m0.clone()].iter().cloned().collect(),
