@@ -6,16 +6,20 @@ use justification::{Justification, Weights};
 type Miner = u32;
 
 #[derive(Clone, Default, Eq, PartialEq, PartialOrd, Ord, Debug, Hash)]
-struct Block {
-    prev_block: ProtoBlock,
-    data: Option<<ProtoBlock as AbstractMsg>::Data>,
+struct BlockChain {
+    prev_block: Block,
+    data: Option<<Block as AbstractMsg>::Data>,
 }
 
-type ProtoBlock = Message<Block /*estimate*/, Miner /*sender*/, Txs>;
+type Block = Message<
+    BlockChain, /*estimate*/
+    Miner,      /*sender*/
+    Txs,        /*data*/
+>;
 
 // TODO: i think its possible to do ghost in arbitrary data, that is default implementation
-impl Estimate for Block {
-    type M = ProtoBlock;
+impl Estimate for BlockChain {
+    type M = Block;
     fn mk_estimate(
         latest_msgs: &Justification<Self::M>,
         finalized_msg: Option<&Self::M>,
@@ -24,11 +28,7 @@ impl Estimate for Block {
     ) -> Option<Self> {
         let senders_weights = weights.get_senders_weights();
         latest_msgs
-            .get_children_weights(
-                finalized_msg,
-                senders_weights,
-                &senders_weights.get_senders(),
-            )
+            .get_children_weights(finalized_msg, senders_weights)
             .iter()
             .max_by(|(_, &weight0), (_, &weight1)| {
                 weight1
@@ -38,14 +38,13 @@ impl Estimate for Block {
                     .unwrap_or(::std::cmp::Ordering::Greater)
             })
             .and_then(|(prev_block, _)| {
-                Some(Block {
+                Some(BlockChain {
                     prev_block: prev_block.clone(),
                     data,
                 })
             })
     }
 }
-
 
 #[derive(Eq, Ord, PartialOrd, PartialEq, Clone, Default, Hash, Debug)]
 pub struct Tx;
@@ -57,7 +56,6 @@ fn blockchain() {
     let miner = 10;
     let prev_block = None;
     let justification = Justification::new();
-    let genesis_block =
-        ProtoBlock::new(miner, justification, prev_block.clone());
+    let genesis_block = Block::new(miner, justification, prev_block.clone());
     assert_eq!(genesis_block.get_estimate(), prev_block, "hardcoded");
 }

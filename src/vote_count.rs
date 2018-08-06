@@ -115,7 +115,7 @@ impl Data for VoteCount {}
 impl Estimate for VoteCount {
     // the estimator just counts votes, which in this case are the unjustified
     // msgs
-    type M = Message<Self, Voter, VoteCount>;
+    type M = Message<Self, Voter, Self>;
 
     // Data could be anything, as it will not be used, will just pass None to
     // mk_estimate, as it takes an Option
@@ -125,7 +125,7 @@ impl Estimate for VoteCount {
         latest_msgs: &Justification<Self::M>,
         _finalized_msg: Option<&Self::M>,
         _weights: &Weights<Voter>, // all voters have same weight
-        _external_data: Option<VoteCount>,
+        _external_data: Option<Self>,
         // _external_data: Option<Self::Data>,
     ) -> Option<Self> {
         // stub msg w/ no estimate and no valid sender that will be dropped on

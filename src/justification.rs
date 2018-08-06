@@ -202,7 +202,6 @@ impl<M: AbstractMsg> Justification<M> {
         &self,
         finalized_msg: Option<&M>,
         senders_weights: &SendersWeight<M::Sender>,
-        all_senders: &HashSet<M::Sender>,
     ) -> HashMap<M, WeightUnit> {
         fn recursor<M>(
             m: &M,
@@ -257,6 +256,7 @@ impl<M: AbstractMsg> Justification<M> {
             )
         };
         // initial state, trigger recursion
+        let all_senders = &senders_weights.get_senders();
         let senders_referred: HashSet<M::Sender> = [].iter().cloned().collect();
         let initial_weight = WeightUnit::ZERO;
         self.iter()
