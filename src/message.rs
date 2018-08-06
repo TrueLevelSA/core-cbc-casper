@@ -1,4 +1,3 @@
-#[macro_use]
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::fmt::{Debug, Formatter, Result};
@@ -15,7 +14,7 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     // To be implemented on concrete struct
     type Data: Data;
     type Sender: Sender;
-    type Estimate: Estimate<M = Self, Sender = Self::Sender>;
+    type Estimate: Estimate<M = Self>;
     fn get_sender(&self) -> Self::Sender;
     fn get_estimate(&self) -> Option<Self::Estimate>;
     fn get_justification<'z>(&'z self) -> &'z Justification<Self>;
@@ -50,6 +49,7 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
             &justification,
             finalized_msg,
             &weights,
+            external_data
         );
         let message = Self::new(sender, justification, estimate);
         (message, weights)
@@ -209,7 +209,7 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
 #[derive(Clone, Default, Eq, PartialEq, PartialOrd, Ord)]
 struct ProtoMessage<E, S, D>
 where
-    E: Estimate<Sender = S, M = Message<E, S, D>>,
+    E: Estimate<M = Message<E, S, D>>,
     S: Sender,
     D: Data,
 {
@@ -220,7 +220,7 @@ where
 
 #[derive(Eq, Ord, PartialOrd, Clone, Default)]
 pub struct Message<
-    E: Estimate<Sender = S, M = Message<E, S, D>>,
+    E: Estimate<M = Message<E, S, D>>,
     S: Sender,
     D: Data,
 >(Arc<ProtoMessage<E, S, D>>);
@@ -247,7 +247,7 @@ where
 
 impl<E, S, D> AbstractMsg for Message<E, S, D>
 where
-    E: Estimate<M = Self, Sender = S>,
+    E: Estimate<M = Self>,
     S: Sender,
     D: Data,
 {
@@ -280,7 +280,7 @@ where
 
 impl<E, S, D> Hash for Message<E, S, D>
 where
-    E: Estimate<M = Self, Sender = S>,
+    E: Estimate<M = Self>,
     S: Sender,
     D: Data,
 {
@@ -293,7 +293,7 @@ where
 
 impl<E, S, D> PartialEq for Message<E, S, D>
 where
-    E: Estimate<M = Self, Sender = S>,
+    E: Estimate<M = Self>,
     S: Sender,
     D: Data,
 {
@@ -306,7 +306,7 @@ where
 
 impl<E, S, D> Debug for Message<E, S, D>
 where
-    E: Estimate<M = Self, Sender = S>,
+    E: Estimate<M = Self>,
     S: Sender,
     D: Data,
 {

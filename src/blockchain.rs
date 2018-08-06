@@ -1,29 +1,26 @@
-use std::collections::{HashSet, BTreeSet};
-use std::hash::{Hash};
-use std::fmt::{Debug};
-
-use traits::{Estimate, Data, Sender};
+use std::collections::{BTreeSet};
+use traits::{Estimate, Data};
 use message::{AbstractMsg, Message};
 use justification::{Justification, Weights};
-use senders_weight::{SendersWeight};
-use std::sync::{Arc};
 
 type Miner = u32;
-type TxHash = u64;
 
 #[derive(Clone, Default, Eq, PartialEq, PartialOrd, Ord, Debug, Hash)]
-struct BlockWrapped(Block);
+struct Block {
+    prev_block: ProtoBlock,
+    data: Option<<ProtoBlock as AbstractMsg>::Data>,
+}
 
-type Block = Message<BlockWrapped /*estimate*/, Miner /*sender*/, Txs>;
+type ProtoBlock = Message<Block /*estimate*/, Miner /*sender*/, Txs>;
 
 // TODO: i think its possible to do ghost in arbitrary data, that is default implementation
-impl Estimate for BlockWrapped {
-    type M = Block;
-    type Sender = Miner;
+impl Estimate for Block {
+    type M = ProtoBlock;
     fn mk_estimate(
         latest_msgs: &Justification<Self::M>,
         finalized_msg: Option<&Self::M>,
         weights: &Weights<Miner>,
+        data: Option<<<Self as Estimate>::M as AbstractMsg>::Data>,
     ) -> Option<Self> {
         let senders_weights = weights.get_senders_weights();
         latest_msgs
@@ -40,14 +37,18 @@ impl Estimate for BlockWrapped {
                     // same and we arbitrarily chose a result
                     .unwrap_or(::std::cmp::Ordering::Greater)
             })
-            .and_then(|(best_msg, _)| Some(BlockWrapped(best_msg.clone())))
+            .and_then(|(prev_block, _)| {
+                Some(Block {
+                    prev_block: prev_block.clone(),
+                    data,
+                })
+            })
     }
 }
 
+
 #[derive(Eq, Ord, PartialOrd, PartialEq, Clone, Default, Hash, Debug)]
-pub struct Tx(TxHash);
-
-
+pub struct Tx;
 pub type Txs = BTreeSet<Tx>;
 impl Data for Txs {}
 
@@ -57,6 +58,6 @@ fn blockchain() {
     let prev_block = None;
     let justification = Justification::new();
     let genesis_block =
-        Block::new(miner, justification, prev_block.clone());
+        ProtoBlock::new(miner, justification, prev_block.clone());
     assert_eq!(genesis_block.get_estimate(), prev_block, "hardcoded");
 }
