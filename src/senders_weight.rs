@@ -24,7 +24,7 @@ impl<S: Sender> SendersWeight<S> {
     /// picks senders with positive weights
     pub fn get_senders(&self) -> HashSet<S> {
         self.read()
-            .unwrap()
+            .expect("Can't unwrap SendersWeight")
             .iter()
             .filter_map(|(sender, &weight)| {
                 if weight > WeightUnit::ZERO {
@@ -39,13 +39,13 @@ impl<S: Sender> SendersWeight<S> {
 
     pub fn get_weight(&self, sender: &S) -> Option<WeightUnit> {
         self.read()
-            .unwrap()
+            .expect("Can't unwrap SendersWeight")
             .get(sender)
             .and_then(|weight| Some(weight.clone()))
     }
 
     pub fn into_relative_weights(&self) -> Self {
-        let senders_weights = self.read().unwrap();
+        let senders_weights = self.read().expect("Can't unwrap SendersWeight");
 
         let iterator = senders_weights
             .iter()
@@ -64,13 +64,9 @@ impl<S: Sender> SendersWeight<S> {
         )
     }
     pub fn sum_weight_senders(&self, senders: &HashSet<S>) -> WeightUnit {
-        senders.iter().fold(
-            WeightUnit::ZERO,
-            |acc, equivocator| {
-                acc + self
-                    .get_weight(equivocator)
-                    .unwrap_or(::std::f64::NAN)
-            })
+        senders.iter().fold(WeightUnit::ZERO, |acc, equivocator| {
+            acc + self.get_weight(equivocator).unwrap_or(::std::f64::NAN)
+        })
     }
 }
 

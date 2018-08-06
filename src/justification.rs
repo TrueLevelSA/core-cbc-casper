@@ -6,7 +6,7 @@ use message::{AbstractMsg, Message};
 use rayon::collections::btree_set::Iter as ParIter;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use weight_unit::{WeightUnit};
-use traits::{Zero, Sender, Estimate};
+use traits::{Zero, Sender};
 use senders_weight::SendersWeight;
 
 #[derive(Eq, Ord, PartialOrd, PartialEq, Clone, Default, Hash)]
@@ -76,42 +76,36 @@ impl<M: AbstractMsg> Justification<M> {
         ) -> Vec<&'z M> {
             let mut msgs_sorted_by_faultw: Vec<_> = msgs
                 .iter()
-                .filter_map(|&msg| {
+                .enumerate()
+                .filter_map(|(outer_i, &msg)| {
                     // equivocations in relation to state
-                    let state_equvctrs: HashSet<_> = justification
-                        .get_equivocators(msg)
-                        .iter()
-                        // take only the equivocators that are not yet on the
-                        // equivocator set as the others already have their
-                        // weight counted into the state fault count
-                        .filter(|equivocator| !equivocators.contains(equivocator))
-                        .cloned()
-                        .collect();
+                    let state_equvctrs: HashSet<_> =
+                        justification.get_equivocators(msg);
 
                     // equivocations present within the current latest_msgs set that
                     // we're trying to insert to the state
                     let pairwise_equivocators: HashSet<_> = msgs
                         .iter()
+                    // ensures we check only once per pair [(a, b)] and not
+                    // [(a, b), (b, a)]
+                        .skip(outer_i)
                         .filter_map(|m| {
-                            let sender = m.get_sender();
-                            if m.equivocates(msg)
-                                && !equivocators.contains(&sender)
-                            {
-                                Some(sender)
-                            }
-                            else {
-                                None
-                            }
+                            if m.equivocates(msg) { Some(m.get_sender()) }
+                            else { None }
                         })
                         .collect();
 
                     let msg_equivocators: HashSet<_> = state_equvctrs
-                        .iter()
-                        .chain(pairwise_equivocators.iter())
+                        .union(&pairwise_equivocators)
+                    // take only the equivocators that are not yet on the
+                    // equivocator set as the others already have their
+                    // weight counted into the state fault count
+                        .filter(|equivocator| !equivocators.contains(equivocator))
                         .cloned()
                         .collect();
                     let msg_faultweight_overhead =
                         senders_weights.sum_weight_senders(&msg_equivocators);
+                    // sum_weight_senders returns nan if a sender is not found
                     if msg_faultweight_overhead.is_nan() {
                         None
                     }
@@ -172,8 +166,7 @@ impl<M: AbstractMsg> Justification<M> {
             weights.state_fault_weight + msg_fault_weight_overhead;
         let equivocators = weights
             .equivocators
-            .iter()
-            .chain(msg_equivocators_overhead.iter())
+            .union(&msg_equivocators_overhead)
             .cloned()
             .collect();
 
@@ -227,7 +220,12 @@ impl<M: AbstractMsg> Justification<M> {
                 |weight_referred, m_prime| {
                     // base case
                     if finalized_msg
-                        .and_then(|msg| Some(msg == m_prime))
+                        .and_then(|finalized_msg| {
+                            Some(
+                                finalized_msg == m_prime
+                                    || !m_prime.depends(finalized_msg), // TODO: check if needed
+                            )
+                        })
                         .unwrap_or(false)
                     {
                         weight_referred
@@ -294,7 +292,6 @@ pub struct FaultyInsertResult<S: Sender> {
     // pub equivocators: HashSet<S>,
 }
 
-
 // FIXME: this became more than Weights, should find a better name, or break up in parts
 #[derive(Debug, Clone)]
 pub struct Weights<S: Sender> {
@@ -352,7 +349,6 @@ mod justification {
             &weights,
             None as Option<VoteCount>,
         );
-        println!("{:?}", weights);
         let mut rhs = Justification::new();
         rhs.insert(v0.clone());
         rhs.insert(v0_prime.clone());

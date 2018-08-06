@@ -1,4 +1,4 @@
-use std::collections::{HashSet};
+use std::collections::{HashSet, BTreeSet};
 use std::hash::{Hash};
 use std::fmt::{Debug};
 
@@ -9,24 +9,21 @@ use senders_weight::{SendersWeight};
 use std::sync::{Arc};
 
 type Miner = u32;
-type TxHash = u128;
+type TxHash = u64;
 
 #[derive(Clone, Default, Eq, PartialEq, PartialOrd, Ord, Debug, Hash)]
 struct BlockWrapped(Block);
 
-type Block = Message<BlockWrapped /*estimate*/, Miner /*sender*/>;
-
+type Block = Message<BlockWrapped /*estimate*/, Miner /*sender*/, Txs>;
 
 // TODO: i think its possible to do ghost in arbitrary data, that is default implementation
 impl Estimate for BlockWrapped {
     type M = Block;
     type Sender = Miner;
-    type Data = Txs;
     fn mk_estimate(
         latest_msgs: &Justification<Self::M>,
         finalized_msg: Option<&Self::M>,
         weights: &Weights<Miner>,
-        external_data: Option<Self::Data>, // mempool
     ) -> Option<Self> {
         let senders_weights = weights.get_senders_weights();
         latest_msgs
@@ -48,19 +45,18 @@ impl Estimate for BlockWrapped {
 }
 
 #[derive(Eq, Ord, PartialOrd, PartialEq, Clone, Default, Hash, Debug)]
-pub struct Tx {
-    tx_hash: TxHash,
-}
+pub struct Tx(TxHash);
 
-pub type Txs = HashSet<Tx>;
+
+pub type Txs = BTreeSet<Tx>;
 impl Data for Txs {}
 
 #[test]
 fn blockchain() {
     let miner = 10;
-    let prev_blockhash = None;
+    let prev_block = None;
     let justification = Justification::new();
     let genesis_block =
-        Block::new(miner, justification, prev_blockhash.clone());
-    assert_eq!(genesis_block.get_estimate(), prev_blockhash, "hardcoded");
+        Block::new(miner, justification, prev_block.clone());
+    assert_eq!(genesis_block.get_estimate(), prev_block, "hardcoded");
 }

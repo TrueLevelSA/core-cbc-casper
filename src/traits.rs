@@ -6,16 +6,16 @@ use justification::{Justification, Weights};
 pub trait Estimate: Hash + Clone + Ord + Send + Sync + Debug {
     type M: AbstractMsg<Estimate = Self, Sender = Self::Sender>;
     type Sender: Sender;
-    type Data: Data;
+    // type Data: Data;
     fn mk_estimate(
         latest_msgs: &Justification<Self::M>,
         finalized_msg: Option<&Self::M>,
         weights: &Weights<Self::Sender>,
-        external_data: Option<Self::Data>, // TODO, i think should go to AbstractMsg
+        // external_data: Option<Self::Data>, // TODO, i think should go to AbstractMsg
     ) ->  Option<Self>;
 }
 
-pub trait Data: Clone + Eq + Sync + Send + Debug {}
+pub trait Data: Clone + Eq + Sync + Send + Debug + Ord {}
 
 pub trait Sender: Hash + Clone + Ord + Eq + Send + Sync + Debug {}
 

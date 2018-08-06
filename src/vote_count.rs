@@ -56,7 +56,7 @@ impl VoteCount {
         }
     }
 
-    pub fn create_vote_msg(sender: u32, vote: bool) -> Message<Self, u32> {
+    pub fn create_vote_msg(sender: u32, vote: bool) -> Message<Self, u32, VoteCount> {
         let justification = Justification::new();
         let estimate = match vote {
             true => Some(VoteCount { yes: 1, no: 0 }),
@@ -67,12 +67,12 @@ impl VoteCount {
     }
 
     fn get_vote_msgs(
-        msg: &Message<Self, Voter>,
-    ) -> HashSet<Message<Self, Voter>> {
+        msg: &Message<Self, Voter, VoteCount>,
+    ) -> HashSet<Message<Self, Voter, VoteCount>> {
         fn recursor(
-            msg: &Message<VoteCount, Voter>,
-            acc: HashSet<Message<VoteCount, Voter>>,
-        ) -> HashSet<Message<VoteCount, Voter>> {
+            msg: &Message<VoteCount, Voter, VoteCount>,
+            acc: HashSet<Message<VoteCount, Voter, VoteCount>>,
+        ) -> HashSet<Message<VoteCount, Voter, VoteCount>> {
             msg.get_justification()
                 .iter()
                 .fold(acc, |mut acc_prime, m| {
@@ -115,18 +115,18 @@ impl Data for VoteCount {}
 impl Estimate for VoteCount {
     // the estimator just counts votes, which in this case are the unjustified
     // msgs
-    type M = Message<Self, Voter>;
+    type M = Message<Self, Voter, VoteCount>;
     type Sender = Voter;
 
     // Data could be anything, as it will not be used, will just pass None to
     // mk_estimate, as it takes an Option
-    type Data = Self;
+    // type Data = Self;
 
     fn mk_estimate(
         latest_msgs: &Justification<Self::M>,
         finalized_msg: Option<&Self::M>,
         _weights: &Weights<Voter>, // all voters have same weight
-        _external_data: Option<Self::Data>,
+        // _external_data: Option<Self::Data>,
     ) -> Option<Self> {
         // stub msg w/ no estimate and no valid sender that will be dropped on
         // the pattern matching below

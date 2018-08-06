@@ -6,13 +6,14 @@ use std::sync::{Arc};
 // use std::io::{Error};
 
 use rayon::prelude::*;
-use traits::{Estimate, Zero, Sender};
+use traits::{Estimate, Zero, Sender, Data};
 use justification::{Justification, Weights, FaultyInsertResult};
 use weight_unit::{WeightUnit};
 use senders_weight::SendersWeight;
 
 pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     // To be implemented on concrete struct
+    type Data: Data;
     type Sender: Sender;
     type Estimate: Estimate<M = Self, Sender = Self::Sender>;
     fn get_sender(&self) -> Self::Sender;
@@ -30,9 +31,7 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         latest_msgs: Vec<&Self>,
         finalized_msg: Option<&Self>,
         weights: &Weights<Self::Sender>,
-        external_data: Option<
-            <<Self as AbstractMsg>::Estimate as Estimate>::Data,
-        >,
+        external_data: Option<Self::Data>,
     ) -> (Self, Weights<Self::Sender>) {
         // // TODO eventually comment out these lines, and FIXME tests
         // // check whether two messages from same sender
@@ -51,9 +50,9 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
             &justification,
             finalized_msg,
             &weights,
-            external_data,
         );
-        (Self::new(sender, justification, estimate), weights)
+        let message = Self::new(sender, justification, estimate);
+        (message, weights)
     }
     fn equivocates(&self, rhs: &Self) -> bool {
         self != rhs
@@ -140,7 +139,8 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     }
 
     /// returns the dag tip-most safe messages. a safe message is defined as one
-    /// that was seen by more than a given thr of total weight units.
+    /// that was seen by more than a given thr of total weight units. TODO: not
+    /// sure about this implementation, i assume its not working correctly.
     fn get_safe_msgs_by_weight(
         &self,
         senders_weights: &SendersWeight<Self::Sender>,
@@ -207,20 +207,23 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
 }
 
 #[derive(Clone, Default, Eq, PartialEq, PartialOrd, Ord)]
-struct ProtoMessage<E, S>
+struct ProtoMessage<E, S, D>
 where
-    E: Estimate<Sender = S, M = Message<E, S>>,
+    E: Estimate<Sender = S, M = Message<E, S, D>>,
     S: Sender,
+    D: Data,
 {
     estimate: Option<E>,
     sender: S,
-    justification: Justification<Message<E, S>>,
+    justification: Justification<Message<E, S, D>>,
 }
 
 #[derive(Eq, Ord, PartialOrd, Clone, Default)]
-pub struct Message<E: Estimate<Sender = S, M = Message<E, S>>, S: Sender>(
-    Arc<ProtoMessage<E, S>>,
-);
+pub struct Message<
+    E: Estimate<Sender = S, M = Message<E, S, D>>,
+    S: Sender,
+    D: Data,
+>(Arc<ProtoMessage<E, S, D>>);
 /*
 // TODO start we should make messages lazy. continue this after async-await is better
 // documented
@@ -242,13 +245,15 @@ where
 // TODO end
 */
 
-impl<E, S> AbstractMsg for Message<E, S>
+impl<E, S, D> AbstractMsg for Message<E, S, D>
 where
     E: Estimate<M = Self, Sender = S>,
     S: Sender,
+    D: Data,
 {
     type Estimate = E;
     type Sender = S;
+    type Data = D;
 
     fn get_sender(&self) -> Self::Sender {
         self.0.sender.clone()
@@ -273,10 +278,11 @@ where
     }
 }
 
-impl<E, S> Hash for Message<E, S>
+impl<E, S, D> Hash for Message<E, S, D>
 where
     E: Estimate<M = Self, Sender = S>,
     S: Sender,
+    D: Data,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let _ = self.get_sender().hash(state);
@@ -285,10 +291,11 @@ where
     }
 }
 
-impl<E, S> PartialEq for Message<E, S>
+impl<E, S, D> PartialEq for Message<E, S, D>
 where
     E: Estimate<M = Self, Sender = S>,
     S: Sender,
+    D: Data,
 {
     fn eq(&self, rhs: &Self) -> bool {
         self.get_sender() == rhs.get_sender()
@@ -297,10 +304,11 @@ where
     }
 }
 
-impl<E, S> Debug for Message<E, S>
+impl<E, S, D> Debug for Message<E, S, D>
 where
     E: Estimate<M = Self, Sender = S>,
     S: Sender,
+    D: Data,
 {
     fn fmt(&self, f: &mut Formatter) -> Result {
         write!(
@@ -348,7 +356,8 @@ mod message {
         );
 
         let external_data: Option<VoteCount> = None;
-        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, external_data);
+        let (m0, _) =
+            &Message::from_msgs(0, vec![v0], None, &weights, external_data);
         // let m0 = &Message::new(0, justification, estimate);
 
         let mut j1 = Justification::new();
@@ -360,21 +369,13 @@ mod message {
             j1.faulty_inserts(vec![m0].iter().cloned().collect(), &weights)
                 .success
         );
-        assert!(
-            Message::from_msgs(
-                0,
-                vec![v0].iter().cloned().collect(),
-                None,
-                &weights,
-                None,
-            ).0
-                == Message::from_msgs(0, vec![v0], None, &weights, None).0,
-            "messages should be equal"
-        );
-        assert!(
-            Message::from_msgs(0, vec![v0], None, &weights, None).0
-                != Message::from_msgs(0, vec![v0, m0], None, &weights, None).0
-        );
+
+        let (msg1, _) = Message::from_msgs(0, vec![v0], None, &weights, None);
+        let (msg2, _) = Message::from_msgs(0, vec![v0], None, &weights, None);
+        assert!(msg1 == msg2, "messages should be equal");
+        let (msg3, _) =
+            Message::from_msgs(0, vec![v0, m0], None, &weights, None);
+        assert!(msg1 != msg3, "msg1 should be different than msg3");
     }
 
     #[test]
@@ -406,22 +407,23 @@ mod message {
 
         let mut j0 = Justification::new();
         assert!(
-            j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
+            j0.faulty_inserts([v0].iter().cloned().collect(), &weights)
                 .success
         );
         let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, None);
 
         let mut j1 = Justification::new();
         assert!(
-            j1.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
+            j1.faulty_inserts([v0].iter().cloned().collect(), &weights)
                 .success
         );
         assert!(
-            j1.faulty_inserts(vec![m0].iter().cloned().collect(), &weights)
+            j1.faulty_inserts([m0].iter().cloned().collect(), &weights)
                 .success
         );
 
-        let (m1, _) = &Message::from_msgs(0, vec![v0, m0], None, &weights, None);
+        let (m1, _) =
+            &Message::from_msgs(0, vec![v0, m0], None, &weights, None);
         assert!(m1.depends(m0), "m1 DOES depent on m0");
         assert!(!m0.depends(m1), "but m0 does NOT depend on m1");
         assert!(m1.depends(v0), "m1 depends on v0 through m0");
