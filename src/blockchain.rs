@@ -6,19 +6,19 @@ use justification::{Justification, Weights};
 type Miner = u32;
 
 #[derive(Clone, Default, Eq, PartialEq, PartialOrd, Ord, Debug, Hash)]
-struct BlockChain {
+struct Blockchain {
     prev_block: Block,
     data: Option<<Block as AbstractMsg>::Data>,
 }
 
 type Block = Message<
-    BlockChain, /*estimate*/
+    Blockchain, /*estimate*/
     Miner,      /*sender*/
     Txs,        /*data*/
 >;
 
 // TODO: i think its possible to do ghost in arbitrary data, that is default implementation
-impl Estimate for BlockChain {
+impl Estimate for Blockchain {
     type M = Block;
     fn mk_estimate(
         latest_msgs: &Justification<Self::M>,
@@ -38,7 +38,7 @@ impl Estimate for BlockChain {
                     .unwrap_or(::std::cmp::Ordering::Greater)
             })
             .and_then(|(prev_block, _)| {
-                Some(BlockChain {
+                Some(Blockchain {
                     prev_block: prev_block.clone(),
                     data,
                 })
