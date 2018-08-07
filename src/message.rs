@@ -315,7 +315,7 @@ where
             f,
             "M{:?}({:?}) -> {:?}",
             self.get_sender(),
-            self.get_estimate().clone().unwrap(),
+            self.get_estimate().clone(),
             self.get_justification()
         )
     }

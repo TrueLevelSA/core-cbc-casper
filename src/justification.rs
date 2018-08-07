@@ -219,10 +219,9 @@ impl<M: AbstractMsg> Justification<M> {
                 |weight_referred, m_prime| {
                     // base case
                     if finalized_msg
-                        .and_then(|finalized_msg| {
+                        .and_then(|f_msg| {
                             Some(
-                                finalized_msg == m_prime
-                                    || !m_prime.depends(finalized_msg), // TODO: check if needed
+                                f_msg == m_prime || !m_prime.depends(f_msg), // TODO: check if needed
                             )
                         })
                         .unwrap_or(false)
@@ -231,6 +230,8 @@ impl<M: AbstractMsg> Justification<M> {
                     }
                     else {
                         let sender_current = m_prime.get_sender();
+                        // it fails to insert sender_current, if sender_current is
+                        // already in set
                         let weight_referred = if senders_referred
                             .insert(sender_current.clone())
                         {
@@ -257,10 +258,14 @@ impl<M: AbstractMsg> Justification<M> {
         };
         // initial state, trigger recursion
         let all_senders = &senders_weights.get_senders();
-        let senders_referred: HashSet<M::Sender> = [].iter().cloned().collect();
-        let initial_weight = WeightUnit::ZERO;
         self.iter()
             .map(|m| {
+                let sender_current = m.get_sender();
+                let senders_referred: HashSet<M::Sender> =
+                    [sender_current.clone()].iter().cloned().collect();
+                let initial_weight = senders_weights
+                    .get_weight(&sender_current)
+                    .unwrap_or(WeightUnit::ZERO);
                 (
                     m.clone(),
                     recursor(
@@ -324,6 +329,75 @@ impl<S: Sender> Weights<S> {
 mod justification {
     use vote_count::{VoteCount};
     use super::*;
+
+    #[test]
+    fn children_weight() {
+        use blockchain::{Block, Blockchain};
+        let (sender0, sender1, sender2, sender3) = (0, 1, 2, 3); // miner identities
+        let (weight0, weight1, weight2, weight3) = (2., 4., 8., 16.); // and their corresponding weights
+        let senders_weights = SendersWeight::new(
+            [
+                (sender0, weight0),
+                (sender1, weight1),
+                (sender2, weight2),
+                (sender3, weight3),
+            ].iter()
+                .cloned()
+                .collect(),
+        );
+        let weights = Weights::new(
+            senders_weights.clone(),
+            0.0,            // state fault weight
+            1.0,            // subjective fault weight threshold
+            HashSet::new(), // equivocators
+        );
+        let prev_block = None;
+        let justification = Justification::new();
+        let genesis_block =
+            Block::new(sender0, justification, prev_block.clone());
+        assert_eq!(
+            genesis_block.get_estimate(),
+            prev_block,
+            "genesis block with None as prev_block"
+        );
+        // genesis(s=0, w=2) -> b1(s=1, w=4) -> b2(s=2, w=8) -> b3(s=3, w=16)
+        // weights:   2               6               14               30
+        let mut justification = Justification::new();
+        assert!(justification.insert(genesis_block.clone()));
+        let children_weights =
+            justification.get_children_weights(None, &senders_weights);
+        let (_msg, weight) = children_weights.iter().next().unwrap();
+        assert_eq!(weight, &2.0);
+        println!("children_weights1: {:?}", children_weights);
+        let estimate = Some(Blockchain::new(genesis_block.clone(), None));
+        let b1 = Block::new(sender1, justification, estimate);
+
+        let mut justification = Justification::new();
+        assert!(justification.insert(b1.clone()));
+        let children_weights =
+            justification.get_children_weights(None, &senders_weights);
+        let (_msg, weight) = children_weights.iter().next().unwrap();
+        assert_eq!(weight, &6.0);
+        let estimate = Some(Blockchain::new(b1, None));
+        let b2 = Block::new(sender2, justification, estimate);
+
+        let mut justification = Justification::new();
+        assert!(justification.insert(b2.clone()));
+        let children_weights =
+            justification.get_children_weights(None, &senders_weights);
+        let (_msg, weight) = children_weights.iter().next().unwrap();
+        assert_eq!(weight, &14.0);
+        let estimate = Some(Blockchain::new(b2, None));
+        let b3 = Block::new(sender3, justification, estimate);
+
+        let mut justification = Justification::new();
+        assert!(justification.insert(b3.clone()));
+        let children_weights =
+            justification.get_children_weights(None, &senders_weights);
+        let (_msg, weight) = children_weights.iter().next().unwrap();
+        assert_eq!(weight, &30.0);
+    }
+
     #[test]
     fn faulty_inserts_sorted() {
         let senders_weights = SendersWeight::new(
@@ -349,13 +423,7 @@ mod justification {
             &weights,
             None as Option<VoteCount>,
         );
-        let mut rhs = Justification::new();
-        rhs.insert(v0.clone());
-        rhs.insert(v0_prime.clone());
-        rhs.insert(v1.clone());
-        rhs.insert(v1_prime.clone());
-        rhs.insert(v2.clone());
-        assert_eq!(m0.get_justification(), &rhs);
+        assert_eq!(m0.get_justification().len(), 5);
         assert_eq!(weights.state_fault_weight, 3.0);
     }
     #[test]
