@@ -7,7 +7,7 @@ type Miner = u32;
 
 #[derive(Clone, Default, Eq, PartialEq, PartialOrd, Ord, Debug, Hash)]
 pub struct Blockchain {
-    prev_block: Block,
+    prev_block: Option<Block>,
     data: Option<<Block as AbstractMsg>::Data>,
 }
 
@@ -15,8 +15,8 @@ impl Blockchain {
     pub fn new(
         prev_block: Block,
         data: Option<<Block as AbstractMsg>::Data>,
-    ) -> Self {
-        Blockchain { prev_block, data }
+    ) -> Option<Self> {
+        Some(Blockchain { prev_block: Some(prev_block), data })
     }
 }
 
@@ -48,10 +48,7 @@ impl Estimate for Blockchain {
                     .unwrap_or(::std::cmp::Ordering::Greater)
             })
             .and_then(|(prev_block, _)| {
-                Some(Blockchain {
-                    prev_block: prev_block.clone(),
-                    data,
-                })
+                Blockchain::new(prev_block.clone(), data)
             })
     }
 }
@@ -109,10 +106,7 @@ fn example_usage() {
 
     assert_eq!(
         b3.get_estimate(),
-        &Some(Blockchain {
-            prev_block: b2,
-            data: None,
-        }),
+        &Blockchain::new(b2, None),
         "should build on top of b2"
     )
 }
