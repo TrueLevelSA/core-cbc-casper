@@ -87,7 +87,7 @@ fn example_usage() {
     let genesis_block = Block::new(sender0, justification, prev_block.clone());
     assert_eq!(
         genesis_block.get_estimate(),
-        prev_block,
+        &prev_block,
         "genesis block with None as prev_block"
     );
 
@@ -109,7 +109,7 @@ fn example_usage() {
 
     assert_eq!(
         b3.get_estimate(),
-        Some(Blockchain {
+        &Some(Blockchain {
             prev_block: b2,
             data: None,
         }),

@@ -15,8 +15,8 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     type Data: Data;
     type Sender: Sender;
     type Estimate: Estimate<M = Self>;
-    fn get_sender(&self) -> Self::Sender;
-    fn get_estimate(&self) -> Option<Self::Estimate>;
+    fn get_sender(&self) -> &Self::Sender;
+    fn get_estimate(&self) -> &Option<Self::Estimate>;
     fn get_justification<'z>(&'z self) -> &'z Justification<Self>;
     fn new(
         sender: Self::Sender,
@@ -105,7 +105,7 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
                 |mut safe_ms_prime, m_prime| {
                     // base case
                     if &senders_referred == all_senders
-                        && original_sender == &m_prime.get_sender()
+                        && original_sender == m_prime.get_sender()
                     {
                         let _ = safe_ms_prime.insert(m_prime.clone());
                         safe_ms_prime
@@ -255,11 +255,11 @@ where
     type Sender = S;
     type Data = D;
 
-    fn get_sender(&self) -> Self::Sender {
-        self.0.sender.clone()
+    fn get_sender(&self) -> &Self::Sender {
+        &self.0.sender
     }
-    fn get_estimate(&self) -> Option<Self::Estimate> {
-        self.0.estimate.clone()
+    fn get_estimate(&self) -> &Option<Self::Estimate> {
+        &self.0.estimate
     }
     fn get_justification<'z>(&'z self) -> &'z Justification<Self> {
         &self.0.justification

@@ -35,6 +35,7 @@ impl<M: AbstractMsg> Justification<M> {
     fn head(&self) -> Option<&M> {
         self.0.iter().next()
     }
+
     // Custom functions
 
     /// get the additional equivocators upon insertion of msg to the state. note
@@ -90,7 +91,7 @@ impl<M: AbstractMsg> Justification<M> {
                     // [(a, b), (b, a)]
                         .skip(outer_i)
                         .filter_map(|m| {
-                            if m.equivocates(msg) { Some(m.get_sender()) }
+                            if m.equivocates(msg) { Some(m.get_sender().clone()) }
                             else { None }
                         })
                         .collect();
@@ -115,7 +116,9 @@ impl<M: AbstractMsg> Justification<M> {
                 })
                 .collect();
             let _ = msgs_sorted_by_faultw.sort_unstable_by(
-                |(_, w0), (_, w1)| w0.partial_cmp(w1).unwrap(),
+                |(_, w0), (_, w1)| {
+                    w0.partial_cmp(w1).unwrap_or(::std::cmp::Ordering::Greater) // tie breaker
+                },
             );
 
             // return a Vec<AbstractMsg>
@@ -357,7 +360,7 @@ mod justification {
             Block::new(sender0, justification, prev_block.clone());
         assert_eq!(
             genesis_block.get_estimate(),
-            prev_block,
+            &prev_block,
             "genesis block with None as prev_block"
         );
         // genesis(s=0, w=2) -> b1(s=1, w=4) -> b2(s=2, w=8) -> b3(s=3, w=16)
@@ -427,7 +430,6 @@ mod justification {
         assert_eq!(weights.state_fault_weight, 3.0);
     }
     #[test]
-    #[ignore]
     fn faulty_inserts() {
         let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
