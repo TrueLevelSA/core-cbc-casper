@@ -348,19 +348,12 @@ mod justification {
                 .cloned()
                 .collect(),
         );
-        let weights = Weights::new(
-            senders_weights.clone(),
-            0.0,            // state fault weight
-            1.0,            // subjective fault weight threshold
-            HashSet::new(), // equivocators
-        );
-        let prev_block = None;
+        let estimate = Blockchain::new(None, None);
         let justification = Justification::new();
-        let genesis_block =
-            Block::new(sender0, justification, prev_block.clone());
+        let genesis_block = Block::new(sender0, justification, estimate.clone());
         assert_eq!(
             genesis_block.get_estimate(),
-            &prev_block,
+            &estimate,
             "genesis block with None as prev_block"
         );
         // genesis(s=0, w=2) -> b1(s=1, w=4) -> b2(s=2, w=8) -> b3(s=3, w=16)
@@ -372,7 +365,7 @@ mod justification {
         let (_msg, weight) = children_weights.iter().next().unwrap();
         assert_eq!(weight, &2.0);
         println!("children_weights1: {:?}", children_weights);
-        let estimate = Blockchain::new(genesis_block.clone(), None);
+        let estimate = Blockchain::new(Some(genesis_block.clone()), None);
         let b1 = Block::new(sender1, justification, estimate);
 
         let mut justification = Justification::new();
@@ -381,7 +374,7 @@ mod justification {
             justification.get_children_weights(None, &senders_weights);
         let (_msg, weight) = children_weights.iter().next().unwrap();
         assert_eq!(weight, &6.0);
-        let estimate = Blockchain::new(b1, None);
+        let estimate = Blockchain::new(Some(b1), None);
         let b2 = Block::new(sender2, justification, estimate);
 
         let mut justification = Justification::new();
@@ -390,7 +383,7 @@ mod justification {
             justification.get_children_weights(None, &senders_weights);
         let (_msg, weight) = children_weights.iter().next().unwrap();
         assert_eq!(weight, &14.0);
-        let estimate = Blockchain::new(b2, None);
+        let estimate = Blockchain::new(Some(b2), None);
         let b3 = Block::new(sender3, justification, estimate);
 
         let mut justification = Justification::new();

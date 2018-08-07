@@ -13,10 +13,13 @@ pub struct Blockchain {
 
 impl Blockchain {
     pub fn new(
-        prev_block: Block,
+        prev_block: Option<Block>,
         data: Option<<Block as AbstractMsg>::Data>,
-    ) -> Option<Self> {
-        Some(Blockchain { prev_block: Some(prev_block), data })
+    ) -> Self {
+        Blockchain {
+            prev_block,
+            data,
+        }
     }
 }
 
@@ -34,7 +37,7 @@ impl Estimate for Blockchain {
         finalized_msg: Option<&Self::M>,
         weights: &Weights<Miner>,
         data: Option<<<Self as Estimate>::M as AbstractMsg>::Data>,
-    ) -> Option<Self> {
+    ) -> Self {
         let senders_weights = weights.get_senders_weights();
         latest_msgs
             .get_children_weights(finalized_msg, senders_weights)
@@ -48,7 +51,11 @@ impl Estimate for Blockchain {
                     .unwrap_or(::std::cmp::Ordering::Greater)
             })
             .and_then(|(prev_block, _)| {
-                Blockchain::new(prev_block.clone(), data)
+                Some(Blockchain::new(Some(prev_block.clone()), data.clone()))
+            })
+            .unwrap_or(Blockchain {
+                prev_block: None,
+                data,
             })
     }
 }
@@ -79,12 +86,12 @@ fn example_usage() {
         HashSet::new(), // equivocators
     );
 
-    let prev_block = None;
+    let estimate = Blockchain {prev_block: None, data: None};
     let justification = Justification::new();
-    let genesis_block = Block::new(sender0, justification, prev_block.clone());
+    let genesis_block = Block::new(sender0, justification, estimate.clone());
     assert_eq!(
         genesis_block.get_estimate(),
-        &prev_block,
+        &estimate,
         "genesis block with None as prev_block"
     );
 
@@ -106,7 +113,7 @@ fn example_usage() {
 
     assert_eq!(
         b3.get_estimate(),
-        &Blockchain::new(b2, None),
+        &Blockchain::new(Some(b2), None),
         "should build on top of b2"
     )
 }

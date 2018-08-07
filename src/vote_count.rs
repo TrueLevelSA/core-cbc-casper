@@ -35,32 +35,33 @@ impl Debug for VoteCount {
 impl VoteCount {
     // makes sure nobody adds more than one vote to their unjustified VoteCount
     // object. if they did, their vote is invalid and will be ignored
-    fn is_valid_vote(vote: &Option<Self>) -> bool {
+    fn is_valid_vote(vote: &Self) -> bool {
         // these two are the only allowed votes (unjustified msgs)
         match vote {
-            Some(VoteCount { yes: 1, no: 0 }) => true,
-            Some(VoteCount { yes: 0, no: 1 }) => true,
+            VoteCount { yes: 1, no: 0 } => true,
+            VoteCount { yes: 0, no: 1 } => true,
             _ => false,
         }
     }
 
     // used to create an equivocation vote
-    fn toggle_vote(vote: &Option<Self>) -> Option<Self> {
+    fn toggle_vote(vote: &Self) -> Self {
         // these two are the only allowed votes (unjustified msgs)
         match vote {
-            Some(VoteCount { yes: 1, no: 0 }) =>
-                Some(VoteCount { yes: 0, no: 1 }),
-            Some(VoteCount { yes: 0, no: 1 }) =>
-                Some(VoteCount { yes: 1, no: 0 }),
-            _ => None,
+            VoteCount { yes: 1, no: 0 } => VoteCount { yes: 0, no: 1 },
+            VoteCount { yes: 0, no: 1 } => VoteCount { yes: 1, no: 0 },
+            _ => VoteCount { yes: 0, no: 0 },
         }
     }
 
-    pub fn create_vote_msg(sender: u32, vote: bool) -> Message<Self, u32, VoteCount> {
+    pub fn create_vote_msg(
+        sender: u32,
+        vote: bool,
+    ) -> Message<Self, u32, VoteCount> {
         let justification = Justification::new();
         let estimate = match vote {
-            true => Some(VoteCount { yes: 1, no: 0 }),
-            false => Some(VoteCount { yes: 0, no: 1 }),
+            true => VoteCount { yes: 1, no: 0 },
+            false => VoteCount { yes: 0, no: 1 },
         };
 
         Message::new(sender, justification, estimate)
@@ -79,9 +80,8 @@ impl VoteCount {
                     match m.get_justification().len() {
                         0 => {
                             // vote found, vote is a message with 0 justification
-                            let estimate = m
-                                .get_estimate().clone()
-                                .and_then(|estimate| Some(estimate.clone()));
+                            let estimate = m.get_estimate().clone();
+                            // .and_then(|estimate| Some(estimate.clone()));
                             if VoteCount::is_valid_vote(&estimate) {
                                 let equivocation = Message::new(
                                     m.get_sender().clone(),
@@ -127,24 +127,24 @@ impl Estimate for VoteCount {
         _weights: &Weights<Voter>, // all voters have same weight
         _external_data: Option<Self>,
         // _external_data: Option<Self::Data>,
-    ) -> Option<Self> {
+    ) -> Self {
         // stub msg w/ no estimate and no valid sender that will be dropped on
         // the pattern matching below
         let msg = Message::new(
             ::std::u32::MAX, // sender,
             latest_msgs.clone(),
-            None, // estimate, will be droped on the pattern matching below
+            VoteCount {yes: 0, no: 0}, // estimate, will be droped on the pattern matching below
         );
         // the estimates are actually the original votes of each of the voters /
         // validators
         let votes = Self::get_vote_msgs(&msg);
         let res = votes.iter().fold(Self::ZERO, |acc, vote| {
             match vote.get_estimate() {
-                Some(estimate) => acc + estimate.clone(),
-                None => acc, // skip counting
+                estimate => acc + estimate.clone(),
+                // None => acc, // skip counting
             }
         });
-        Some(res)
+        res
     }
 }
 
@@ -180,10 +180,10 @@ mod count_votes {
         let (m1, _) =
             &Message::from_msgs(1, vec![v1, m0], None, &weights, None);
         assert_eq!(
-            Message::get_estimate(m1).clone().unwrap(),
+            Message::get_estimate(m1).clone(),
             VoteCount { yes: 1, no: 1 },
             "should have 1 yes, and 1 no vote, found {:?}",
-            Message::get_estimate(m1).clone().unwrap(),
+            Message::get_estimate(m1).clone(),
         );
 
         assert!(
@@ -200,9 +200,9 @@ mod count_votes {
             None,
         );
         assert_eq!(
-            Message::get_estimate(m1_prime).clone().unwrap(),
+            Message::get_estimate(m1_prime).clone(),
             VoteCount { yes: 1, no: 0 },
             "should have 1 yes, and 0 no vote, found {:?}, the equivocation vote should cancels out the normal vote",
-            Message::get_estimate(&m1_prime).clone().unwrap(),)
+            Message::get_estimate(&m1_prime).clone())
     }
 }

@@ -16,12 +16,12 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     type Sender: Sender;
     type Estimate: Estimate<M = Self>;
     fn get_sender(&self) -> &Self::Sender;
-    fn get_estimate(&self) -> &Option<Self::Estimate>;
+    fn get_estimate(&self) -> &Self::Estimate;
     fn get_justification<'z>(&'z self) -> &'z Justification<Self>;
     fn new(
         sender: Self::Sender,
         justification: Justification<Self>,
-        estimate: Option<Self::Estimate>,
+        estimate: Self::Estimate,
     ) -> Self;
 
     // Following methods are actual implementations
@@ -213,7 +213,7 @@ where
     S: Sender,
     D: Data,
 {
-    estimate: Option<E>,
+    estimate: E,
     sender: S,
     justification: Justification<Message<E, S, D>>,
 }
@@ -258,7 +258,7 @@ where
     fn get_sender(&self) -> &Self::Sender {
         &self.0.sender
     }
-    fn get_estimate(&self) -> &Option<Self::Estimate> {
+    fn get_estimate(&self) -> &Self::Estimate {
         &self.0.estimate
     }
     fn get_justification<'z>(&'z self) -> &'z Justification<Self> {
@@ -268,7 +268,7 @@ where
     fn new(
         sender: S,
         justification: Justification<Self>,
-        estimate: Option<E>,
+        estimate: E,
     ) -> Self {
         Message(Arc::new(ProtoMessage {
             sender,
