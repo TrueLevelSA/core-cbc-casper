@@ -16,10 +16,7 @@ impl Blockchain {
         prev_block: Option<Block>,
         data: Option<<Block as AbstractMsg>::Data>,
     ) -> Self {
-        Blockchain {
-            prev_block,
-            data,
-        }
+        Self { prev_block, data }
     }
 }
 
@@ -35,12 +32,13 @@ impl Estimate for Blockchain {
     fn mk_estimate(
         latest_msgs: &Justification<Self::M>,
         finalized_msg: Option<&Self::M>,
-        weights: &Weights<Miner>,
+        weights: &Weights<<<Self as Estimate>::M as AbstractMsg>::Sender>,
         data: Option<<<Self as Estimate>::M as AbstractMsg>::Data>,
     ) -> Self {
         let senders_weights = weights.get_senders_weights();
-        latest_msgs
-            .get_children_weights(finalized_msg, senders_weights)
+        let children_weights =
+            latest_msgs.get_children_weights(finalized_msg, senders_weights);
+        let best_child = children_weights
             .iter()
             .max_by(|(_, &weight0), (_, &weight1)| {
                 weight0
@@ -50,13 +48,9 @@ impl Estimate for Blockchain {
                     // something deterministic, like blockhash
                     .unwrap_or(::std::cmp::Ordering::Greater)
             })
-            .and_then(|(prev_block, _)| {
-                Some(Blockchain::new(Some(prev_block.clone()), data.clone()))
-            })
-            .unwrap_or(Blockchain {
-                prev_block: None,
-                data,
-            })
+            .map(|(best_child, _)| best_child)
+            .expect("Needs at least one latest message to produce an estimate");
+        Self::new(Some(best_child.clone()), data)
     }
 }
 
@@ -86,7 +80,10 @@ fn example_usage() {
         HashSet::new(), // equivocators
     );
 
-    let estimate = Blockchain {prev_block: None, data: None};
+    let estimate = Blockchain {
+        prev_block: None,
+        data: None,
+    };
     let justification = Justification::new();
     let genesis_block = Block::new(sender0, justification, estimate.clone());
     assert_eq!(

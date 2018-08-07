@@ -356,7 +356,7 @@ mod justification {
             &estimate,
             "genesis block with None as prev_block"
         );
-        // genesis(s=0, w=2) -> b1(s=1, w=4) -> b2(s=2, w=8) -> b3(s=3, w=16)
+        // genesis(s=0, w=2) <- b1(s=1, w=4) <- b2(s=2, w=8) <- b3(s=3, w=16)
         // weights:   2               6               14               30
         let mut justification = Justification::new();
         assert!(justification.insert(genesis_block.clone()));

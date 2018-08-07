@@ -10,7 +10,7 @@ pub trait Estimate: Hash + Clone + Ord + Send + Sync + Debug {
         finalized_msg: Option<&Self::M>,
         weights: &Weights<<<Self as Estimate>::M as AbstractMsg>::Sender>,
         external_data: Option<<<Self as Estimate>::M as AbstractMsg>::Data>,
-    ) ->  Self;
+    ) -> Self;
 }
 
 pub trait Data: Clone + Eq + Sync + Send + Debug + Ord + Sized {}
