@@ -6,7 +6,7 @@ use message::{AbstractMsg, Message};
 use rayon::collections::btree_set::Iter as ParIter;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use weight_unit::{WeightUnit};
-use traits::{Zero, Sender};
+use traits::{Zero, Sender, Estimate};
 use senders_weight::SendersWeight;
 
 #[derive(Eq, Ord, PartialOrd, PartialEq, Clone, Default, Hash)]
@@ -36,8 +36,17 @@ impl<M: AbstractMsg> Justification<M> {
         self.0.iter().next()
     }
 
-    // Custom functions
+    // reexport from Estimate impl
+    pub fn mk_estimate(
+        &self,
+        finalized_msg: Option<&M>,
+        weights: &Weights<<M as AbstractMsg>::Sender>,
+        data: Option<<M as AbstractMsg>::Data>,
+    ) -> M::Estimate {
+        M::Estimate::mk_estimate(self, finalized_msg, weights, data)
+    }
 
+    // Custom functions
     /// get the additional equivocators upon insertion of msg to the state. note
     /// that if equivocator is a recurrent equivocator, it will be found again
     /// here. i believe the weight of an equivocator has to be set to ZERO
@@ -200,7 +209,6 @@ impl<M: AbstractMsg> Justification<M> {
             }
         }
     }
-    /// get cum weights until reaching safe_msg
     pub fn get_children_weights(
         &self,
         finalized_msg: Option<&M>,
@@ -350,7 +358,8 @@ mod justification {
         );
         let estimate = Blockchain::new(None, None);
         let justification = Justification::new();
-        let genesis_block = Block::new(sender0, justification, estimate.clone());
+        let genesis_block =
+            Block::new(sender0, justification, estimate.clone());
         assert_eq!(
             genesis_block.get_estimate(),
             &estimate,

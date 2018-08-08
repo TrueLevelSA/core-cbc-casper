@@ -3,13 +3,21 @@ use traits::{Estimate, Data};
 use message::{AbstractMsg, Message};
 use justification::{Justification, Weights};
 use senders_weight::{SendersWeight};
-type Miner = u32;
+type Validator = u32;
 
 #[derive(Clone, Default, Eq, PartialEq, PartialOrd, Ord, Debug, Hash)]
+/// a genesis block should be a block with estimate Blockchain with prev_block =
+/// None and data. data will be the unique identifier of this blockchain
 pub struct Blockchain {
     prev_block: Option<Block>,
-    data: Option<<Block as AbstractMsg>::Data>,
+    data: Option<<Block as AbstractMsg>::Data>, // TODO: lift the Option when we have real data structures.
 }
+
+pub type Block = Message<
+    Blockchain, /*Estimate*/
+    Validator,  /*Sender*/
+    Txs,        /*Data*/
+>;
 
 impl Blockchain {
     pub fn new(
@@ -18,13 +26,21 @@ impl Blockchain {
     ) -> Self {
         Self { prev_block, data }
     }
+    fn get_prev_blockchain(&self) -> Option<Blockchain> {
+        self.prev_block
+            .clone()
+            .and_then(|prev_block| Some(prev_block.get_estimate().clone()))
+    }
+    pub fn is_member(&self, rhs: &Self, genesis: &Block) -> bool {
+        self == rhs
+            || rhs
+                .get_prev_blockchain()
+                .and_then(|blockchain| {
+                    Some(self.is_member(&blockchain, genesis))
+                })
+                .unwrap_or(rhs == genesis.get_estimate())
+    }
 }
-
-pub type Block = Message<
-    Blockchain, /*estimate*/
-    Miner,      /*sender*/
-    Txs,        /*data*/
->;
 
 // TODO: i think its possible to do ghost in arbitrary data, that is default implementation
 impl Estimate for Blockchain {

@@ -25,6 +25,8 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     ) -> Self;
 
     // Following methods are actual implementations
+
+    /// create a new msg from latest_messages
     fn from_msgs(
         sender: Self::Sender,
         latest_msgs: Vec<&Self>,
@@ -45,12 +47,8 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         let FaultyInsertResult { success, weights } =
             justification.faulty_inserts(latest_msgs, &weights);
         assert!(success, "None of the messages could be added to the state!");
-        let estimate = Self::Estimate::mk_estimate(
-            &justification,
-            finalized_msg,
-            &weights,
-            external_data
-        );
+        let estimate =
+            justification.mk_estimate(finalized_msg, &weights, external_data);
         let message = Self::new(sender, justification, estimate);
         (message, weights)
     }
@@ -219,11 +217,12 @@ where
 }
 
 #[derive(Eq, Ord, PartialOrd, Clone, Default)]
-pub struct Message<
+pub struct Message<E, S, D>(Arc<ProtoMessage<E, S, D>>)
+where
     E: Estimate<M = Message<E, S, D>>,
     S: Sender,
-    D: Data,
->(Arc<ProtoMessage<E, S, D>>);
+    D: Data;
+
 /*
 // TODO start we should make messages lazy. continue this after async-await is better
 // documented
@@ -265,11 +264,7 @@ where
         &self.0.justification
     }
 
-    fn new(
-        sender: S,
-        justification: Justification<Self>,
-        estimate: E,
-    ) -> Self {
+    fn new(sender: S, justification: Justification<Self>, estimate: E) -> Self {
         Message(Arc::new(ProtoMessage {
             sender,
             justification,
