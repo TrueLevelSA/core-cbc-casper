@@ -26,19 +26,19 @@ impl Blockchain {
     ) -> Self {
         Self { prev_block, data }
     }
-    fn get_prev_blockchain(&self) -> Option<Blockchain> {
-        self.prev_block
-            .clone()
-            .and_then(|prev_block| Some(prev_block.get_estimate().clone()))
+}
+
+impl Block {
+    fn get_prev_block(&self) -> Option<&Self> {
+        self.get_estimate().prev_block.as_ref()
     }
-    pub fn is_member(&self, rhs: &Self, genesis: &Block) -> bool {
+
+    fn is_member(&self, rhs: &Self) -> bool {
         self == rhs
             || rhs
-                .get_prev_blockchain()
-                .and_then(|blockchain| {
-                    Some(self.is_member(&blockchain, genesis))
-                })
-                .unwrap_or(rhs == genesis.get_estimate())
+                .get_prev_block()
+                .and_then(|prev_block| Some(self.is_member(prev_block)))
+                .unwrap_or(false)
     }
 }
 
@@ -122,11 +122,17 @@ fn example_usage() {
     let (b3, weights) =
         Block::from_msgs(sender3, vec![&b1, &b2], None, &weights, None);
 
-    // println!("estimate: {:?}", b3.get_estimate());
-
     assert_eq!(
         b3.get_estimate(),
-        &Blockchain::new(Some(b2), None),
+        &Blockchain::new(Some(b2.clone()), None),
         "should build on top of b2"
-    )
+    );
+
+    assert!(b1.is_member(&b1));
+    assert!(!b1.is_member(&b2));
+    assert!(!b2.is_member(&b1));
+    assert!(!b1.is_member(&b2));
+    assert!(b2.is_member(&b3));
+    assert!(!b3.is_member(&b2));
+    assert!(!b3.is_member(&b1));
 }
