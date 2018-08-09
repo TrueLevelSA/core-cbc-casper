@@ -6,10 +6,10 @@ use senders_weight::{SendersWeight};
 type Validator = u32;
 
 #[derive(Clone, Default, Eq, PartialEq, PartialOrd, Ord, Debug, Hash)]
-/// a genesis block should be a block with estimate Blockchain with prev_block =
+/// a genesis block should be a block with estimate Blockchain with prevblock =
 /// None and data. data will be the unique identifier of this blockchain
 pub struct Blockchain {
-    prev_block: Option<Block>,
+    prevblock: Option<Block>,
     data: Option<<Block as AbstractMsg>::Data>, // TODO: lift the Option when we have real data structures.
 }
 
@@ -21,23 +21,23 @@ pub type Block = Message<
 
 impl Blockchain {
     pub fn new(
-        prev_block: Option<Block>,
+        prevblock: Option<Block>,
         data: Option<<Block as AbstractMsg>::Data>,
     ) -> Self {
-        Self { prev_block, data }
+        Self { prevblock, data }
     }
 }
 
 impl Block {
-    fn get_prev_block(&self) -> Option<&Self> {
-        self.get_estimate().prev_block.as_ref()
+    fn get_prevblock(&self) -> Option<&Self> {
+        self.get_estimate().prevblock.as_ref()
     }
 
     fn is_member(&self, rhs: &Self) -> bool {
         self == rhs
             || rhs
-                .get_prev_block()
-                .and_then(|prev_block| Some(self.is_member(prev_block)))
+                .get_prevblock()
+                .and_then(|prevblock| Some(self.is_member(prevblock)))
                 .unwrap_or(false)
     }
 }
@@ -53,10 +53,11 @@ impl Estimate for Blockchain {
     ) -> Self {
         assert!(
             latest_msgs.len() > 0,
-            "Needs at least one latest message to be able to pick the heaviest"
+            "Needs at least one latest message to be able to pick one"
         );
         let heaviest_subtree =
             latest_msgs.ghost(finalized_msg, weights.get_senders_weights());
+        assert!(heaviest_subtree.is_some());
         Self::new(heaviest_subtree, data)
     }
 }
@@ -88,7 +89,7 @@ fn example_usage() {
     );
 
     let estimate = Blockchain {
-        prev_block: None,
+        prevblock: None,
         data: None,
     };
     let justification = Justification::new();
@@ -96,7 +97,7 @@ fn example_usage() {
     assert_eq!(
         genesis_block.get_estimate(),
         &estimate,
-        "genesis block with None as prev_block"
+        "genesis block with None as prevblock"
     );
 
     let (b1, weights) = Block::from_msgs(
