@@ -51,14 +51,21 @@ impl Estimate for Blockchain {
         weights: &Weights<<<Self as Estimate>::M as AbstractMsg>::Sender>,
         data: Option<<<Self as Estimate>::M as AbstractMsg>::Data>,
     ) -> Self {
-        assert!(
-            latest_msgs.len() > 0,
-            "Needs at least one latest message to be able to pick one"
-        );
-        let heaviest_subtree =
-            latest_msgs.ghost(finalized_msg, weights.get_senders_weights());
-        assert!(heaviest_subtree.is_some());
-        Self::new(heaviest_subtree, data)
+        match latest_msgs.len() {
+            0 => panic!(
+                "Needs at least one latest message to be able to pick one"
+            ),
+            1 => Self::new(latest_msgs.iter().next().cloned(), data),
+            _ => {
+                let heaviest_subtree = latest_msgs
+                    .ghost(finalized_msg, weights.get_senders_weights());
+                assert!(
+                    heaviest_subtree.is_some(),
+                    "prevblock None is reserved for genesis, should be impossible to fail here as latest_msg.len() > 1"
+                );
+                Self::new(heaviest_subtree, data)
+            },
+        }
     }
 }
 
