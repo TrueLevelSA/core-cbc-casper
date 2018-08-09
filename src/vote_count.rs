@@ -50,7 +50,7 @@ impl VoteCount {
         match vote {
             VoteCount { yes: 1, no: 0 } => VoteCount { yes: 0, no: 1 },
             VoteCount { yes: 0, no: 1 } => VoteCount { yes: 1, no: 0 },
-            _ => VoteCount { yes: 0, no: 0 },
+            _ => VoteCount::ZERO,
         }
     }
 
@@ -81,7 +81,6 @@ impl VoteCount {
                         0 => {
                             // vote found, vote is a message with 0 justification
                             let estimate = m.get_estimate().clone();
-                            // .and_then(|estimate| Some(estimate.clone()));
                             if VoteCount::is_valid_vote(&estimate) {
                                 let equivocation = Message::new(
                                     m.get_sender().clone(),

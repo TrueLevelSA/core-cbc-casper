@@ -216,9 +216,7 @@ impl<M: AbstractMsg> Justification<M> {
         finalized_msg: Option<&M>,
         senders_weights: &SendersWeight<M::Sender>,
     ) -> Option<M> {
-        let subtree_weights =
-            self.get_subtree_weights(finalized_msg, senders_weights);
-        let heaviest_subtree = subtree_weights
+        self.get_subtree_weights(finalized_msg, senders_weights)
             .iter()
             .max_by(|(_, &weight0), (_, &weight1)| {
                 weight0
@@ -228,13 +226,12 @@ impl<M: AbstractMsg> Justification<M> {
                 // something deterministic, like blockhash
                     .unwrap_or(::std::cmp::Ordering::Greater)
             })
-            .map(|(heaviest_subtree, _)| heaviest_subtree.clone());
-        heaviest_subtree
+            .map(|(heaviest_subtree, _)| heaviest_subtree.clone())
     }
 
     pub fn get_subtree_weights(
         &self,
-        finalized_msg: Option<&M>,
+        finalized_msg: Option<&M>, // stops sum at finalized_msg
         senders_weights: &SendersWeight<M::Sender>,
     ) -> HashMap<M, WeightUnit> {
         fn recursor<M>(
@@ -253,10 +250,8 @@ impl<M: AbstractMsg> Justification<M> {
                 |weight_referred, m_prime| {
                     // base case
                     if finalized_msg
-                        .and_then(|f_msg| {
-                            Some(
-                                f_msg == m_prime || !m_prime.depends(f_msg), // TODO: check if needed
-                            )
+                        .map(|f_msg| {
+                            f_msg == m_prime || !m_prime.depends(f_msg) // TODO: check if needed
                         })
                         .unwrap_or(false)
                     {

@@ -37,7 +37,7 @@ impl Block {
         self == rhs
             || rhs
                 .get_prevblock()
-                .and_then(|prevblock| Some(self.is_member(prevblock)))
+                .map(|prevblock| self.is_member(prevblock))
                 .unwrap_or(false)
     }
 }
@@ -59,10 +59,6 @@ impl Estimate for Blockchain {
             _ => {
                 let heaviest_subtree = latest_msgs
                     .ghost(finalized_msg, weights.get_senders_weights());
-                assert!(
-                    heaviest_subtree.is_some(),
-                    "prevblock None is reserved for genesis, should be impossible to fail here as latest_msg.len() > 1"
-                );
                 Self::new(heaviest_subtree, data)
             },
         }
@@ -127,7 +123,7 @@ fn example_usage() {
         "should build on top of b2"
     );
 
-    assert!(b1.is_member(&b1));
+    assert!(b1.is_member(&b1), "equal blocks");
     assert!(!b1.is_member(&b2));
     assert!(!b2.is_member(&b1));
     assert!(!b1.is_member(&b2));

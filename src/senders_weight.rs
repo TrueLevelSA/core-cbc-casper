@@ -41,7 +41,7 @@ impl<S: Sender> SendersWeight<S> {
         self.read()
             .expect("Can't unwrap SendersWeight")
             .get(sender)
-            .and_then(|weight| Some(weight.clone()))
+            .map(|weight| weight.clone())
     }
 
     pub fn into_relative_weights(&self) -> Self {
