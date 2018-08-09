@@ -9,11 +9,14 @@ pub trait Estimate: Hash + Clone + Ord + Send + Sync + Debug {
         latest_msgs: &Justification<Self::M>,
         finalized_msg: Option<&Self::M>,
         weights: &Weights<<<Self as Estimate>::M as AbstractMsg>::Sender>,
-        external_data: Option<<<Self as Estimate>::M as AbstractMsg>::Data>,
+        external_data: Option<<<Self as Estimate>::M as Data>::Data>,
     ) -> Self;
 }
 
-pub trait Data: Clone + Eq + Sync + Send + Debug + Ord + Sized {}
+pub trait Data {
+    type Data;
+    fn is_valid(&Self::Data) -> bool;
+}
 
 pub trait Sender: Hash + Clone + Ord + Eq + Send + Sync + Debug {}
 

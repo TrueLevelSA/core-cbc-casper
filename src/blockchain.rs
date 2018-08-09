@@ -3,26 +3,34 @@ use traits::{Estimate, Data};
 use message::{AbstractMsg, Message};
 use justification::{Justification, Weights};
 use senders_weight::{SendersWeight};
+
+
 type Validator = u32;
 
-#[derive(Clone, Default, Eq, PartialEq, PartialOrd, Ord, Debug, Hash)]
 /// a genesis block should be a block with estimate Blockchain with prevblock =
 /// None and data. data will be the unique identifier of this blockchain
+#[derive(Clone, Default, Eq, PartialEq, PartialOrd, Ord, Debug, Hash)]
 pub struct Blockchain {
     prevblock: Option<Block>,
-    data: Option<<Block as AbstractMsg>::Data>, // TODO: lift the Option when we have real data structures.
+    data: Option<<Block as Data>::Data>, // TODO: lift the Option when we have real data structures.
 }
 
-pub type Block = Message<
-    Blockchain, /*Estimate*/
-    Validator,  /*Sender*/
-    Txs,        /*Data*/
->;
+pub type Block =
+    Message<Blockchain /*Estimate*/, Validator /*Sender*/>;
 
+#[derive(Clone, Eq, Debug, Ord, PartialOrd, PartialEq, Hash)]
+pub struct Tx;
+
+impl Data for Block {
+    type Data = BTreeSet<Tx>;
+    fn is_valid(data: &Self::Data) -> bool {
+        unimplemented!()
+    }
+}
 impl Blockchain {
     pub fn new(
         prevblock: Option<Block>,
-        data: Option<<Block as AbstractMsg>::Data>,
+        data: Option<<Block as Data>::Data>,
     ) -> Self {
         Self { prevblock, data }
     }
@@ -49,7 +57,7 @@ impl Estimate for Blockchain {
         latest_msgs: &Justification<Self::M>,
         finalized_msg: Option<&Self::M>,
         weights: &Weights<<<Self as Estimate>::M as AbstractMsg>::Sender>,
-        data: Option<<<Self as Estimate>::M as AbstractMsg>::Data>,
+        data: Option<<<Self as Estimate>::M as Data>::Data>,
     ) -> Self {
         match latest_msgs.len() {
             0 => panic!(
@@ -64,11 +72,6 @@ impl Estimate for Blockchain {
         }
     }
 }
-
-#[derive(Eq, Ord, PartialOrd, PartialEq, Clone, Default, Hash, Debug)]
-pub struct Tx;
-pub type Txs = BTreeSet<Tx>;
-impl Data for Txs {}
 
 #[test]
 fn example_usage() {

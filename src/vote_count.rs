@@ -57,7 +57,7 @@ impl VoteCount {
     pub fn create_vote_msg(
         sender: u32,
         vote: bool,
-    ) -> Message<Self, u32, VoteCount> {
+    ) -> Message<Self, u32> {
         let justification = Justification::new();
         let estimate = match vote {
             true => VoteCount { yes: 1, no: 0 },
@@ -68,12 +68,12 @@ impl VoteCount {
     }
 
     fn get_vote_msgs(
-        msg: &Message<Self, Voter, VoteCount>,
-    ) -> HashSet<Message<Self, Voter, VoteCount>> {
+        msg: &Message<Self, Voter>,
+    ) -> HashSet<Message<Self, Voter>> {
         fn recursor(
-            msg: &Message<VoteCount, Voter, VoteCount>,
-            acc: HashSet<Message<VoteCount, Voter, VoteCount>>,
-        ) -> HashSet<Message<VoteCount, Voter, VoteCount>> {
+            msg: &Message<VoteCount, Voter>,
+            acc: HashSet<Message<VoteCount, Voter>>,
+        ) -> HashSet<Message<VoteCount, Voter>> {
             msg.get_justification()
                 .iter()
                 .fold(acc, |mut acc_prime, m| {
@@ -109,12 +109,17 @@ impl VoteCount {
 
 type Voter = u32;
 impl Sender for Voter {}
-impl Data for VoteCount {}
+impl Data for Message<VoteCount, Voter> {
+    type Data = VoteCount;
+    fn is_valid(data: &Self::Data) -> bool{
+        unimplemented!()
+    }
+}
 
 impl Estimate for VoteCount {
     // the estimator just counts votes, which in this case are the unjustified
     // msgs
-    type M = Message<Self, Voter, Self>;
+    type M = Message<Self, Voter>;
 
     // Data could be anything, as it will not be used, will just pass None to
     // mk_estimate, as it takes an Option
@@ -132,7 +137,7 @@ impl Estimate for VoteCount {
         let msg = Message::new(
             ::std::u32::MAX, // sender,
             latest_msgs.clone(),
-            VoteCount {yes: 0, no: 0}, // estimate, will be droped on the pattern matching below
+            VoteCount { yes: 0, no: 0 }, // estimate, will be droped on the pattern matching below
         );
         // the estimates are actually the original votes of each of the voters /
         // validators

@@ -10,9 +10,11 @@ use justification::{Justification, Weights, FaultyInsertResult};
 use weight_unit::{WeightUnit};
 use senders_weight::SendersWeight;
 
-pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
+pub trait AbstractMsg:
+    Hash + Ord + Clone + Eq + Sync + Send + Debug + Data
+{
     // To be implemented on concrete struct
-    type Data: Data;
+    // type Data: Data;
     type Sender: Sender;
     type Estimate: Estimate<M = Self>;
     fn get_sender(&self) -> &Self::Sender;
@@ -205,23 +207,23 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
 }
 
 #[derive(Clone, Default, Eq, PartialEq, PartialOrd, Ord)]
-struct ProtoMessage<E, S, D>
+struct ProtoMessage<E, S>
 where
-    E: Estimate<M = Message<E, S, D>>,
+    E: Estimate<M = Message<E, S>>,
     S: Sender,
-    D: Data,
+    Message<E, S>: Data,
 {
     estimate: E,
     sender: S,
-    justification: Justification<Message<E, S, D>>,
+    justification: Justification<Message<E, S>>,
 }
 
 #[derive(Eq, Ord, PartialOrd, Clone, Default)]
-pub struct Message<E, S, D>(Arc<ProtoMessage<E, S, D>>)
+pub struct Message<E, S>(Arc<ProtoMessage<E, S>>)
 where
-    E: Estimate<M = Message<E, S, D>>,
+    E: Estimate<M = Message<E, S>>,
     S: Sender,
-    D: Data;
+    Message<E, S>: Data;
 
 /*
 // TODO start we should make messages lazy. continue this after async-await is better
@@ -244,15 +246,14 @@ where
 // TODO end
 */
 
-impl<E, S, D> AbstractMsg for Message<E, S, D>
+impl<E, S> AbstractMsg for Message<E, S>
 where
     E: Estimate<M = Self>,
     S: Sender,
-    D: Data,
+    Message<E, S>: Data,
 {
     type Estimate = E;
     type Sender = S;
-    type Data = D;
 
     fn get_sender(&self) -> &Self::Sender {
         &self.0.sender
@@ -273,11 +274,11 @@ where
     }
 }
 
-impl<E, S, D> Hash for Message<E, S, D>
+impl<E, S> Hash for Message<E, S>
 where
     E: Estimate<M = Self>,
     S: Sender,
-    D: Data,
+    Message<E, S>: Data,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let _ = self.get_sender().hash(state);
@@ -286,11 +287,11 @@ where
     }
 }
 
-impl<E, S, D> PartialEq for Message<E, S, D>
+impl<E, S> PartialEq for Message<E, S>
 where
     E: Estimate<M = Self>,
     S: Sender,
-    D: Data,
+    Message<E, S>: Data,
 {
     fn eq(&self, rhs: &Self) -> bool {
         self.get_sender() == rhs.get_sender()
@@ -299,11 +300,11 @@ where
     }
 }
 
-impl<E, S, D> Debug for Message<E, S, D>
+impl<E, S> Debug for Message<E, S>
 where
     E: Estimate<M = Self>,
     S: Sender,
-    D: Data,
+    Message<E, S>: Data,
 {
     fn fmt(&self, f: &mut Formatter) -> Result {
         write!(

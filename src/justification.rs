@@ -6,7 +6,7 @@ use message::{AbstractMsg, Message};
 use rayon::collections::btree_set::Iter as ParIter;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use weight_unit::{WeightUnit};
-use traits::{Zero, Sender, Estimate};
+use traits::{Zero, Sender, Estimate, Data};
 use senders_weight::SendersWeight;
 
 #[derive(Eq, Ord, PartialOrd, PartialEq, Clone, Default, Hash)]
@@ -41,7 +41,7 @@ impl<M: AbstractMsg> Justification<M> {
         &self,
         finalized_msg: Option<&M>,
         weights: &Weights<<M as AbstractMsg>::Sender>,
-        data: Option<<M as AbstractMsg>::Data>,
+        data: Option<<M as Data>::Data>,
     ) -> M::Estimate {
         M::Estimate::mk_estimate(self, finalized_msg, weights, data)
     }
