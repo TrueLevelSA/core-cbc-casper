@@ -209,7 +209,30 @@ impl<M: AbstractMsg> Justification<M> {
             }
         }
     }
-    pub fn get_children_weights(
+
+    /// The Greedy Heaviest-Observed Sub-Tree
+    pub fn ghost(
+        &self,
+        finalized_msg: Option<&M>,
+        senders_weights: &SendersWeight<M::Sender>,
+    ) -> Option<M> {
+        let subtree_weights =
+            self.get_subtree_weights(finalized_msg, senders_weights);
+        let heaviest_subtree = subtree_weights
+            .iter()
+            .max_by(|(_, &weight0), (_, &weight1)| {
+                weight0
+                    .partial_cmp(&weight1)
+                // tie breaker, the unwrap fails because both values are the
+                // same and we arbitrarily chose a result. TODO this should be
+                // something deterministic, like blockhash
+                    .unwrap_or(::std::cmp::Ordering::Greater)
+            })
+            .map(|(heaviest_subtree, _)| heaviest_subtree.clone());
+        heaviest_subtree
+    }
+
+    pub fn get_subtree_weights(
         &self,
         finalized_msg: Option<&M>,
         senders_weights: &SendersWeight<M::Sender>,
@@ -369,37 +392,37 @@ mod justification {
         // weights:   2               6               14               30
         let mut justification = Justification::new();
         assert!(justification.insert(genesis_block.clone()));
-        let children_weights =
-            justification.get_children_weights(None, &senders_weights);
-        let (_msg, weight) = children_weights.iter().next().unwrap();
+        let subtree_weights =
+            justification.get_subtree_weights(None, &senders_weights);
+        let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &2.0);
-        println!("children_weights1: {:?}", children_weights);
+        println!("children_weights1: {:?}", subtree_weights);
         let estimate = Blockchain::new(Some(genesis_block.clone()), None);
         let b1 = Block::new(sender1, justification, estimate);
 
         let mut justification = Justification::new();
         assert!(justification.insert(b1.clone()));
-        let children_weights =
-            justification.get_children_weights(None, &senders_weights);
-        let (_msg, weight) = children_weights.iter().next().unwrap();
+        let subtree_weights =
+            justification.get_subtree_weights(None, &senders_weights);
+        let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &6.0);
         let estimate = Blockchain::new(Some(b1), None);
         let b2 = Block::new(sender2, justification, estimate);
 
         let mut justification = Justification::new();
         assert!(justification.insert(b2.clone()));
-        let children_weights =
-            justification.get_children_weights(None, &senders_weights);
-        let (_msg, weight) = children_weights.iter().next().unwrap();
+        let subtree_weights =
+            justification.get_subtree_weights(None, &senders_weights);
+        let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &14.0);
         let estimate = Blockchain::new(Some(b2), None);
         let b3 = Block::new(sender3, justification, estimate);
 
         let mut justification = Justification::new();
         assert!(justification.insert(b3.clone()));
-        let children_weights =
-            justification.get_children_weights(None, &senders_weights);
-        let (_msg, weight) = children_weights.iter().next().unwrap();
+        let subtree_weights =
+            justification.get_subtree_weights(None, &senders_weights);
+        let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &30.0);
     }
 

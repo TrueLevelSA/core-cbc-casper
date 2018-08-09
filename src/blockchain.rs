@@ -51,22 +51,13 @@ impl Estimate for Blockchain {
         weights: &Weights<<<Self as Estimate>::M as AbstractMsg>::Sender>,
         data: Option<<<Self as Estimate>::M as AbstractMsg>::Data>,
     ) -> Self {
-        let senders_weights = weights.get_senders_weights();
-        let children_weights =
-            latest_msgs.get_children_weights(finalized_msg, senders_weights);
-        let best_child = children_weights
-            .iter()
-            .max_by(|(_, &weight0), (_, &weight1)| {
-                weight0
-                    .partial_cmp(&weight1)
-                    // tie breaker, the unwrap fails because both values are the
-                    // same and we arbitrarily chose a result. TODO this should be
-                    // something deterministic, like blockhash
-                    .unwrap_or(::std::cmp::Ordering::Greater)
-            })
-            .map(|(best_child, _)| best_child)
-            .expect("Needs at least one latest message to produce an estimate");
-        Self::new(Some(best_child.clone()), data)
+        assert!(
+            latest_msgs.len() > 0,
+            "Needs at least one latest message to be able to pick the heaviest"
+        );
+        let heaviest_subtree =
+            latest_msgs.ghost(finalized_msg, weights.get_senders_weights());
+        Self::new(heaviest_subtree, data)
     }
 }
 
