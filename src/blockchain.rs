@@ -23,7 +23,7 @@ pub struct Tx;
 
 impl Data for Block {
     type Data = BTreeSet<Tx>;
-    fn is_valid(data: &Self::Data) -> bool {
+    fn is_valid(_data: &Self::Data) -> bool {
         unimplemented!()
     }
 }
@@ -34,11 +34,17 @@ impl Blockchain {
     ) -> Self {
         Self { prevblock, data }
     }
+    fn get_prevblock(&self) -> &Option<Block> {
+        &self.prevblock
+    }
+    fn get_data(&self) -> &Option<<Block as Data>::Data> {
+        &self.data
+    }
 }
 
 impl Block {
     fn get_prevblock(&self) -> Option<&Self> {
-        self.get_estimate().prevblock.as_ref()
+        self.get_estimate().get_prevblock().as_ref()
     }
 
     fn is_member(&self, rhs: &Self) -> bool {

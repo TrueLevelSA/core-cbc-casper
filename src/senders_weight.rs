@@ -17,7 +17,7 @@ impl<S: Sender> SendersWeight<S> {
         self.0.read()
     }
 
-    fn write(&self) -> LockResult<RwLockWriteGuard<HashMap<S, WeightUnit>>> {
+    pub fn write(&self) -> LockResult<RwLockWriteGuard<HashMap<S, WeightUnit>>> {
         self.0.write()
     }
 
