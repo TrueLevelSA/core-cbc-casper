@@ -3,13 +3,13 @@ use std::fmt::{Debug};
 use message::{AbstractMsg};
 use justification::{Justification, Weights};
 
-pub trait Estimate: Hash + Clone + Ord + Send + Sync + Debug {
+pub trait Estimate: Hash + Clone + Ord + Send + Sync + Debug + Data {
     type M: AbstractMsg<Estimate = Self>;
     fn mk_estimate(
         latest_msgs: &Justification<Self::M>,
         finalized_msg: Option<&Self::M>,
         weights: &Weights<<<Self as Estimate>::M as AbstractMsg>::Sender>,
-        external_data: Option<<<Self as Estimate>::M as Data>::Data>,
+        external_data: Option<<Self as Data>::Data>,
     ) -> Self;
 }
 

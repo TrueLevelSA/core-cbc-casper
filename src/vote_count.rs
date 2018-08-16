@@ -109,7 +109,7 @@ impl VoteCount {
 
 type Voter = u32;
 impl Sender for Voter {}
-impl Data for Message<VoteCount, Voter> {
+impl Data for VoteCount {
     type Data = VoteCount;
     fn is_valid(data: &Self::Data) -> bool{
         unimplemented!()

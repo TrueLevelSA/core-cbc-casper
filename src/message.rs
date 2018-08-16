@@ -10,9 +10,7 @@ use justification::{Justification, Weights, FaultyInsertResult};
 use weight_unit::{WeightUnit};
 use senders_weight::SendersWeight;
 
-pub trait AbstractMsg:
-    Hash + Ord + Clone + Eq + Sync + Send + Debug + Data
-{
+pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     // To be implemented on concrete struct
     // type Data: Data;
     type Sender: Sender;
@@ -34,7 +32,7 @@ pub trait AbstractMsg:
         latest_msgs: Vec<&Self>,
         finalized_msg: Option<&Self>,
         weights: &Weights<Self::Sender>,
-        external_data: Option<Self::Data>,
+        external_data: Option<<<Self as AbstractMsg>::Estimate as Data>::Data>,
     ) -> (Self, Weights<Self::Sender>) {
         // // TODO eventually comment out these lines, and FIXME tests
         // // check whether two messages from same sender
@@ -211,7 +209,6 @@ struct ProtoMessage<E, S>
 where
     E: Estimate<M = Message<E, S>>,
     S: Sender,
-    Message<E, S>: Data,
 {
     estimate: E,
     sender: S,
@@ -222,8 +219,7 @@ where
 pub struct Message<E, S>(Arc<ProtoMessage<E, S>>)
 where
     E: Estimate<M = Message<E, S>>,
-    S: Sender,
-    Message<E, S>: Data;
+    S: Sender;
 
 /*
 // TODO start we should make messages lazy. continue this after async-await is better
@@ -250,7 +246,6 @@ impl<E, S> AbstractMsg for Message<E, S>
 where
     E: Estimate<M = Self>,
     S: Sender,
-    Message<E, S>: Data,
 {
     type Estimate = E;
     type Sender = S;
@@ -278,7 +273,6 @@ impl<E, S> Hash for Message<E, S>
 where
     E: Estimate<M = Self>,
     S: Sender,
-    Message<E, S>: Data,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let _ = self.get_sender().hash(state);
@@ -291,7 +285,6 @@ impl<E, S> PartialEq for Message<E, S>
 where
     E: Estimate<M = Self>,
     S: Sender,
-    Message<E, S>: Data,
 {
     fn eq(&self, rhs: &Self) -> bool {
         self.get_sender() == rhs.get_sender()
@@ -304,7 +297,6 @@ impl<E, S> Debug for Message<E, S>
 where
     E: Estimate<M = Self>,
     S: Sender,
-    Message<E, S>: Data,
 {
     fn fmt(&self, f: &mut Formatter) -> Result {
         write!(

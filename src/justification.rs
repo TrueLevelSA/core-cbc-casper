@@ -41,7 +41,7 @@ impl<M: AbstractMsg> Justification<M> {
         &self,
         finalized_msg: Option<&M>,
         weights: &Weights<<M as AbstractMsg>::Sender>,
-        data: Option<<M as Data>::Data>,
+        data: Option<<<M as AbstractMsg>::Estimate as Data>::Data>,
     ) -> M::Estimate {
         M::Estimate::mk_estimate(self, finalized_msg, weights, data)
     }
@@ -361,7 +361,7 @@ mod justification {
 
     #[test]
     fn children_weight() {
-        use blockchain::{Block, Blockchain};
+        use blockchain::{BlockMsg, Block};
         let (sender0, sender1, sender2, sender3) = (0, 1, 2, 3); // miner identities
         let (weight0, weight1, weight2, weight3) = (2., 4., 8., 16.); // and their corresponding weights
         let senders_weights = SendersWeight::new(
@@ -374,10 +374,10 @@ mod justification {
                 .cloned()
                 .collect(),
         );
-        let estimate = Blockchain::new(None, None);
+        let estimate = Block::new(None, None);
         let justification = Justification::new();
         let genesis_block =
-            Block::new(sender0, justification, estimate.clone());
+            BlockMsg::new(sender0, justification, estimate.clone());
         assert_eq!(
             genesis_block.get_estimate(),
             &estimate,
@@ -392,8 +392,8 @@ mod justification {
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &2.0);
         println!("children_weights1: {:?}", subtree_weights);
-        let estimate = Blockchain::new(Some(genesis_block.clone()), None);
-        let b1 = Block::new(sender1, justification, estimate);
+        let estimate = Block::new(Some(Box::new(genesis_block.get_estimate().clone())), None);
+        let b1 = BlockMsg::new(sender1, justification, estimate);
 
         let mut justification = Justification::new();
         assert!(justification.insert(b1.clone()));
@@ -401,8 +401,8 @@ mod justification {
             justification.get_subtree_weights(None, &senders_weights);
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &6.0);
-        let estimate = Blockchain::new(Some(b1), None);
-        let b2 = Block::new(sender2, justification, estimate);
+        let estimate = Block::new(Some(Box::new(b1.get_estimate().clone())), None);
+        let b2 = BlockMsg::new(sender2, justification, estimate);
 
         let mut justification = Justification::new();
         assert!(justification.insert(b2.clone()));
@@ -410,8 +410,8 @@ mod justification {
             justification.get_subtree_weights(None, &senders_weights);
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &14.0);
-        let estimate = Blockchain::new(Some(b2), None);
-        let b3 = Block::new(sender3, justification, estimate);
+        let estimate = Block::new(Some(Box::new(b2.get_estimate().clone())), None);
+        let b3 = BlockMsg::new(sender3, justification, estimate);
 
         let mut justification = Justification::new();
         assert!(justification.insert(b3.clone()));
