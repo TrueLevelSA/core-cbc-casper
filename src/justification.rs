@@ -392,7 +392,7 @@ mod justification {
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &2.0);
         println!("children_weights1: {:?}", subtree_weights);
-        let estimate = Block::new(Some(Box::new(genesis_block.get_estimate().clone())), None);
+        let estimate = Block::from_prevblock_msg(Some(genesis_block), None);
         let b1 = BlockMsg::new(sender1, justification, estimate);
 
         let mut justification = Justification::new();
@@ -401,7 +401,7 @@ mod justification {
             justification.get_subtree_weights(None, &senders_weights);
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &6.0);
-        let estimate = Block::new(Some(Box::new(b1.get_estimate().clone())), None);
+        let estimate = Block::from_prevblock_msg(Some(b1), None);
         let b2 = BlockMsg::new(sender2, justification, estimate);
 
         let mut justification = Justification::new();
@@ -410,7 +410,7 @@ mod justification {
             justification.get_subtree_weights(None, &senders_weights);
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &14.0);
-        let estimate = Block::new(Some(Box::new(b2.get_estimate().clone())), None);
+        let estimate = Block::from_prevblock_msg(Some(b2), None);
         let b3 = BlockMsg::new(sender3, justification, estimate);
 
         let mut justification = Justification::new();

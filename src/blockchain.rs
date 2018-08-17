@@ -3,7 +3,7 @@ use traits::{Estimate, Data};
 use message::{AbstractMsg, Message};
 use justification::{Justification, Weights};
 use senders_weight::{SendersWeight};
-
+use std::convert::{From};
 type Validator = u32;
 
 /// a genesis block should be a block with estimate Block with prevblock =
@@ -25,6 +25,13 @@ impl Data for Block {
         unimplemented!()
     }
 }
+
+impl<'z> From<&'z BlockMsg> for Block {
+    fn from(msg: &BlockMsg) -> Self {
+        msg.get_estimate().clone()
+    }
+}
+
 impl Block {
     pub fn new(
         prevblock: Option<Box<Block>>,
@@ -37,6 +44,13 @@ impl Block {
     }
     fn get_data(&self) -> &Option<<Block as Data>::Data> {
         &self.data
+    }
+    pub fn from_prevblock_msg(
+        prevblock_msg: Option<BlockMsg>,
+        data: Option<<Block as Data>::Data>,
+    ) -> Self {
+        let prevblock = prevblock_msg.map(|m| Box::new(Block::from(&m)));
+        Self { prevblock, data }
     }
 
     // fn get_prevblock(&self) -> Option<&Self> {
@@ -65,21 +79,14 @@ impl Estimate for Block {
             0 => panic!(
                 "Needs at least one latest message to be able to pick one"
             ),
-            1 => Self::new(
-                latest_msgs
-                    .iter()
-                    .next()
-                    .map(|msg| Box::new(msg.get_estimate().clone())),
+            1 => Self::from_prevblock_msg(
+                latest_msgs.iter().next().map(|msg| msg.clone()),
                 data,
             ),
             _ => {
-                let heaviest_subtree = latest_msgs
+                let heaviest_msg = latest_msgs
                     .ghost(finalized_msg, weights.get_senders_weights());
-                Self::new(
-                    heaviest_subtree
-                        .map(|msg| Box::new(msg.get_estimate().clone())),
-                    data,
-                )
+                Self::from_prevblock_msg(heaviest_msg, data)
             },
         }
     }
@@ -111,24 +118,25 @@ fn example_usage() {
         data: None,
     };
     let justification = Justification::new();
-    let genesis_block = BlockMsg::new(sender0, justification, estimate.clone());
+    let genesis_block_msg =
+        BlockMsg::new(sender0, justification, estimate.clone());
     assert_eq!(
-        genesis_block.get_estimate(),
+        genesis_block_msg.get_estimate(),
         &estimate,
         "genesis block with None as prevblock"
     );
 
     let (b1, weights) = BlockMsg::from_msgs(
         sender1,
-        vec![&genesis_block],
-        None, // finalized_msg, could be genesis_block
+        vec![&genesis_block_msg],
+        None, // finalized_msg, could be genesis_block_msg
         &weights,
         None, // data
     );
 
     let (b2, weights) = BlockMsg::from_msgs(
         sender2,
-        vec![&genesis_block],
+        vec![&genesis_block_msg],
         None,
         &weights,
         None,
@@ -139,7 +147,7 @@ fn example_usage() {
 
     assert_eq!(
         b3.get_estimate(),
-        &Block::new(Some(Box::new(b2.get_estimate().clone())), None),
+        &Block::new(Some(Box::new(Block::from(&b2))), None),
         "should build on top of b2 as sender2 has more weight"
     );
 
@@ -180,27 +188,27 @@ fn example_usage() {
 //         data: None,
 //     };
 //     let justification = Justification::new();
-//     let genesis_block = BlockMsg::new(sender0, justification, estimate.clone());
+//     let genesis_block_msg = BlockMsg::new(sender0, justification, estimate.clone());
 //     assert_eq!(
-//         genesis_block.get_estimate(),
+//         genesis_block_msg.get_estimate(),
 //         &estimate,
 //         "genesis block with None as prevblock"
 //     );
 
 //     let (b1, weights) = BlockMsg::from_msgs(
 //         sender1,
-//         vec![&genesis_block],
-//         None, // finalized_msg, could be genesis_block
+//         vec![&genesis_block_msg],
+//         None, // finalized_msg, could be genesis_block_msg
 //         &weights,
 //         None, // data
 //     );
 
 //     let (b2, weights) =
-//         BlockMsg::from_msgs(sender2, vec![&genesis_block], None, &weights, None);
+//         BlockMsg::from_msgs(sender2, vec![&genesis_block_msg], None, &weights, None);
 //     let (b3, weights) =
-//         BlockMsg::from_msgs(sender3, vec![&genesis_block], None, &weights, None);
+//         BlockMsg::from_msgs(sender3, vec![&genesis_block_msg], None, &weights, None);
 //     let (b4, weights) =
-//         BlockMsg::from_msgs(sender4, vec![&genesis_block], None, &weights, None);
+//         BlockMsg::from_msgs(sender4, vec![&genesis_block_msg], None, &weights, None);
 //     let (b5, weights) =
 //         BlockMsg::from_msgs(sender1, vec![&b1, &b2], None, &weights, None);
 //     let (b6, weights) =
