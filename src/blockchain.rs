@@ -53,17 +53,13 @@ impl Block {
         Self { prevblock, data }
     }
 
-    // fn get_prevblock(&self) -> Option<&Self> {
-    //       self.get_estimate().get_prevblock().as_ref()
-    //   }
-
-    // fn is_member(&self, rhs: &Self) -> bool {
-    //     self == rhs
-    //         || rhs
-    //             .get_prevblock()
-    //             .map(|prevblock| self.is_member(prevblock))
-    //             .unwrap_or(false)
-    // }
+    fn is_member(&self, rhs: &Self) -> bool {
+        self == rhs
+            || rhs
+                .get_prevblock()
+                .map(|prevblock| self.is_member(prevblock))
+                .unwrap_or(false)
+    }
 }
 
 // TODO: i think its possible to do ghost in arbitrary data, that is default implementation
@@ -158,6 +154,12 @@ fn example_usage() {
     // assert!(b2.is_member(&b3));
     // assert!(!b3.is_member(&b2));
     // assert!(!b3.is_member(&b1));
+    assert!(Block::from(&b1).is_member(&Block::from(&b1)), "equal blocks");
+    assert!(!Block::from(&b1).is_member(&Block::from(&b2)));
+    assert!(!Block::from(&b2).is_member(&Block::from(&b1)));
+    assert!(Block::from(&b2).is_member(&Block::from(&b3)));
+    assert!(!Block::from(&b3).is_member(&Block::from(&b2)));
+    assert!(!Block::from(&b3).is_member(&Block::from(&b1)));
 }
 
 // #[test]
