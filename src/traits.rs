@@ -15,7 +15,7 @@ pub trait Estimate: Hash + Clone + Ord + Send + Sync + Debug + Data {
 
 pub trait Data {
     type Data;
-    fn is_valid(&Self::Data) -> bool;
+    fn is_valid(&self, &Self::Data) -> bool;
 }
 
 pub trait Sender: Hash + Clone + Ord + Eq + Send + Sync + Debug {}

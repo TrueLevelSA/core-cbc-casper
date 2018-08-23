@@ -21,7 +21,7 @@ pub struct Tx;
 
 impl Data for Block {
     type Data = BTreeSet<Tx>;
-    fn is_valid(_data: &Self::Data) -> bool {
+    fn is_valid(&self, _data: &Self::Data) -> bool {
         unimplemented!()
     }
 }
@@ -54,15 +54,20 @@ impl Block {
     }
 
     fn is_member(&self, rhs: &Self) -> bool {
+        println!("in is_member rhs : {:?}", rhs);
+        println!("in is_member self: {:?}", self);
         self == rhs
             || rhs
                 .get_prevblock()
-                .map(|prevblock| self.is_member(prevblock))
+                .map(|prevblock| {
+                    println!("out is_member prevblock: {:?}", prevblock);
+                    println!("out is_member self     : {:?}", self);
+                    self.is_member(prevblock)
+                })
                 .unwrap_or(false)
     }
 }
 
-// TODO: i think its possible to do ghost in arbitrary data, that is default implementation
 impl Estimate for Block {
     type M = BlockMsg;
     fn mk_estimate(
@@ -75,10 +80,15 @@ impl Estimate for Block {
             0 => panic!(
                 "Needs at least one latest message to be able to pick one"
             ),
-            1 => Self::from_prevblock_msg(
-                latest_msgs.iter().next().map(|msg| msg.clone()),
-                data,
-            ),
+            1 => {
+                let block = Self::from_prevblock_msg(
+                    latest_msgs.iter().next().map(|msg| msg.clone()),
+                    data,
+                );
+                // TODO: here u have to verify that the data is consistent with the block choice
+                // is_valid_estimate
+                block
+            },
             _ => {
                 let heaviest_msg = latest_msgs
                     .ghost(finalized_msg, weights.get_senders_weights());
@@ -122,7 +132,7 @@ fn example_usage() {
         "genesis block with None as prevblock"
     );
 
-    let (b1, weights) = BlockMsg::from_msgs(
+    let (m1, weights) = BlockMsg::from_msgs(
         sender1,
         vec![&genesis_block_msg],
         None, // finalized_msg, could be genesis_block_msg
@@ -130,7 +140,7 @@ fn example_usage() {
         None, // data
     );
 
-    let (b2, weights) = BlockMsg::from_msgs(
+    let (m2, weights) = BlockMsg::from_msgs(
         sender2,
         vec![&genesis_block_msg],
         None,
@@ -138,28 +148,36 @@ fn example_usage() {
         None,
     );
 
-    let (b3, weights) =
-        BlockMsg::from_msgs(sender3, vec![&b1, &b2], None, &weights, None);
+    let (m3, weights) =
+        BlockMsg::from_msgs(sender3, vec![&m1, &m2], None, &weights, None);
 
     assert_eq!(
-        b3.get_estimate(),
-        &Block::new(Some(Box::new(Block::from(&b2))), None),
-        "should build on top of b2 as sender2 has more weight"
+        m3.get_estimate(),
+        &Block::new(Some(Box::new(Block::from(&m2))), None),
+        "should build on top of m2 as sender2 has more weight"
     );
 
-    // assert!(b1.is_member(&b1), "equal blocks");
-    // assert!(!b1.is_member(&b2));
-    // assert!(!b2.is_member(&b1));
-    // assert!(!b1.is_member(&b2));
-    // assert!(b2.is_member(&b3));
-    // assert!(!b3.is_member(&b2));
-    // assert!(!b3.is_member(&b1));
-    assert!(Block::from(&b1).is_member(&Block::from(&b1)), "equal blocks");
-    assert!(!Block::from(&b1).is_member(&Block::from(&b2)));
-    assert!(!Block::from(&b2).is_member(&Block::from(&b1)));
-    assert!(Block::from(&b2).is_member(&Block::from(&b3)));
-    assert!(!Block::from(&b3).is_member(&Block::from(&b2)));
-    assert!(!Block::from(&b3).is_member(&Block::from(&b1)));
+    // assert!(m1.is_member(&m1), "equal blocks");
+    // assert!(!m1.is_member(&m2));
+    // assert!(!m2.is_member(&m1));
+    // assert!(!m1.is_member(&m2));
+    // assert!(m2.is_member(&m3));
+    // assert!(!m3.is_member(&m2));
+    // assert!(!m3.is_member(&m1));
+
+
+
+    // assert!(
+    //     Block::from(&m1).is_member(&Block::from(&m1)),
+    //     "equal blocks"
+    // );
+    // assert!(Block::from(&m2).is_member(&Block::from(&m3)));
+    // assert!(!Block::from(&m3).is_member(&Block::from(&m2)));
+    // assert!(!Block::from(&m3).is_member(&Block::from(&m1)));
+
+
+    assert!(!Block::from(&m1).is_member(&Block::from(&m2)));
+    // assert!(!Block::from(&m2).is_member(&Block::from(&m1)));
 }
 
 // #[test]
@@ -197,7 +215,7 @@ fn example_usage() {
 //         "genesis block with None as prevblock"
 //     );
 
-//     let (b1, weights) = BlockMsg::from_msgs(
+//     let (m1, weights) = BlockMsg::from_msgs(
 //         sender1,
 //         vec![&genesis_block_msg],
 //         None, // finalized_msg, could be genesis_block_msg
@@ -205,20 +223,20 @@ fn example_usage() {
 //         None, // data
 //     );
 
-//     let (b2, weights) =
+//     let (m2, weights) =
 //         BlockMsg::from_msgs(sender2, vec![&genesis_block_msg], None, &weights, None);
-//     let (b3, weights) =
+//     let (m3, weights) =
 //         BlockMsg::from_msgs(sender3, vec![&genesis_block_msg], None, &weights, None);
 //     let (b4, weights) =
 //         BlockMsg::from_msgs(sender4, vec![&genesis_block_msg], None, &weights, None);
 //     let (b5, weights) =
-//         BlockMsg::from_msgs(sender1, vec![&b1, &b2], None, &weights, None);
+//         BlockMsg::from_msgs(sender1, vec![&m1, &m2], None, &weights, None);
 //     let (b6, weights) =
-//         BlockMsg::from_msgs(sender2, vec![&b2], None, &weights, None);
+//         BlockMsg::from_msgs(sender2, vec![&m2], None, &weights, None);
 //     let (b7, weights) =
-//         BlockMsg::from_msgs(sender3, vec![&b3], None, &weights, None);
+//         BlockMsg::from_msgs(sender3, vec![&m3], None, &weights, None);
 //     let (b8, weights) =
-//         BlockMsg::from_msgs(sender4, vec![&b3, &b4], None, &weights, None);
+//         BlockMsg::from_msgs(sender4, vec![&m3, &b4], None, &weights, None);
 //     let (b9, weights) =
 //         BlockMsg::from_msgs(sender1, vec![&b5], None, &weights, None);
 //     let (b10, weights) =
@@ -230,7 +248,7 @@ fn example_usage() {
 
 //     assert_eq!(
 //         b5.get_estimate(),
-//         &Block::new(Some(b2.clone()), None),
-//         "should build on top of b2"
+//         &Block::new(Some(m2.clone()), None),
+//         "should build on top of m2"
 //     );
 // }
