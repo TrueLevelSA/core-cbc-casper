@@ -374,47 +374,49 @@ mod justification {
                 .cloned()
                 .collect(),
         );
-        let estimate = Block::new(None, None);
+        let genesis_block = Block::new(None, sender0); // estimate of the first casper message
         let justification = Justification::new();
-        let genesis_block =
-            BlockMsg::new(sender0, justification, estimate.clone());
+        let genesis_msg =
+            BlockMsg::new(sender0, justification, genesis_block.clone());
         assert_eq!(
-            genesis_block.get_estimate(),
-            &estimate,
+            genesis_msg.get_estimate(),
+            &genesis_block,
             "genesis block with None as prev_block"
         );
-        // genesis(s=0, w=2) <- b1(s=1, w=4) <- b2(s=2, w=8) <- b3(s=3, w=16)
-        // weights:   2               6               14               30
+        // genesis_msg(s=0, w=2) <- m1(s=1, w=4) <- m2(s=2, w=8) <- m3(s=3, w=16)
+        // weights:       2               6               14               30
         let mut justification = Justification::new();
-        assert!(justification.insert(genesis_block.clone()));
+        assert!(justification.insert(genesis_msg.clone()));
         let subtree_weights =
             justification.get_subtree_weights(None, &senders_weights);
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &2.0);
-        println!("children_weights1: {:?}", subtree_weights);
-        let estimate = Block::from_prevblock_msg(Some(genesis_block), None);
-        let b1 = BlockMsg::new(sender1, justification, estimate);
+        let proto_b1 = Block::new(None, sender1);
+        let b1 = Block::from_prevblock_msg(Some(genesis_msg), proto_b1);
+        let m1 = BlockMsg::new(sender1, justification, b1);
 
         let mut justification = Justification::new();
-        assert!(justification.insert(b1.clone()));
+        assert!(justification.insert(m1.clone()));
         let subtree_weights =
             justification.get_subtree_weights(None, &senders_weights);
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &6.0);
-        let estimate = Block::from_prevblock_msg(Some(b1), None);
-        let b2 = BlockMsg::new(sender2, justification, estimate);
+        let proto_b2 = Block::new(None, sender2);
+        let b2 = Block::from_prevblock_msg(Some(m1), proto_b2);
+        let m2 = BlockMsg::new(sender2, justification, b2);
 
         let mut justification = Justification::new();
-        assert!(justification.insert(b2.clone()));
+        assert!(justification.insert(m2.clone()));
         let subtree_weights =
             justification.get_subtree_weights(None, &senders_weights);
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &14.0);
-        let estimate = Block::from_prevblock_msg(Some(b2), None);
-        let b3 = BlockMsg::new(sender3, justification, estimate);
+        let proto_b3 = Block::new(None, sender3);
+        let b3 = Block::from_prevblock_msg(Some(m2), proto_b3);
+        let m3 = BlockMsg::new(sender3, justification, b3);
 
         let mut justification = Justification::new();
-        assert!(justification.insert(b3.clone()));
+        assert!(justification.insert(m3.clone()));
         let subtree_weights =
             justification.get_subtree_weights(None, &senders_weights);
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
