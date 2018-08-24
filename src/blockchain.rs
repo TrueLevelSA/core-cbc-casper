@@ -13,6 +13,7 @@ type Validator = u32;
 pub struct Block {
     prevblock: Option<Box<Block>>,
     sender: Validator,
+    txs: BTreeSet<Tx>,
 }
 
 pub type BlockMsg = Message<Block /*Estimate*/, Validator /*Sender*/>;
@@ -22,7 +23,7 @@ pub struct Tx;
 
 impl Data for Block {
     type Data = Self;
-    fn is_valid(&self, _data: &Self::Data) -> bool {
+    fn is_valid(_data: &Self::Data) -> bool {
         true // FIXME
     }
 }
@@ -34,16 +35,35 @@ impl<'z> From<&'z BlockMsg> for Block {
 }
 
 impl Block {
-    pub fn new(prevblock: Option<Box<Block>>, sender: Validator) -> Self {
-        Self { prevblock, sender }
+    pub fn new(
+        prevblock: Option<Box<Block>>,
+        sender: Validator,
+        txs: BTreeSet<Tx>,
+    ) -> Self {
+        Self {
+            prevblock,
+            sender,
+            txs,
+        }
     }
     pub fn from_prevblock_msg(
         prevblock_msg: Option<BlockMsg>,
-        // a proto_block is a block with a None prevblock and is not a genesis_block
+        // a proto_block is a block with a None prevblock (ie, Estimate) AND is
+        // not a genesis_block
         proto_block: Block,
     ) -> Self {
         let prevblock = prevblock_msg.map(|m| Box::new(Block::from(&m)));
-        Self { prevblock, ..proto_block }
+        let block = Self {
+            prevblock,
+            ..proto_block
+        };
+
+        if Block::is_valid(&block) {
+            block
+        }
+        else {
+            panic!("Block not valid")
+        }
     }
 }
 
@@ -53,29 +73,28 @@ impl Estimate for Block {
         latest_msgs: &Justification<Self::M>,
         finalized_msg: Option<&Self::M>,
         weights: &Weights<<<Self as Estimate>::M as AbstractMsg>::Sender>,
+        // in fact i could put the whole mempool inside of this proto_block and
+        // search for a reasonable set of txs in this function that does not
+        // conflict with the past blocks
         proto_block: Option<<Self as Data>::Data>,
     ) -> Self {
         match (latest_msgs.len(), proto_block) {
             (0, _) => panic!(
                 "Needs at least one latest message to be able to pick one"
             ),
+            (_, None) => panic!("proto_block is None"),
             (1, Some(proto_block)) => {
-                let block = Self::from_prevblock_msg(
-                    latest_msgs.iter().next().map(|msg| msg.clone()),
-                    proto_block,
-                );
-                // TODO: here u have to verify that the proto_block is consistent with the block choice
-                // is_valid_estimate
-                block
+                // only msg to built on top, no choice thus no ghost
+                let msg = latest_msgs.iter().next().map(|msg| msg.clone());
+                Self::from_prevblock_msg(msg, proto_block)
             },
             (_, Some(proto_block)) => {
                 let heaviest_msg = latest_msgs
                     .ghost(finalized_msg, weights.get_senders_weights());
                 Self::from_prevblock_msg(heaviest_msg, proto_block)
             },
-            (_, None) =>
-                panic!("proto_block is None, and latest_msgs: {:?}", latest_msgs),
         }
+
     }
 }
 
@@ -100,19 +119,22 @@ fn example_usage() {
         HashSet::new(), // equivocators
     );
 
-    let estimate = Block {
+    let txs = BTreeSet::new();
+
+    let genesis_block = Block {
         prevblock: None,
         sender: sender0,
+        txs: txs.clone(),
     };
     let justification = Justification::new();
     let genesis_block_msg =
-        BlockMsg::new(sender0, justification, estimate.clone());
+        BlockMsg::new(sender0, justification, genesis_block.clone());
     assert_eq!(
         genesis_block_msg.get_estimate(),
-        &estimate,
+        &genesis_block,
         "genesis block with None as prevblock"
     );
-    let proto_b1 = Block::new(None, sender1);
+    let proto_b1 = Block::new(None, sender1, txs.clone());
     let (m1, weights) = BlockMsg::from_msgs(
         proto_b1.sender,
         vec![&genesis_block_msg],
@@ -120,7 +142,7 @@ fn example_usage() {
         &weights,
         Some(proto_b1), // data
     );
-    let proto_b2 =  Block::new(None, sender2);
+    let proto_b2 = Block::new(None, sender2, txs.clone());
     let (m2, weights) = BlockMsg::from_msgs(
         proto_b2.sender,
         vec![&genesis_block_msg],
@@ -128,7 +150,7 @@ fn example_usage() {
         &weights,
         Some(proto_b2),
     );
-    let proto_b3 = Block::new(None, sender3);
+    let proto_b3 = Block::new(None, sender3, txs.clone());
     let (m3, weights) = BlockMsg::from_msgs(
         proto_b3.sender,
         vec![&m1, &m2],
@@ -139,7 +161,7 @@ fn example_usage() {
 
     assert_eq!(
         m3.get_estimate(),
-        &Block::new(Some(Box::new(Block::from(&m2))), sender3),
+        &Block::new(Some(Box::new(Block::from(&m2))), sender3, txs.clone()),
         "should build on top of m2 as sender2 has more weight"
     );
 }

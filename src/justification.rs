@@ -75,13 +75,10 @@ impl<M: AbstractMsg> Justification<M> {
     ) -> FaultyInsertResult<M::Sender> {
         /// get msgs and fault weight overhead and equivocators overhead sorted
         /// by fault weight overhead
-        fn get_msgs_sorted_by_faultweight<'z, M: AbstractMsg>(
+        fn sort_by_faultweight<'z, M: AbstractMsg>(
             justification: &Justification<M>,
-            Weights {
-                senders_weights,
-                equivocators,
-                ..
-            }: &Weights<M::Sender>,
+            senders_weights: SendersWeight<M::Sender>,
+            equivocators: HashSet<M::Sender>,
             msgs: HashSet<&'z M>,
         ) -> Vec<&'z M> {
             let mut msgs_sorted_by_faultw: Vec<_> = msgs
@@ -89,7 +86,7 @@ impl<M: AbstractMsg> Justification<M> {
                 .enumerate()
                 .filter_map(|(outer_i, &msg)| {
                     // equivocations in relation to state
-                    let state_equvctrs: HashSet<_> =
+                    let state_equivocators: HashSet<_> =
                         justification.get_equivocators(msg);
 
                     // equivocations present within the current latest_msgs set that
@@ -105,7 +102,7 @@ impl<M: AbstractMsg> Justification<M> {
                         })
                         .collect();
 
-                    let msg_equivocators: HashSet<_> = state_equvctrs
+                    let msg_equivocators: HashSet<_> = state_equivocators
                         .union(&pairwise_equivocators)
                     // take only the equivocators that are not yet on the
                     // equivocator set as the others already have their
@@ -139,8 +136,12 @@ impl<M: AbstractMsg> Justification<M> {
         }
 
         // do the actual insertions to the state
-        get_msgs_sorted_by_faultweight(&self, &weights, msgs)
-            .iter()
+        sort_by_faultweight(
+            &self,
+            weights.senders_weights.clone(),
+            weights.equivocators.clone(),
+            msgs,
+        ).iter()
             .fold(
                 FaultyInsertResult {
                     success: false,
@@ -192,7 +193,7 @@ impl<M: AbstractMsg> Justification<M> {
                 }
             }
             else {
-                Weights { ..weights }
+                weights
             };
 
             FaultyInsertResult { success, weights }
@@ -374,7 +375,8 @@ mod justification {
                 .cloned()
                 .collect(),
         );
-        let genesis_block = Block::new(None, sender0); // estimate of the first casper message
+        let txs = BTreeSet::new();
+        let genesis_block = Block::new(None, sender0, txs.clone()); // estimate of the first casper message
         let justification = Justification::new();
         let genesis_msg =
             BlockMsg::new(sender0, justification, genesis_block.clone());
@@ -391,7 +393,7 @@ mod justification {
             justification.get_subtree_weights(None, &senders_weights);
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &2.0);
-        let proto_b1 = Block::new(None, sender1);
+        let proto_b1 = Block::new(None, sender1, txs.clone());
         let b1 = Block::from_prevblock_msg(Some(genesis_msg), proto_b1);
         let m1 = BlockMsg::new(sender1, justification, b1);
 
@@ -401,7 +403,7 @@ mod justification {
             justification.get_subtree_weights(None, &senders_weights);
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &6.0);
-        let proto_b2 = Block::new(None, sender2);
+        let proto_b2 = Block::new(None, sender2, txs.clone());
         let b2 = Block::from_prevblock_msg(Some(m1), proto_b2);
         let m2 = BlockMsg::new(sender2, justification, b2);
 
@@ -411,7 +413,7 @@ mod justification {
             justification.get_subtree_weights(None, &senders_weights);
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &14.0);
-        let proto_b3 = Block::new(None, sender3);
+        let proto_b3 = Block::new(None, sender3, txs);
         let b3 = Block::from_prevblock_msg(Some(m2), proto_b3);
         let m3 = BlockMsg::new(sender3, justification, b3);
 
