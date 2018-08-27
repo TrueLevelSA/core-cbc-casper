@@ -5,10 +5,11 @@ use std::sync::{Arc};
 // use std::io::{Error};
 
 use rayon::prelude::*;
-use traits::{Estimate, Zero, Sender, Data};
-use justification::{Justification, Weights, FaultyInsertResult};
-use weight_unit::{WeightUnit};
-use senders_weight::SendersWeight;
+
+use casper::traits::{Estimate, Zero, Sender, Data};
+use casper::justification::{Justification, Weights, FaultyInsertResult};
+use casper::weight_unit::{WeightUnit};
+use casper::senders_weight::SendersWeight;
 
 pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     // To be implemented on concrete struct
@@ -311,8 +312,8 @@ where
 
 #[cfg(test)]
 mod message {
-    use vote_count::{VoteCount};
-    use senders_weight::{SendersWeight};
+    use example::vote_count::{VoteCount};
+    use casper::senders_weight::{SendersWeight};
 
     use std::{f64};
     use super::*;

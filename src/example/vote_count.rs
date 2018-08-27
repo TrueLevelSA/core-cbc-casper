@@ -2,9 +2,9 @@ use std::collections::{HashSet};
 use std::ops::{Add};
 use std::fmt::{Debug, Formatter, Result};
 
-use traits::{Zero, Estimate, Sender, Data};
-use message::{Message, AbstractMsg};
-use justification::{Justification, Weights};
+use casper::traits::{Zero, Estimate, Sender, Data};
+use casper::message::{Message, AbstractMsg};
+use casper::justification::{Justification, Weights};
 
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default)]
 pub struct VoteCount {
@@ -154,10 +154,12 @@ impl Estimate for VoteCount {
 
 mod count_votes {
     use super::*;
+
     #[test]
     fn count_votes() {
-        use justification::{Weights};
-        use senders_weight::{SendersWeight};
+        use casper::justification::{Weights};
+        use casper::senders_weight::{SendersWeight};
+
         let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
