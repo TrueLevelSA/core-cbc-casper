@@ -5,15 +5,6 @@ image: rust:1.28.0
 before_script:
   - cargo version
 
-# This folder is cached between builds
-# http://docs.gitlab.com/ce/ci/yaml/README.html#cache
-# https://gitlab.com/gitlab-org/gitlab-ce/issues/12963
-cache:
-  untracked: true
-  key: "$CI_BUILD_REF_NAME"
-  paths:
-    - target/
-
 stages:
   - build
   - test
