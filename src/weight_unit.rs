@@ -1,4 +1,4 @@
-use casper::traits::{Zero};
+use traits::{Zero};
 
 pub type WeightUnit = f64;
 

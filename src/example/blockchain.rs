@@ -1,10 +1,10 @@
 use std::convert::{From};
 use std::collections::{BTreeSet, HashSet};
 
-use casper::traits::{Estimate, Data};
-use casper::message::{AbstractMsg, Message};
-use casper::justification::{Justification, Weights};
-use casper::senders_weight::{SendersWeight};
+use traits::{Estimate, Data};
+use message::{AbstractMsg, Message};
+use justification::{Justification, Weights};
+use senders_weight::{SendersWeight};
 
 type Validator = u32;
 

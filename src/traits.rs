@@ -1,8 +1,8 @@
 use std::hash::{Hash};
 use std::fmt::{Debug};
 
-use casper::message::{AbstractMsg};
-use casper::justification::{Justification, Weights};
+use message::{AbstractMsg};
+use justification::{Justification, Weights};
 
 pub trait Estimate: Hash + Clone + Ord + Send + Sync + Debug + Data {
     type M: AbstractMsg<Estimate = Self>;

@@ -6,10 +6,10 @@ use std::fmt::{Debug, Formatter, Result};
 use rayon::collections::btree_set::Iter as ParIter;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-use casper::message::{AbstractMsg, Message};
-use casper::weight_unit::{WeightUnit};
-use casper::traits::{Zero, Sender, Estimate, Data};
-use casper::senders_weight::SendersWeight;
+use message::{AbstractMsg, Message};
+use weight_unit::{WeightUnit};
+use traits::{Zero, Sender, Estimate, Data};
+use senders_weight::SendersWeight;
 
 #[derive(Eq, Ord, PartialOrd, PartialEq, Clone, Default, Hash)]
 pub struct Justification<M: AbstractMsg>(BTreeSet<M>);

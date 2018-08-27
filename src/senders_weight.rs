@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, LockResult};
 
-use casper::weight_unit::WeightUnit;
-use casper::traits::{Zero, Sender};
+use weight_unit::WeightUnit;
+use traits::{Zero, Sender};
 
 // RwLock locks only before writing, while Mutex locks to both read and write
 
