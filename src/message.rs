@@ -32,7 +32,7 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         sender: Self::Sender,
         latest_msgs: Vec<&Self>,
         finalized_msg: Option<&Self>,
-        weights: &SenderState<Self::Sender>,
+        senders_state: &SenderState<Self::Sender>,
         external_data: Option<<<Self as CasperMsg>::Estimate as Data>::Data>,
     ) -> Result<(Self, SenderState<Self::Sender>), &'static str> {
         // // TODO eventually comment out these lines, and FIXME tests
@@ -45,16 +45,22 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         let latest_msgs: HashSet<_> = latest_msgs.iter().cloned().collect();
 
         let mut justification = Justification::new();
-        let FaultyInsertResult { success, weights } =
-            justification.faulty_inserts(latest_msgs, &weights);
+        let FaultyInsertResult {
+            success,
+            sender_state,
+        } = justification.faulty_inserts(latest_msgs, &senders_state);
         // assert!(success, "None of the messages could be added to the state!");
         if !success {
             Err("None of the messages could be added to the state!")
-        } else {
-            let estimate =
-                justification.mk_estimate(finalized_msg, &weights, external_data);
+        }
+        else {
+            let estimate = justification.mk_estimate(
+                finalized_msg,
+                &senders_state.get_senders_weights(),
+                external_data,
+            );
             let message = Self::new(sender, justification, estimate);
-            Ok((message, weights))
+            Ok((message, sender_state))
         }
     }
     fn equivocates(&self, rhs: &Self) -> bool {
@@ -341,7 +347,8 @@ mod message {
         let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
-        let weights = SenderState::new(senders_weights, 0.0, 0.0, HashSet::new());
+        let weights =
+            SenderState::new(senders_weights, 0.0, 0.0, HashSet::new());
         let mut j0 = Justification::new();
         assert!(
             j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
@@ -350,7 +357,8 @@ mod message {
 
         let external_data: Option<VoteCount> = None;
         let (m0, _) =
-            &Message::from_msgs(0, vec![v0], None, &weights, external_data).unwrap();
+            &Message::from_msgs(0, vec![v0], None, &weights, external_data)
+                .unwrap();
         // let m0 = &Message::new(0, justification, estimate);
 
         let mut j1 = Justification::new();
@@ -363,8 +371,10 @@ mod message {
                 .success
         );
 
-        let (msg1, _) = Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
-        let (msg2, _) = Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
+        let (msg1, _) =
+            Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
+        let (msg2, _) =
+            Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
         assert!(msg1 == msg2, "messages should be equal");
         let (msg3, _) =
             Message::from_msgs(0, vec![v0, m0], None, &weights, None).unwrap();
@@ -379,14 +389,16 @@ mod message {
         let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
-        let weights = SenderState::new(senders_weights, 0.0, 0.0, HashSet::new());
+        let weights =
+            SenderState::new(senders_weights, 0.0, 0.0, HashSet::new());
 
         let mut j0 = Justification::new();
         assert!(
             j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
                 .success
         );
-        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
+        let (m0, _) =
+            &Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
         assert!(
             !v0.depends(v0_prime),
             "v0 does NOT depends on v0_prime as they are equivocating"
@@ -403,7 +415,8 @@ mod message {
             j0.faulty_inserts([v0].iter().cloned().collect(), &weights)
                 .success
         );
-        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
+        let (m0, _) =
+            &Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
 
         let mut j1 = Justification::new();
         assert!(
@@ -431,14 +444,16 @@ mod message {
         let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
-        let weights = SenderState::new(senders_weights, 0.0, 0.0, HashSet::new());
+        let weights =
+            SenderState::new(senders_weights, 0.0, 0.0, HashSet::new());
 
         let mut j0 = Justification::new();
         assert!(
             j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
                 .success
         );
-        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
+        let (m0, _) =
+            &Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
         assert!(!v0.equivocates(v0), "should be all good");
         assert!(!v1.equivocates(m0), "should be all good");
         assert!(!m0.equivocates(v1), "should be all good");

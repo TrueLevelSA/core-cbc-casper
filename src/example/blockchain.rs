@@ -74,7 +74,7 @@ impl Estimate for Block {
     fn mk_estimate(
         latest_msgs: &Justification<Self::M>,
         finalized_msg: Option<&Self::M>,
-        weights: &SenderState<<<Self as Estimate>::M as CasperMsg>::Sender>,
+        senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
         // in fact i could put the whole mempool inside of this proto_block and
         // search for a reasonable set of txs in this function that does not
         // conflict with the past blocks
@@ -92,7 +92,7 @@ impl Estimate for Block {
             },
             (_, Some(proto_block)) => {
                 let heaviest_msg = latest_msgs
-                    .ghost(finalized_msg, weights.get_senders_weights());
+                    .ghost(finalized_msg, senders_weights);
                 Self::from_prevblock_msg(heaviest_msg, proto_block)
             },
         }

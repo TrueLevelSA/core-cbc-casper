@@ -5,7 +5,7 @@ use std::fmt::{Debug, Formatter, Result};
 use traits::{Zero, Estimate, Sender, Data};
 use message::{Message, CasperMsg};
 use justification::{Justification, SenderState};
-
+use senders_weight::{SendersWeight};
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default)]
 pub struct VoteCount {
     yes: u32,
@@ -128,7 +128,7 @@ impl Estimate for VoteCount {
     fn mk_estimate(
         latest_msgs: &Justification<Self::M>,
         _finalized_msg: Option<&Self::M>,
-        _weights: &SenderState<Voter>, // all voters have same weight
+        _weights: &SendersWeight<Voter>, // all voters have same weight
         _external_data: Option<Self>,
         // _external_data: Option<Self::Data>,
     ) -> Self {

@@ -42,10 +42,10 @@ impl<M: CasperMsg> Justification<M> {
     pub fn mk_estimate(
         &self,
         finalized_msg: Option<&M>,
-        weights: &SenderState<<M as CasperMsg>::Sender>,
+        senders_weights: &SendersWeight<<M as CasperMsg>::Sender>,
         data: Option<<<M as CasperMsg>::Estimate as Data>::Data>,
     ) -> M::Estimate {
-        M::Estimate::mk_estimate(self, finalized_msg, weights, data)
+        M::Estimate::mk_estimate(self, finalized_msg, senders_weights, data)
     }
 
     // Custom functions
@@ -147,14 +147,14 @@ impl<M: CasperMsg> Justification<M> {
             .fold(
                 FaultyInsertResult {
                     success: false,
-                    weights: weights.clone(),
+                    sender_state: weights.clone(),
                 },
                 |acc, &msg| {
-                    let FaultyInsertResult { success, weights } =
-                        self.faulty_insert(msg, &acc.weights);
+                    let FaultyInsertResult { success, sender_state } =
+                        self.faulty_insert(msg, &acc.sender_state);
                     FaultyInsertResult {
                         success: acc.success || success,
-                        weights,
+                        sender_state,
                     }
                 },
             )
@@ -163,51 +163,51 @@ impl<M: CasperMsg> Justification<M> {
     pub fn faulty_insert(
         &mut self,
         msg: &M,
-        weights: &SenderState<M::Sender>,
+        sender_state: &SenderState<M::Sender>,
     ) -> FaultyInsertResult<M::Sender> {
-        let weights = weights.clone();
+        let sender_state = sender_state.clone();
         let msg_equivocators_overhead: HashSet<_> = self.get_equivocators(msg)
             .iter()
         // take only the msg_eoquivocators_overhead that are not yet on the
         // equivocator set as the others already have their weight counted into
         // the state fault count
-            .filter(|equivocator| !weights.equivocators.contains(equivocator))
+            .filter(|equivocator| !sender_state.equivocators.contains(equivocator))
             .cloned()
             .collect();
-        let msg_fault_weight_overhead = weights
+        let msg_fault_weight_overhead = sender_state
             .senders_weights
             .sum_weight_senders(&msg_equivocators_overhead);
         let new_fault_weight =
-            weights.state_fault_weight + msg_fault_weight_overhead;
-        let equivocators = weights
+            sender_state.state_fault_weight + msg_fault_weight_overhead;
+        let equivocators = sender_state
             .equivocators
             .union(&msg_equivocators_overhead)
             .cloned()
             .collect();
 
-        if new_fault_weight <= weights.thr {
+        if new_fault_weight <= sender_state.thr {
             let success = self.insert(msg.clone());
-            let weights = if success {
+            let sender_state = if success {
                 SenderState {
                     state_fault_weight: new_fault_weight,
                     equivocators,
-                    ..weights
+                    ..sender_state
                 }
             }
             else {
-                weights
+                sender_state
             };
 
-            FaultyInsertResult { success, weights }
+            FaultyInsertResult { success, sender_state }
         }
         // conflicting message NOT added to the set as it crosses the fault
         // weight thr OR msg_fault_weight_overhead is NAN (from the unwrap)
         else {
             FaultyInsertResult {
                 success: false,
-                weights: SenderState {
+                sender_state: SenderState {
                     // equivocators,
-                    ..weights
+                    ..sender_state
                 },
             }
         }
@@ -325,7 +325,7 @@ impl<M: CasperMsg> Debug for Justification<M> {
 // insertion
 pub struct FaultyInsertResult<S: Sender> {
     pub success: bool,
-    pub weights: SenderState<S>,
+    pub sender_state: SenderState<S>,
     // pub equivocators: HashSet<S>,
 }
 
@@ -545,7 +545,7 @@ mod justification {
                         equivocators: HashSet::new(),
                     }
                 )
-                .weights
+                .sender_state
                 .state_fault_weight,
             1.0,
             "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept
@@ -579,7 +579,7 @@ state_fault_weight should be incremented to 1.0"
                         equivocators: HashSet::new(),
                     }
                 )
-                .weights.state_fault_weight,
+                .sender_state.state_fault_weight,
             0.1,
             "$v0_prime$ conflicts with $v0$ through $m0$, and we should NOT accept this fault as the fault threshold gets crossed for the set, and thus the state_fault_weight should not be incremented"
         );
@@ -627,7 +627,7 @@ state_fault_weight should be incremented to 1.0"
                         equivocators: HashSet::new(),
                     }
                 )
-                .weights.state_fault_weight,
+                .sender_state.state_fault_weight,
             1.0,
             "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we can't know the weight of the sender, which could be Infinity, and thus the state_fault_weight should be unchanged"
         );

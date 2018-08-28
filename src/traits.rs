@@ -3,13 +3,14 @@ use std::fmt::{Debug};
 
 use message::{CasperMsg};
 use justification::{Justification, SenderState};
+use senders_weight::{SendersWeight};
 
 pub trait Estimate: Hash + Clone + Ord + Send + Sync + Debug + Data {
     type M: CasperMsg<Estimate = Self>;
     fn mk_estimate(
         latest_msgs: &Justification<Self::M>,
         finalized_msg: Option<&Self::M>,
-        weights: &SenderState<<<Self as Estimate>::M as CasperMsg>::Sender>,
+        senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
         external_data: Option<<Self as Data>::Data>,
     ) -> Self;
 }
