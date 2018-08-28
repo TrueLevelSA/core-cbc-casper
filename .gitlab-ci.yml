@@ -1,0 +1,25 @@
+# Official framework image. Look for the different tagged releases at:
+# https://hub.docker.com/r/library/node/tags/
+image: rust:1.28.0
+
+before_script:
+  - cargo version
+
+stages:
+  - build
+  - test
+
+build:
+  stage: build
+  script:
+    - cargo build
+
+test:
+  stage: test
+  script:
+    - cargo test
+
+doc:
+  stage: test
+  script:
+    - cargo doc
