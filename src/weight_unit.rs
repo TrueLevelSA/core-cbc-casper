@@ -1,4 +1,5 @@
 use traits::{Zero};
+
 pub type WeightUnit = f64;
 
 impl Zero<WeightUnit> for WeightUnit {

@@ -1,10 +1,12 @@
 #![allow(dead_code)]
-mod message;
-mod justification;
-mod weight_unit;
-mod vote_count;
-// mod vote_count2;
-mod senders_weight;
-mod traits;
-mod blockchain;
+
 extern crate rayon;
+
+pub mod weight_unit;
+pub mod message;
+pub mod justification;
+pub mod senders_weight;
+pub mod traits;
+
+mod example;
+

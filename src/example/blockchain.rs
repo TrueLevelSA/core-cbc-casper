@@ -1,9 +1,11 @@
+use std::convert::{From};
 use std::collections::{BTreeSet, HashSet};
+
 use traits::{Estimate, Data};
 use message::{AbstractMsg, Message};
 use justification::{Justification, Weights};
 use senders_weight::{SendersWeight};
-use std::convert::{From};
+
 type Validator = u32;
 
 /// a genesis block should be a block with estimate Block with prevblock =

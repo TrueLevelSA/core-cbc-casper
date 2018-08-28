@@ -1,5 +1,6 @@
 use std::hash::{Hash};
 use std::fmt::{Debug};
+
 use message::{AbstractMsg};
 use justification::{Justification, Weights};
 

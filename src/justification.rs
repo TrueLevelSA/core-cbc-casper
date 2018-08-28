@@ -2,9 +2,11 @@ use std::collections::{BTreeSet, HashSet, HashMap};
 use std::collections::btree_set::{Iter};
 use std::fmt::{Debug, Formatter, Result};
 // use std::io::{Error};
-use message::{AbstractMsg, Message};
+
 use rayon::collections::btree_set::Iter as ParIter;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+
+use message::{AbstractMsg, Message};
 use weight_unit::{WeightUnit};
 use traits::{Zero, Sender, Estimate, Data};
 use senders_weight::SendersWeight;
@@ -357,12 +359,14 @@ impl<S: Sender> Weights<S> {
 
 #[cfg(test)]
 mod justification {
-    use vote_count::{VoteCount};
     use super::*;
+
+    use example::vote_count::{VoteCount};
 
     #[test]
     fn children_weight() {
-        use blockchain::{BlockMsg, Block};
+        use example::blockchain::{BlockMsg, Block};
+
         let (sender0, sender1, sender2, sender3) = (0, 1, 2, 3); // miner identities
         let (weight0, weight1, weight2, weight3) = (2., 4., 8., 16.); // and their corresponding weights
         let senders_weights = SendersWeight::new(

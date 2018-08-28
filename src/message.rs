@@ -5,6 +5,7 @@ use std::sync::{Arc};
 // use std::io::{Error};
 
 use rayon::prelude::*;
+
 use traits::{Estimate, Zero, Sender, Data};
 use justification::{Justification, Weights, FaultyInsertResult};
 use weight_unit::{WeightUnit};
@@ -311,7 +312,7 @@ where
 
 #[cfg(test)]
 mod message {
-    use vote_count::{VoteCount};
+    use example::vote_count::{VoteCount};
     use senders_weight::{SendersWeight};
 
     use std::{f64};
