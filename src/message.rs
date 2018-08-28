@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
-use std::fmt::{Debug, Formatter, Result};
+use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::sync::{Arc};
 // use std::io::{Error};
 
@@ -34,7 +34,7 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         finalized_msg: Option<&Self>,
         weights: &Weights<Self::Sender>,
         external_data: Option<<<Self as AbstractMsg>::Estimate as Data>::Data>,
-    ) -> (Self, Weights<Self::Sender>) {
+    ) -> Result<(Self, Weights<Self::Sender>), &'static str> {
         // // TODO eventually comment out these lines, and FIXME tests
         // // check whether two messages from same sender
         // let mut senders = HashSet::new();
@@ -47,11 +47,15 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         let mut justification = Justification::new();
         let FaultyInsertResult { success, weights } =
             justification.faulty_inserts(latest_msgs, &weights);
-        assert!(success, "None of the messages could be added to the state!");
-        let estimate =
-            justification.mk_estimate(finalized_msg, &weights, external_data);
-        let message = Self::new(sender, justification, estimate);
-        (message, weights)
+        // assert!(success, "None of the messages could be added to the state!");
+        if !success {
+            Err("None of the messages could be added to the state!")
+        } else {
+            let estimate =
+                justification.mk_estimate(finalized_msg, &weights, external_data);
+            let message = Self::new(sender, justification, estimate);
+            Ok((message, weights))
+        }
     }
     fn equivocates(&self, rhs: &Self) -> bool {
         self != rhs
@@ -299,7 +303,7 @@ where
     E: Estimate<M = Self>,
     S: Sender,
 {
-    fn fmt(&self, f: &mut Formatter) -> Result {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(
             f,
             "M{:?}({:?}) -> {:?}",
@@ -346,7 +350,7 @@ mod message {
 
         let external_data: Option<VoteCount> = None;
         let (m0, _) =
-            &Message::from_msgs(0, vec![v0], None, &weights, external_data);
+            &Message::from_msgs(0, vec![v0], None, &weights, external_data).unwrap();
         // let m0 = &Message::new(0, justification, estimate);
 
         let mut j1 = Justification::new();
@@ -359,11 +363,11 @@ mod message {
                 .success
         );
 
-        let (msg1, _) = Message::from_msgs(0, vec![v0], None, &weights, None);
-        let (msg2, _) = Message::from_msgs(0, vec![v0], None, &weights, None);
+        let (msg1, _) = Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
+        let (msg2, _) = Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
         assert!(msg1 == msg2, "messages should be equal");
         let (msg3, _) =
-            Message::from_msgs(0, vec![v0, m0], None, &weights, None);
+            Message::from_msgs(0, vec![v0, m0], None, &weights, None).unwrap();
         assert!(msg1 != msg3, "msg1 should be different than msg3");
     }
 
@@ -382,7 +386,7 @@ mod message {
             j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
                 .success
         );
-        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, None);
+        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
         assert!(
             !v0.depends(v0_prime),
             "v0 does NOT depends on v0_prime as they are equivocating"
@@ -399,7 +403,7 @@ mod message {
             j0.faulty_inserts([v0].iter().cloned().collect(), &weights)
                 .success
         );
-        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, None);
+        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
 
         let mut j1 = Justification::new();
         assert!(
@@ -412,7 +416,7 @@ mod message {
         );
 
         let (m1, _) =
-            &Message::from_msgs(0, vec![v0, m0], None, &weights, None);
+            &Message::from_msgs(0, vec![v0, m0], None, &weights, None).unwrap();
         assert!(m1.depends(m0), "m1 DOES depent on m0");
         assert!(!m0.depends(m1), "but m0 does NOT depend on m1");
         assert!(m1.depends(v0), "m1 depends on v0 through m0");
@@ -434,7 +438,7 @@ mod message {
             j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
                 .success
         );
-        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, None);
+        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
         assert!(!v0.equivocates(v0), "should be all good");
         assert!(!v1.equivocates(m0), "should be all good");
         assert!(!m0.equivocates(v1), "should be all good");
@@ -470,7 +474,7 @@ mod message {
             None,
             &weights,
             None as Option<VoteCount>,
-        );
+        ).unwrap();
         let safe_msgs =
             m0.get_safe_msgs_by_weight(relative_senders_weights, thr);
         assert_eq!(safe_msgs.len(), 0, "only 0.5 of weight saw v0 and m0");
@@ -481,7 +485,7 @@ mod message {
             None,
             &weights,
             None as Option<VoteCount>,
-        );
+        ).unwrap();
         let safe_msgs =
             m1.get_safe_msgs_by_weight(relative_senders_weights, thr);
         assert_eq!(
@@ -497,7 +501,7 @@ necessarly seen sender1 seeing v0 and m0, thus not yet safe"
             None,
             &weights,
             None as Option<VoteCount>,
-        );
+        ).unwrap();
         let safe_msgs =
             m2.get_safe_msgs_by_weight(relative_senders_weights, thr);
         assert_eq!(
@@ -533,7 +537,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
             None,
             &weights,
             None as Option<VoteCount>,
-        );
+        ).unwrap();
         let safe_msgs = m0.get_finalized_msgs(senders);
         assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0 and m0");
 
@@ -543,7 +547,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
             None,
             &weights,
             None as Option<VoteCount>,
-        );
+        ).unwrap();
         let safe_msgs = m1.get_finalized_msgs(senders);
         assert_eq!(
             safe_msgs.len(),
@@ -558,7 +562,7 @@ necessarly seen sender1 seeing v0 and m0, thus not yet safe"
             None,
             &weights,
             None as Option<VoteCount>,
-        );
+        ).unwrap();
         let safe_msgs = m2.get_finalized_msgs(senders);
         assert_eq!(
             safe_msgs,
@@ -577,7 +581,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
             None,
             &weights,
             None as Option<VoteCount>,
-        );
+        ).unwrap();
         let safe_msgs = m0.get_finalized_msgs(senders);
         assert_eq!(
             safe_msgs.len(),
@@ -591,7 +595,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
             None,
             &weights,
             None as Option<VoteCount>,
-        );
+        ).unwrap();
         let safe_msgs = m1.get_finalized_msgs(senders);
 
         assert_eq!(
@@ -607,7 +611,7 @@ necessarly seen sender1 seeing v0 and m0, just v1 is safe"
             None,
             &weights,
             None as Option<VoteCount>,
-        );
+        ).unwrap();
         let safe_msgs = m2.get_finalized_msgs(senders);
         assert_eq!(
             safe_msgs,

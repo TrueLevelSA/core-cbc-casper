@@ -453,7 +453,7 @@ mod justification {
             None,
             &weights,
             None as Option<VoteCount>,
-        );
+        ).unwrap();
         assert_eq!(m0.get_justification().len(), 5);
         assert_eq!(weights.state_fault_weight, 3.0);
     }
@@ -482,7 +482,7 @@ mod justification {
             None,
             &weights,
             None as Option<VoteCount>,
-        );
+        ).unwrap();
         // let m0 = &Message::new(0, justification, estimate);
         let mut j1 = Justification::new();
         assert!(

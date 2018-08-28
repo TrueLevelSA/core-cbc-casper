@@ -143,7 +143,7 @@ fn example_usage() {
         None, // finalized_msg, could be genesis_block_msg
         &weights,
         Some(proto_b1), // data
-    );
+    ).unwrap();
     let proto_b2 = Block::new(None, sender2, txs.clone());
     let (m2, weights) = BlockMsg::from_msgs(
         proto_b2.sender,
@@ -151,7 +151,7 @@ fn example_usage() {
         None,
         &weights,
         Some(proto_b2),
-    );
+    ).unwrap();
     let proto_b3 = Block::new(None, sender3, txs.clone());
     let (m3, weights) = BlockMsg::from_msgs(
         proto_b3.sender,
@@ -159,7 +159,7 @@ fn example_usage() {
         None,
         &weights,
         Some(proto_b3),
-    );
+    ).unwrap();
 
     assert_eq!(
         m3.get_estimate(),

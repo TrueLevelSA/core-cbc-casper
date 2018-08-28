@@ -172,7 +172,7 @@ mod count_votes {
             j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
                 .success
         );
-        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, None);
+        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
         let mut j1 = Justification::new();
         assert!(
             j1.faulty_inserts(vec![v1].iter().cloned().collect(), &weights)
@@ -184,7 +184,7 @@ mod count_votes {
         );
 
         let (m1, _) =
-            &Message::from_msgs(1, vec![v1, m0], None, &weights, None);
+            &Message::from_msgs(1, vec![v1, m0], None, &weights, None).unwrap();
         assert_eq!(
             Message::get_estimate(m1).clone(),
             VoteCount { yes: 1, no: 1 },
@@ -204,7 +204,7 @@ mod count_votes {
             None,
             &weights,
             None,
-        );
+        ).unwrap();
         assert_eq!(
             Message::get_estimate(m1_prime).clone(),
             VoteCount { yes: 1, no: 0 },
