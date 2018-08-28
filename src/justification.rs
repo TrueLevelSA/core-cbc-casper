@@ -73,7 +73,7 @@ impl<M: CasperMsg> Justification<M> {
     pub fn faulty_inserts(
         &mut self,
         msgs: HashSet<&M>,
-        weights: &SenderState<M::Sender>,
+        sender_state: &SenderState<M::Sender>,
     ) -> FaultyInsertResult<M::Sender> {
         /// get msgs and fault weight overhead and equivocators overhead sorted
         /// by fault weight overhead
@@ -140,14 +140,14 @@ impl<M: CasperMsg> Justification<M> {
         // do the actual insertions to the state
         sort_by_faultweight(
             &self,
-            weights.senders_weights.clone(),
-            weights.equivocators.clone(),
+            sender_state.senders_weights.clone(),
+            sender_state.equivocators.clone(),
             msgs,
         ).iter()
             .fold(
                 FaultyInsertResult {
                     success: false,
-                    sender_state: weights.clone(),
+                    sender_state: sender_state.clone(),
                 },
                 |acc, &msg| {
                     let FaultyInsertResult { success, sender_state } =
