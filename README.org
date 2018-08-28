@@ -1,6 +1,6 @@
 * CBC-casper abstract message lib
 :PROPERTIES:
-:MODIFIED: [2018-08-23 Thu 17:38]
+:MODIFIED: [2018-08-28 Tue 20:11]
 :END:
 
 Minimal message and safe state creation and maintenance based on
@@ -13,13 +13,13 @@ the casper family of protocols fairly easy based upon this library.
 
 The design decision was to be as general as possible, and leave all the specific
 stuff for the implementer of the protocol. Basically the developer has to
-implement the AbstractMsg trait in order to benefit from the casper-cbc safety
+implement the CasperMsg trait in order to benefit from the casper-cbc safety
 proofs. But in order to implement that trait, he will have to fulfill many other
 conditions, such as implement the Estimate trait for the estimate and Data trait
 if the estimate carries data.
 
-One generic type implementing the AbstractMsg trait, namely Message, is also
-provided that helps getting to a compliant AbstractMsg trait easily.
+One generic type implementing the CasperMsg trait, namely Message, is also
+provided that helps getting to a compliant CasperMsg trait easily.
 
 We present an example of a simple blockchain implementation using this protocol
 that use the generic type implementation to generate the protocol.

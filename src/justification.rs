@@ -6,15 +6,15 @@ use std::fmt::{Debug, Formatter, Result};
 use rayon::collections::btree_set::Iter as ParIter;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-use message::{AbstractMsg, Message};
+use message::{CasperMsg, Message};
 use weight_unit::{WeightUnit};
 use traits::{Zero, Sender, Estimate, Data};
 use senders_weight::SendersWeight;
 
 #[derive(Eq, Ord, PartialOrd, PartialEq, Clone, Default, Hash)]
-pub struct Justification<M: AbstractMsg>(BTreeSet<M>);
+pub struct Justification<M: CasperMsg>(BTreeSet<M>);
 
-impl<M: AbstractMsg> Justification<M> {
+impl<M: CasperMsg> Justification<M> {
     // Re-exports from BTreeSet wrapping M
     pub fn new() -> Self {
         Justification(BTreeSet::new())
@@ -42,8 +42,8 @@ impl<M: AbstractMsg> Justification<M> {
     pub fn mk_estimate(
         &self,
         finalized_msg: Option<&M>,
-        weights: &Weights<<M as AbstractMsg>::Sender>,
-        data: Option<<<M as AbstractMsg>::Estimate as Data>::Data>,
+        weights: &Weights<<M as CasperMsg>::Sender>,
+        data: Option<<<M as CasperMsg>::Estimate as Data>::Data>,
     ) -> M::Estimate {
         M::Estimate::mk_estimate(self, finalized_msg, weights, data)
     }
@@ -77,7 +77,7 @@ impl<M: AbstractMsg> Justification<M> {
     ) -> FaultyInsertResult<M::Sender> {
         /// get msgs and fault weight overhead and equivocators overhead sorted
         /// by fault weight overhead
-        fn sort_by_faultweight<'z, M: AbstractMsg>(
+        fn sort_by_faultweight<'z, M: CasperMsg>(
             justification: &Justification<M>,
             senders_weights: SendersWeight<M::Sender>,
             equivocators: HashSet<M::Sender>,
@@ -129,7 +129,7 @@ impl<M: AbstractMsg> Justification<M> {
                 },
             );
 
-            // return a Vec<AbstractMsg>
+            // return a Vec<CasperMsg>
             msgs_sorted_by_faultw
                 .iter()
                 .map(|(m, _)| m)
@@ -246,7 +246,7 @@ impl<M: AbstractMsg> Justification<M> {
             initial_weight: WeightUnit,
         ) -> WeightUnit
         where
-            M: AbstractMsg,
+            M: CasperMsg,
         {
             m.get_justification().iter().fold(
                 initial_weight,
@@ -314,7 +314,7 @@ impl<M: AbstractMsg> Justification<M> {
     }
 }
 
-impl<M: AbstractMsg> Debug for Justification<M> {
+impl<M: CasperMsg> Debug for Justification<M> {
     fn fmt(&self, f: &mut Formatter) -> Result {
         write!(f, "{:?}", self.0)
     }

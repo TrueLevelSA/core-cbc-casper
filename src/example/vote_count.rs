@@ -3,7 +3,7 @@ use std::ops::{Add};
 use std::fmt::{Debug, Formatter, Result};
 
 use traits::{Zero, Estimate, Sender, Data};
-use message::{Message, AbstractMsg};
+use message::{Message, CasperMsg};
 use justification::{Justification, Weights};
 
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default)]

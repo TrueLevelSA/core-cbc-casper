@@ -2,7 +2,7 @@ use std::convert::{From};
 use std::collections::{BTreeSet, HashSet};
 
 use traits::{Estimate, Data};
-use message::{AbstractMsg, Message};
+use message::{CasperMsg, Message};
 use justification::{Justification, Weights};
 use senders_weight::{SendersWeight};
 
@@ -74,7 +74,7 @@ impl Estimate for Block {
     fn mk_estimate(
         latest_msgs: &Justification<Self::M>,
         finalized_msg: Option<&Self::M>,
-        weights: &Weights<<<Self as Estimate>::M as AbstractMsg>::Sender>,
+        weights: &Weights<<<Self as Estimate>::M as CasperMsg>::Sender>,
         // in fact i could put the whole mempool inside of this proto_block and
         // search for a reasonable set of txs in this function that does not
         // conflict with the past blocks

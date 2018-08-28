@@ -11,7 +11,7 @@ use justification::{Justification, Weights, FaultyInsertResult};
 use weight_unit::{WeightUnit};
 use senders_weight::SendersWeight;
 
-pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
+pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     // To be implemented on concrete struct
     // type Data: Data;
     type Sender: Sender;
@@ -33,7 +33,7 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         latest_msgs: Vec<&Self>,
         finalized_msg: Option<&Self>,
         weights: &Weights<Self::Sender>,
-        external_data: Option<<<Self as AbstractMsg>::Estimate as Data>::Data>,
+        external_data: Option<<<Self as CasperMsg>::Estimate as Data>::Data>,
     ) -> Result<(Self, Weights<Self::Sender>), &'static str> {
         // // TODO eventually comment out these lines, and FIXME tests
         // // check whether two messages from same sender
@@ -101,7 +101,7 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
             original_sender: &M::Sender,
         ) -> HashSet<M>
         where
-            M: AbstractMsg,
+            M: CasperMsg,
         {
             m.get_justification().iter().fold(
                 safe_ms,
@@ -158,7 +158,7 @@ pub trait AbstractMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
             safe_msg_weight: HashMap<M, WeightUnit>,
         ) -> HashMap<M, WeightUnit>
         where
-            M: AbstractMsg,
+            M: CasperMsg,
         {
             m.get_justification().iter().fold(
                 safe_msg_weight,
@@ -247,7 +247,7 @@ where
 // TODO end
 */
 
-impl<E, S> AbstractMsg for Message<E, S>
+impl<E, S> CasperMsg for Message<E, S>
 where
     E: Estimate<M = Self>,
     S: Sender,
