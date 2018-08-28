@@ -4,7 +4,7 @@ use std::fmt::{Debug, Formatter, Result};
 
 use traits::{Zero, Estimate, Sender, Data};
 use message::{Message, CasperMsg};
-use justification::{Justification, Weights};
+use justification::{Justification, SenderState};
 
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default)]
 pub struct VoteCount {
@@ -128,7 +128,7 @@ impl Estimate for VoteCount {
     fn mk_estimate(
         latest_msgs: &Justification<Self::M>,
         _finalized_msg: Option<&Self::M>,
-        _weights: &Weights<Voter>, // all voters have same weight
+        _weights: &SenderState<Voter>, // all voters have same weight
         _external_data: Option<Self>,
         // _external_data: Option<Self::Data>,
     ) -> Self {
@@ -157,7 +157,7 @@ mod count_votes {
 
     #[test]
     fn count_votes() {
-        use justification::{Weights};
+        use justification::{SenderState};
         use senders_weight::{SendersWeight};
 
         let senders_weights = SendersWeight::new(
@@ -167,7 +167,7 @@ mod count_votes {
         let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
         let v1 = &VoteCount::create_vote_msg(1, true);
         let mut j0 = Justification::new();
-        let weights = Weights::new(senders_weights, 0.0, 2.0, HashSet::new());
+        let weights = SenderState::new(senders_weights, 0.0, 2.0, HashSet::new());
         assert!(
             j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
                 .success

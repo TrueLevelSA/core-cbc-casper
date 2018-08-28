@@ -7,7 +7,7 @@ use std::sync::{Arc};
 use rayon::prelude::*;
 
 use traits::{Estimate, Zero, Sender, Data};
-use justification::{Justification, Weights, FaultyInsertResult};
+use justification::{Justification, SenderState, FaultyInsertResult};
 use weight_unit::{WeightUnit};
 use senders_weight::SendersWeight;
 
@@ -32,9 +32,9 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         sender: Self::Sender,
         latest_msgs: Vec<&Self>,
         finalized_msg: Option<&Self>,
-        weights: &Weights<Self::Sender>,
+        weights: &SenderState<Self::Sender>,
         external_data: Option<<<Self as CasperMsg>::Estimate as Data>::Data>,
-    ) -> Result<(Self, Weights<Self::Sender>), &'static str> {
+    ) -> Result<(Self, SenderState<Self::Sender>), &'static str> {
         // // TODO eventually comment out these lines, and FIXME tests
         // // check whether two messages from same sender
         // let mut senders = HashSet::new();
@@ -341,7 +341,7 @@ mod message {
         let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
-        let weights = Weights::new(senders_weights, 0.0, 0.0, HashSet::new());
+        let weights = SenderState::new(senders_weights, 0.0, 0.0, HashSet::new());
         let mut j0 = Justification::new();
         assert!(
             j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
@@ -379,7 +379,7 @@ mod message {
         let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
-        let weights = Weights::new(senders_weights, 0.0, 0.0, HashSet::new());
+        let weights = SenderState::new(senders_weights, 0.0, 0.0, HashSet::new());
 
         let mut j0 = Justification::new();
         assert!(
@@ -431,7 +431,7 @@ mod message {
         let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
-        let weights = Weights::new(senders_weights, 0.0, 0.0, HashSet::new());
+        let weights = SenderState::new(senders_weights, 0.0, 0.0, HashSet::new());
 
         let mut j0 = Justification::new();
         assert!(
@@ -458,7 +458,7 @@ mod message {
 
         let relative_senders_weights = &senders_weights.into_relative_weights();
         let weights =
-            Weights::new(senders_weights.clone(), 0.0, 0.0, HashSet::new());
+            SenderState::new(senders_weights.clone(), 0.0, 0.0, HashSet::new());
 
         let thr = &0.5;
         // sender0        v0---m0        m2---
@@ -522,7 +522,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
             [(sender0, 1.0), (sender1, 1.0)].iter().cloned().collect(),
         );
         let weights =
-            Weights::new(senders_weights.clone(), 0.0, 0.0, HashSet::new());
+            SenderState::new(senders_weights.clone(), 0.0, 0.0, HashSet::new());
         let senders = &senders_weights.get_senders();
 
         // sender0        v0---m0        m2---

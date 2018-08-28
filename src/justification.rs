@@ -42,7 +42,7 @@ impl<M: CasperMsg> Justification<M> {
     pub fn mk_estimate(
         &self,
         finalized_msg: Option<&M>,
-        weights: &Weights<<M as CasperMsg>::Sender>,
+        weights: &SenderState<<M as CasperMsg>::Sender>,
         data: Option<<<M as CasperMsg>::Estimate as Data>::Data>,
     ) -> M::Estimate {
         M::Estimate::mk_estimate(self, finalized_msg, weights, data)
@@ -73,7 +73,7 @@ impl<M: CasperMsg> Justification<M> {
     pub fn faulty_inserts(
         &mut self,
         msgs: HashSet<&M>,
-        weights: &Weights<M::Sender>,
+        weights: &SenderState<M::Sender>,
     ) -> FaultyInsertResult<M::Sender> {
         /// get msgs and fault weight overhead and equivocators overhead sorted
         /// by fault weight overhead
@@ -163,7 +163,7 @@ impl<M: CasperMsg> Justification<M> {
     pub fn faulty_insert(
         &mut self,
         msg: &M,
-        weights: &Weights<M::Sender>,
+        weights: &SenderState<M::Sender>,
     ) -> FaultyInsertResult<M::Sender> {
         let weights = weights.clone();
         let msg_equivocators_overhead: HashSet<_> = self.get_equivocators(msg)
@@ -188,7 +188,7 @@ impl<M: CasperMsg> Justification<M> {
         if new_fault_weight <= weights.thr {
             let success = self.insert(msg.clone());
             let weights = if success {
-                Weights {
+                SenderState {
                     state_fault_weight: new_fault_weight,
                     equivocators,
                     ..weights
@@ -205,7 +205,7 @@ impl<M: CasperMsg> Justification<M> {
         else {
             FaultyInsertResult {
                 success: false,
-                weights: Weights {
+                weights: SenderState {
                     // equivocators,
                     ..weights
                 },
@@ -325,27 +325,27 @@ impl<M: CasperMsg> Debug for Justification<M> {
 // insertion
 pub struct FaultyInsertResult<S: Sender> {
     pub success: bool,
-    pub weights: Weights<S>,
+    pub weights: SenderState<S>,
     // pub equivocators: HashSet<S>,
 }
 
-// FIXME: this became more than Weights, should find a better name, or break up in parts
+// FIXME: this became more than SenderState, should find a better name, or break up in parts
 #[derive(Debug, Clone)]
-pub struct Weights<S: Sender> {
+pub struct SenderState<S: Sender> {
     senders_weights: SendersWeight<S>,
     state_fault_weight: WeightUnit,
     thr: WeightUnit,
     equivocators: HashSet<S>, // FIXME: put it here as its needed on the same context as
 }
 
-impl<S: Sender> Weights<S> {
+impl<S: Sender> SenderState<S> {
     pub fn new(
         senders_weights: SendersWeight<S>,
         state_fault_weight: WeightUnit,
         thr: WeightUnit,
         equivocators: HashSet<S>,
     ) -> (Self) {
-        Weights {
+        SenderState {
             senders_weights,
             equivocators,
             state_fault_weight,
@@ -441,7 +441,7 @@ mod justification {
         let v1_prime = &VoteCount::create_vote_msg(1, false);
         let v2 = &VoteCount::create_vote_msg(2, true);
         let v2_prime = &VoteCount::create_vote_msg(2, false); // equivocating vote
-        let weights = Weights {
+        let weights = SenderState {
             senders_weights: senders_weights.clone(),
             state_fault_weight: 0.0,
             thr: 3.0,
@@ -466,7 +466,7 @@ mod justification {
         let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
         let v1 = &VoteCount::create_vote_msg(1, true);
         let mut j0 = Justification::new();
-        let weights = Weights {
+        let weights = SenderState {
             senders_weights: senders_weights.clone(),
             state_fault_weight: 0.0,
             thr: 0.0,
@@ -488,7 +488,7 @@ mod justification {
         assert!(
             j1.faulty_inserts(
                 vec![v1].iter().cloned().collect(),
-                &Weights {
+                &SenderState {
                     senders_weights: senders_weights.clone(),
                     state_fault_weight: 0.0,
                     thr: 0.0,
@@ -499,7 +499,7 @@ mod justification {
         assert!(
             j1.faulty_inserts(
                 vec![m0].iter().cloned().collect(),
-                &Weights {
+                &SenderState {
                     senders_weights: senders_weights.clone(),
                     state_fault_weight: 0.0,
                     thr: 0.0,
@@ -510,7 +510,7 @@ mod justification {
         assert!(
             !j1.faulty_inserts(
                 vec![v0_prime].iter().cloned().collect(),
-                &Weights {
+                &SenderState {
                     senders_weights: senders_weights.clone(),
                     state_fault_weight: 0.0,
                     thr: 0.0,
@@ -523,7 +523,7 @@ mod justification {
             j1.clone()
                 .faulty_inserts(
                     vec![v0_prime].iter().cloned().collect(),
-                    &Weights {
+                    &SenderState {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 0.0,
                         thr: 1.0,
@@ -538,7 +538,7 @@ mod justification {
             j1.clone()
                 .faulty_inserts(
                     vec![v0_prime].iter().cloned().collect(),
-                    &Weights {
+                    &SenderState {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 0.0,
                         thr: 1.0,
@@ -557,7 +557,7 @@ state_fault_weight should be incremented to 1.0"
             !j1.clone()
                 .faulty_inserts(
                     vec![v0_prime].iter().cloned().collect(),
-                    &Weights {
+                    &SenderState {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 0.1,
                         thr: 1.0,
@@ -572,7 +572,7 @@ state_fault_weight should be incremented to 1.0"
             j1.clone()
                 .faulty_inserts(
                     vec![v0_prime].iter().cloned().collect(),
-                    &Weights {
+                    &SenderState {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 0.1,
                         thr: 1.0,
@@ -588,7 +588,7 @@ state_fault_weight should be incremented to 1.0"
             j1.clone()
                 .faulty_inserts(
                     vec![v0_prime].iter().cloned().collect(),
-                    &Weights {
+                    &SenderState {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 1.0,
                         thr: 2.0,
@@ -605,7 +605,7 @@ state_fault_weight should be incremented to 1.0"
             !j1.clone()
                 .faulty_inserts(
                     vec![v0_prime].iter().cloned().collect(),
-                    &Weights {
+                    &SenderState {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 1.0,
                         thr: 2.0,
@@ -620,7 +620,7 @@ state_fault_weight should be incremented to 1.0"
             j1.clone()
                 .faulty_inserts(
                     vec![v0_prime].iter().cloned().collect(),
-                    &Weights {
+                    &SenderState {
                         senders_weights: senders_weights.clone(),
                         state_fault_weight: 1.0,
                         thr: 2.0,

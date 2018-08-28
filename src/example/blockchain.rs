@@ -3,7 +3,7 @@ use std::collections::{BTreeSet, HashSet};
 
 use traits::{Estimate, Data};
 use message::{CasperMsg, Message};
-use justification::{Justification, Weights};
+use justification::{Justification, SenderState};
 use senders_weight::{SendersWeight};
 
 type Validator = u32;
@@ -74,7 +74,7 @@ impl Estimate for Block {
     fn mk_estimate(
         latest_msgs: &Justification<Self::M>,
         finalized_msg: Option<&Self::M>,
-        weights: &Weights<<<Self as Estimate>::M as CasperMsg>::Sender>,
+        weights: &SenderState<<<Self as Estimate>::M as CasperMsg>::Sender>,
         // in fact i could put the whole mempool inside of this proto_block and
         // search for a reasonable set of txs in this function that does not
         // conflict with the past blocks
@@ -114,7 +114,7 @@ fn example_usage() {
             .cloned()
             .collect(),
     );
-    let weights = Weights::new(
+    let weights = SenderState::new(
         senders_weights.clone(),
         0.0,            // state fault weight
         1.0,            // subjective fault weight threshold
