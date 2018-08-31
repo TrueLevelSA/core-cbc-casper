@@ -13,7 +13,6 @@ use senders_weight::SendersWeight;
 
 pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     // To be implemented on concrete struct
-    // type Data: Data;
     type Sender: Sender;
     type Estimate: Estimate<M = Self>;
     fn get_sender(&self) -> &Self::Sender;
@@ -24,6 +23,13 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         justification: Justification<Self>,
         estimate: Self::Estimate,
     ) -> Self;
+    // this function is used to clean up memory. when a msg is final, there's no
+    // need to keep its justifications. when dropping its justification, all the
+    // Msgs (Arc) which are referenced on the justification will get dropped
+    // from memory
+    fn set_as_final(&mut self);
+
+
 
     // Following methods are actual implementations
 
@@ -49,7 +55,6 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
             success,
             sender_state,
         } = justification.faulty_inserts(latest_msgs, &senders_state);
-        // assert!(success, "None of the messages could be added to the state!");
         if !success {
             Err("None of the messages could be added to the state!")
         }
@@ -168,11 +173,12 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         {
             m.get_justification().iter().fold(
                 safe_msg_weight,
-                |mut safe_prime, m_prime| {
+                |mut safe_msg_weight_prime, m_prime| {
                     // base case
                     if &weight_referred > thr {
-                        let _ = safe_prime.insert(m.clone(), weight_referred);
-                        safe_prime
+                        let _ = safe_msg_weight_prime
+                            .insert(m.clone(), weight_referred);
+                        safe_msg_weight_prime
                     }
                     else {
                         let sender_current = m_prime.get_sender();
@@ -194,7 +200,7 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
                             senders_referred.clone(),
                             weight_referred,
                             thr,
-                            safe_prime,
+                            safe_msg_weight_prime,
                         )
                     }
                 },
@@ -216,7 +222,7 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
 }
 
 #[derive(Clone, Default, Eq, PartialEq, PartialOrd, Ord)]
-struct ProtoMessage<E, S>
+struct ProtoMsg<E, S>
 where
     E: Estimate<M = Message<E, S>>,
     S: Sender,
@@ -227,10 +233,11 @@ where
 }
 
 #[derive(Eq, Ord, PartialOrd, Clone, Default)]
-pub struct Message<E, S>(Arc<ProtoMessage<E, S>>)
+pub struct Message<E, S>(Box<Arc<ProtoMsg<E, S>>>)
 where
     E: Estimate<M = Message<E, S>>,
     S: Sender;
+
 
 /*
 // TODO start we should make messages lazy. continue this after async-await is better
@@ -242,7 +249,7 @@ enum MsgStatus {
     Invalid,
 }
 
-struct Msg<E, S, D>
+struct Message<E, S, D>
 where
     E: Estimate,
     S: Sender,
@@ -272,11 +279,17 @@ where
     }
 
     fn new(sender: S, justification: Justification<Self>, estimate: E) -> Self {
-        Message(Arc::new(ProtoMessage {
+        Message(Box::new(Arc::new(ProtoMsg {
             sender,
             justification,
             estimate,
-        }))
+        })))
+    }
+
+    fn set_as_final(&mut self) {
+        let mut proto_msg = (**self.0).clone();
+        proto_msg.justification = Justification::new();
+        *self.0 = Arc::new(proto_msg);
     }
 }
 
@@ -527,6 +540,61 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         );
         // let senders = &Sender::get_senders(&relative_senders_weights);
     }
+    #[test]
+    fn set_as_final() {
+        let sender0 = 0;
+        let sender1 = 1;
+        let senders_weights = SendersWeight::new(
+            [(sender0, 1.0), (sender1, 1.0)].iter().cloned().collect(),
+        );
+        let weights =
+            SenderState::new(senders_weights.clone(), 0.0, 0.0, HashSet::new());
+        let senders = &senders_weights.get_senders();
+
+        // sender0        v0---m0        m2---
+        // sender1               \--m1--/
+        let v0 = &VoteCount::create_vote_msg(sender1, false);
+        let safe_msgs = v0.get_finalized_msgs(senders);
+        assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0");
+
+        let (m0, weights) = &mut Message::from_msgs(
+            sender0,
+            vec![v0],
+            None,
+            &weights,
+            None as Option<VoteCount>,
+        ).unwrap();
+
+        let (m1, weights) = &Message::from_msgs(
+            sender1,
+            vec![m0],
+            None,
+            &weights,
+            None as Option<VoteCount>,
+        ).unwrap();
+        let (m2, weights) = &Message::from_msgs(
+            sender0,
+            vec![m1],
+            None,
+            &weights,
+            None as Option<VoteCount>,
+        ).unwrap();
+
+        let safe_msgs = m2.get_finalized_msgs(senders);
+        //         assert_eq!(
+        //             safe_msgs,
+        //             [m0.clone()].iter().cloned().collect(),
+        //             "both sender0 and sender1 saw v0 and m0, and additionally both
+        // parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
+        //         );
+
+        assert!(safe_msgs.len() == 1);
+        println!("------------");
+        println!("message before trimmed by set_as_final\n {:?}", m0);
+        m0.set_as_final();
+        println!("message after\n {:?}", m0);
+        println!("------------");
+    }
 
     #[test]
     fn msg_safe_by_sender() {
@@ -590,7 +658,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         // sender1        v1--/   \--m1--/
         let v0 = &VoteCount::create_vote_msg(sender0, false);
         let v1 = &VoteCount::create_vote_msg(sender1, false);
-        let (m0, weights) = &Message::from_msgs(
+        let (ref mut m0, weights) = &mut Message::from_msgs(
             sender0,
             vec![v0, v1],
             None,
@@ -634,5 +702,6 @@ necessarly seen sender1 seeing v0 and m0, just v1 is safe"
             "both sender0 and sender1 saw v0 and m0, and additionally both
 parties saw each other seing v0 and m0, safe"
         );
+        m0.set_as_final()
     }
 }
