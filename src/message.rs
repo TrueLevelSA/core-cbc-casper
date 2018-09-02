@@ -36,7 +36,7 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         sender: Self::Sender,
         latest_msgs: Vec<&Self>,
         finalized_msg: Option<&Self>,
-        senders_state: &SenderState<Self::Sender>,
+        sender_state: &SenderState<Self::Sender>,
         external_data: Option<<<Self as CasperMsg>::Estimate as Data>::Data>,
     ) -> Result<(Self, SenderState<Self::Sender>), &'static str> {
         // // TODO eventually comment out these lines, and FIXME tests
@@ -50,14 +50,14 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
 
         let mut justification = Justification::new();
         let (success, sender_state) =
-            justification.faulty_inserts(latest_msgs, &senders_state);
+            justification.faulty_inserts(latest_msgs, &sender_state);
         if !success {
             Err("None of the messages could be added to the state!")
         }
         else {
             let estimate = justification.mk_estimate(
                 finalized_msg,
-                &senders_state.get_senders_weights(),
+                &sender_state.get_senders_weights(),
                 external_data,
             );
             let message = Self::new(sender, justification, estimate);

@@ -18,7 +18,9 @@ impl<S: Sender> SendersWeight<S> {
         self.0.read()
     }
 
-    pub fn write(&self) -> LockResult<RwLockWriteGuard<HashMap<S, WeightUnit>>> {
+    pub fn write(
+        &self,
+    ) -> LockResult<RwLockWriteGuard<HashMap<S, WeightUnit>>> {
         self.0.write()
     }
 
@@ -38,11 +40,13 @@ impl<S: Sender> SendersWeight<S> {
             .collect()
     }
 
-    pub fn get_weight(&self, sender: &S) -> Option<WeightUnit> {
+    pub fn get_weight(&self, sender: &S) -> Result<WeightUnit, &'static str> {
         self.read()
-            .expect("Can't unwrap SendersWeight")
-            .get(sender)
-            .map(|weight| weight.clone())
+            .map_err(|_x| "Can't unwrap SendersWeight")
+            .and_then(|weights| match weights.get(sender) {
+                Some(weight) => Ok(weight.clone()),
+                None => Err("Could not find sender"),
+            })
     }
 
     pub fn into_relative_weights(&self) -> Self {
