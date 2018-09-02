@@ -7,7 +7,7 @@ use std::sync::{Arc};
 use rayon::prelude::*;
 
 use traits::{Estimate, Zero, Sender, Data};
-use justification::{Justification, SenderState, FaultyInsertResult};
+use justification::{Justification, SenderState};
 use weight_unit::{WeightUnit};
 use senders_weight::SendersWeight;
 
@@ -29,8 +29,6 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     // from memory
     fn set_as_final(&mut self);
 
-
-
     // Following methods are actual implementations
 
     /// create a new msg from latest_messages
@@ -51,10 +49,8 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         let latest_msgs: HashSet<_> = latest_msgs.iter().cloned().collect();
 
         let mut justification = Justification::new();
-        let FaultyInsertResult {
-            success,
-            sender_state,
-        } = justification.faulty_inserts(latest_msgs, &senders_state);
+        let (success, sender_state) =
+            justification.faulty_inserts(latest_msgs, &senders_state);
         if !success {
             Err("None of the messages could be added to the state!")
         }
@@ -238,7 +234,6 @@ where
     E: Estimate<M = Message<E, S>>,
     S: Sender;
 
-
 /*
 // TODO start we should make messages lazy. continue this after async-await is better
 // documented
@@ -363,10 +358,9 @@ mod message {
         let weights =
             SenderState::new(senders_weights, 0.0, 0.0, HashSet::new());
         let mut j0 = Justification::new();
-        assert!(
-            j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
-                .success
-        );
+        let (success, _) =
+            j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights);
+        assert!(success);
 
         let external_data: Option<VoteCount> = None;
         let (m0, _) =
@@ -375,14 +369,12 @@ mod message {
         // let m0 = &Message::new(0, justification, estimate);
 
         let mut j1 = Justification::new();
-        assert!(
-            j1.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
-                .success
-        );
-        assert!(
-            j1.faulty_inserts(vec![m0].iter().cloned().collect(), &weights)
-                .success
-        );
+        let (success, _) =
+            j1.faulty_inserts(vec![v0].iter().cloned().collect(), &weights);
+        assert!(success);
+        let (success, _) =
+            j1.faulty_inserts(vec![m0].iter().cloned().collect(), &weights);
+        assert!(success);
 
         let (msg1, _) =
             Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
@@ -406,10 +398,9 @@ mod message {
             SenderState::new(senders_weights, 0.0, 0.0, HashSet::new());
 
         let mut j0 = Justification::new();
-        assert!(
-            j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
-                .success
-        );
+        let (success, _) =
+            j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights);
+        assert!(success);
         let (m0, _) =
             &Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
         assert!(
@@ -424,22 +415,19 @@ mod message {
         assert!(m0.depends(v0), "m0 depends on v0 directly");
 
         let mut j0 = Justification::new();
-        assert!(
-            j0.faulty_inserts([v0].iter().cloned().collect(), &weights)
-                .success
-        );
+        let (success, _) =
+            j0.faulty_inserts([v0].iter().cloned().collect(), &weights);
+        assert!(success);
         let (m0, _) =
             &Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
 
         let mut j1 = Justification::new();
-        assert!(
-            j1.faulty_inserts([v0].iter().cloned().collect(), &weights)
-                .success
-        );
-        assert!(
-            j1.faulty_inserts([m0].iter().cloned().collect(), &weights)
-                .success
-        );
+        let (success, _) =
+            j1.faulty_inserts([v0].iter().cloned().collect(), &weights);
+        assert!(success);
+        let (success, _) =
+            j1.faulty_inserts([m0].iter().cloned().collect(), &weights);
+        assert!(success);
 
         let (m1, _) =
             &Message::from_msgs(0, vec![v0, m0], None, &weights, None).unwrap();
@@ -461,9 +449,9 @@ mod message {
             SenderState::new(senders_weights, 0.0, 0.0, HashSet::new());
 
         let mut j0 = Justification::new();
+        let (success, _) = j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights);
         assert!(
-            j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
-                .success
+                success
         );
         let (m0, _) =
             &Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
@@ -581,12 +569,6 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         ).unwrap();
 
         let safe_msgs = m2.get_finalized_msgs(senders);
-        //         assert_eq!(
-        //             safe_msgs,
-        //             [m0.clone()].iter().cloned().collect(),
-        //             "both sender0 and sender1 saw v0 and m0, and additionally both
-        // parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
-        //         );
 
         assert!(safe_msgs.len() == 1);
         println!("------------");

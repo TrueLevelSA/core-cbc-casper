@@ -54,10 +54,7 @@ impl VoteCount {
         }
     }
 
-    pub fn create_vote_msg(
-        sender: u32,
-        vote: bool,
-    ) -> Message<Self, u32> {
+    pub fn create_vote_msg(sender: u32, vote: bool) -> Message<Self, u32> {
         let justification = Justification::new();
         let estimate = match vote {
             true => VoteCount { yes: 1, no: 0 },
@@ -111,7 +108,7 @@ type Voter = u32;
 impl Sender for Voter {}
 impl Data for VoteCount {
     type Data = VoteCount;
-    fn is_valid(_data: &Self::Data) -> bool{
+    fn is_valid(_data: &Self::Data) -> bool {
         unimplemented!()
     }
 }
@@ -167,21 +164,20 @@ mod count_votes {
         let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
         let v1 = &VoteCount::create_vote_msg(1, true);
         let mut j0 = Justification::new();
-        let weights = SenderState::new(senders_weights, 0.0, 2.0, HashSet::new());
-        assert!(
-            j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights)
-                .success
-        );
-        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
+        let weights =
+            SenderState::new(senders_weights, 0.0, 2.0, HashSet::new());
+        let (success, _) =
+            j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights);
+        assert!(success);
+        let (m0, _) =
+            &Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
         let mut j1 = Justification::new();
-        assert!(
-            j1.faulty_inserts(vec![v1].iter().cloned().collect(), &weights)
-                .success
-        );
-        assert!(
-            j1.faulty_inserts(vec![m0].iter().cloned().collect(), &weights)
-                .success
-        );
+        let (success, _) =
+            j1.faulty_inserts(vec![v1].iter().cloned().collect(), &weights);
+        assert!(success);
+        let (success, _) =
+            j1.faulty_inserts(vec![m0].iter().cloned().collect(), &weights);
+        assert!(success);
 
         let (m1, _) =
             &Message::from_msgs(1, vec![v1, m0], None, &weights, None).unwrap();
@@ -191,13 +187,10 @@ mod count_votes {
             "should have 1 yes, and 1 no vote, found {:?}",
             Message::get_estimate(m1).clone(),
         );
+        let (success, _) = j1
+            .faulty_inserts(vec![v0_prime].iter().cloned().collect(), &weights);
 
-        assert!(
-            j1.faulty_inserts(
-                vec![v0_prime].iter().cloned().collect(),
-                &weights
-            ).success
-        );
+        assert!(success);
         let (m1_prime, _) = &Message::from_msgs(
             1,
             vec![v1, m0, v0_prime].iter().cloned().collect(),

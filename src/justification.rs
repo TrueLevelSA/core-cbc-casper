@@ -74,7 +74,7 @@ impl<M: CasperMsg> Justification<M> {
         &mut self,
         msgs: HashSet<&M>,
         sender_state: &SenderState<M::Sender>,
-    ) -> FaultyInsertResult<M::Sender> {
+    ) -> (bool, SenderState<M::Sender>) {
         /// get msgs and fault weight overhead and equivocators overhead sorted
         /// by fault weight overhead
         fn sort_by_faultweight<'z, M: CasperMsg>(
@@ -145,17 +145,11 @@ impl<M: CasperMsg> Justification<M> {
             msgs,
         ).iter()
             .fold(
-                FaultyInsertResult {
-                    success: false,
-                    sender_state: sender_state.clone(),
-                },
-                |acc, &msg| {
-                    let FaultyInsertResult { success, sender_state } =
-                        self.faulty_insert(msg, &acc.sender_state);
-                    FaultyInsertResult {
-                        success: acc.success || success,
-                        sender_state,
-                    }
+                (false, sender_state.clone()),
+                |(success, sender_state), &msg| {
+                    let (success_prime, sender_state_prime) =
+                        self.faulty_insert(msg, &sender_state);
+                    (success || success_prime, sender_state_prime)
                 },
             )
     }
@@ -164,7 +158,7 @@ impl<M: CasperMsg> Justification<M> {
         &mut self,
         msg: &M,
         sender_state: &SenderState<M::Sender>,
-    ) -> FaultyInsertResult<M::Sender> {
+    ) -> (bool, SenderState<M::Sender>) {
         let sender_state = sender_state.clone();
         let msg_equivocators_overhead: HashSet<_> = self.get_equivocators(msg)
             .iter()
@@ -198,18 +192,12 @@ impl<M: CasperMsg> Justification<M> {
                 sender_state
             };
 
-            FaultyInsertResult { success, sender_state }
+            (success, sender_state)
         }
         // conflicting message NOT added to the set as it crosses the fault
         // weight thr OR msg_fault_weight_overhead is NAN (from the unwrap)
         else {
-            FaultyInsertResult {
-                success: false,
-                sender_state: SenderState {
-                    // equivocators,
-                    ..sender_state
-                },
-            }
+            (false, sender_state)
         }
     }
 
@@ -323,11 +311,12 @@ impl<M: CasperMsg> Debug for Justification<M> {
 // FIXME: success should probably be out of this struct, as this struct can be
 // used to keep track of state cummulatively and success is related to a single
 // insertion
-pub struct FaultyInsertResult<S: Sender> {
-    pub success: bool,
-    pub sender_state: SenderState<S>,
-    // pub equivocators: HashSet<S>,
-}
+
+// pub struct FaultyInsertResult<S: Sender> {
+//     pub success: bool,
+//     pub sender_state: SenderState<S>,
+//     // pub equivocators: HashSet<S>,
+// }
 
 // FIXME: this became more than SenderState, should find a better name, or break up in parts
 #[derive(Debug, Clone)]
@@ -472,10 +461,9 @@ mod justification {
             thr: 0.0,
             equivocators: HashSet::new(),
         };
-        assert!(
-            j0.faulty_inserts([v0].iter().cloned().collect(), &weights)
-                .success
-        );
+        let (success, _) =
+            j0.faulty_inserts([v0].iter().cloned().collect(), &weights);
+        assert!(success);
         let (m0, _weights) = &Message::from_msgs(
             0,
             vec![v0],
@@ -485,149 +473,129 @@ mod justification {
         ).unwrap();
         // let m0 = &Message::new(0, justification, estimate);
         let mut j1 = Justification::new();
-        assert!(
-            j1.faulty_inserts(
-                vec![v1].iter().cloned().collect(),
-                &SenderState {
-                    senders_weights: senders_weights.clone(),
-                    state_fault_weight: 0.0,
-                    thr: 0.0,
-                    equivocators: HashSet::new(),
-                }
-            ).success
+        let (success, _) = j1.faulty_inserts(
+            vec![v1].iter().cloned().collect(),
+            &SenderState {
+                senders_weights: senders_weights.clone(),
+                state_fault_weight: 0.0,
+                thr: 0.0,
+                equivocators: HashSet::new(),
+            },
+        );
+        assert!(success);
+        let (success, _) = j1.faulty_inserts(
+            vec![m0].iter().cloned().collect(),
+            &SenderState {
+                senders_weights: senders_weights.clone(),
+                state_fault_weight: 0.0,
+                thr: 0.0,
+                equivocators: HashSet::new(),
+            },
+        );
+        assert!(success);
+        let (success, _) = j1.faulty_inserts(
+            vec![v0_prime].iter().cloned().collect(),
+            &SenderState {
+                senders_weights: senders_weights.clone(),
+                state_fault_weight: 0.0,
+                thr: 0.0,
+                equivocators: HashSet::new(),
+            },
         );
         assert!(
-            j1.faulty_inserts(
-                vec![m0].iter().cloned().collect(),
-                &SenderState {
-                    senders_weights: senders_weights.clone(),
-                    state_fault_weight: 0.0,
-                    thr: 0.0,
-                    equivocators: HashSet::new(),
-                }
-            ).success
-        );
-        assert!(
-            !j1.faulty_inserts(
-                vec![v0_prime].iter().cloned().collect(),
-                &SenderState {
-                    senders_weights: senders_weights.clone(),
-                    state_fault_weight: 0.0,
-                    thr: 0.0,
-                    equivocators: HashSet::new(),
-                }
-            ).success,
+            !success,
             "$v0_prime$ should conflict with $v0$ through $m0$, and we should reject as our fault tolerance thr is zero"
         );
-        assert!(
-            j1.clone()
-                .faulty_inserts(
-                    vec![v0_prime].iter().cloned().collect(),
-                    &SenderState {
-                        senders_weights: senders_weights.clone(),
-                        state_fault_weight: 0.0,
-                        thr: 1.0,
-                        equivocators: HashSet::new(),
-                    }
-                )
-                .success,
+        let (success, _) = j1.clone().faulty_inserts(
+            vec![v0_prime].iter().cloned().collect(),
+            &SenderState {
+                senders_weights: senders_weights.clone(),
+                state_fault_weight: 0.0,
+                thr: 1.0,
+                equivocators: HashSet::new(),
+            },
+        );
+        assert!(success,
             "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set"
         );
-
+        let (_, sender_state) = j1.clone().faulty_inserts(
+            vec![v0_prime].iter().cloned().collect(),
+            &SenderState {
+                senders_weights: senders_weights.clone(),
+                state_fault_weight: 0.0,
+                thr: 1.0,
+                equivocators: HashSet::new(),
+            },
+        );
         assert_eq!(
-            j1.clone()
-                .faulty_inserts(
-                    vec![v0_prime].iter().cloned().collect(),
-                    &SenderState {
-                        senders_weights: senders_weights.clone(),
-                        state_fault_weight: 0.0,
-                        thr: 1.0,
-                        equivocators: HashSet::new(),
-                    }
-                )
-                .sender_state
-                .state_fault_weight,
-            1.0,
+            sender_state.state_fault_weight, 1.0,
             "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept
 this fault as it doesnt cross the fault threshold for the set, and thus the
 state_fault_weight should be incremented to 1.0"
         );
-
-        assert!(
-            !j1.clone()
-                .faulty_inserts(
-                    vec![v0_prime].iter().cloned().collect(),
-                    &SenderState {
-                        senders_weights: senders_weights.clone(),
-                        state_fault_weight: 0.1,
-                        thr: 1.0,
-                        equivocators: HashSet::new(),
-                    }
-                )
-                .success,
+        let (success, _) = j1.clone().faulty_inserts(
+            vec![v0_prime].iter().cloned().collect(),
+            &SenderState {
+                senders_weights: senders_weights.clone(),
+                state_fault_weight: 0.1,
+                thr: 1.0,
+                equivocators: HashSet::new(),
+            },
+        );
+        assert!(!success,
             "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as the fault threshold gets crossed for the set"
         );
-
-        assert_eq!(
-            j1.clone()
-                .faulty_inserts(
-                    vec![v0_prime].iter().cloned().collect(),
-                    &SenderState {
-                        senders_weights: senders_weights.clone(),
-                        state_fault_weight: 0.1,
-                        thr: 1.0,
-                        equivocators: HashSet::new(),
-                    }
-                )
-                .sender_state.state_fault_weight,
-            0.1,
+        let (_, sender_state) = j1.clone().faulty_inserts(
+            vec![v0_prime].iter().cloned().collect(),
+            &SenderState {
+                senders_weights: senders_weights.clone(),
+                state_fault_weight: 0.1,
+                thr: 1.0,
+                equivocators: HashSet::new(),
+            },
+        );
+        assert_eq!(sender_state.state_fault_weight, 0.1,
             "$v0_prime$ conflicts with $v0$ through $m0$, and we should NOT accept this fault as the fault threshold gets crossed for the set, and thus the state_fault_weight should not be incremented"
         );
-
-        assert!(
-            j1.clone()
-                .faulty_inserts(
-                    vec![v0_prime].iter().cloned().collect(),
-                    &SenderState {
-                        senders_weights: senders_weights.clone(),
-                        state_fault_weight: 1.0,
-                        thr: 2.0,
-                        equivocators: HashSet::new(),
-                    }
-                )
-                .success,
+        let (success, _) = j1.clone().faulty_inserts(
+            vec![v0_prime].iter().cloned().collect(),
+            &SenderState {
+                senders_weights: senders_weights.clone(),
+                state_fault_weight: 1.0,
+                thr: 2.0,
+                equivocators: HashSet::new(),
+            },
+        );
+        assert!(success,
             "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the thr doesnt get crossed for the set"
         );
 
         let senders_weights = SendersWeight::new([].iter().cloned().collect());
         // bug found
+        let (success, _) = j1.clone().faulty_inserts(
+            vec![v0_prime].iter().cloned().collect(),
+            &SenderState {
+                senders_weights: senders_weights.clone(),
+                state_fault_weight: 1.0,
+                thr: 2.0,
+                equivocators: HashSet::new(),
+            },
+        );
         assert!(
-            !j1.clone()
-                .faulty_inserts(
-                    vec![v0_prime].iter().cloned().collect(),
-                    &SenderState {
-                        senders_weights: senders_weights.clone(),
-                        state_fault_weight: 1.0,
-                        thr: 2.0,
-                        equivocators: HashSet::new(),
-                    }
-                )
-                .success,
+            !success,
             "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we can't know the weight of the sender, which could be Infinity"
         );
-
+        let (_, sender_state) = j1.clone().faulty_inserts(
+            vec![v0_prime].iter().cloned().collect(),
+            &SenderState {
+                senders_weights: senders_weights.clone(),
+                state_fault_weight: 1.0,
+                thr: 2.0,
+                equivocators: HashSet::new(),
+            },
+        );
         assert_eq!(
-            j1.clone()
-                .faulty_inserts(
-                    vec![v0_prime].iter().cloned().collect(),
-                    &SenderState {
-                        senders_weights: senders_weights.clone(),
-                        state_fault_weight: 1.0,
-                        thr: 2.0,
-                        equivocators: HashSet::new(),
-                    }
-                )
-                .sender_state.state_fault_weight,
+                sender_state.state_fault_weight,
             1.0,
             "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we can't know the weight of the sender, which could be Infinity, and thus the state_fault_weight should be unchanged"
         );

@@ -5,7 +5,7 @@ use traits::{Estimate, Data};
 use message::{CasperMsg, Message};
 use justification::{Justification, SenderState};
 use senders_weight::{SendersWeight};
-
+use std::sync::Arc;
 type Validator = u32;
 
 /// a genesis block should be a block with estimate Block with prevblock =
