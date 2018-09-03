@@ -1,6 +1,6 @@
 use std::collections::{BTreeSet, HashSet, HashMap};
 use std::collections::btree_set::{Iter};
-use std::fmt::{Debug, Formatter, Result};
+use std::fmt::{Debug, Formatter};
 // use std::io::{Error};
 
 use rayon::collections::btree_set::Iter as ParIter;
@@ -207,24 +207,27 @@ impl<M: CasperMsg> Justification<M> {
         finalized_msg: Option<&M>,
         senders_weights: &SendersWeight<M::Sender>,
     ) -> Option<M> {
-        self.get_subtree_weights(finalized_msg, senders_weights)
-            .iter()
-            .max_by(|(_, &weight0), (_, &weight1)| {
-                weight0
-                    .partial_cmp(&weight1)
-                // tie breaker, the unwrap fails because both values are the
-                // same and we arbitrarily chose a result. TODO this should be
-                // something deterministic, like blockhash
-                    .unwrap_or(::std::cmp::Ordering::Greater)
-            })
-            .map(|(heaviest_subtree, _)| heaviest_subtree.clone())
+        match self.get_subtree_weights(finalized_msg, senders_weights) {
+            Ok(subtree_weights) => subtree_weights
+                .iter()
+                .max_by(|(_, &weight0), (_, &weight1)| {
+                    weight0
+                        .partial_cmp(&weight1)
+                    // tie breaker, the unwrap fails because both values are the
+                    // same and we arbitrarily chose a result. TODO this should be
+                    // something deterministic, like blockhash
+                        .unwrap_or(::std::cmp::Ordering::Greater)
+                })
+                .map(|(heaviest_subtree, _)| heaviest_subtree.clone()),
+            Err(_) => None,
+        }
     }
 
     pub fn get_subtree_weights(
         &self,
         finalized_msg: Option<&M>, // stops sum at finalized_msg
         senders_weights: &SendersWeight<M::Sender>,
-    ) -> HashMap<M, WeightUnit> {
+    ) -> Result<HashMap<M, WeightUnit>, &'static str> {
         fn recursor<M>(
             m: &M,
             finalized_msg: Option<&M>, // if None, runs all the way to genesis msgs
@@ -277,33 +280,37 @@ impl<M: CasperMsg> Justification<M> {
             )
         };
         // initial state, trigger recursion
-        let all_senders = &senders_weights.get_senders();
-        self.iter()
-            .map(|m| {
-                let sender_current = m.get_sender();
-                let senders_referred: HashSet<M::Sender> =
-                    [sender_current.clone()].iter().cloned().collect();
-                let initial_weight = senders_weights
-                    .get_weight(&sender_current)
-                    .unwrap_or(WeightUnit::ZERO);
-                (
-                    m.clone(),
-                    recursor(
-                        m,
-                        finalized_msg,
-                        senders_weights,
-                        all_senders,
-                        senders_referred.clone(),
-                        initial_weight,
-                    ),
-                )
-            })
-            .collect()
+        match &senders_weights.get_senders() {
+            Ok(all_senders) => Ok(self
+                .iter()
+                .map(|m| {
+                    let sender_current = m.get_sender();
+                    let senders_referred: HashSet<
+                        M::Sender,
+                    > = [sender_current.clone()].iter().cloned().collect();
+                    let initial_weight = senders_weights
+                        .get_weight(&sender_current)
+                        .unwrap_or(WeightUnit::ZERO);
+                    (
+                        m.clone(),
+                        recursor(
+                            m,
+                            finalized_msg,
+                            senders_weights,
+                            all_senders,
+                            senders_referred.clone(),
+                            initial_weight,
+                        ),
+                    )
+                })
+                .collect()),
+            Err(e) => Err(e),
+        }
     }
 }
 
 impl<M: CasperMsg> Debug for Justification<M> {
-    fn fmt(&self, f: &mut Formatter) -> Result {
+    fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
         write!(f, "{:?}", self.0)
     }
 }
@@ -382,8 +389,9 @@ mod justification {
         // weights:       2               6               14               30
         let mut justification = Justification::new();
         assert!(justification.insert(genesis_msg.clone()));
-        let subtree_weights =
-            justification.get_subtree_weights(None, &senders_weights);
+        let subtree_weights = justification
+            .get_subtree_weights(None, &senders_weights)
+            .unwrap();
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &2.0);
         let proto_b1 = Block::new(None, sender1, txs.clone());
@@ -392,8 +400,9 @@ mod justification {
 
         let mut justification = Justification::new();
         assert!(justification.insert(m1.clone()));
-        let subtree_weights =
-            justification.get_subtree_weights(None, &senders_weights);
+        let subtree_weights = justification
+            .get_subtree_weights(None, &senders_weights)
+            .unwrap();
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &6.0);
         let proto_b2 = Block::new(None, sender2, txs.clone());
@@ -402,8 +411,9 @@ mod justification {
 
         let mut justification = Justification::new();
         assert!(justification.insert(m2.clone()));
-        let subtree_weights =
-            justification.get_subtree_weights(None, &senders_weights);
+        let subtree_weights = justification
+            .get_subtree_weights(None, &senders_weights)
+            .unwrap();
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &14.0);
         let proto_b3 = Block::new(None, sender3, txs);
@@ -412,8 +422,9 @@ mod justification {
 
         let mut justification = Justification::new();
         assert!(justification.insert(m3.clone()));
-        let subtree_weights =
-            justification.get_subtree_weights(None, &senders_weights);
+        let subtree_weights = justification
+            .get_subtree_weights(None, &senders_weights)
+            .unwrap();
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &30.0);
     }

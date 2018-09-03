@@ -25,49 +25,52 @@ impl<S: Sender> SendersWeight<S> {
     }
 
     /// picks senders with positive weights
-    pub fn get_senders(&self) -> HashSet<S> {
-        self.read()
-            .expect("Can't unwrap SendersWeight")
-            .iter()
-            .filter_map(|(sender, &weight)| {
-                if weight > WeightUnit::ZERO {
-                    Some(sender.clone())
-                }
-                else {
-                    None
-                }
-            })
-            .collect()
+    pub fn get_senders(&self) -> Result<HashSet<S>, &'static str> {
+        self.read().map_err(|_| "Can't unwrap SendersWeight").map(
+            |senders_weight| {
+                senders_weight
+                    .iter()
+                    .filter_map(|(sender, &weight)| {
+                        if weight > WeightUnit::ZERO {
+                            Some(sender.clone())
+                        }
+                        else {
+                            None
+                        }
+                    })
+                    .collect()
+            },
+        )
     }
 
     pub fn get_weight(&self, sender: &S) -> Result<WeightUnit, &'static str> {
         self.read()
-            .map_err(|_x| "Can't unwrap SendersWeight")
+            .map_err(|_| "Can't unwrap SendersWeight")
             .and_then(|weights| match weights.get(sender) {
                 Some(weight) => Ok(weight.clone()),
                 None => Err("Could not find sender"),
             })
     }
 
-    pub fn into_relative_weights(&self) -> Self {
-        let senders_weights = self.read().expect("Can't unwrap SendersWeight");
+    // pub fn into_relative_weights(&self) -> Self {
+    //     let senders_weights = self.read().expect("Can't unwrap SendersWeight");
 
-        let iterator = senders_weights
-            .iter()
-            .filter(|(_, &weight)| weight > WeightUnit::ZERO);
+    //     let iterator = senders_weights
+    //         .iter()
+    //         .filter(|(_, &weight)| weight > WeightUnit::ZERO);
 
-        let total_weight: WeightUnit = iterator
-            .clone()
-            .fold(WeightUnit::ZERO, |acc, (_, weight)| acc + weight);
+    //     let total_weight: WeightUnit = iterator
+    //         .clone()
+    //         .fold(WeightUnit::ZERO, |acc, (_, weight)| acc + weight);
 
-        SendersWeight::new(
-            iterator
-                .map(|(sender, weight)| {
-                    (sender.clone(), weight.clone() / total_weight)
-                })
-                .collect(),
-        )
-    }
+    //     SendersWeight::new(
+    //         iterator
+    //             .map(|(sender, weight)| {
+    //                 (sender.clone(), weight.clone() / total_weight)
+    //             })
+    //             .collect(),
+    //     )
+    // }
     pub fn sum_weight_senders(&self, senders: &HashSet<S>) -> WeightUnit {
         senders.iter().fold(WeightUnit::ZERO, |acc, sender| {
             acc + self.get_weight(sender).unwrap_or(::std::f64::NAN)
@@ -85,7 +88,7 @@ mod sender_weight {
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
         assert_eq!(
-            SendersWeight::get_senders(&senders_weights),
+            SendersWeight::get_senders(&senders_weights).unwrap(),
             [0, 1, 2].iter().cloned().collect(),
             "should include senders with valid, positive weight"
         );
@@ -94,7 +97,7 @@ mod sender_weight {
             [(0, 0.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
         assert_eq!(
-            SendersWeight::get_senders(&senders_weights),
+            SendersWeight::get_senders(&senders_weights).unwrap(),
             [1, 2].iter().cloned().collect(),
             "should exclude senders with 0 weight"
         );
@@ -103,7 +106,7 @@ mod sender_weight {
             [(0, 1.0), (1, -1.0), (2, 1.0)].iter().cloned().collect(),
         );
         assert_eq!(
-            SendersWeight::get_senders(&senders_weights),
+            SendersWeight::get_senders(&senders_weights).unwrap(),
             [0, 2].iter().cloned().collect(),
             "should exclude senders with negative weight"
         );
@@ -115,7 +118,7 @@ mod sender_weight {
                 .collect(),
         );
         assert_eq!(
-            SendersWeight::get_senders(&senders_weights),
+            SendersWeight::get_senders(&senders_weights).unwrap(),
             [1, 2].iter().cloned().collect(),
             "should exclude senders with NAN weight"
         );
@@ -127,7 +130,7 @@ mod sender_weight {
                 .collect(),
         );
         assert_eq!(
-            SendersWeight::get_senders(&senders_weights),
+            SendersWeight::get_senders(&senders_weights).unwrap(),
             [0, 1, 2].iter().cloned().collect(),
             "should include senders with INFINITY weight"
         );

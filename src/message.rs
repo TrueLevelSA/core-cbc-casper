@@ -469,10 +469,9 @@ mod message {
         let sender0 = 0;
         let sender1 = 1;
         let senders_weights = &SendersWeight::new(
-            [(sender0, 1.0), (sender1, 1.0)].iter().cloned().collect(),
+            [(sender0, 0.5), (sender1, 0.5)].iter().cloned().collect(),
         );
 
-        let relative_senders_weights = &senders_weights.into_relative_weights();
         let weights =
             SenderState::new(senders_weights.clone(), 0.0, 0.0, HashSet::new());
 
@@ -481,7 +480,7 @@ mod message {
         // sender1               \--m1--/
         let v0 = &VoteCount::create_vote_msg(sender0, false);
         let safe_msgs =
-            v0.get_safe_msgs_by_weight(relative_senders_weights, thr);
+            v0.get_safe_msgs_by_weight(senders_weights, thr);
         assert_eq!(safe_msgs.len(), 0, "only 0.5 of weight saw v0");
 
         let (m0, _) = &Message::from_msgs(
@@ -492,7 +491,7 @@ mod message {
             None as Option<VoteCount>,
         ).unwrap();
         let safe_msgs =
-            m0.get_safe_msgs_by_weight(relative_senders_weights, thr);
+            m0.get_safe_msgs_by_weight(senders_weights, thr);
         assert_eq!(safe_msgs.len(), 0, "only 0.5 of weight saw v0 and m0");
 
         let (m1, _) = &Message::from_msgs(
@@ -503,7 +502,7 @@ mod message {
             None as Option<VoteCount>,
         ).unwrap();
         let safe_msgs =
-            m1.get_safe_msgs_by_weight(relative_senders_weights, thr);
+            m1.get_safe_msgs_by_weight(senders_weights, thr);
         assert_eq!(
             safe_msgs.len(),
             0,
@@ -519,7 +518,7 @@ necessarly seen sender1 seeing v0 and m0, thus not yet safe"
             None as Option<VoteCount>,
         ).unwrap();
         let safe_msgs =
-            m2.get_safe_msgs_by_weight(relative_senders_weights, thr);
+            m2.get_safe_msgs_by_weight(senders_weights, thr);
         assert_eq!(
             safe_msgs.get(m0).unwrap_or(&f64::NAN),
             &1.0,
@@ -537,7 +536,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         );
         let weights =
             SenderState::new(senders_weights.clone(), 0.0, 0.0, HashSet::new());
-        let senders = &senders_weights.get_senders();
+        let senders = &senders_weights.get_senders().unwrap();
 
         // sender0        v0---m0        m2---
         // sender1               \--m1--/
@@ -588,7 +587,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         );
         let weights =
             SenderState::new(senders_weights.clone(), 0.0, 0.0, HashSet::new());
-        let senders = &senders_weights.get_senders();
+        let senders = &senders_weights.get_senders().unwrap();
 
         // sender0        v0---m0        m2---
         // sender1               \--m1--/
