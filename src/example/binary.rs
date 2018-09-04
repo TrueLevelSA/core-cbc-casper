@@ -1,246 +1,204 @@
-use std::convert::From;
-
-use message;
-use message::CasperMsg;
-use traits::{Data, Estimate};
-use justification::Justification;
-use senders_weight::SendersWeight;
+use traits::{Estimate, Data, Zero};
+use message::{CasperMsg, Message};
+use justification::{LatestMsgsHonest};
+use senders_weight::{SendersWeight};
+use weight_unit::{WeightUnit};
 
 type Validator = u32;
 
-pub type Message = message::Message<Value, Validator>;
+pub type BinaryMsg = Message<bool /*Estimate*/, Validator /*Sender*/>;
 
-#[derive(Debug, Hash, Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
-pub enum Value {
-    Zero = 0,
-    One = 1,
-}
-
-impl Data for Value {
+impl Data for bool {
     type Data = Self;
-
-    fn is_valid(_data: &Value) -> bool {
-        true
+    fn is_valid(_data: &Self::Data) -> bool {
+        true // FIXME
     }
 }
 
-impl From<((Value, f64), (Value, f64))> for Value {
-    fn from(val: ((Value, f64), (Value, f64))) -> Self {
-        let ((v1, w1), (v2, w2)) = val;
-        if w1 > w2 {
-            v1
-        } else {
-            v2
-        }
-    }
-}
+impl Estimate for bool {
+    type M = BinaryMsg;
 
-impl Estimate for Value {
-    type M = Message;
-
+    /// weighted count of the votes contained in the latest messages
     fn mk_estimate(
-        latest_msgs: &Justification<Message>,
-        _finalized_msg: Option<&Message>,
-        senders_weights: &SendersWeight<Validator>,
-        _proto_block: Option<Value>,
-    ) -> Value {
-        latest_msgs.iter()
-            .map(|msg| (msg.get_estimate(), senders_weights.get_weight(msg.get_sender())))
-            .fold(((Value::Zero, 0f64), (Value::One, 0f64)), |acc, t| match t {
-                (Value::Zero, Some(weight)) => (((acc.0).0, (acc.0).1 + weight), acc.1),
-                (Value::One, Some(weight)) => (acc.0, ((acc.1).0, (acc.1).1 + weight)),
-                _ => acc, // No weight for the given validator, do nothing
-            }).into()
+        latest_msgs: &LatestMsgsHonest<Self::M>,
+        _finalized_msg: Option<&Self::M>,
+        senders_weights: &SendersWeight<
+            <<Self as Estimate>::M as CasperMsg>::Sender,
+        >,
+        _data: Option<<Self as Data>::Data>,
+    ) -> Self {
+        // loop over all the latest messages
+        let (true_w, false_w) = latest_msgs.iter().fold(
+            (WeightUnit::ZERO, WeightUnit::ZERO),
+            |(true_w, false_w), msg| {
+                // get the weight for the sender
+                let sender_weight = senders_weights
+                    .get_weight(msg.get_sender())
+                    .unwrap_or(WeightUnit::ZERO);
+
+                // add the weight to the right accumulator
+                if *msg.get_estimate() {
+                    (true_w + sender_weight, false_w)
+                } else {
+                    (true_w, false_w + sender_weight)
+                }
+            },
+        );
+
+        true_w >= false_w
     }
 }
 
-#[test]
-fn casper_binary_consensus() {
-    use std::collections::HashSet;
-    use justification::SenderState;
-
-    let (sender1, sender2, sender3, sender4) = (1, 2, 3, 4);
-    let (weight1, weight2, weight3, weight4) = (0.6, 1.0, 2.0, 1.3);
-
-    let senders_weights = SendersWeight::new(
-        [
-            (sender1, weight1),
-            (sender2, weight2),
-            (sender3, weight3),
-            (sender4, weight4),
-        ].iter()
-            .cloned()
-            .collect(),
-    );
-
-    let weights = SenderState::new(
-        senders_weights.clone(),
-        0.0,            // state fault weight
-        1.0,            // subjective fault weight threshold
-        HashSet::new(), // equivocators
-    );
-
-    // 1: (1)  (1)
-    // 2: (1)       (0)
-    // 3: (0)  (0)       (0)
-    // 4: (1)  (0)
-
-    let msg1 = Message::new(sender1, Justification::new(), Value::One);
-    let msg2 = Message::new(sender2, Justification::new(), Value::One);
-    let msg3 = Message::new(sender3, Justification::new(), Value::Zero);
-    let msg4 = Message::new(sender4, Justification::new(), Value::One);
-    let (msg5, _) = Message::from_msgs(sender1, vec![&msg1, &msg2], None, &weights, None).unwrap();
-    let (msg6, _) = Message::from_msgs(sender3, vec![&msg3, &msg4], None, &weights, None).unwrap();
-    let (msg7, _) = Message::from_msgs(sender2, vec![&msg2, &msg5, &msg6], None, &weights, None).unwrap();
-    let (msg8, _) = Message::from_msgs(sender3, vec![&msg7, &msg6], None, &weights, None).unwrap();
-    let (msg9, _) = Message::from_msgs(sender4, vec![&msg4, &msg6], None, &weights, None).unwrap();
-
-    assert_eq!(msg5.get_estimate(), &Value::One);
-    assert_eq!(msg6.get_estimate(), &Value::Zero);
-    assert_eq!(msg7.get_estimate(), &Value::Zero);
-    assert_eq!(msg8.get_estimate(), &Value::Zero);
-    assert_eq!(msg9.get_estimate(), &Value::Zero);
-}
-
-pub mod list {
-    use message;
-    use message::CasperMsg;
-    use traits::{Data, Estimate};
-    use justification::Justification;
+#[cfg(test)]
+mod tests {
+    use super::*;
     use senders_weight::SendersWeight;
-
-    use super::{Value, Validator};
-
-    pub type Message = message::Message<List, Validator>;
-
-    #[derive(Debug, Hash, Clone, Ord, PartialOrd, Eq, PartialEq)]
-    pub enum List {
-        Cons(Value, Box<List>),
-        Nil,
-    }
-
-    impl List {
-        // Create a new empty list of value
-        fn new() -> List {
-            List::Nil
-        }
-
-        // Create a new list with initial value
-        fn create(elem: Value) -> List {
-            let l = List::new();
-            l.prepend(elem)
-        }
-
-        // Consume and return a new list preprended with value
-        fn prepend(self, elem: Value) -> List {
-            List::Cons(elem, Box::new(self))
-        }
-
-        // Return representation of the list as a (heap allocated) string
-        fn stringify(&self) -> String {
-            match *self {
-                List::Cons(head, ref tail) => {
-                    // `format!` is similar to `print!`, but returns a heap
-                    // allocated string instead of printing to the console
-                    format!("{:?}, {}", head, tail.stringify())
-                },
-                List::Nil => {
-                    format!("Nil")
-                },
-            }
-        }
-    }
-
-    impl Data for List {
-        type Data = Value;
-
-        fn is_valid(_data: &Value) -> bool {
-            // Value is always valid because value is an enum
-            true
-        }
-    }
-
-    impl Estimate for List {
-        type M = Message;
-
-        fn mk_estimate(
-            latest_msgs: &Justification<Message>,
-            finalized_msg: Option<&Message>,
-            senders_weights: &SendersWeight<Validator>,
-            data: Option<Value>,
-        ) -> List {
-            match latest_msgs.ghost(finalized_msg, senders_weights) {
-                Some(message) => match data {
-                    Some(value) => {
-                        let mut l = message.get_estimate().clone();
-                        l.prepend(value)
-                    },
-                    None => message.get_estimate().clone(),
-                },
-                None => match data {
-                    Some(value) => {
-                        let mut l = List::new();
-                        l.prepend(value)
-                    },
-                    None => List::new(),
-                },
-            }
-        }
-    }
+    use justification::{SenderState, Justification, LatestMsgs};
+    use std::collections::{HashSet};
 
     #[test]
-    fn casper_binary_list_consensus() {
-        use std::collections::HashSet;
-        use justification::SenderState;
-
-        let (sender1, sender2, sender3, sender4) = (1, 2, 3, 4);
-        let (weight1, weight2, weight3, weight4) = (0.6, 1.0, 2.0, 1.3);
+    fn equal_weight() {
+        let senders: Vec<u32> = (0..4).collect();
+        let weights = [1.0, 1.0, 1.0, 1.0];
 
         let senders_weights = SendersWeight::new(
-            [
-                (sender1, weight1),
-                (sender2, weight2),
-                (sender3, weight3),
-                (sender4, weight4),
-            ].iter()
+            senders
+                .iter()
                 .cloned()
+                .zip(weights.iter().cloned())
                 .collect(),
         );
 
-        let weights = SenderState::new(
+        let sender_state = SenderState::new(
             senders_weights.clone(),
-            0.0,            // state fault weight
+            0.0, // state fault weight
+            None,
+            LatestMsgs::new(),
             1.0,            // subjective fault weight threshold
             HashSet::new(), // equivocators
         );
 
-        // 0.6| 1: {1}  {0, 0}                           {1, 0, 0, 0}
-        // 1.0| 2:              {1, 0, 0}                {1, 0, 0, 0}
-        // 2.0| 3: {0}                     {1, 0, 0, 0}  {1, 0, 0, 0}
-        // 1.3| 4:              {0, 0, 0}  {0, 0, 0, 0}  {1, 0, 0, 0}
+        let m0 = BinaryMsg::new(senders[0], Justification::new(), false);
+        let m1 = BinaryMsg::new(senders[1], Justification::new(), true);
+        let m2 = BinaryMsg::new(senders[2], Justification::new(), false);
+        let (m3, _) = BinaryMsg::from_msgs(
+            senders[0],
+            vec![&m0, &m1],
+            None,
+            &sender_state,
+            None,
+        ).unwrap();
 
-        let genesis = Message::new(sender1, Justification::new(), List::new());
+        assert_eq!(
+            bool::mk_estimate(
+                &LatestMsgsHonest::from_latest_msgs(
+                    &LatestMsgs::from(&Justification::new()),
+                    sender_state.get_equivocators()
+                ),
+                None,
+                &senders_weights,
+                None
+            ),
+            true
+        );
+        let (mut j0, _) =
+            Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
+        // s0 and s1 vote. since tie-breaker is `true`, get `true`
+        assert_eq!(
+            j0.mk_estimate(
+                None,
+                sender_state.get_equivocators(),
+                &senders_weights,
+                None
+            ),
+            true
+        );
+        j0.faulty_insert(&m2, &sender_state);
+        // `false` now has weight 2.0, while true has weight `1.0`
+        assert_eq!(
+            j0.mk_estimate(
+                None,
+                sender_state.get_equivocators(),
+                &senders_weights,
+                None
+            ),
+            false
+        );
+        j0.faulty_insert(&m3, &sender_state);
+        assert_eq!(
+            j0.mk_estimate(
+                None,
+                sender_state.get_equivocators(),
+                &senders_weights,
+                None
+            ),
+            true
+        );
+    }
 
-        let (msg1, _) = Message::from_msgs(sender1, vec![&genesis], None, &weights, Some(Value::One)).unwrap();
-        let (msg2, _) = Message::from_msgs(sender3, vec![&genesis], None, &weights, Some(Value::Zero)).unwrap();
+    #[test]
+    fn vote_swaying() {
+        let senders: Vec<u32> = (0..5).collect();
+        let weights = [1.0, 1.0, 1.0, 1.0, 1.0];
 
-        let (msg3, _) = Message::from_msgs(sender1, vec![&msg1, &msg2], None, &weights, Some(Value::Zero)).unwrap();
+        let senders_weights = SendersWeight::new(
+            senders
+                .iter()
+                .cloned()
+                .zip(weights.iter().cloned())
+                .collect(),
+        );
 
-        let (msg4, _) = Message::from_msgs(sender2, vec![&msg2, &msg3], None, &weights, Some(Value::One)).unwrap();
-        println!("{:?}", msg4);
-        let (msg5, _) = Message::from_msgs(sender4, vec![&msg2, &msg3], None, &weights, Some(Value::Zero)).unwrap();
+        let sender_state = SenderState::new(
+            senders_weights.clone(),
+            0.0, // state fault weight
+            None,
+            LatestMsgs::new(),
+            1.0,            // subjective fault weight threshold
+            HashSet::new(), // equivocators
+        );
 
-        let (msg6, _) = Message::from_msgs(sender3, vec![&msg3, &msg4, &msg5], None, &weights, Some(Value::One)).unwrap();
-        let (msg7, _) = Message::from_msgs(sender4, vec![&msg3, &msg4, &msg5], None, &weights, Some(Value::Zero)).unwrap();
+        let m0 = BinaryMsg::new(senders[0], Justification::new(), false);
+        let m1 = BinaryMsg::new(senders[1], Justification::new(), true);
+        let m2 = BinaryMsg::new(senders[2], Justification::new(), true);
+        let m3 = BinaryMsg::new(senders[3], Justification::new(), false);
+        let m4 = BinaryMsg::new(senders[4], Justification::new(), false);
 
-        let (msg8, _) =  Message::from_msgs(sender1, vec![&msg3, &msg4, &msg6, &msg7], None, &weights, None).unwrap();
-        let (msg9, _) =  Message::from_msgs(sender2, vec![&msg1, &msg2, &msg3, &msg4, &msg5, &msg6, &msg7], None, &weights, None).unwrap();
-        let (msg10, _) = Message::from_msgs(sender3, vec![&msg1, &msg2, &msg3, &msg4, &msg5, &msg6, &msg7], None, &weights, None).unwrap();
-        let (msg11, _) = Message::from_msgs(sender4, vec![&msg1, &msg2, &msg3, &msg4, &msg5, &msg6, &msg7], None, &weights, None).unwrap();
+        let (mut j0, _) = Justification::from_msgs(
+            vec![m0.clone(), m1.clone(), m2.clone(), m3.clone(), m4.clone()],
+            &sender_state,
+        );
 
-        //println!("{}", List::create(Value::One).stringify());
+        // honest result of vote: false
+        assert_eq!(
+            j0.mk_estimate(
+                None,
+                sender_state.get_equivocators(),
+                &senders_weights,
+                None
+            ),
+            false
+        );
 
-        assert!(false);
+        // assume sender 0 has seen messages from sender 1 and sender 2 and reveals this in a published message
+        let (m5, _) = BinaryMsg::from_msgs(
+            senders[0],
+            vec![&m0, &m1, &m2],
+            None,
+            &sender_state,
+            None,
+        ).unwrap();
+
+        j0.faulty_insert(&m5, &sender_state);
+        // sender 0 now "votes" in the other direction and sways the result: true
+        assert_eq!(
+            j0.mk_estimate(
+                None,
+                sender_state.get_equivocators(),
+                &senders_weights,
+                None
+            ),
+            true
+        );
     }
 }
-
