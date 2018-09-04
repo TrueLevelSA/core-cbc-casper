@@ -1,10 +1,9 @@
 use std::convert::From;
-use std::collections::HashSet;
 
 use message;
 use message::CasperMsg;
 use traits::{Data, Estimate};
-use justification::{Justification, SenderState};
+use justification::Justification;
 use senders_weight::SendersWeight;
 
 type Validator = u32;
@@ -20,7 +19,7 @@ pub enum Value {
 impl Data for Value {
     type Data = Self;
 
-    fn is_valid(data: &Value) -> bool {
+    fn is_valid(_data: &Value) -> bool {
         true
     }
 }
@@ -41,9 +40,9 @@ impl Estimate for Value {
 
     fn mk_estimate(
         latest_msgs: &Justification<Message>,
-        finalized_msg: Option<&Message>,
+        _finalized_msg: Option<&Message>,
         senders_weights: &SendersWeight<Validator>,
-        proto_block: Option<Value>,
+        _proto_block: Option<Value>,
     ) -> Value {
         latest_msgs.iter()
             .map(|msg| (msg.get_estimate(), senders_weights.get_weight(msg.get_sender())))
@@ -57,6 +56,9 @@ impl Estimate for Value {
 
 #[test]
 fn casper_binary_consensus() {
+    use std::collections::HashSet;
+    use justification::SenderState;
+
     let (sender1, sender2, sender3, sender4) = (1, 2, 3, 4);
     let (weight1, weight2, weight3, weight4) = (0.6, 1.0, 2.0, 1.3);
 
