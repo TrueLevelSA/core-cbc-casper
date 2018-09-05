@@ -12,12 +12,15 @@ type Validator = u32;
 /// a genesis block should be a block with estimate Block with prevblock =
 /// None and data. data will be the unique identifier of this blockchain
 
-#[derive(Clone, Default, Eq, PartialEq, PartialOrd, Ord, Debug, Hash)]
-pub struct Block {
-    prevblock: Option<Arc<Block>>,
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Debug, Hash)]
+struct ProtoBlock {
+    prevblock: Option<Block>,
     sender: Validator,
     txs: BTreeSet<Tx>,
 }
+
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Debug, Hash)]
+pub struct Block(Arc<ProtoBlock>);
 
 pub type BlockMsg = Message<Block /*Estimate*/, Validator /*Sender*/>;
 
@@ -25,9 +28,15 @@ pub type BlockMsg = Message<Block /*Estimate*/, Validator /*Sender*/>;
 pub struct Tx;
 
 impl Data for Block {
-    type Data = Self;
+    type Data = Block;
     fn is_valid(_data: &Self::Data) -> bool {
         true // FIXME
+    }
+}
+
+impl From<ProtoBlock> for Block {
+    fn from(protoblock: ProtoBlock) -> Self {
+        Block(Arc::new(protoblock))
     }
 }
 
@@ -39,15 +48,18 @@ impl<'z> From<&'z BlockMsg> for Block {
 
 impl Block {
     pub fn new(
-        prevblock: Option<Arc<Block>>,
+        prevblock: Option<Block>,
         sender: Validator,
         txs: BTreeSet<Tx>,
     ) -> Self {
-        Self {
+        Block(Arc::new(ProtoBlock {
             prevblock,
             sender,
             txs,
-        }
+        }))
+    }
+    pub fn get_sender(&self) -> Validator {
+        self.0.sender
     }
     pub fn from_prevblock_msg(
         prevblock_msg: Option<BlockMsg>,
@@ -55,11 +67,11 @@ impl Block {
         // not a genesis_block
         proto_block: Block,
     ) -> Self {
-        let prevblock = prevblock_msg.map(|m| Arc::new(Block::from(&m)));
-        let block = Self {
+        let prevblock = prevblock_msg.map(|m| Block::from(&m));
+        let block = Block(Arc::new(ProtoBlock {
             prevblock,
-            ..proto_block
-        };
+            ..(*proto_block.0).clone()
+        }));
 
         if Block::is_valid(&block) {
             block
@@ -70,9 +82,10 @@ impl Block {
     }
 
     pub fn get_prevblock(&self) -> Option<Self> {
-        self.prevblock
+        self.0
+            .prevblock
             .as_ref()
-            .map(|prevblock| (**prevblock).clone())
+            .map(|prevblock| (*prevblock).clone())
     }
 
     pub fn is_member(&self, rhs: &Self) -> bool {
@@ -170,11 +183,11 @@ fn example_usage() {
     // (s3, w=1)         \---m3
 
     // blockchain gen <--m2 <--m3
-    let genesis_block = Block {
+    let genesis_block: Block = (ProtoBlock {
         prevblock: None,
         sender: sender0,
         txs: txs.clone(),
-    };
+    }).into();
     let justification = Justification::new();
     let genesis_block_msg =
         BlockMsg::new(sender0, justification, genesis_block.clone());
@@ -185,7 +198,7 @@ fn example_usage() {
     );
     let proto_b1 = Block::new(None, sender1, txs.clone());
     let (m1, weights) = BlockMsg::from_msgs(
-        proto_b1.sender,
+        proto_b1.get_sender(),
         vec![&genesis_block_msg],
         None, // finalized_msg, could be genesis_block_msg
         &weights,
@@ -193,7 +206,7 @@ fn example_usage() {
     ).unwrap();
     let proto_b2 = Block::new(None, sender2, txs.clone());
     let (m2, weights) = BlockMsg::from_msgs(
-        proto_b2.sender,
+        proto_b2.get_sender(),
         vec![&genesis_block_msg],
         None,
         &weights,
@@ -201,7 +214,7 @@ fn example_usage() {
     ).unwrap();
     let proto_b3 = Block::new(None, sender3, txs.clone());
     let (m3, weights) = BlockMsg::from_msgs(
-        proto_b3.sender,
+        proto_b3.get_sender(),
         vec![&m1, &m2],
         None,
         &weights,
@@ -210,13 +223,13 @@ fn example_usage() {
 
     assert_eq!(
         m3.get_estimate(),
-        &Block::new(Some(Arc::new(Block::from(&m2))), sender3, txs.clone()),
+        &Block::new(Some(Block::from(&m2)), sender3, txs.clone()),
         "should build on top of m2 as sender2 has more weight"
     );
 
     let proto_b4 = Block::new(None, sender4, txs.clone());
     let (m4, weights) = BlockMsg::from_msgs(
-        proto_b4.sender,
+        proto_b4.get_sender(),
         vec![&m1],
         None,
         &weights,
@@ -225,7 +238,7 @@ fn example_usage() {
 
     assert_eq!(
         m4.get_estimate(),
-        &Block::new(Some(Arc::new(Block::from(&m1))), sender4, txs.clone()),
+        &Block::new(Some(Block::from(&m1)), sender4, txs.clone()),
         "should build on top of m1 as as thats the only msg it saw"
     );
 
