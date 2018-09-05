@@ -14,7 +14,7 @@ impl<S: Sender> SendersWeight<S> {
         SendersWeight(Arc::new(RwLock::new(senders_weight)))
     }
 
-    fn read(&self) -> LockResult<RwLockReadGuard<HashMap<S, WeightUnit>>> {
+    pub fn read(&self) -> LockResult<RwLockReadGuard<HashMap<S, WeightUnit>>> {
         self.0.read()
     }
 
@@ -52,25 +52,6 @@ impl<S: Sender> SendersWeight<S> {
             })
     }
 
-    // pub fn into_relative_weights(&self) -> Self {
-    //     let senders_weights = self.read().expect("Can't unwrap SendersWeight");
-
-    //     let iterator = senders_weights
-    //         .iter()
-    //         .filter(|(_, &weight)| weight > WeightUnit::ZERO);
-
-    //     let total_weight: WeightUnit = iterator
-    //         .clone()
-    //         .fold(WeightUnit::ZERO, |acc, (_, weight)| acc + weight);
-
-    //     SendersWeight::new(
-    //         iterator
-    //             .map(|(sender, weight)| {
-    //                 (sender.clone(), weight.clone() / total_weight)
-    //             })
-    //             .collect(),
-    //     )
-    // }
     pub fn sum_weight_senders(&self, senders: &HashSet<S>) -> WeightUnit {
         senders.iter().fold(WeightUnit::ZERO, |acc, sender| {
             acc + self.get_weight(sender).unwrap_or(::std::f64::NAN)

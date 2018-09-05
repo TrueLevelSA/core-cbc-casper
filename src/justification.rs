@@ -325,7 +325,6 @@ impl<M: CasperMsg> Debug for Justification<M> {
 //     // pub equivocators: HashSet<S>,
 // }
 
-// FIXME: this became more than SenderState, should find a better name, or break up in parts
 #[derive(Debug, Clone)]
 pub struct SenderState<S: Sender> {
     senders_weights: SendersWeight<S>,
