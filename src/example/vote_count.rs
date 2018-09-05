@@ -2,10 +2,11 @@ use std::collections::{HashSet};
 use std::ops::{Add};
 use std::fmt::{Debug, Formatter, Result};
 
-use traits::{Zero, Estimate, Sender, Data};
+use traits::{Zero, Estimate, Sender, Data, Node};
 use message::{Message, CasperMsg};
 use justification::{Justification, SenderState};
 use senders_weight::{SendersWeight};
+use weight_unit::WeightUnit;
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default)]
 pub struct VoteCount {
     yes: u32,
@@ -103,9 +104,76 @@ impl VoteCount {
         recursor(msg, HashSet::new())
     }
 }
-
 type Voter = u32;
+
 impl Sender for Voter {}
+
+impl Node for NodeT {
+    type M = Message<VoteCount, Voter>;
+    type WeightUnit = WeightUnit;
+    fn get_senders_weight(
+        &self,
+    ) -> &SendersWeight<<<Self as Node>::M as CasperMsg>::Sender> {
+        &self.0
+    }
+    fn get_latest_msgs(&self) -> &Justification<Self::M> {
+        &self.1
+    }
+    fn get_equivocators(
+        &self,
+    ) -> &HashSet<<<Self as Node>::M as CasperMsg>::Sender> {
+        &self.2
+    }
+    fn get_thr(&self) -> Self::WeightUnit {
+        self.3
+    }
+    fn get_state_fault_weight(&self) -> Self::WeightUnit {
+        self.4
+    }
+    fn new(
+        senders_weight: SendersWeight<<<Self as Node>::M as CasperMsg>::Sender>,
+        last_msgs: Justification<Self::M>,
+        equivocators: HashSet<<<Self as Node>::M as CasperMsg>::Sender>,
+        thr: Self::WeightUnit,
+        state_fault_weight: Self::WeightUnit,
+    ) -> Self {
+        (
+            senders_weight,
+            last_msgs,
+            equivocators,
+            thr,
+            state_fault_weight,
+        )
+    }
+}
+
+type NodeT = (
+    SendersWeight<Voter>,
+    Justification<Message<VoteCount, Voter>>,
+    HashSet<Voter>,
+    WeightUnit,
+    WeightUnit,
+);
+
+// impl Sender for Voter {
+//     type Base = u32;
+//     type WeightUnit = WeightUnit;
+//     fn get_senders_weight(&self) -> &SendersWeight<Self::Base> {
+//         self.0
+//     }
+//     fn get_latest_msgs<'z, M: CasperMsg<Sender = Self>>(&self) -> &'z Justification<M> {
+//         self.1
+//     }
+//     fn get_equivocators(&self) -> HashSet<Voter> {
+//         self.2
+//     }
+//     fn get_thr(&self) -> Self::WeightUnit {
+//         self.3
+//     }
+//     fn get_state_fault_weight(&self) -> Self::WeightUnit {
+//         self.4
+//     }
+// }
 impl Data for VoteCount {
     type Data = VoteCount;
     fn is_valid(_data: &Self::Data) -> bool {

@@ -1,11 +1,11 @@
 use std::convert::{From};
 use std::collections::{BTreeSet, HashSet};
 
-use traits::{Estimate, Data};
+use traits::{Estimate, Data, Node};
 use message::{CasperMsg, Message};
 use justification::{Justification, SenderState};
 use senders_weight::{SendersWeight};
-use std::sync::Arc;
+use weight_unit::WeightUnit;
 type Validator = u32;
 
 /// a genesis block should be a block with estimate Block with prevblock =
@@ -16,6 +16,54 @@ pub struct Block {
     prevblock: Option<Box<Block>>,
     sender: Validator,
     txs: BTreeSet<Tx>,
+}
+
+#[derive(Clone, Debug)]
+struct NodeT {
+    senders_weight: SendersWeight<Validator>,
+    last_msgs: Justification<BlockMsg>,
+    equivocators: HashSet<Validator>,
+    thr: WeightUnit,
+    state_fault_weight: WeightUnit,
+}
+
+impl Node for NodeT {
+    type M = BlockMsg;
+    type WeightUnit = WeightUnit; //
+    fn get_senders_weight(
+        &self,
+    ) -> &SendersWeight<<<Self as Node>::M as CasperMsg>::Sender> {
+        &self.senders_weight
+    }
+    fn get_latest_msgs(&self) -> &Justification<Self::M> {
+        &self.last_msgs
+    }
+    fn get_equivocators(
+        &self,
+    ) -> &HashSet<<<Self as Node>::M as CasperMsg>::Sender> {
+        &self.equivocators
+    }
+    fn get_thr(&self) -> Self::WeightUnit {
+        self.thr
+    }
+    fn get_state_fault_weight(&self) -> Self::WeightUnit {
+        self.state_fault_weight
+    }
+    fn new(
+        senders_weight: SendersWeight<<<Self as Node>::M as CasperMsg>::Sender>,
+        last_msgs: Justification<Self::M>,
+        equivocators: HashSet<<<Self as Node>::M as CasperMsg>::Sender>,
+        thr: Self::WeightUnit,
+        state_fault_weight: Self::WeightUnit,
+    ) -> Self {
+        Self {
+            senders_weight,
+            last_msgs,
+            equivocators,
+            thr,
+            state_fault_weight,
+        }
+    }
 }
 
 pub type BlockMsg = Message<Block /*Estimate*/, Validator /*Sender*/>;
@@ -74,7 +122,9 @@ impl Estimate for Block {
     fn mk_estimate(
         latest_msgs: &Justification<Self::M>,
         finalized_msg: Option<&Self::M>,
-        senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
+        senders_weights: &SendersWeight<
+            <<Self as Estimate>::M as CasperMsg>::Sender,
+        >,
         // in fact i could put the whole mempool inside of this proto_block and
         // search for a reasonable set of txs in this function that does not
         // conflict with the past blocks
@@ -91,25 +141,25 @@ impl Estimate for Block {
                 Self::from_prevblock_msg(msg, proto_block)
             },
             (_, Some(proto_block)) => {
-                let heaviest_msg = latest_msgs
-                    .ghost(finalized_msg, senders_weights);
+                let heaviest_msg =
+                    latest_msgs.ghost(finalized_msg, senders_weights);
                 Self::from_prevblock_msg(heaviest_msg, proto_block)
             },
         }
-
     }
 }
 
 #[test]
 fn example_usage() {
-    let (sender0, sender1, sender2, sender3) = (0, 1, 2, 3); // miner identities
-    let (weight0, weight1, weight2, weight3) = (1.0, 1.0, 2.0, 1.0); // and their corresponding weights
+    let (sender0, sender1, sender2, sender3, sender4) = (0, 1, 2, 3, 4); // miner identities
+    let (weight0, weight1, weight2, weight3, weight4) = (1.0, 1.0, 2.0, 1.0, 1.1); // and their corresponding weights
     let senders_weights = SendersWeight::new(
         [
             (sender0, weight0),
             (sender1, weight1),
             (sender2, weight2),
             (sender3, weight3),
+            (sender4, weight4),
         ].iter()
             .cloned()
             .collect(),
@@ -123,6 +173,13 @@ fn example_usage() {
 
     let txs = BTreeSet::new();
 
+    // msg dag
+    // (s0, w=1)   gen
+    // (s1, w=1)    |\--m1---\
+    // (s2, w=2)    \---m2--\|
+    // (s3, w=1)         \---m3
+
+    // blockchain gen <--m2 <--m3
     let genesis_block = Block {
         prevblock: None,
         sender: sender0,
@@ -165,5 +222,36 @@ fn example_usage() {
         m3.get_estimate(),
         &Block::new(Some(Box::new(Block::from(&m2))), sender3, txs.clone()),
         "should build on top of m2 as sender2 has more weight"
+    );
+
+    let proto_b4 = Block::new(None, sender4, txs.clone());
+    let (m4, weights) = BlockMsg::from_msgs(
+        proto_b4.sender,
+        vec![&m1],
+        None,
+        &weights,
+        Some(proto_b4),
+    ).unwrap();
+
+    assert_eq!(
+        m4.get_estimate(),
+        &Block::new(Some(Box::new(Block::from(&m1))), sender4, txs.clone()),
+        "should build on top of m1 as as thats the only msg it saw"
+    );
+
+
+    let proto_b5 = Block::new(None, sender0, txs.clone());
+    let (m5, weights) = BlockMsg::from_msgs(
+        proto_b5.sender,
+        vec![&m3, &m4],
+        None,
+        &weights,
+        Some(proto_b5),
+    ).unwrap();
+
+    assert_eq!(
+        m5.get_estimate(),
+        &Block::new(Some(Box::new(Block::from(&m4))), sender0, txs.clone()),
+        "should build on top of "
     );
 }
