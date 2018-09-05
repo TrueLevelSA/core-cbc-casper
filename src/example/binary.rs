@@ -8,12 +8,6 @@ use senders_weight::{SendersWeight};
 use weight_unit::{WeightUnit};
 type Validator = u32;
 
-/// a genesis block should be a block with estimate Block with prevblock =
-/// None and data. data will be the unique identifier of this blockchain
-
-// #[derive(Clone, Default, Eq, PartialEq, PartialOrd, Ord, Debug, Hash)]
-// pub struct Binary(bool);
-
 pub type BinaryMsg = Message<bool /*Estimate*/, Validator /*Sender*/>;
 
 #[derive(Clone, Eq, Debug, Ord, PartialOrd, PartialEq, Hash)]
@@ -33,10 +27,7 @@ impl Estimate for bool {
         senders_weights: &SendersWeight<
             <<Self as Estimate>::M as CasperMsg>::Sender,
         >,
-        // in fact i could put the whole mempool inside of this proto_block and
-        // search for a reasonable set of txs in this function that does not
-        // conflict with the past blocks
-        proto_block: Option<<Self as Data>::Data>,
+        data: Option<<Self as Data>::Data>,
     ) -> Self {
         let (true_w, false_w) = latest_msgs.iter().fold(
             (WeightUnit::ZERO, WeightUnit::ZERO),
