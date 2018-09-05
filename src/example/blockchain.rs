@@ -63,15 +63,15 @@ impl Block {
     }
     pub fn from_prevblock_msg(
         prevblock_msg: Option<BlockMsg>,
-        // a proto_block is a block with a None prevblock (ie, Estimate) AND is
+        // a preblock is a block with a None prevblock (ie, Estimate) AND is
         // not a genesis_block
-        proto_block: Block,
+        preblock: Block,
     ) -> Self {
         let prevblock = prevblock_msg.map(|m| Block::from(&m));
-        let block = Block(Arc::new(ProtoBlock {
+        let block = Block::from(ProtoBlock {
             prevblock,
-            ..(*proto_block.0).clone()
-        }));
+            ..(*preblock.0).clone()
+        });
 
         if Block::is_valid(&block) {
             block
@@ -127,25 +127,25 @@ impl Estimate for Block {
         senders_weights: &SendersWeight<
             <<Self as Estimate>::M as CasperMsg>::Sender,
         >,
-        // in fact i could put the whole mempool inside of this proto_block and
+        // in fact i could put the whole mempool inside of this preblock and
         // search for a reasonable set of txs in this function that does not
         // conflict with the past blocks
-        proto_block: Option<<Self as Data>::Data>,
+        preblock: Option<<Self as Data>::Data>,
     ) -> Self {
-        match (latest_msgs.len(), proto_block) {
+        match (latest_msgs.len(), preblock) {
             (0, _) => panic!(
                 "Needs at least one latest message to be able to pick one"
             ),
-            (_, None) => panic!("proto_block is None"),
-            (1, Some(proto_block)) => {
+            (_, None) => panic!("preblock is None"),
+            (1, Some(preblock)) => {
                 // only msg to built on top, no choice thus no ghost
                 let msg = latest_msgs.iter().next().map(|msg| msg.clone());
-                Self::from_prevblock_msg(msg, proto_block)
+                Self::from_prevblock_msg(msg, preblock)
             },
-            (_, Some(proto_block)) => {
+            (_, Some(preblock)) => {
                 let heaviest_msg =
                     latest_msgs.ghost(finalized_msg, senders_weights);
-                Self::from_prevblock_msg(heaviest_msg, proto_block)
+                Self::from_prevblock_msg(heaviest_msg, preblock)
             },
         }
     }
@@ -183,11 +183,11 @@ fn example_usage() {
     // (s3, w=1)         \---m3
 
     // blockchain gen <--m2 <--m3
-    let genesis_block: Block = (ProtoBlock {
+    let genesis_block = Block::from(ProtoBlock {
         prevblock: None,
         sender: sender0,
         txs: txs.clone(),
-    }).into();
+    });
     let justification = Justification::new();
     let genesis_block_msg =
         BlockMsg::new(sender0, justification, genesis_block.clone());
