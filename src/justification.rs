@@ -8,7 +8,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use message::{CasperMsg, Message};
 use weight_unit::{WeightUnit};
-use traits::{Zero, Sender, Estimate, Data};
+use traits::{Zero, Estimate, Data};
 use senders_weight::SendersWeight;
 
 #[derive(Eq, Ord, PartialOrd, PartialEq, Clone, Default, Hash)]
@@ -73,8 +73,8 @@ impl<M: CasperMsg> Justification<M> {
     pub fn faulty_inserts(
         &mut self,
         msgs: HashSet<&M>,
-        sender_state: &SenderState<M::Sender, M>,
-    ) -> (bool, SenderState<M::Sender, M>) {
+        sender_state: &SenderState<M>,
+    ) -> (bool, SenderState<M>) {
         /// get msgs and fault weight overhead and equivocators overhead sorted
         /// by fault weight overhead
         fn sort_by_faultweight<'z, M: CasperMsg>(
@@ -157,8 +157,8 @@ impl<M: CasperMsg> Justification<M> {
     pub fn faulty_insert(
         &mut self,
         msg: &M,
-        sender_state: &SenderState<M::Sender, M>,
-    ) -> (bool, SenderState<M::Sender, M>) {
+        sender_state: &SenderState<M>,
+    ) -> (bool, SenderState<M>) {
         let sender_state = sender_state.clone();
         let msg_equivocators_overhead: HashSet<_> = self.get_equivocators(msg)
             .iter()
@@ -326,21 +326,21 @@ impl<M: CasperMsg> Debug for Justification<M> {
 // }
 
 #[derive(Debug, Clone)]
-pub struct SenderState<S: Sender, M: CasperMsg> {
-    senders_weights: SendersWeight<S>,
+pub struct SenderState<M: CasperMsg> {
+    senders_weights: SendersWeight<M::Sender>,
     state_fault_weight: WeightUnit,
     latest_msgs: HashMap<M::Sender, HashSet<M>>,
     thr: WeightUnit,
-    equivocators: HashSet<S>, // FIXME: put it here as its needed on the same context as
+    equivocators: HashSet<M::Sender>, // FIXME: put it here as its needed on the same context as
 }
 
-impl<S: Sender, M: CasperMsg> SenderState<S, M> {
+impl<M: CasperMsg> SenderState<M> {
     pub fn new(
-        senders_weights: SendersWeight<S>,
+        senders_weights: SendersWeight<M::Sender>,
         state_fault_weight: WeightUnit,
         latest_msgs: HashMap<M::Sender, HashSet<M>>,
         thr: WeightUnit,
-        equivocators: HashSet<S>,
+        equivocators: HashSet<M::Sender>,
     ) -> Self {
         SenderState {
             senders_weights,
@@ -350,7 +350,7 @@ impl<S: Sender, M: CasperMsg> SenderState<S, M> {
             latest_msgs,
         }
     }
-    pub fn get_senders_weights(&self) -> &SendersWeight<S> {
+    pub fn get_senders_weights(&self) -> &SendersWeight<M::Sender> {
         &self.senders_weights
     }
     pub fn update_latest_msgs(&mut self, new_message: M) -> bool {

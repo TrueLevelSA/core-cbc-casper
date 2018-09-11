@@ -36,9 +36,9 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         sender: Self::Sender,
         latest_msgs: Vec<&Self>,
         finalized_msg: Option<&Self>,
-        sender_state: &SenderState<Self::Sender, Self>,
+        sender_state: &SenderState<Self>,
         external_data: Option<<<Self as CasperMsg>::Estimate as Data>::Data>,
-    ) -> Result<(Self, SenderState<Self::Sender, Self>), &'static str> {
+    ) -> Result<(Self, SenderState<Self>), &'static str> {
         // // TODO eventually comment out these lines, and FIXME tests
         // // check whether two messages from same sender
         // let mut senders = HashSet::new();
