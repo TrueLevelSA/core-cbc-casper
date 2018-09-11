@@ -73,8 +73,8 @@ impl<M: CasperMsg> Justification<M> {
     pub fn faulty_inserts(
         &mut self,
         msgs: HashSet<&M>,
-        sender_state: &SenderState<M::Sender>,
-    ) -> (bool, SenderState<M::Sender>) {
+        sender_state: &SenderState<M::Sender, M>,
+    ) -> (bool, SenderState<M::Sender, M>) {
         /// get msgs and fault weight overhead and equivocators overhead sorted
         /// by fault weight overhead
         fn sort_by_faultweight<'z, M: CasperMsg>(
@@ -157,8 +157,8 @@ impl<M: CasperMsg> Justification<M> {
     pub fn faulty_insert(
         &mut self,
         msg: &M,
-        sender_state: &SenderState<M::Sender>,
-    ) -> (bool, SenderState<M::Sender>) {
+        sender_state: &SenderState<M::Sender, M>,
+    ) -> (bool, SenderState<M::Sender, M>) {
         let sender_state = sender_state.clone();
         let msg_equivocators_overhead: HashSet<_> = self.get_equivocators(msg)
             .iter()
@@ -326,29 +326,62 @@ impl<M: CasperMsg> Debug for Justification<M> {
 // }
 
 #[derive(Debug, Clone)]
-pub struct SenderState<S: Sender> {
+pub struct SenderState<S: Sender, M: CasperMsg> {
     senders_weights: SendersWeight<S>,
     state_fault_weight: WeightUnit,
+    latest_msgs: HashMap<M::Sender, HashSet<M>>,
     thr: WeightUnit,
     equivocators: HashSet<S>, // FIXME: put it here as its needed on the same context as
 }
 
-impl<S: Sender> SenderState<S> {
+impl<S: Sender, M: CasperMsg> SenderState<S, M> {
     pub fn new(
         senders_weights: SendersWeight<S>,
         state_fault_weight: WeightUnit,
+        latest_msgs: HashMap<M::Sender, HashSet<M>>,
         thr: WeightUnit,
         equivocators: HashSet<S>,
-    ) -> (Self) {
+    ) -> Self {
         SenderState {
             senders_weights,
             equivocators,
             state_fault_weight,
             thr,
+            latest_msgs,
         }
     }
     pub fn get_senders_weights(&self) -> &SendersWeight<S> {
         &self.senders_weights
+    }
+    pub fn update_latest_msgs(&mut self, new_message: M) -> bool {
+        let sender: &M::Sender = new_message.get_sender();
+        if self.latest_msgs.contains_key(sender) {
+            let later_than_new: HashSet<M> = self.latest_msgs[sender]
+                .iter()
+                .filter(|current_message| current_message.depends(&new_message))
+                .cloned()
+                .collect();
+            if later_than_new.is_empty() {
+                let mut new_later_than: HashSet<M> = self.latest_msgs[sender]
+                    .iter()
+                    .filter(|current_message| {
+                        !new_message.depends(&current_message)
+                    })
+                    .cloned()
+                    .collect();
+                new_later_than.insert(new_message.clone());
+                self.latest_msgs.insert(sender.clone(), new_later_than);
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            self.latest_msgs.insert(
+                sender.clone(),
+                [new_message.clone()].iter().cloned().collect(),
+            );
+            return true;
+        }
     }
 }
 
@@ -443,6 +476,7 @@ mod justification {
         let weights = SenderState {
             senders_weights: senders_weights.clone(),
             state_fault_weight: 0.0,
+            latest_msgs: HashMap::new(),
             thr: 3.0,
             equivocators: HashSet::new(),
         };
@@ -468,6 +502,7 @@ mod justification {
         let weights = SenderState {
             senders_weights: senders_weights.clone(),
             state_fault_weight: 0.0,
+            latest_msgs: HashMap::new(),
             thr: 0.0,
             equivocators: HashSet::new(),
         };
@@ -488,6 +523,7 @@ mod justification {
             &SenderState {
                 senders_weights: senders_weights.clone(),
                 state_fault_weight: 0.0,
+                latest_msgs: HashMap::new(),
                 thr: 0.0,
                 equivocators: HashSet::new(),
             },
@@ -498,6 +534,7 @@ mod justification {
             &SenderState {
                 senders_weights: senders_weights.clone(),
                 state_fault_weight: 0.0,
+                latest_msgs: HashMap::new(),
                 thr: 0.0,
                 equivocators: HashSet::new(),
             },
@@ -508,6 +545,7 @@ mod justification {
             &SenderState {
                 senders_weights: senders_weights.clone(),
                 state_fault_weight: 0.0,
+                latest_msgs: HashMap::new(),
                 thr: 0.0,
                 equivocators: HashSet::new(),
             },
@@ -521,6 +559,7 @@ mod justification {
             &SenderState {
                 senders_weights: senders_weights.clone(),
                 state_fault_weight: 0.0,
+                latest_msgs: HashMap::new(),
                 thr: 1.0,
                 equivocators: HashSet::new(),
             },
@@ -533,6 +572,7 @@ mod justification {
             &SenderState {
                 senders_weights: senders_weights.clone(),
                 state_fault_weight: 0.0,
+                latest_msgs: HashMap::new(),
                 thr: 1.0,
                 equivocators: HashSet::new(),
             },
@@ -548,6 +588,7 @@ state_fault_weight should be incremented to 1.0"
             &SenderState {
                 senders_weights: senders_weights.clone(),
                 state_fault_weight: 0.1,
+                latest_msgs: HashMap::new(),
                 thr: 1.0,
                 equivocators: HashSet::new(),
             },
@@ -560,6 +601,7 @@ state_fault_weight should be incremented to 1.0"
             &SenderState {
                 senders_weights: senders_weights.clone(),
                 state_fault_weight: 0.1,
+                latest_msgs: HashMap::new(),
                 thr: 1.0,
                 equivocators: HashSet::new(),
             },
@@ -572,6 +614,7 @@ state_fault_weight should be incremented to 1.0"
             &SenderState {
                 senders_weights: senders_weights.clone(),
                 state_fault_weight: 1.0,
+                latest_msgs: HashMap::new(),
                 thr: 2.0,
                 equivocators: HashSet::new(),
             },
@@ -587,6 +630,7 @@ state_fault_weight should be incremented to 1.0"
             &SenderState {
                 senders_weights: senders_weights.clone(),
                 state_fault_weight: 1.0,
+                latest_msgs: HashMap::new(),
                 thr: 2.0,
                 equivocators: HashSet::new(),
             },
@@ -600,6 +644,7 @@ state_fault_weight should be incremented to 1.0"
             &SenderState {
                 senders_weights: senders_weights.clone(),
                 state_fault_weight: 1.0,
+                latest_msgs: HashMap::new(),
                 thr: 2.0,
                 equivocators: HashSet::new(),
             },
