@@ -9,6 +9,11 @@ use traits::{Zero, Sender};
 #[derive(Clone, Default, Debug)]
 pub struct SendersWeight<S: Sender>(Arc<RwLock<HashMap<S, WeightUnit>>>);
 
+////TODO
+// impl<S: Sender> From<HashMap<S, WeightUnit>> for SendersWeight<S>{
+//     fn from()
+// }
+
 impl<S: Sender> SendersWeight<S> {
     pub fn new(senders_weight: HashMap<S, WeightUnit>) -> Self {
         SendersWeight(Arc::new(RwLock::new(senders_weight)))
