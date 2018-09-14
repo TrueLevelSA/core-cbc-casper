@@ -325,7 +325,24 @@ impl<M: CasperMsg> Debug for Justification<M> {
 //     // pub equivocators: HashSet<S>,
 // }
 
-pub type LatestMsgs<M:CasperMsg>=HashMap<M::Sender, HashSet<M>>;
+#[derive(Eq, PartialEq, Clone, Default, Debug)]
+pub struct LatestMsgs<M:CasperMsg> (HashMap<<M as CasperMsg>::Sender, HashSet<M>>);
+impl<M: CasperMsg> LatestMsgs<M>{
+    pub fn new() -> Self {
+        LatestMsgs(HashMap::new())
+    }
+    pub fn insert(&mut self, k: M::Sender, v: HashSet<M>) -> Option<HashSet<M>> {
+        self.0.insert(k, v)
+    }
+    pub fn contains_key(&self, k: &M::Sender) -> bool {
+        self.0.contains_key(k)
+    }
+    pub fn get(&self, k: &M::Sender) -> Option<&HashSet<M>>
+    {
+        self.0.get(k)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SenderState<M: CasperMsg> {
     senders_weights: SendersWeight<M::Sender>,
@@ -357,13 +374,15 @@ impl<M: CasperMsg> SenderState<M> {
     pub fn update_latest_msgs(&mut self, new_message: M) -> bool {
         let sender: &M::Sender = new_message.get_sender();
         if self.latest_msgs.contains_key(sender) {
-            let later_than_new: HashSet<M> = self.latest_msgs[sender]
+            let later_than_new: HashSet<M> = self.latest_msgs.get(sender)
+                .unwrap()
                 .iter()
                 .filter(|current_message| current_message.depends(&new_message))
                 .cloned()
                 .collect();
             if later_than_new.is_empty() {
-                let mut new_later_than: HashSet<M> = self.latest_msgs[sender]
+                let mut new_later_than: HashSet<M> = self.latest_msgs.get(sender)
+                    .unwrap()
                     .iter()
                     .filter(|current_message| {
                         !new_message.depends(&current_message)
