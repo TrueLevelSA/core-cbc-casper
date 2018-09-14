@@ -373,16 +373,16 @@ impl<M: CasperMsg> SenderState<M> {
     }
     pub fn update_latest_msgs(&mut self, new_message: M) -> bool {
         let sender: &M::Sender = new_message.get_sender();
-        if self.latest_msgs.contains_key(sender) {
-            let later_than_new: HashSet<M> = self.latest_msgs.get(sender)
-                .unwrap()
+        if let Some(latest_msgs_from_sender) =
+            self.latest_msgs.clone().get(sender)
+        {
+            let later_than_new: HashSet<M> = latest_msgs_from_sender
                 .iter()
                 .filter(|current_message| current_message.depends(&new_message))
                 .cloned()
                 .collect();
             if later_than_new.is_empty() {
-                let mut new_later_than: HashSet<M> = self.latest_msgs.get(sender)
-                    .unwrap()
+                let mut new_later_than: HashSet<M> = latest_msgs_from_sender
                     .iter()
                     .filter(|current_message| {
                         !new_message.depends(&current_message)
@@ -391,16 +391,16 @@ impl<M: CasperMsg> SenderState<M> {
                     .collect();
                 new_later_than.insert(new_message.clone());
                 self.latest_msgs.insert(sender.clone(), new_later_than);
-                return true;
+                true
             } else {
-                return false;
+                false
             }
         } else {
             self.latest_msgs.insert(
                 sender.clone(),
                 [new_message.clone()].iter().cloned().collect(),
             );
-            return true;
+            true
         }
     }
 }
