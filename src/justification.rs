@@ -341,6 +341,38 @@ impl<M: CasperMsg> LatestMsgs<M>{
     {
         self.0.get(k)
     }
+    pub fn update(&mut self, new_message: M) -> bool {
+        let sender: &M::Sender = new_message.get_sender();
+        if let Some(latest_msgs_from_sender) =
+            self.clone().get(sender)
+        {
+            let later_than_new: HashSet<M> = latest_msgs_from_sender
+                .iter()
+                .filter(|current_message| current_message.depends(&new_message))
+                .cloned()
+                .collect();
+            if later_than_new.is_empty() {
+                let mut new_later_than: HashSet<M> = latest_msgs_from_sender
+                    .iter()
+                    .filter(|current_message| {
+                        !new_message.depends(&current_message)
+                    })
+                    .cloned()
+                    .collect();
+                new_later_than.insert(new_message.clone());
+                self.insert(sender.clone(), new_later_than);
+                true
+            } else {
+                false
+            }
+        } else {
+            self.insert(
+                sender.clone(),
+                [new_message.clone()].iter().cloned().collect(),
+            );
+            true
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -370,38 +402,6 @@ impl<M: CasperMsg> SenderState<M> {
     }
     pub fn get_senders_weights(&self) -> &SendersWeight<M::Sender> {
         &self.senders_weights
-    }
-    pub fn update_latest_msgs(&mut self, new_message: M) -> bool {
-        let sender: &M::Sender = new_message.get_sender();
-        if let Some(latest_msgs_from_sender) =
-            self.latest_msgs.clone().get(sender)
-        {
-            let later_than_new: HashSet<M> = latest_msgs_from_sender
-                .iter()
-                .filter(|current_message| current_message.depends(&new_message))
-                .cloned()
-                .collect();
-            if later_than_new.is_empty() {
-                let mut new_later_than: HashSet<M> = latest_msgs_from_sender
-                    .iter()
-                    .filter(|current_message| {
-                        !new_message.depends(&current_message)
-                    })
-                    .cloned()
-                    .collect();
-                new_later_than.insert(new_message.clone());
-                self.latest_msgs.insert(sender.clone(), new_later_than);
-                true
-            } else {
-                false
-            }
-        } else {
-            self.latest_msgs.insert(
-                sender.clone(),
-                [new_message.clone()].iter().cloned().collect(),
-            );
-            true
-        }
     }
 }
 
