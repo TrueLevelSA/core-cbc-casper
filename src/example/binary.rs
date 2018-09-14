@@ -44,11 +44,6 @@ impl Estimate for bool {
                 }
             },
         );
-        if true_w >= false_w {
-            true
-        }
-        else {
-            false
-        }
+        true_w >= false_w
     }
 }
