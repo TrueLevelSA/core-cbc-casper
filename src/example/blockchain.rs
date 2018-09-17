@@ -19,7 +19,6 @@ type Validator = u32;
 struct ProtoBlock {
     id: usize,
     prevblock: Option<Block>,
-    height: usize,
     sender: Validator,
     txs: BTreeSet<Tx>,
 }
@@ -28,9 +27,8 @@ impl Debug for Block {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(
             f,
-            "B{:?}(h{:?})->B{:?}",
+            "B{:?}->B{:?}",
             self.0.id,
-            self.get_height(),
             self.get_prevblock().map(|b| b.0.id).unwrap_or(9),
             // self.get_estimate().clone(),
             // self.get_justification()
@@ -81,26 +79,14 @@ impl Block {
         id: usize,
     ) -> Self {
         Block::from(ProtoBlock {
-            height: Block::next_height(&prevblock),
             prevblock,
             sender,
             txs,
             id,
         })
     }
-
-    pub fn next_height(block: &Option<Self>) -> usize {
-        match block {
-            None => 0,
-            Some(b) => b.get_height() + 1,
-        }
-    }
     pub fn get_txs(&self) -> &BTreeSet<Tx> {
         &self.0.txs
-    }
-
-    pub fn get_height(&self) -> &usize {
-        &self.0.height
     }
     pub fn get_sender(&self) -> Validator {
         self.0.sender
@@ -113,7 +99,6 @@ impl Block {
     ) -> Self {
         let prevblock = prevblock_msg.map(|m| Block::from(&m));
         let block = Block::from(ProtoBlock {
-            height: Block::next_height(&prevblock),
             prevblock,
             ..(*incomplete_block.0).clone()
         });
@@ -129,27 +114,15 @@ impl Block {
     pub fn get_prevblock(&self) -> Option<Self> {
         self.0.prevblock.as_ref().cloned()
     }
-    // /// works without block height, but expensive
-    // pub fn is_member(&self, rhs: &Self) -> bool {
-    //     self == rhs
-    //         || rhs
-    //         .get_prevblock()
-    //         .as_ref()
-    //         .map(|prevblock| self.is_member(prevblock))
-    //         .unwrap_or(false)
-    // }
 
-    /// works only with block height, but cheap
+    /// works without block height, but expensive
     pub fn is_member(&self, rhs: &Self) -> bool {
-        match (self.get_height(), rhs.get_height()) {
-            (l, r) if l > r => false,
-            (l, r) if l < r => rhs
-                .get_prevblock()
-                .as_ref()
-                .map(|prevblock| self.is_member(prevblock))
-                .unwrap_or(false),
-            _ => self == rhs,
-        }
+        self == rhs
+            || rhs
+            .get_prevblock()
+            .as_ref()
+            .map(|prevblock| self.is_member(prevblock))
+            .unwrap_or(false)
     }
 
     pub fn score(
@@ -203,12 +176,10 @@ impl Block {
                     }
                     else {
                         // println!("didnt visit parent before, set initial state, and push to queue");
-                        visited.get(&child).cloned().map(|childs_children| {
-                            let mut parents_children = childs_children.clone();
-                            parents_children.insert(child);
-                            visited.insert(parent.clone(), parents_children);
-                            queue.push_back(parent);
-                        });
+                        let mut parents_children = HashSet::new();
+                        parents_children.insert(child);
+                        visited.insert(parent.clone(), parents_children);
+                        queue.push_back(parent);
                     }
                 },
                 None => {
@@ -294,7 +265,6 @@ impl Estimate for Block {
                 let prevblock =
                     Block::ghost(latest_msgs, finalized_msg, senders_weights);
                 let block = Block::from(ProtoBlock {
-                    height: Block::next_height(&prevblock),
                     prevblock,
                     ..(*incomplete_block.0).clone()
                 });
@@ -348,7 +318,6 @@ mod tests {
 
         // block dag
         let genesis_block = Block::from(ProtoBlock {
-            height: 0,
             prevblock: None,
             sender: sender0,
             txs: txs.clone(),
@@ -474,7 +443,6 @@ mod tests {
 
         // block dag
         let genesis_block = Block::from(ProtoBlock {
-            height: 0,
             prevblock: None,
             sender: senderg,
             txs: txs.clone(),
@@ -567,5 +535,3 @@ mod tests {
         );
     }
 }
-// `Block(ProtoBlock { prevblock: Some(Block(ProtoBlock { prevblock: Some(Block(ProtoBlock { prevblock: Some(Block(ProtoBlock { prevblock: None, height: 0, sender: 0, txs: {} })), height: 1, sender: 3, txs: {} })), height: 2, sender: 4, txs: {} })), height: 3, sender: 6, txs: {} })`
-// `Block(ProtoBlock { prevblock: Some(Block(ProtoBlock { prevblock: Some(Block(ProtoBlock { prevblock: Some(Block(ProtoBlock { prevblock: None, height: 0, sender: 0, txs: {} })), height: 1, sender: 3, txs: {} })), height: 2, sender: 1, txs: {} })), height: 3, sender: 6, txs: {} })`
