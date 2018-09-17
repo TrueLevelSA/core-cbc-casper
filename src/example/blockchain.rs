@@ -60,33 +60,11 @@ impl From<ProtoBlock> for Block {
         Block(Arc::new(protoblock))
     }
 }
-
-// impl<'z> From<&'z BlockMsg> for Block {
-//     fn from(msg: &BlockMsg) -> Self {
-//         let estimate = msg.get_estimate();
-//         Block::new(
-//             Some(estimate.clone()),
-//             msg.get_sender().clone(),
-//             estimate.get_txs().clone(),
-//         )
-//     }
-// }
-
 impl<'z> From<&'z BlockMsg> for Block {
     fn from(msg: &BlockMsg) -> Self {
         msg.get_estimate().clone()
     }
 }
-// impl<'z> From<&'z BlockMsg> for Block {
-//     fn from(msg: &BlockMsg) -> Self {
-//         let estimate = msg.get_estimate();
-//         Block::new(
-//             Some(estimate.clone()),
-//             msg.get_sender().clone(),
-//             estimate.get_txs().clone(),
-//         )
-//     }
-// }
 
 impl Iterator for Block {
     type Item = Self;
@@ -129,15 +107,15 @@ impl Block {
     }
     pub fn from_prevblock_msg(
         prevblock_msg: Option<BlockMsg>,
-        // a preblock is a block with a None prevblock (ie, Estimate) AND is
+        // a incomplete_block is a block with a None prevblock (ie, Estimate) AND is
         // not a genesis_block
-        preblock: Block,
+        incomplete_block: Block,
     ) -> Self {
         let prevblock = prevblock_msg.map(|m| Block::from(&m));
         let block = Block::from(ProtoBlock {
             height: Block::next_height(&prevblock),
             prevblock,
-            ..(*preblock.0).clone()
+            ..(*incomplete_block.0).clone()
         });
 
         if Block::is_valid(&block) {
@@ -200,60 +178,10 @@ impl Block {
         })
     }
 
-    pub fn get_prefork_block(
-        &self,
-        rhs: &Self,
-        mut validators: HashSet<Validator>,
-    ) -> Option<(Block, HashSet<Validator>)> {
-        let comp = self.get_height().cmp(rhs.get_height());
-        match comp {
-            Greater => self.get_prevblock().and_then(|b| {
-                let _ = validators.insert(b.get_sender());
-                b.get_prefork_block(rhs, validators)
-            }),
-            Equal =>
-                if self == rhs {
-                    // this is the prefork block
-                    Some((self.clone(), validators))
-                }
-                else {
-                    self.get_prevblock().and_then(|l| {
-                        rhs.get_prevblock().and_then(|r| {
-                            let _ = validators.insert(l.get_sender());
-                            let _ = validators.insert(r.get_sender());
-                            l.get_prefork_block(&r, validators)
-                        })
-                    })
-                },
-            Less => rhs.get_prevblock().and_then(|b| {
-                let _ = validators.insert(b.get_sender());
-                b.get_prefork_block(self, validators)
-            }),
-        }
-    }
-
-    pub fn descend(
-        &self,
-        height: &usize,
-        mut validators: HashSet<Validator>,
-        original_msg: Self,
-    ) -> Option<(Block, (Self, HashSet<Validator>))> {
-        match height.cmp(self.get_height()) {
-            Greater => {
-                let _ = validators.insert(self.get_sender());
-                self.get_prevblock()
-                    .and_then(|b| b.descend(height, validators, original_msg))
-            },
-            Equal => Some((self.clone(), (original_msg, validators))),
-            Less => None,
-        }
-    }
-
-    pub fn ghost(
+    pub fn parse_blockchains(
         justification: &Justification<BlockMsg>,
         finalized_msg: Option<&BlockMsg>,
-        senders_weights: &SendersWeight<<BlockMsg as CasperMsg>::Sender>,
-    ) -> Option<Self> {
+    ) -> (HashMap<Block, HashSet<Block>>, HashSet<Block>) {
         let mut visited: HashMap<Block, HashSet<Block>> = justification
             .iter()
             .map(|msg| {
@@ -262,42 +190,44 @@ impl Block {
                 (parent, children)
             })
             .collect();
-
-        let mut queue: VecDeque<Block> =
-            justification.iter().map(Block::from).collect();
-
+        let mut queue: VecDeque<Block> = visited.keys().cloned().collect();
         let mut genesis: HashSet<Block> = HashSet::new();
-
         while let Some(child) = queue.pop_front() {
             match child.get_prevblock() {
-                Some(parent) => Some((child, parent)),
+                Some(parent) => {
+                    if visited.contains_key(&parent) {
+                        // println!("visited parent before, fork found");
+                        visited.get_mut(&parent).map(|parents_children| {
+                            parents_children.insert(child);
+                        });
+                    }
+                    else {
+                        // println!("didnt visit parent before, set initial state, and push to queue");
+                        visited.get(&child).cloned().map(|childs_children| {
+                            let mut parents_children = childs_children.clone();
+                            parents_children.insert(child);
+                            visited.insert(parent.clone(), parents_children);
+                            queue.push_back(parent);
+                        });
+                    }
+                },
                 None => {
                     genesis.insert(child);
-                    None
                 },
-            }.map(|(child, parent)| {
-                // println!("child: {:?}\nparent: {:?}", child, parent);
-                if visited.contains_key(&parent) {
-                    // println!("visited parent before, fork found");
-                    visited.get_mut(&parent).map(|parents_children| {
-                        parents_children.insert(child);
-                    });
-                }
-                else {
-                    // println!("didnt visit parent before, set initial state, and push to queue");
-                    visited.get(&child).cloned().map(|childs_children| {
-                        let mut parents_children = childs_children.clone();
-                        parents_children.insert(child);
-                        visited.insert(parent.clone(), parents_children);
-                        queue.push_back(parent);
-                    });
-                }
-            });
+            };
         }
-        let res = Block::pick_heaviest(&genesis, &visited, senders_weights)
-            .and_then(|(opt_block, ..)| opt_block);
-        res.clone().map(|res| print!("heaviest block: {:?}", res));
-        res
+        (visited, genesis)
+    }
+
+    pub fn ghost(
+        justification: &Justification<BlockMsg>,
+        finalized_msg: Option<&BlockMsg>,
+        senders_weights: &SendersWeight<<BlockMsg as CasperMsg>::Sender>,
+    ) -> Option<Self> {
+        let (visited, genesis) =
+            Self::parse_blockchains(justification, finalized_msg);
+        Block::pick_heaviest(&genesis, &visited, senders_weights)
+            .and_then(|(opt_block, ..)| opt_block)
     }
     // find heaviest block
     fn pick_heaviest(
@@ -310,21 +240,16 @@ impl Block {
             best.and_then(|best| {
                 visited.get(&block).map(|children| (best, children))
             }).map(|((b_block, b_weight, b_children), children)| {
-                let mut ref_validators: HashSet<_> =
+                let mut referred_senders: HashSet<_> =
                     children.iter().map(Self::get_sender).collect();
                 // add current block sender such that its weight counts too
-                ref_validators.insert(block.get_sender());
-
-                let weight = weights.sum_weight_senders(&ref_validators);
-
+                referred_senders.insert(block.get_sender());
+                let weight = weights.sum_weight_senders(&referred_senders);
                 // TODO: break ties with blockhash
                 if weight > b_weight {
-                    println!("block: {:?}", block);
-                    println!("validators: {:?}", ref_validators);
                     (Some(block.clone()), weight, children.clone())
                 }
                 else {
-                    // println!("block: {:?}", b_block);
                     (b_block, b_weight, b_children)
                 }
             })
@@ -350,28 +275,28 @@ impl Estimate for Block {
         senders_weights: &SendersWeight<
             <<Self as Estimate>::M as CasperMsg>::Sender,
         >,
-        // in fact i could put the whole mempool inside of this preblock and
-        // search for a reasonable set of txs in this function that does not
+        // in fact i could put the whole mempool inside of this incomplete_block
+        // and search for a reasonable set of txs in this function that does not
         // conflict with the past blocks
-        preblock: Option<<Self as Data>::Data>,
+        incomplete_block: Option<<Self as Data>::Data>,
     ) -> Self {
-        match (latest_msgs.len(), preblock) {
+        match (latest_msgs.len(), incomplete_block) {
             (0, _) => panic!(
                 "Needs at least one latest message to be able to pick one"
             ),
-            (_, None) => panic!("preblock is None"),
-            (1, Some(preblock)) => {
+            (_, None) => panic!("incomplete_block is None"),
+            (1, Some(incomplete_block)) => {
                 // only msg to built on top, no choice thus no ghost
                 let msg = latest_msgs.iter().next().map(|msg| msg.clone());
-                Self::from_prevblock_msg(msg, preblock)
+                Self::from_prevblock_msg(msg, incomplete_block)
             },
-            (_, Some(preblock)) => {
+            (_, Some(incomplete_block)) => {
                 let prevblock =
                     Block::ghost(latest_msgs, finalized_msg, senders_weights);
                 let block = Block::from(ProtoBlock {
                     height: Block::next_height(&prevblock),
                     prevblock,
-                    ..(*preblock.0).clone()
+                    ..(*incomplete_block.0).clone()
                 });
                 block
             },
