@@ -17,25 +17,12 @@ type Validator = u32;
 
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Debug, Hash)]
 struct ProtoBlock {
-    id: usize,
     prevblock: Option<Block>,
     sender: Validator,
     txs: BTreeSet<Tx>,
 }
 
-impl Debug for Block {
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
-        write!(
-            f,
-            "B{:?}->B{:?}",
-            self.0.id,
-            self.get_prevblock().map(|b| b.0.id).unwrap_or(9),
-            // self.get_estimate().clone(),
-            // self.get_justification()
-        )
-    }
-}
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Debug)]
 pub struct Block(Arc<ProtoBlock>);
 
 pub type BlockMsg = Message<Block /*Estimate*/, Validator /*Sender*/>;
@@ -76,13 +63,11 @@ impl Block {
         prevblock: Option<Block>,
         sender: Validator,
         txs: BTreeSet<Tx>,
-        id: usize,
     ) -> Self {
         Block::from(ProtoBlock {
             prevblock,
             sender,
             txs,
-            id,
         })
     }
     pub fn get_txs(&self) -> &BTreeSet<Tx> {
@@ -321,7 +306,6 @@ mod tests {
             prevblock: None,
             sender: sender0,
             txs: txs.clone(),
-            id: 0,
         });
         let justification = Justification::new();
         let genesis_block_msg =
@@ -331,7 +315,7 @@ mod tests {
             &genesis_block,
             "genesis block with None as prevblock"
         );
-        let proto_b1 = Block::new(None, sender1, txs.clone(), 1);
+        let proto_b1 = Block::new(None, sender1, txs.clone());
         let (m1, weights) = BlockMsg::from_msgs(
             proto_b1.get_sender(),
             vec![&genesis_block_msg],
@@ -339,7 +323,7 @@ mod tests {
             &weights,
             Some(proto_b1), // data
         ).unwrap();
-        let proto_b2 = Block::new(None, sender2, txs.clone(), 2);
+        let proto_b2 = Block::new(None, sender2, txs.clone());
         let (m2, weights) = BlockMsg::from_msgs(
             proto_b2.get_sender(),
             vec![&genesis_block_msg],
@@ -347,7 +331,7 @@ mod tests {
             &weights,
             Some(proto_b2),
         ).unwrap();
-        let proto_b3 = Block::new(None, sender3, txs.clone(), 3);
+        let proto_b3 = Block::new(None, sender3, txs.clone());
         let (m3, weights) = BlockMsg::from_msgs(
             proto_b3.get_sender(),
             vec![&m1, &m2],
@@ -358,11 +342,11 @@ mod tests {
 
         assert_eq!(
             m3.get_estimate(),
-            &Block::new(Some(Block::from(&m2)), sender3, txs.clone(), 3),
+            &Block::new(Some(Block::from(&m2)), sender3, txs.clone()),
             "should build on top of m2 as sender2 has more weight"
         );
 
-        let proto_b4 = Block::new(None, sender4, txs.clone(), 4);
+        let proto_b4 = Block::new(None, sender4, txs.clone());
         let (m4, weights) = BlockMsg::from_msgs(
             proto_b4.get_sender(),
             vec![&m1],
@@ -373,11 +357,11 @@ mod tests {
 
         assert_eq!(
             m4.get_estimate(),
-            &Block::new(Some(Block::from(&m1)), sender4, txs.clone(), 4),
+            &Block::new(Some(Block::from(&m1)), sender4, txs.clone()),
             "should build on top of m1 as as thats the only msg it saw"
         );
 
-        let proto_b5 = Block::new(None, sender0, txs.clone(), 5);
+        let proto_b5 = Block::new(None, sender0, txs.clone());
         // println!("\n3 {:?}", m3);
         // println!("\n4 {:?}", m4);
         let (m5, weights) = BlockMsg::from_msgs(
@@ -393,7 +377,7 @@ mod tests {
         // println!();
         assert_eq!(
             m5.get_estimate(),
-            &Block::new(Some(Block::from(&m3)), sender0, txs.clone(), 5),
+            &Block::new(Some(Block::from(&m3)), sender0, txs.clone()),
             "should build on top of "
         );
 
@@ -408,7 +392,7 @@ mod tests {
         let mut block = Block::from(&m3);
         assert_eq!(
             block,
-            Block::new(Some(Block::from(&m2)), sender3, txs.clone(), 3),
+            Block::new(Some(Block::from(&m2)), sender3, txs.clone()),
         );
         // assert_eq!(block.get_prevblock(), Some(genesis_block),);
     }
@@ -446,7 +430,6 @@ mod tests {
             prevblock: None,
             sender: senderg,
             txs: txs.clone(),
-            id: 9,
         });
         let justification = Justification::new();
         let genesis_block_msg =
@@ -456,7 +439,7 @@ mod tests {
         //     &genesis_block,
         //     "genesis block with None as prevblock"
         // );
-        let proto_b0 = Block::new(None, sender0, txs.clone(), 0);
+        let proto_b0 = Block::new(None, sender0, txs.clone());
         let (m0, weights) = BlockMsg::from_msgs(
             proto_b0.get_sender(),
             vec![&genesis_block_msg],
@@ -464,7 +447,7 @@ mod tests {
             &weights,
             Some(proto_b0), // data
         ).unwrap();
-        let proto_b1 = Block::new(None, sender1, txs.clone(), 1);
+        let proto_b1 = Block::new(None, sender1, txs.clone());
         let (m1, weights) = BlockMsg::from_msgs(
             proto_b1.get_sender(),
             vec![&m0],
@@ -472,7 +455,7 @@ mod tests {
             &weights,
             Some(proto_b1),
         ).unwrap();
-        let proto_b2 = Block::new(None, sender2, txs.clone(), 2);
+        let proto_b2 = Block::new(None, sender2, txs.clone());
         let (m2, weights) = BlockMsg::from_msgs(
             proto_b2.get_sender(),
             vec![&genesis_block_msg],
@@ -487,7 +470,7 @@ mod tests {
         //     "should build on top of m1 as sender1 has more weight"
         // );
 
-        let proto_b3 = Block::new(None, sender3, txs.clone(), 3);
+        let proto_b3 = Block::new(None, sender3, txs.clone());
         let (m3, weights) = BlockMsg::from_msgs(
             proto_b3.get_sender(),
             vec![&m2],
@@ -502,7 +485,7 @@ mod tests {
         //     "should build on top of m0 as as thats the only msg it saw"
         // );
 
-        let proto_b4 = Block::new(None, sender4, txs.clone(), 4);
+        let proto_b4 = Block::new(None, sender4, txs.clone());
         // println!("\n3 {:?}", m2);
         // println!("\n4 {:?}", m3);
         let (m4, weights) = BlockMsg::from_msgs(
@@ -518,7 +501,7 @@ mod tests {
         //     "should build on top of "
         // );
 
-        let proto_b5 = Block::new(None, sender5, txs.clone(), 5);
+        let proto_b5 = Block::new(None, sender5, txs.clone());
 
         let (m5, weights) = BlockMsg::from_msgs(
             proto_b5.get_sender(),
@@ -530,7 +513,7 @@ mod tests {
 
         assert_eq!(
             m5.get_estimate(),
-            &Block::new(Some(Block::from(&m4)), sender5, txs.clone(), 5),
+            &Block::new(Some(Block::from(&m4)), sender5, txs.clone()),
             "should build on top of "
         );
     }
