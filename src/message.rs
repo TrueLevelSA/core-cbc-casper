@@ -255,6 +255,16 @@ where
 // TODO end
 */
 
+impl<E, S> From<ProtoMsg<E, S>> for Message<E, S>
+where
+    E: Estimate<M = Self>,
+    S: Sender,
+{
+    fn from(msg: ProtoMsg<E, S>) -> Self {
+        Message(Box::new(Arc::new(msg)))
+    }
+}
+
 impl<E, S> CasperMsg for Message<E, S>
 where
     E: Estimate<M = Self>,
@@ -274,11 +284,11 @@ where
     }
 
     fn new(sender: S, justification: Justification<Self>, estimate: E) -> Self {
-        Message(Box::new(Arc::new(ProtoMsg {
+        Message::from(ProtoMsg {
             sender,
             justification,
             estimate,
-        })))
+        })
     }
 
     fn set_as_final(&mut self) {
@@ -449,10 +459,9 @@ mod message {
             SenderState::new(senders_weights, 0.0, 0.0, HashSet::new());
 
         let mut j0 = Justification::new();
-        let (success, _) = j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights);
-        assert!(
-                success
-        );
+        let (success, _) =
+            j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights);
+        assert!(success);
         let (m0, _) =
             &Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
         assert!(!v0.equivocates(v0), "should be all good");
@@ -479,8 +488,7 @@ mod message {
         // sender0        v0---m0        m2---
         // sender1               \--m1--/
         let v0 = &VoteCount::create_vote_msg(sender0, false);
-        let safe_msgs =
-            v0.get_safe_msgs_by_weight(senders_weights, thr);
+        let safe_msgs = v0.get_safe_msgs_by_weight(senders_weights, thr);
         assert_eq!(safe_msgs.len(), 0, "only 0.5 of weight saw v0");
 
         let (m0, _) = &Message::from_msgs(
@@ -490,8 +498,7 @@ mod message {
             &weights,
             None as Option<VoteCount>,
         ).unwrap();
-        let safe_msgs =
-            m0.get_safe_msgs_by_weight(senders_weights, thr);
+        let safe_msgs = m0.get_safe_msgs_by_weight(senders_weights, thr);
         assert_eq!(safe_msgs.len(), 0, "only 0.5 of weight saw v0 and m0");
 
         let (m1, _) = &Message::from_msgs(
@@ -501,8 +508,7 @@ mod message {
             &weights,
             None as Option<VoteCount>,
         ).unwrap();
-        let safe_msgs =
-            m1.get_safe_msgs_by_weight(senders_weights, thr);
+        let safe_msgs = m1.get_safe_msgs_by_weight(senders_weights, thr);
         assert_eq!(
             safe_msgs.len(),
             0,
@@ -517,8 +523,7 @@ necessarly seen sender1 seeing v0 and m0, thus not yet safe"
             &weights,
             None as Option<VoteCount>,
         ).unwrap();
-        let safe_msgs =
-            m2.get_safe_msgs_by_weight(senders_weights, thr);
+        let safe_msgs = m2.get_safe_msgs_by_weight(senders_weights, thr);
         assert_eq!(
             safe_msgs.get(m0).unwrap_or(&f64::NAN),
             &1.0,

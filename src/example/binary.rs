@@ -10,9 +10,6 @@ type Validator = u32;
 
 pub type BinaryMsg = Message<bool /*Estimate*/, Validator /*Sender*/>;
 
-#[derive(Clone, Eq, Debug, Ord, PartialOrd, PartialEq, Hash)]
-pub struct Tx;
-
 impl Data for bool {
     type Data = Self;
     fn is_valid(_data: &Self::Data) -> bool {
