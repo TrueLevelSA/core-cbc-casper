@@ -1,4 +1,5 @@
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::fmt::{Debug, Formatter, Result as FmtResult};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::convert::From;
 use std::iter::Iterator;
 
@@ -16,13 +17,27 @@ type Validator = u32;
 
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Debug, Hash)]
 struct ProtoBlock {
+    id: usize,
     prevblock: Option<Block>,
-    height: u32,
+    height: usize,
     sender: Validator,
     txs: BTreeSet<Tx>,
 }
 
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Debug, Hash)]
+impl Debug for Block {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(
+            f,
+            "B{:?}(h{:?})->B{:?}",
+            self.0.id,
+            self.get_height(),
+            self.get_prevblock().map(|b| b.0.id).unwrap_or(9),
+            // self.get_estimate().clone(),
+            // self.get_justification()
+        )
+    }
+}
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct Block(Arc<ProtoBlock>);
 
 pub type BlockMsg = Message<Block /*Estimate*/, Validator /*Sender*/>;
@@ -56,6 +71,7 @@ impl From<ProtoBlock> for Block {
 //         )
 //     }
 // }
+
 impl<'z> From<&'z BlockMsg> for Block {
     fn from(msg: &BlockMsg) -> Self {
         msg.get_estimate().clone()
@@ -84,16 +100,18 @@ impl Block {
         prevblock: Option<Block>,
         sender: Validator,
         txs: BTreeSet<Tx>,
+        id: usize,
     ) -> Self {
         Block::from(ProtoBlock {
             height: Block::next_height(&prevblock),
             prevblock,
             sender,
             txs,
+            id,
         })
     }
 
-    pub fn next_height(block: &Option<Self>) -> u32 {
+    pub fn next_height(block: &Option<Self>) -> usize {
         match block {
             None => 0,
             Some(b) => b.get_height() + 1,
@@ -103,7 +121,7 @@ impl Block {
         &self.0.txs
     }
 
-    pub fn get_height(&self) -> &u32 {
+    pub fn get_height(&self) -> &usize {
         &self.0.height
     }
     pub fn get_sender(&self) -> Validator {
@@ -131,10 +149,7 @@ impl Block {
     }
 
     pub fn get_prevblock(&self) -> Option<Self> {
-        self.0
-            .prevblock
-            .as_ref()
-            .map(|prevblock| (*prevblock).clone())
+        self.0.prevblock.as_ref().cloned()
     }
     // /// works without block height, but expensive
     // pub fn is_member(&self, rhs: &Self) -> bool {
@@ -219,171 +234,111 @@ impl Block {
 
     pub fn descend(
         &self,
-        height: &u32,
+        height: &usize,
         mut validators: HashSet<Validator>,
         original_msg: Self,
-    ) -> Option<(Block, HashSet<Validator>, Self)> {
+    ) -> Option<(Block, (Self, HashSet<Validator>))> {
         match height.cmp(self.get_height()) {
             Greater => {
                 let _ = validators.insert(self.get_sender());
                 self.get_prevblock()
                     .and_then(|b| b.descend(height, validators, original_msg))
             },
-            Equal => Some((self.clone(), validators, original_msg)),
+            Equal => Some((self.clone(), (original_msg, validators))),
             Less => None,
         }
     }
-    // pub fn branch_validators(
-    //     justification: &Justification<BlockMsg>,
-    //     senders_weights: &SendersWeight<<BlockMsg as CasperMsg>::Sender>,
-    // ) -> HashMap<Block, (HashSet<Validator>, HashSet<Block>)> {
 
-    // }
-
-    // pub fn ghost(
-    //     justification: &Justification<BlockMsg>,
-    //     finalized_msg: Option<&BlockMsg>,
-    //     senders_weights: &SendersWeight<<BlockMsg as CasperMsg>::Sender>,
-    // ) -> Option<Block> {
-    //     // fn recursor(msgs: VecDeque<BlockMsg>) -> Box<Iterator<Item = BlockMsg>> {}
-    //     let mut latest_blocks: Vec<_> =
-    //         justification.iter().map(|m| Block::from(m)).collect();
-    //     // sort blocks by height
-    //     latest_blocks
-    //         .sort_unstable_by(|l, r| l.get_height().cmp(r.get_height()));
-    //     let heights: Vec<_> =
-    //         latest_blocks.iter().map(|b| b.get_height()).collect();
-    //     let h_len = heights.len();
-    //     // let min_height = if h_len > 0 {
-    //     //     heights.iter().min().clone().unwrap()
-    //     // }
-    //     // else {
-    //     //     return None;
-    //     // };
-
-    //     let i = 0;
-    //     // blocks at the same height
-    //     let aligned_bs: Vec<_> = latest_blocks
-    //         .iter()
-    //         .map(|block| {
-    //             if h_len < i + 1 {
-    //                 block.descend(heights[i + 1], HashSet::new(), block.clone())
-    //             }
-    //             else {
-    //                 None
-    //             }
-    //         })
-    //         .collect();
-
-    //     aligned_bs.iter().fold(
-    //         HashMap::new(),
-    //         |acc: HashMap<Block, (HashSet<Validator>, HashSet<Block>)>,
-    //          &Some((b, v, o))| {
-    //             match acc.get_mut(&b) {
-    //                 // fork found
-    //                 Some((v_prime, o_prime)) => {
-    //                     *v_prime = v_prime.union(&v).cloned().collect();
-    //                     let _ = o_prime.insert(o);
-    //                     acc
-    //                 },
-    //                 // no fork
-    //                 None => {
-    //                     let os = HashSet::new();
-    //                     os.insert(o);
-    //                     acc.insert(b, (v, os));
-    //                     acc
-    //                 },
-    //             }
-    //         },
-    //     );
-
-    //     // aligned_bs.fold(HashSet::new(), |acc, b| {
-    //     //     acc.
-    //     // });
-
-    //     None
-    // }
-
-    /// nicos version
     pub fn ghost(
         justification: &Justification<BlockMsg>,
         finalized_msg: Option<&BlockMsg>,
         senders_weights: &SendersWeight<<BlockMsg as CasperMsg>::Sender>,
-    ) -> Option<BlockMsg> {
-        let mut latest_message_per_validator: HashMap<
-            <<Self as Estimate>::M as CasperMsg>::Sender,
-            BlockMsg,
-        > = HashMap::new();
+    ) -> Option<Self> {
+        let mut visited: HashMap<Block, HashSet<Block>> = justification
+            .iter()
+            .map(|msg| {
+                let parent = Block::from(msg);
+                let children = HashSet::new();
+                (parent, children)
+            })
+            .collect();
 
-        // compute the last message for each validator
-        for validator in senders_weights.get_senders().expect("err1") {
-            let mut latest_messages: Vec<_> = justification
-                .iter()
-                .filter(|m| m.get_sender() == &validator)
-                .collect();
+        let mut queue: VecDeque<Block> =
+            justification.iter().map(Block::from).collect();
 
-            if latest_messages.len() > 0 {
-                latest_messages.sort_unstable_by(|a, b| b.cmp(&a));
-                latest_message_per_validator
-                    .insert(validator, latest_messages[0].clone());
-            }
-        }
+        let mut genesis: HashSet<Block> = HashSet::new();
 
-        let mut b = finalized_msg.unwrap(); // TODO figure out genesis block if None
-
-        // GHOST
-        loop {
-            // get the id of the current block
-            let b_cmp = b;
-            println!("b: {:?}", Block::from(b));
-
-            // get all children of b
-            let b_children = latest_message_per_validator.iter().filter(|&(_, m)| {
-                Block::from(m)
-                    .get_prevblock()
-                    .map(|block| {
-                        // Block::from(b_cmp).is_member(&block)
-                        Block::from(b_cmp) == block
-                    })
-                    .unwrap_or(false)
-            });
-            // println!("b: {:?}", b);
-            // println!("b_children: {:?}", b_children);
-            // get the score of each child
-            let mut sorted_by_score_and_hash: Vec<_> = b_children
-                .map(|(_, child)| {
-                    (
-                        child,
-                        Block::from(child).score(
-                            &latest_message_per_validator,
-                            senders_weights,
-                        ),
-                    )
-                })
-                .collect();
-
-            // sort by score (and hash TODO if max score is not unique)
-            sorted_by_score_and_hash.sort_unstable_by(
-                |(block, score), (block_prime, score_prime)| {
-                    // sort by bigger score. and then by smaller hash value (here we consider id is the
-                    // hash of the message)
-                    score_prime
-                        .partial_cmp(&score)
-                        .unwrap_or(block.cmp(&block_prime))
+        while let Some(child) = queue.pop_front() {
+            match child.get_prevblock() {
+                Some(parent) => Some((child, parent)),
+                None => {
+                    genesis.insert(child);
+                    None
                 },
-            );
-            // if we have a next block, loop again
-            if sorted_by_score_and_hash.len() > 0 {
-                let (best_child, _) = sorted_by_score_and_hash[0];
-                b = best_child;
-            }
-            // no next block, we have our complete blockchain
-            else {
-                break;
-            }
+            }.map(|(child, parent)| {
+                // println!("child: {:?}\nparent: {:?}", child, parent);
+                if visited.contains_key(&parent) {
+                    // println!("visited parent before, fork found");
+                    visited.get_mut(&parent).map(|parents_children| {
+                        parents_children.insert(child);
+                    });
+                }
+                else {
+                    // println!("didnt visit parent before, set initial state, and push to queue");
+                    visited.get(&child).cloned().map(|childs_children| {
+                        let mut parents_children = childs_children.clone();
+                        parents_children.insert(child);
+                        visited.insert(parent.clone(), parents_children);
+                        queue.push_back(parent);
+                    });
+                }
+            });
         }
+        let res = Block::pick_heaviest(&genesis, &visited, senders_weights)
+            .and_then(|(opt_block, ..)| opt_block);
+        res.clone().map(|res| print!("heaviest block: {:?}", res));
+        res
+    }
+    // find heaviest block
+    fn pick_heaviest(
+        blocks: &HashSet<Block>,
+        visited: &HashMap<Block, HashSet<Block>>,
+        weights: &SendersWeight<Validator>,
+    ) -> Option<(Option<Self>, WeightUnit, HashSet<Self>)> {
+        let init = Some((None, WeightUnit::ZERO, HashSet::new()));
+        let heaviest_child = blocks.iter().fold(init, |best, block| {
+            best.and_then(|best| {
+                visited.get(&block).map(|children| (best, children))
+            }).map(|((b_block, b_weight, b_children), children)| {
+                let mut ref_validators: HashSet<_> =
+                    children.iter().map(Self::get_sender).collect();
+                // add current block sender such that its weight counts too
+                ref_validators.insert(block.get_sender());
 
-        Some(b.clone())
+                let weight = weights.sum_weight_senders(&ref_validators);
+
+                // TODO: break ties with blockhash
+                if weight > b_weight {
+                    println!("block: {:?}", block);
+                    println!("validators: {:?}", ref_validators);
+                    (Some(block.clone()), weight, children.clone())
+                }
+                else {
+                    // println!("block: {:?}", b_block);
+                    (b_block, b_weight, b_children)
+                }
+            })
+        });
+        heaviest_child.and_then(|(b_block, b_weight, b_children)| {
+            if b_children.is_empty() {
+                // base case
+                Some((b_block, b_weight, b_children))
+            }
+            else {
+                // recurse
+                Self::pick_heaviest(&b_children, visited, &weights)
+            }
+        })
     }
 }
 
@@ -411,145 +366,281 @@ impl Estimate for Block {
                 Self::from_prevblock_msg(msg, preblock)
             },
             (_, Some(preblock)) => {
-                let heaviest_msg =
+                let prevblock =
                     Block::ghost(latest_msgs, finalized_msg, senders_weights);
-                Self::from_prevblock_msg(heaviest_msg, preblock)
+                let block = Block::from(ProtoBlock {
+                    height: Block::next_height(&prevblock),
+                    prevblock,
+                    ..(*preblock.0).clone()
+                });
+                block
             },
         }
     }
 }
 
-#[test]
-fn example_usage() {
-    let (sender0, sender1, sender2, sender3, sender4) = (0, 1, 2, 3, 4); // miner identities
-    let (weight0, weight1, weight2, weight3, weight4) =
-        (1.0, 1.0, 2.0, 1.0, 1.1); // and their corresponding weights
-    let senders_weights = SendersWeight::new(
-        [
-            (sender0, weight0),
-            (sender1, weight1),
-            (sender2, weight2),
-            (sender3, weight3),
-            (sender4, weight4),
-        ].iter()
-            .cloned()
-            .collect(),
-    );
-    let weights = SenderState::new(
-        senders_weights.clone(),
-        0.0,            // state fault weight
-        1.0,            // subjective fault weight threshold
-        HashSet::new(), // equivocators
-    );
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let txs = BTreeSet::new();
+    #[test]
+    fn example_usage() {
+        let (sender0, sender1, sender2, sender3, sender4) = (0, 1, 2, 3, 4); // miner identities
+        let (weight0, weight1, weight2, weight3, weight4) =
+            (1.0, 1.0, 2.0, 1.0, 1.1); // and their corresponding weights
+        let senders_weights = SendersWeight::new(
+            [
+                (sender0, weight0),
+                (sender1, weight1),
+                (sender2, weight2),
+                (sender3, weight3),
+                (sender4, weight4),
+            ].iter()
+                .cloned()
+                .collect(),
+        );
+        let weights = SenderState::new(
+            senders_weights.clone(),
+            0.0,            // state fault weight
+            1.0,            // subjective fault weight threshold
+            HashSet::new(), // equivocators
+        );
 
-    // msg dag
-    // (s0, w=1.0)   gen            m5
-    // (s1, w=1.0)    |\--m1---\    |
-    // (s2, w=2.0)    \---m2--\|  --|
-    // (s3, w=1.0)    |    \---m3---|
-    // (s4, w=1.1)    \---m4
+        let txs = BTreeSet::new();
 
-    // blockchain gen <--m2 <--m3
-    // (s0, w=1.0)   gen            b5
-    // (s1, w=1.0)    |\--b1
-    // (s2, w=2.0)    \---b2
-    // (s3, w=1.0)    |     \---b3
+        // msg dag
+        // (s0, w=1.0)   gen            m5
+        // (s1, w=1.0)    |\--m1---\    |
+        // (s2, w=2.0)    \---m2--\|  --|
+        // (s3, w=1.0)    |    \---m3---|
+        // (s4, w=1.1)    \---m4
 
-    // block dag
-    let genesis_block = Block::from(ProtoBlock {
-        height: 0,
-        prevblock: None,
-        sender: sender0,
-        txs: txs.clone(),
-    });
-    let justification = Justification::new();
-    let genesis_block_msg =
-        BlockMsg::new(sender0, justification, genesis_block.clone());
-    assert_eq!(
-        &Block::from(&genesis_block_msg),
-        &genesis_block,
-        "genesis block with None as prevblock"
-    );
-    let proto_b1 = Block::new(None, sender1, txs.clone());
-    let (m1, weights) = BlockMsg::from_msgs(
-        proto_b1.get_sender(),
-        vec![&genesis_block_msg],
-        Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
-        &weights,
-        Some(proto_b1), // data
-    ).unwrap();
-    let proto_b2 = Block::new(None, sender2, txs.clone());
-    let (m2, weights) = BlockMsg::from_msgs(
-        proto_b2.get_sender(),
-        vec![&genesis_block_msg],
-        None,
-        &weights,
-        Some(proto_b2),
-    ).unwrap();
-    let proto_b3 = Block::new(None, sender3, txs.clone());
-    let (m3, weights) = BlockMsg::from_msgs(
-        proto_b3.get_sender(),
-        vec![&m1, &m2],
-        Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
-        &weights,
-        Some(proto_b3),
-    ).unwrap();
+        // blockchain gen <--m2 <--m3
+        // (s0, w=1.0)   gen            b5
+        // (s1, w=1.0)    |\--b1
+        // (s2, w=2.0)    \---b2
+        // (s3, w=1.0)    |     \---b3
 
-    assert_eq!(
-        m3.get_estimate(),
-        &Block::new(Some(Block::from(&m2)), sender3, txs.clone()),
-        "should build on top of m2 as sender2 has more weight"
-    );
+        // block dag
+        let genesis_block = Block::from(ProtoBlock {
+            height: 0,
+            prevblock: None,
+            sender: sender0,
+            txs: txs.clone(),
+            id: 0,
+        });
+        let justification = Justification::new();
+        let genesis_block_msg =
+            BlockMsg::new(sender0, justification, genesis_block.clone());
+        assert_eq!(
+            &Block::from(&genesis_block_msg),
+            &genesis_block,
+            "genesis block with None as prevblock"
+        );
+        let proto_b1 = Block::new(None, sender1, txs.clone(), 1);
+        let (m1, weights) = BlockMsg::from_msgs(
+            proto_b1.get_sender(),
+            vec![&genesis_block_msg],
+            Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
+            &weights,
+            Some(proto_b1), // data
+        ).unwrap();
+        let proto_b2 = Block::new(None, sender2, txs.clone(), 2);
+        let (m2, weights) = BlockMsg::from_msgs(
+            proto_b2.get_sender(),
+            vec![&genesis_block_msg],
+            None,
+            &weights,
+            Some(proto_b2),
+        ).unwrap();
+        let proto_b3 = Block::new(None, sender3, txs.clone(), 3);
+        let (m3, weights) = BlockMsg::from_msgs(
+            proto_b3.get_sender(),
+            vec![&m1, &m2],
+            Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
+            &weights,
+            Some(proto_b3),
+        ).unwrap();
 
-    let proto_b4 = Block::new(None, sender4, txs.clone());
-    let (m4, weights) = BlockMsg::from_msgs(
-        proto_b4.get_sender(),
-        vec![&m1],
-        Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
-        &weights,
-        Some(proto_b4),
-    ).unwrap();
+        assert_eq!(
+            m3.get_estimate(),
+            &Block::new(Some(Block::from(&m2)), sender3, txs.clone(), 3),
+            "should build on top of m2 as sender2 has more weight"
+        );
 
-    assert_eq!(
-        m4.get_estimate(),
-        &Block::new(Some(Block::from(&m1)), sender4, txs.clone()),
-        "should build on top of m1 as as thats the only msg it saw"
-    );
+        let proto_b4 = Block::new(None, sender4, txs.clone(), 4);
+        let (m4, weights) = BlockMsg::from_msgs(
+            proto_b4.get_sender(),
+            vec![&m1],
+            Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
+            &weights,
+            Some(proto_b4),
+        ).unwrap();
 
-    let proto_b5 = Block::new(None, sender0, txs.clone());
-    // println!("\n3 {:?}", m3);
-    // println!("\n4 {:?}", m4);
-    let (m5, weights) = BlockMsg::from_msgs(
-        proto_b5.get_sender(),
-        vec![&m3, &m2],
-        Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
-        &weights,
-        Some(proto_b5),
-    ).unwrap();
-    // println!("\nm5 {:?}", m5);
-    // println!("\nm5_estimate {:?}", Block::from(&m5));
+        assert_eq!(
+            m4.get_estimate(),
+            &Block::new(Some(Block::from(&m1)), sender4, txs.clone(), 4),
+            "should build on top of m1 as as thats the only msg it saw"
+        );
 
-    // println!();
-    assert_eq!(
-        m5.get_estimate(),
-        &Block::new(Some(Block::from(&m3)), sender0, txs.clone()),
-        "should build on top of "
-    );
+        let proto_b5 = Block::new(None, sender0, txs.clone(), 5);
+        // println!("\n3 {:?}", m3);
+        // println!("\n4 {:?}", m4);
+        let (m5, weights) = BlockMsg::from_msgs(
+            proto_b5.get_sender(),
+            vec![&m3, &m2],
+            Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
+            &weights,
+            Some(proto_b5),
+        ).unwrap();
+        // println!("\nm5 {:?}", m5);
+        // println!("\nm5_estimate {:?}", Block::from(&m5));
 
-    assert!(Block::from(&m1).is_member(&Block::from(&m1)));
-    assert!(!Block::from(&m1).is_member(&Block::from(&m2)));
-    assert!(!Block::from(&m2).is_member(&Block::from(&m1)));
-    assert!(!Block::from(&m1).is_member(&Block::from(&m2)));
-    assert!(Block::from(&m2).is_member(&Block::from(&m3)));
-    assert!(!Block::from(&m3).is_member(&Block::from(&m2)));
-    assert!(!Block::from(&m3).is_member(&Block::from(&m1)));
+        // println!();
+        assert_eq!(
+            m5.get_estimate(),
+            &Block::new(Some(Block::from(&m3)), sender0, txs.clone(), 5),
+            "should build on top of "
+        );
 
-    // let mut block = Block::from(&m3);
-    // assert_eq!(
-    //     block,
-    //     Block::new(Some(Block::from(&m2)), sender3, txs.clone()),
-    // );
-    // assert_eq!(block.next(), Some(genesis_block),);
+        assert!(Block::from(&m1).is_member(&Block::from(&m1)));
+        assert!(!Block::from(&m1).is_member(&Block::from(&m2)));
+        assert!(!Block::from(&m2).is_member(&Block::from(&m1)));
+        assert!(!Block::from(&m1).is_member(&Block::from(&m2)));
+        assert!(Block::from(&m2).is_member(&Block::from(&m3)));
+        assert!(!Block::from(&m3).is_member(&Block::from(&m2)));
+        assert!(!Block::from(&m3).is_member(&Block::from(&m1)));
+
+        let mut block = Block::from(&m3);
+        assert_eq!(
+            block,
+            Block::new(Some(Block::from(&m2)), sender3, txs.clone(), 3),
+        );
+        // assert_eq!(block.get_prevblock(), Some(genesis_block),);
+    }
+
+    #[test]
+    fn test2() {
+        let (senderg, sender0, sender1, sender2, sender3, sender4, sender5) =
+            (0, 1, 2, 3, 4, 5, 6); // miner identities
+        let (weightg, weight0, weight1, weight2, weight3, weight4, weight5) =
+            (1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.0); // and their corresponding weights
+        let senders_weights = SendersWeight::new(
+            [
+                (senderg, weightg),
+                (sender0, weight0),
+                (sender1, weight1),
+                (sender2, weight2),
+                (sender3, weight3),
+                (sender4, weight4),
+                (sender5, weight5),
+            ].iter()
+                .cloned()
+                .collect(),
+        );
+        let weights = SenderState::new(
+            senders_weights.clone(),
+            0.0,            // state fault weight
+            1.0,            // subjective fault weight threshold
+            HashSet::new(), // equivocators
+        );
+
+        let txs = BTreeSet::new();
+
+        // block dag
+        let genesis_block = Block::from(ProtoBlock {
+            height: 0,
+            prevblock: None,
+            sender: senderg,
+            txs: txs.clone(),
+            id: 9,
+        });
+        let justification = Justification::new();
+        let genesis_block_msg =
+            BlockMsg::new(senderg, justification, genesis_block.clone());
+        // assert_eq!(
+        //     &Block::from(&genesis_block_msg),
+        //     &genesis_block,
+        //     "genesis block with None as prevblock"
+        // );
+        let proto_b0 = Block::new(None, sender0, txs.clone(), 0);
+        let (m0, weights) = BlockMsg::from_msgs(
+            proto_b0.get_sender(),
+            vec![&genesis_block_msg],
+            Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
+            &weights,
+            Some(proto_b0), // data
+        ).unwrap();
+        let proto_b1 = Block::new(None, sender1, txs.clone(), 1);
+        let (m1, weights) = BlockMsg::from_msgs(
+            proto_b1.get_sender(),
+            vec![&m0],
+            Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
+            &weights,
+            Some(proto_b1),
+        ).unwrap();
+        let proto_b2 = Block::new(None, sender2, txs.clone(), 2);
+        let (m2, weights) = BlockMsg::from_msgs(
+            proto_b2.get_sender(),
+            vec![&genesis_block_msg],
+            Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
+            &weights,
+            Some(proto_b2),
+        ).unwrap();
+
+        // assert_eq!(
+        //     m2.get_estimate(),
+        //     &Block::new(Some(Block::from(&m1)), sender2, txs.clone()),
+        //     "should build on top of m1 as sender1 has more weight"
+        // );
+
+        let proto_b3 = Block::new(None, sender3, txs.clone(), 3);
+        let (m3, weights) = BlockMsg::from_msgs(
+            proto_b3.get_sender(),
+            vec![&m2],
+            Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
+            &weights,
+            Some(proto_b3),
+        ).unwrap();
+
+        // assert_eq!(
+        //     m3.get_estimate(),
+        //     &Block::new(Some(Block::from(&m0)), sender3, txs.clone()),
+        //     "should build on top of m0 as as thats the only msg it saw"
+        // );
+
+        let proto_b4 = Block::new(None, sender4, txs.clone(), 4);
+        // println!("\n3 {:?}", m2);
+        // println!("\n4 {:?}", m3);
+        let (m4, weights) = BlockMsg::from_msgs(
+            proto_b4.get_sender(),
+            vec![&m2],
+            Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
+            &weights,
+            Some(proto_b4),
+        ).unwrap();
+        // assert_eq!(
+        //     m4.get_estimate(),
+        //     &Block::new(Some(Block::from(&m2)), sender4, txs.clone()),
+        //     "should build on top of "
+        // );
+
+        let proto_b5 = Block::new(None, sender5, txs.clone(), 5);
+
+        let (m5, weights) = BlockMsg::from_msgs(
+            proto_b5.get_sender(),
+            vec![&m0, &m1, &m2, &m3, &m4],
+            Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
+            &weights,
+            Some(proto_b5),
+        ).unwrap();
+
+        assert_eq!(
+            m5.get_estimate(),
+            &Block::new(Some(Block::from(&m4)), sender5, txs.clone(), 5),
+            "should build on top of "
+        );
+    }
 }
+// `Block(ProtoBlock { prevblock: Some(Block(ProtoBlock { prevblock: Some(Block(ProtoBlock { prevblock: Some(Block(ProtoBlock { prevblock: None, height: 0, sender: 0, txs: {} })), height: 1, sender: 3, txs: {} })), height: 2, sender: 4, txs: {} })), height: 3, sender: 6, txs: {} })`
+// `Block(ProtoBlock { prevblock: Some(Block(ProtoBlock { prevblock: Some(Block(ProtoBlock { prevblock: Some(Block(ProtoBlock { prevblock: None, height: 0, sender: 0, txs: {} })), height: 1, sender: 3, txs: {} })), height: 2, sender: 1, txs: {} })), height: 3, sender: 6, txs: {} })`
