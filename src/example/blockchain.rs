@@ -51,13 +51,6 @@ impl<'z> From<&'z BlockMsg> for Block {
     }
 }
 
-impl Iterator for Block {
-    type Item = Self;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.get_prevblock()
-    }
-}
-
 impl Block {
     pub fn new(
         prevblock: Option<Block>,
@@ -81,7 +74,7 @@ impl Block {
         // a incomplete_block is a block with a None prevblock (ie, Estimate) AND is
         // not a genesis_block
         incomplete_block: Block,
-    ) -> Self {
+    ) -> Result<Self, &'static str> {
         let prevblock = prevblock_msg.map(|m| Block::from(&m));
         let block = Block::from(ProtoBlock {
             prevblock,
@@ -89,53 +82,15 @@ impl Block {
         });
 
         if Block::is_valid(&block) {
-            block
+            Ok(block)
         }
         else {
-            panic!("Block not valid")
+            Err("Block not valid")
         }
     }
-
     pub fn get_prevblock(&self) -> Option<Self> {
         self.0.prevblock.as_ref().cloned()
     }
-
-    /// works without block height, but expensive
-    pub fn is_member(&self, rhs: &Self) -> bool {
-        self == rhs
-            || rhs
-            .get_prevblock()
-            .as_ref()
-            .map(|prevblock| self.is_member(prevblock))
-            .unwrap_or(false)
-    }
-
-    pub fn score(
-        &self,
-        latest_msg: &HashMap<
-            <<Self as Estimate>::M as CasperMsg>::Sender,
-            BlockMsg,
-        >,
-        senders_weights: &SendersWeight<
-            <<Self as Estimate>::M as CasperMsg>::Sender,
-        >,
-    ) -> WeightUnit {
-        let mut referred_senders = HashSet::new();
-        latest_msg.iter().fold(WeightUnit::ZERO, |acc, (_, msg)| {
-            let sender = msg.get_sender();
-            if self.is_member(&Block::from(msg))
-                && referred_senders.insert(sender)
-            {
-                acc + senders_weights
-                    .get_weight(sender)
-                    .unwrap_or(WeightUnit::ZERO)
-            }
-            else {
-                acc
-            }
-        })
-    }
-
     pub fn parse_blockchains(
         justification: &Justification<BlockMsg>,
         finalized_msg: Option<&BlockMsg>,
@@ -175,16 +130,6 @@ impl Block {
         (visited, genesis)
     }
 
-    pub fn ghost(
-        justification: &Justification<BlockMsg>,
-        finalized_msg: Option<&BlockMsg>,
-        senders_weights: &SendersWeight<<BlockMsg as CasperMsg>::Sender>,
-    ) -> Option<Self> {
-        let (visited, genesis) =
-            Self::parse_blockchains(justification, finalized_msg);
-        Block::pick_heaviest(&genesis, &visited, senders_weights)
-            .and_then(|(opt_block, ..)| opt_block)
-    }
     // find heaviest block
     fn pick_heaviest(
         blocks: &HashSet<Block>,
@@ -221,6 +166,17 @@ impl Block {
             }
         })
     }
+
+    pub fn ghost(
+        justification: &Justification<BlockMsg>,
+        finalized_msg: Option<&BlockMsg>,
+        senders_weights: &SendersWeight<<BlockMsg as CasperMsg>::Sender>,
+    ) -> Option<Self> {
+        let (visited, genesis) =
+            Self::parse_blockchains(justification, finalized_msg);
+        Block::pick_heaviest(&genesis, &visited, senders_weights)
+            .and_then(|(opt_block, ..)| opt_block)
+    }
 }
 
 impl Estimate for Block {
@@ -244,7 +200,7 @@ impl Estimate for Block {
             (1, Some(incomplete_block)) => {
                 // only msg to built on top, no choice thus no ghost
                 let msg = latest_msgs.iter().next().map(|msg| msg.clone());
-                Self::from_prevblock_msg(msg, incomplete_block)
+                Self::from_prevblock_msg(msg, incomplete_block).unwrap()
             },
             (_, Some(incomplete_block)) => {
                 let prevblock =
@@ -380,14 +336,6 @@ mod tests {
             &Block::new(Some(Block::from(&m3)), sender0, txs.clone()),
             "should build on top of "
         );
-
-        assert!(Block::from(&m1).is_member(&Block::from(&m1)));
-        assert!(!Block::from(&m1).is_member(&Block::from(&m2)));
-        assert!(!Block::from(&m2).is_member(&Block::from(&m1)));
-        assert!(!Block::from(&m1).is_member(&Block::from(&m2)));
-        assert!(Block::from(&m2).is_member(&Block::from(&m3)));
-        assert!(!Block::from(&m3).is_member(&Block::from(&m2)));
-        assert!(!Block::from(&m3).is_member(&Block::from(&m1)));
 
         let mut block = Block::from(&m3);
         assert_eq!(
