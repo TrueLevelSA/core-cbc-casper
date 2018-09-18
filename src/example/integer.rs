@@ -1,8 +1,10 @@
 use traits::{Estimate, Data, Zero};
 use message::{CasperMsg, Message};
-use justification::{Justification};
+use justification::{LatestMsgs};
 use senders_weight::{SendersWeight};
 use weight_unit::{WeightUnit};
+use std::collections::HashSet;
+use std::iter::FromIterator;
 type Validator = u32;
 
 pub type IntegerMsg = Message<u32 /*Estimate*/, Validator /*Sender*/>;
@@ -20,7 +22,7 @@ impl Data for u32 {
 impl Estimate for u32 {
     type M = IntegerMsg;
     fn mk_estimate(
-        latest_msgs: &Justification<Self::M>,
+        latest_msgs: &LatestMsgs<Self::M>,
         _finalized_msg: Option<&Self::M>,
         senders_weights: &SendersWeight<
             <<Self as Estimate>::M as CasperMsg>::Sender,
@@ -30,7 +32,12 @@ impl Estimate for u32 {
         // conflict with the past blocks
         _proto_block: Option<<Self as Data>::Data>,
     ) -> Self {
-        let mut msgs_sorted_by_estimate: Vec<_> = latest_msgs.iter().collect();
+        let mut msgs_sorted_by_estimate = Vec::from_iter(latest_msgs.iter().fold(
+            HashSet::new(),
+            |latest, (_, latest_from_validator)| {
+                latest.union(&latest_from_validator).cloned().collect()
+            },
+        ));
         msgs_sorted_by_estimate.sort_unstable_by(|a, b| {
             senders_weights
                 .get_weight(a.get_sender())

@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::convert::From;
-use std::iter::Iterator;
+use std::iter::{Iterator, FromIterator};
 
 use justification::{Justification, SenderState, LatestMsgs};
 use message::{CasperMsg, Message};
@@ -190,7 +190,7 @@ impl Block {
 impl Estimate for Block {
     type M = BlockMsg;
     fn mk_estimate(
-        latest_msgs: &Justification<Self::M>,
+        latest_msgs: &LatestMsgs<Self::M>,
         finalized_msg: Option<&Self::M>,
         senders_weights: &SendersWeight<
             <<Self as Estimate>::M as CasperMsg>::Sender,
@@ -200,25 +200,35 @@ impl Estimate for Block {
         // conflict with the past blocks
         incomplete_block: Option<<Self as Data>::Data>,
     ) -> Self {
-        match (latest_msgs.len(), incomplete_block) {
+        let possible_prevblocks =
+            Vec::from_iter(latest_msgs.iter().fold(
+                HashSet::new(),
+                |latest, (_, latest_from_validator)| {
+                    latest.union(&latest_from_validator).cloned().collect()
+                },
+            ));
+        match (possible_prevblocks.len(), incomplete_block) {
             (0, _) => panic!(
                 "Needs at least one latest message to be able to pick one"
             ),
             (_, None) => panic!("incomplete_block is None"),
             (1, Some(incomplete_block)) => {
                 // only msg to built on top, no choice thus no ghost
-                let msg = latest_msgs.iter().next().map(|msg| msg.clone());
+                let msg = possible_prevblocks.iter().next().map(|msg| msg.clone());
                 Self::from_prevblock_msg(msg, incomplete_block).unwrap()
-            },
+            }
             (_, Some(incomplete_block)) => {
-                let prevblock =
-                    Block::ghost(latest_msgs, finalized_msg, senders_weights);
+                let prevblock = Block::ghost(
+                    &Justification::from_msgs(possible_prevblocks),
+                    finalized_msg,
+                    senders_weights,
+                );
                 let block = Block::from(ProtoBlock {
                     prevblock,
                     ..(**incomplete_block.0).clone()
                 });
                 block
-            },
+            }
         }
     }
 }

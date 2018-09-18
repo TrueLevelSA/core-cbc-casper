@@ -1,6 +1,7 @@
 use std::collections::{HashSet};
 use std::ops::{Add};
 use std::fmt::{Debug, Formatter, Result};
+use std::iter::FromIterator;
 
 use traits::{Zero, Estimate, Sender, Data};
 use message::{Message, CasperMsg};
@@ -123,7 +124,7 @@ impl Estimate for VoteCount {
     // type Data = Self;
 
     fn mk_estimate(
-        latest_msgs: &Justification<Self::M>,
+        latest_msgs: &LatestMsgs<Self::M>,
         _finalized_msg: Option<&Self::M>,
         _weights: &SendersWeight<Voter>, // all voters have same weight
         _external_data: Option<Self>,
@@ -131,9 +132,16 @@ impl Estimate for VoteCount {
     ) -> Self {
         // stub msg w/ no estimate and no valid sender that will be dropped on
         // the pattern matching below
+        let possible_msgs =
+            Vec::from_iter(latest_msgs.iter().fold(
+                HashSet::new(),
+                |latest, (_, latest_from_validator)| {
+                    latest.union(&latest_from_validator).cloned().collect()
+                },
+            ));
         let msg = Message::new(
             ::std::u32::MAX, // sender,
-            latest_msgs.clone(),
+            Justification::from_msgs(possible_msgs),
             VoteCount { yes: 0, no: 0 }, // estimate, will be droped on the pattern matching below
         );
         // the estimates are actually the original votes of each of the voters /

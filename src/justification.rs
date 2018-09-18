@@ -1,5 +1,6 @@
 use std::collections::{BTreeSet, HashSet, HashMap};
-use std::collections::btree_set::{Iter};
+use std::collections::hash_map::Iter as HashIter;
+use std::collections::btree_set::Iter;
 use std::fmt::{Debug, Formatter};
 // use std::io::{Error};
 
@@ -52,7 +53,7 @@ impl<M: CasperMsg> Justification<M> {
         senders_weights: &SendersWeight<<M as CasperMsg>::Sender>,
         data: Option<<<M as CasperMsg>::Estimate as Data>::Data>,
     ) -> M::Estimate {
-        M::Estimate::mk_estimate(self, finalized_msg, senders_weights, data)
+        M::Estimate::mk_estimate(&LatestMsgs::from(self.clone()), finalized_msg, senders_weights, data)
     }
 
     // Custom functions
@@ -347,6 +348,12 @@ impl<M: CasperMsg> LatestMsgs<M>{
     pub fn get(&self, k: &M::Sender) -> Option<&HashSet<M>>
     {
         self.0.get(k)
+    }
+    pub fn iter(&self) -> HashIter<M::Sender, HashSet<M>> {
+        self.0.iter()
+    }
+    pub fn len(&self) -> usize {
+        self.0.len()
     }
     pub fn update(&mut self, new_message: M) -> bool {
         let sender: &M::Sender = new_message.get_sender();
