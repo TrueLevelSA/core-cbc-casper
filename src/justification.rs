@@ -382,6 +382,25 @@ impl<M: CasperMsg> LatestMsgs<M>{
     }
 }
 
+impl<M: CasperMsg> From<Justification<M>> for LatestMsgs<M> {
+    fn from(j: Justification<M>) -> Self {
+        let mut latest_msgs = LatestMsgs::new();
+        fn recur_func<M: CasperMsg>(
+            j: Justification<M>,
+            latest_msgs: &mut LatestMsgs<M>,
+        ) {
+            j.iter().for_each(|m| {
+                m.get_justification().iter().for_each(|mp| {
+                    recur_func(mp.get_justification().clone(), latest_msgs)
+                });
+                latest_msgs.update(m.clone());
+            });
+        }
+        recur_func(j, &mut latest_msgs);
+        latest_msgs
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SenderState<M: CasperMsg> {
     senders_weights: SendersWeight<M::Sender>,
