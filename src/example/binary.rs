@@ -46,3 +46,78 @@ impl Estimate for bool {
         true_w >= false_w
     }
 }
+
+#[test]
+fn equal_weight() {
+    use senders_weight::SendersWeight;
+    use justification::{SenderState,Justification};
+    use std::collections::{HashSet};
+
+    let senders: Vec<u32> = (0..4).collect();
+    let weights = [1.0, 1.0, 1.0, 1.0];
+
+    let senders_weights = SendersWeight::new(
+        senders
+            .iter()
+            .cloned()
+            .zip(weights.iter().cloned())
+            .collect(),
+    );
+
+    let weights = SenderState::new(
+        senders_weights.clone(),
+        0.0, // state fault weight
+        LatestMsgs::new(),
+        1.0,            // subjective fault weight threshold
+        HashSet::new(), // equivocators
+    );
+
+    let m0 = BinaryMsg::new(senders[0], Justification::new(), false);
+    let m1 = BinaryMsg::new(senders[1], Justification::new(), true);
+    let m2 = BinaryMsg::new(senders[2], Justification::new(), false);
+    let (m3, _) =
+        BinaryMsg::from_msgs(senders[0], vec![&m0, &m1], None, &weights, None)
+            .unwrap();
+
+    assert_eq!(
+        bool::mk_estimate(
+            &LatestMsgs::from(Justification::new()),
+            None,
+            &senders_weights,
+            None
+        ),
+        true
+    );
+    let mut j0 = Justification::from_msgs(vec![m0.clone(), m1.clone()]);
+    // s0 and s1 vote. since tie-breaker is `true`, get `true`
+    assert_eq!(
+        bool::mk_estimate(
+            &LatestMsgs::from(j0.clone()),
+            None,
+            &senders_weights,
+            None
+        ),
+        true
+    );
+    j0.insert(m2.clone());
+    // `false` now has weight 2.0, while true has weight `1.0`
+    assert_eq!(
+        bool::mk_estimate(
+            &LatestMsgs::from(j0.clone()),
+            None,
+            &senders_weights,
+            None
+        ),
+        false
+    );
+    j0.insert(m3.clone());
+    assert_eq!(
+        bool::mk_estimate(
+            &LatestMsgs::from(j0.clone()),
+            None,
+            &senders_weights,
+            None
+        ),
+        true
+    );
+}
