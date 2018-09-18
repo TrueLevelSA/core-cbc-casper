@@ -23,7 +23,7 @@ struct ProtoBlock {
 }
 
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Debug)]
-pub struct Block(Arc<ProtoBlock>);
+pub struct Block(Box<Arc<ProtoBlock>>);
 
 pub type BlockMsg = Message<Block /*Estimate*/, Validator /*Sender*/>;
 
@@ -42,7 +42,7 @@ impl Data for Block {
 
 impl From<ProtoBlock> for Block {
     fn from(protoblock: ProtoBlock) -> Self {
-        Block(Arc::new(protoblock))
+        Block(Box::new(Arc::new(protoblock)))
     }
 }
 impl<'z> From<&'z BlockMsg> for Block {
@@ -78,7 +78,7 @@ impl Block {
         let prevblock = prevblock_msg.map(|m| Block::from(&m));
         let block = Block::from(ProtoBlock {
             prevblock,
-            ..(*incomplete_block.0).clone()
+            ..(**incomplete_block.0).clone()
         });
 
         if Block::is_valid(&block) {
@@ -207,7 +207,7 @@ impl Estimate for Block {
                     Block::ghost(latest_msgs, finalized_msg, senders_weights);
                 let block = Block::from(ProtoBlock {
                     prevblock,
-                    ..(*incomplete_block.0).clone()
+                    ..(**incomplete_block.0).clone()
                 });
                 block
             },
