@@ -88,6 +88,14 @@ impl Block {
             Err("Block not valid")
         }
     }
+
+    //TODO: this should possibly go to Estimate trait (not sure)
+    pub fn set_as_final(&mut self) -> () {
+        let mut proto_block = (**self.0).clone();
+        proto_block.prevblock = None;
+        *self.0 = Arc::new(proto_block);
+    }
+
     pub fn get_prevblock(&self) -> Option<Self> {
         self.0.prevblock.as_ref().cloned()
     }
