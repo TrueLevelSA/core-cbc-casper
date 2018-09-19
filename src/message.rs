@@ -71,6 +71,9 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
             && !self.depends(rhs)
     }
     fn depends(&self, rhs: &Self) -> bool {
+        // TODO: this can be done with inner recursion function to keep track of
+        // what was visited
+
         // although the recursion ends supposedly only at genesis message, the
         // trick is the following: it short-circuits while descending on the
         // dependency tree, if it finds a dependent message. when dealing with
@@ -368,7 +371,7 @@ mod message {
         let weights = SenderState::new(
             senders_weights,
             0.0,
-            LatestMsgs::new(),
+            None,
             0.0,
             HashSet::new(),
         );
@@ -412,7 +415,7 @@ mod message {
         let weights = SenderState::new(
             senders_weights,
             0.0,
-            LatestMsgs::new(),
+            None,
             0.0,
             HashSet::new(),
         );
@@ -468,7 +471,7 @@ mod message {
         let weights = SenderState::new(
             senders_weights,
             0.0,
-            LatestMsgs::new(),
+            None,
             0.0,
             HashSet::new(),
         );
@@ -499,7 +502,7 @@ mod message {
         let weights = SenderState::new(
             senders_weights.clone(),
             0.0,
-            LatestMsgs::new(),
+            None,
             0.0,
             HashSet::new(),
         );
@@ -562,7 +565,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         let weights = SenderState::new(
             senders_weights.clone(),
             0.0,
-            LatestMsgs::new(),
+            None,
             0.0,
             HashSet::new(),
         );
@@ -618,7 +621,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         let weights = SenderState::new(
             senders_weights.clone(),
             0.0,
-            LatestMsgs::new(),
+            None,
             0.0,
             HashSet::new(),
         );

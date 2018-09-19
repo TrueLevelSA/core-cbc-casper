@@ -100,15 +100,22 @@ impl Block {
         self.0.prevblock.as_ref().cloned()
     }
     pub fn parse_blockchains(
-        justification: &Justification<BlockMsg>,
+        latest_msgs: &LatestMsgs<BlockMsg>,
         finalized_msg: Option<&BlockMsg>,
     ) -> (HashMap<Block, HashSet<Block>>, HashSet<Block>) {
-        let mut visited: HashMap<Block, HashSet<Block>> = justification
+        let mut visited: HashMap<Block, HashSet<Block>> = latest_msgs
             .iter()
-            .map(|msg| {
-                let parent = Block::from(msg);
-                let children = HashSet::new();
-                (parent, children)
+            .filter_map(|(_, msgs)| {
+                if msgs.len() == 1 {
+                    msgs.iter().next().map(|msg| {
+                        let parent = Block::from(msg);
+                        let children = HashSet::new();
+                        (parent, children)
+                    })
+                }
+                else {
+                    None
+                }
             })
             .collect();
         let mut queue: VecDeque<Block> = visited.keys().cloned().collect();
@@ -176,12 +183,12 @@ impl Block {
     }
 
     pub fn ghost(
-        justification: &Justification<BlockMsg>,
+        latest_msgs: &LatestMsgs<BlockMsg>,
         finalized_msg: Option<&BlockMsg>,
         senders_weights: &SendersWeight<<BlockMsg as CasperMsg>::Sender>,
     ) -> Option<Self> {
         let (visited, genesis) =
-            Self::parse_blockchains(justification, finalized_msg);
+            Self::parse_blockchains(latest_msgs, finalized_msg);
         Block::pick_heaviest(&genesis, &visited, senders_weights)
             .and_then(|(opt_block, ..)| opt_block)
     }
@@ -200,35 +207,33 @@ impl Estimate for Block {
         // conflict with the past blocks
         incomplete_block: Option<<Self as Data>::Data>,
     ) -> Self {
-        let possible_prevblocks =
-            Vec::from_iter(latest_msgs.iter().fold(
-                HashSet::new(),
-                |latest, (_, latest_from_validator)| {
-                    latest.union(&latest_from_validator).cloned().collect()
-                },
-            ));
-        match (possible_prevblocks.len(), incomplete_block) {
+        match (latest_msgs.len(), incomplete_block) {
             (0, _) => panic!(
                 "Needs at least one latest message to be able to pick one"
             ),
             (_, None) => panic!("incomplete_block is None"),
             (1, Some(incomplete_block)) => {
                 // only msg to built on top, no choice thus no ghost
-                let msg = possible_prevblocks.iter().next().map(|msg| msg.clone());
+                let msg = latest_msgs.iter().next().and_then(|(_, msgs)| {
+                    if msgs.len() == 1 {
+                        msgs.iter().next().cloned()
+                    }
+                    else {
+                        panic!("equivocator")
+                    }
+                });
+
                 Self::from_prevblock_msg(msg, incomplete_block).unwrap()
-            }
+            },
             (_, Some(incomplete_block)) => {
-                let prevblock = Block::ghost(
-                    &Justification::from_msgs(possible_prevblocks),
-                    finalized_msg,
-                    senders_weights,
-                );
+                let prevblock =
+                    Block::ghost(latest_msgs, finalized_msg, senders_weights);
                 let block = Block::from(ProtoBlock {
                     prevblock,
                     ..(**incomplete_block.0).clone()
                 });
                 block
-            }
+            },
         }
     }
 }
@@ -256,7 +261,7 @@ mod tests {
         let weights = SenderState::new(
             senders_weights.clone(),
             0.0,            // state fault weight
-            LatestMsgs::new(), // latest messages
+            None,           // latest messages
             1.0,            // subjective fault weight threshold
             HashSet::new(), // equivocators
         );
@@ -282,9 +287,9 @@ mod tests {
             sender: sender0,
             txs: txs.clone(),
         });
-        let justification = Justification::new();
+        let latest_msgs = Justification::new();
         let genesis_block_msg =
-            BlockMsg::new(sender0, justification, genesis_block.clone());
+            BlockMsg::new(sender0, latest_msgs, genesis_block.clone());
         assert_eq!(
             &Block::from(&genesis_block_msg),
             &genesis_block,
@@ -386,7 +391,7 @@ mod tests {
         let weights = SenderState::new(
             senders_weights.clone(),
             0.0,            // state fault weight
-            LatestMsgs::new(), // latest messages
+            None,           // latest messages
             1.0,            // subjective fault weight threshold
             HashSet::new(), // equivocators
         );
@@ -399,9 +404,9 @@ mod tests {
             sender: senderg,
             txs: txs.clone(),
         });
-        let justification = Justification::new();
+        let latest_msgs = Justification::new();
         let genesis_block_msg =
-            BlockMsg::new(senderg, justification, genesis_block.clone());
+            BlockMsg::new(senderg, latest_msgs, genesis_block.clone());
         // assert_eq!(
         //     &Block::from(&genesis_block_msg),
         //     &genesis_block,

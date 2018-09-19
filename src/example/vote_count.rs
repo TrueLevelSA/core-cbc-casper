@@ -132,13 +132,12 @@ impl Estimate for VoteCount {
     ) -> Self {
         // stub msg w/ no estimate and no valid sender that will be dropped on
         // the pattern matching below
-        let possible_msgs =
-            Vec::from_iter(latest_msgs.iter().fold(
-                HashSet::new(),
-                |latest, (_, latest_from_validator)| {
-                    latest.union(&latest_from_validator).cloned().collect()
-                },
-            ));
+        let possible_msgs = Vec::from_iter(latest_msgs.iter().fold(
+            HashSet::new(),
+            |latest, (_, latest_from_validator)| {
+                latest.union(&latest_from_validator).cloned().collect()
+            },
+        ));
         let msg = Message::new(
             ::std::u32::MAX, // sender,
             Justification::from_msgs(possible_msgs),
@@ -173,7 +172,7 @@ mod count_votes {
         let v1 = &VoteCount::create_vote_msg(1, true);
         let mut j0 = Justification::new();
         let weights =
-            SenderState::new(senders_weights, 0.0, LatestMsgs::new(), 2.0, HashSet::new());
+            SenderState::new(senders_weights, 0.0, None, 2.0, HashSet::new());
         let (success, _) =
             j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights);
         assert!(success);
