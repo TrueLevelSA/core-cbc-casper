@@ -67,7 +67,7 @@ fn equal_weight() {
     let weights = SenderState::new(
         senders_weights.clone(),
         0.0, // state fault weight
-        LatestMsgs::new(),
+        None,
         1.0,            // subjective fault weight threshold
         HashSet::new(), // equivocators
     );
@@ -81,7 +81,7 @@ fn equal_weight() {
 
     assert_eq!(
         bool::mk_estimate(
-            &LatestMsgs::from(Justification::new()),
+            &LatestMsgs::from(&Justification::new()),
             None,
             &senders_weights,
             None
@@ -92,7 +92,7 @@ fn equal_weight() {
     // s0 and s1 vote. since tie-breaker is `true`, get `true`
     assert_eq!(
         bool::mk_estimate(
-            &LatestMsgs::from(j0.clone()),
+            &LatestMsgs::from(&j0),
             None,
             &senders_weights,
             None
@@ -103,7 +103,7 @@ fn equal_weight() {
     // `false` now has weight 2.0, while true has weight `1.0`
     assert_eq!(
         bool::mk_estimate(
-            &LatestMsgs::from(j0.clone()),
+            &LatestMsgs::from(&j0),
             None,
             &senders_weights,
             None
@@ -113,7 +113,7 @@ fn equal_weight() {
     j0.insert(m3.clone());
     assert_eq!(
         bool::mk_estimate(
-            &LatestMsgs::from(j0.clone()),
+            &LatestMsgs::from(&j0),
             None,
             &senders_weights,
             None
