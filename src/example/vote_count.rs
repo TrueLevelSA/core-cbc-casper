@@ -66,42 +66,54 @@ impl VoteCount {
     }
 
     fn get_vote_msgs(
-        msg: &Message<Self, Voter>,
+        latest_msgs: &LatestMsgs<Message<Self, Voter>>,
     ) -> HashSet<Message<Self, Voter>> {
         fn recursor(
-            msg: &Message<VoteCount, Voter>,
+            latest_msgs: &LatestMsgs<Message<VoteCount, Voter>>,
             acc: HashSet<Message<VoteCount, Voter>>,
         ) -> HashSet<Message<VoteCount, Voter>> {
-            msg.get_justification()
-                .iter()
-                .fold(acc, |mut acc_prime, m| {
-                    match m.get_justification().len() {
-                        0 => {
-                            // vote found, vote is a message with 0 justification
-                            let estimate = m.get_estimate().clone();
-                            if VoteCount::is_valid_vote(&estimate) {
-                                let equivocation = Message::new(
-                                    m.get_sender().clone(),
-                                    m.get_justification().clone(),
-                                    VoteCount::toggle_vote(&estimate),
-                                );
-                                // search for the equivocation of the current msg
-                                match acc_prime.get(&equivocation) {
-                                    // remove the equivoted vote, none of the pair
-                                    // will stay on the set
-                                    Some(_) => acc_prime.remove(&equivocation),
-                                    // add the vote
-                                    None => acc_prime.insert((*m).clone()),
-                                };
-                            }
-                            acc_prime // returns it
-                        },
-                        _ => recursor(&m, acc_prime),
-                    }
-                })
+            latest_msgs.iter().fold(acc, |mut acc_prime, (_, msg)| {
+                if msg.len() > 1 {
+                    // equivocation
+                    return acc_prime
+                }
+                let m = msg.iter().next().unwrap();
+                match m.get_justification().len() {
+                    0 => {
+                        // vote found, vote is a message with 0 justification
+                        let estimate = m.get_estimate().clone();
+                        if VoteCount::is_valid_vote(&estimate) {
+                            let equivocation = Message::new(
+                                m.get_sender().clone(),
+                                m.get_justification().clone(),
+                                VoteCount::toggle_vote(&estimate),
+                            );
+                            // search for the equivocation of the current latest_msgs
+                            match acc_prime.get(&equivocation) {
+                                // remove the equivoted vote, none of the pair
+                                // will stay on the set
+                                Some(_) => {
+                                    println!("equiv: {:?}", equivocation);
+                                    acc_prime.remove(&equivocation)
+                                },
+                                // add the vote
+                                None => {
+                                    println!("no_equiv: {:?}", equivocation);
+                                    acc_prime.insert((*m).clone())
+                                },
+                            };
+                        }
+                        acc_prime // returns it
+                    },
+                    _ => recursor(
+                        &LatestMsgs::from(m.get_justification()),
+                        acc_prime,
+                    ),
+                }
+            })
         }
         // start recursion
-        recursor(msg, HashSet::new())
+        recursor(latest_msgs, HashSet::new())
     }
 }
 
@@ -130,29 +142,13 @@ impl Estimate for VoteCount {
         _external_data: Option<Self>,
         // _external_data: Option<Self::Data>,
     ) -> Self {
-        // stub msg w/ no estimate and no valid sender that will be dropped on
-        // the pattern matching below
-        let possible_msgs = Vec::from_iter(latest_msgs.iter().fold(
-            HashSet::new(),
-            |latest, (_, latest_from_validator)| {
-                latest.union(&latest_from_validator).cloned().collect()
-            },
-        ));
-        let msg = Message::new(
-            ::std::u32::MAX, // sender,
-            Justification::from_msgs(possible_msgs),
-            VoteCount { yes: 0, no: 0 }, // estimate, will be droped on the pattern matching below
-        );
         // the estimates are actually the original votes of each of the voters /
         // validators
-        let votes = Self::get_vote_msgs(&msg);
-        let res = votes.iter().fold(Self::ZERO, |acc, vote| {
-            match vote.get_estimate() {
-                estimate => acc + estimate.clone(),
-                // None => acc, // skip counting
-            }
-        });
-        res
+
+        let votes = Self::get_vote_msgs(latest_msgs);
+        votes
+            .iter()
+            .fold(Self::ZERO, |acc, vote| acc + vote.get_estimate().clone())
     }
 }
 

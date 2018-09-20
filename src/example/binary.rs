@@ -64,7 +64,7 @@ fn equal_weight() {
             .collect(),
     );
 
-    let weights = SenderState::new(
+    let sender_state = SenderState::new(
         senders_weights.clone(),
         0.0, // state fault weight
         None,
@@ -76,7 +76,7 @@ fn equal_weight() {
     let m1 = BinaryMsg::new(senders[1], Justification::new(), true);
     let m2 = BinaryMsg::new(senders[2], Justification::new(), false);
     let (m3, _) =
-        BinaryMsg::from_msgs(senders[0], vec![&m0, &m1], None, &weights, None)
+        BinaryMsg::from_msgs(senders[0], vec![&m0, &m1], None, & sender_state, None)
             .unwrap();
 
     assert_eq!(
@@ -88,7 +88,7 @@ fn equal_weight() {
         ),
         true
     );
-    let mut j0 = Justification::from_msgs(vec![m0.clone(), m1.clone()]);
+    let (mut j0, _) = Justification::from_msgs(vec![m0.clone(), m1.clone()], & sender_state);
     // s0 and s1 vote. since tie-breaker is `true`, get `true`
     assert_eq!(
         bool::mk_estimate(
@@ -99,7 +99,7 @@ fn equal_weight() {
         ),
         true
     );
-    j0.insert(m2.clone());
+    j0.faulty_insert(&m2, & sender_state);
     // `false` now has weight 2.0, while true has weight `1.0`
     assert_eq!(
         bool::mk_estimate(
@@ -110,7 +110,7 @@ fn equal_weight() {
         ),
         false
     );
-    j0.insert(m3.clone());
+    j0.faulty_insert(&m3, & sender_state);
     assert_eq!(
         bool::mk_estimate(
             &LatestMsgs::from(&j0),

@@ -32,12 +32,13 @@ impl Estimate for u32 {
         // conflict with the past blocks
         _proto_block: Option<<Self as Data>::Data>,
     ) -> Self {
-        let mut msgs_sorted_by_estimate = Vec::from_iter(latest_msgs.iter().fold(
-            HashSet::new(),
-            |latest, (_, latest_from_validator)| {
-                latest.union(&latest_from_validator).cloned().collect()
-            },
-        ));
+        let mut msgs_sorted_by_estimate =
+            Vec::from_iter(latest_msgs.iter().fold(
+                HashSet::new(),
+                |latest, (_, latest_from_validator)| {
+                    latest.union(&latest_from_validator).cloned().collect()
+                },
+            ));
         msgs_sorted_by_estimate.sort_unstable_by(|a, b| {
             senders_weights
                 .get_weight(a.get_sender())
@@ -49,18 +50,22 @@ impl Estimate for u32 {
                 )
                 .unwrap_or(::std::cmp::Ordering::Greater)
         });
-        let total_weight =
-            msgs_sorted_by_estimate.iter().fold(0.0, |acc, x| {
+        let total_weight = msgs_sorted_by_estimate.iter().fold(
+            WeightUnit::ZERO,
+            |acc, x| {
                 acc + senders_weights
                     .get_weight(x.get_sender())
                     .unwrap_or(WeightUnit::ZERO)
-            });
+            },
+        );
         let mut running_weight = 0.0;
         let mut current_msg = msgs_sorted_by_estimate.iter();
         while running_weight / total_weight < 0.5 {
-            running_weight += senders_weights
-                .get_weight(current_msg.next().unwrap().get_sender())
-                .unwrap_or(WeightUnit::ZERO);
+            running_weight += current_msg
+                .next()
+                .ok_or("no next msg")
+                .and_then(|m| senders_weights.get_weight(m.get_sender()))
+                .unwrap_or(WeightUnit::ZERO)
         }
         *current_msg.next().unwrap().get_estimate()
     }

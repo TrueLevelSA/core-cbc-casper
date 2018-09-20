@@ -21,12 +21,12 @@ impl<M: CasperMsg> Justification<M> {
     pub fn new() -> Self {
         Justification(BTreeSet::new())
     }
-    pub fn from_msgs(msgs: Vec<M>) -> Self {
+    pub fn from_msgs(msgs: Vec<M>, sender_state: &SenderState<M>) -> (Self, SenderState<M>) {
         let mut j = Justification::new();
-        msgs.iter().for_each(|m| {
-            j.insert(m.clone());
-        });
-        j
+        let msgs: HashSet<_> = msgs.iter().collect();
+        let (_, sender_state) = j.faulty_inserts(msgs, sender_state);
+        (j, sender_state)
+
     }
     pub fn iter(&self) -> Iter<M> {
         self.0.iter()
