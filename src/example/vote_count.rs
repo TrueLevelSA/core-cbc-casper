@@ -1,11 +1,10 @@
 use std::collections::{HashSet};
 use std::ops::{Add};
 use std::fmt::{Debug, Formatter, Result};
-use std::iter::FromIterator;
 
 use traits::{Zero, Estimate, Sender, Data};
 use message::{Message, CasperMsg};
-use justification::{Justification, LatestMsgs};
+use justification::{Justification, LatestMsgsHonest};
 use senders_weight::{SendersWeight};
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default)]
 pub struct VoteCount {
@@ -66,18 +65,13 @@ impl VoteCount {
     }
 
     fn get_vote_msgs(
-        latest_msgs: &LatestMsgs<Message<Self, Voter>>,
+        latest_msgs: &LatestMsgsHonest<Message<Self, Voter>>,
     ) -> HashSet<Message<Self, Voter>> {
         fn recursor(
-            latest_msgs: &LatestMsgs<Message<VoteCount, Voter>>,
+            latest_msgs: &Justification<Message<VoteCount, Voter>>,
             acc: HashSet<Message<VoteCount, Voter>>,
         ) -> HashSet<Message<VoteCount, Voter>> {
-            latest_msgs.iter().fold(acc, |mut acc_prime, (_, msg)| {
-                if msg.len() > 1 {
-                    // equivocation
-                    return acc_prime
-                }
-                let m = msg.iter().next().unwrap();
+            latest_msgs.iter().fold(acc, |mut acc_prime, m| {
                 match m.get_justification().len() {
                     0 => {
                         // vote found, vote is a message with 0 justification
@@ -105,15 +99,17 @@ impl VoteCount {
                         }
                         acc_prime // returns it
                     },
-                    _ => recursor(
-                        &LatestMsgs::from(m.get_justification()),
-                        acc_prime,
-                    ),
+                    _ => recursor(m.get_justification(), acc_prime),
                 }
             })
         }
+
+        let j = latest_msgs.iter().fold(Justification::new(), |mut acc, m| {
+            acc.insert(m.clone());
+            acc
+        });
         // start recursion
-        recursor(latest_msgs, HashSet::new())
+        recursor(&j, HashSet::new())
     }
 }
 
@@ -136,7 +132,7 @@ impl Estimate for VoteCount {
     // type Data = Self;
 
     fn mk_estimate(
-        latest_msgs: &LatestMsgs<Self::M>,
+        latest_msgs: &LatestMsgsHonest<Self::M>,
         _finalized_msg: Option<&Self::M>,
         _weights: &SendersWeight<Voter>, // all voters have same weight
         _external_data: Option<Self>,

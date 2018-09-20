@@ -1,6 +1,6 @@
 use traits::{Estimate, Data, Zero};
 use message::{CasperMsg, Message};
-use justification::{LatestMsgs};
+use justification::{LatestMsgsHonest};
 use senders_weight::{SendersWeight};
 use weight_unit::{WeightUnit};
 use std::collections::HashSet;
@@ -22,7 +22,7 @@ impl Data for u32 {
 impl Estimate for u32 {
     type M = IntegerMsg;
     fn mk_estimate(
-        latest_msgs: &LatestMsgs<Self::M>,
+        latest_msgs: &LatestMsgsHonest<Self::M>,
         _finalized_msg: Option<&Self::M>,
         senders_weights: &SendersWeight<
             <<Self as Estimate>::M as CasperMsg>::Sender,
@@ -35,8 +35,9 @@ impl Estimate for u32 {
         let mut msgs_sorted_by_estimate =
             Vec::from_iter(latest_msgs.iter().fold(
                 HashSet::new(),
-                |latest, (_, latest_from_validator)| {
-                    latest.union(&latest_from_validator).cloned().collect()
+                |mut latest, latest_from_validator| {
+                    latest.insert(latest_from_validator);
+                    latest
                 },
             ));
         msgs_sorted_by_estimate.sort_unstable_by(|a, b| {

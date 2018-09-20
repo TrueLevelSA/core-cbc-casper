@@ -1,6 +1,6 @@
 use std::collections::{BTreeSet, HashSet, HashMap, VecDeque};
-use std::collections::hash_map::Keys;
-use std::collections::hash_map::Iter as HashIter;
+use std::collections::hash_map::{Iter as HashIter, Keys};
+use std::collections::hash_set::{Iter as HSetIter};
 use std::collections::btree_set::Iter;
 use std::fmt::{Debug, Formatter};
 // use std::io::{Error};
@@ -21,12 +21,14 @@ impl<M: CasperMsg> Justification<M> {
     pub fn new() -> Self {
         Justification(BTreeSet::new())
     }
-    pub fn from_msgs(msgs: Vec<M>, sender_state: &SenderState<M>) -> (Self, SenderState<M>) {
+    pub fn from_msgs(
+        msgs: Vec<M>,
+        sender_state: &SenderState<M>,
+    ) -> (Self, SenderState<M>) {
         let mut j = Justification::new();
         let msgs: HashSet<_> = msgs.iter().collect();
         let (_, sender_state) = j.faulty_inserts(msgs, sender_state);
         (j, sender_state)
-
     }
     pub fn iter(&self) -> Iter<M> {
         self.0.iter()
@@ -51,11 +53,15 @@ impl<M: CasperMsg> Justification<M> {
     pub fn mk_estimate(
         &self,
         finalized_msg: Option<&M>,
+        equivocators: &HashSet<M::Sender>,
         senders_weights: &SendersWeight<<M as CasperMsg>::Sender>,
         data: Option<<<M as CasperMsg>::Estimate as Data>::Data>,
     ) -> M::Estimate {
+        let latest_msgs = LatestMsgs::from(self);
+        let latest_msgs_honest =
+            LatestMsgsHonest::from_latest_msgs(&latest_msgs, equivocators);
         M::Estimate::mk_estimate(
-            &LatestMsgs::from(self),
+            &latest_msgs_honest,
             finalized_msg,
             senders_weights,
             data,
@@ -215,28 +221,6 @@ impl<M: CasperMsg> Justification<M> {
         }
     }
 
-    /// The Greedy Heaviest-Observed Sub-Tree
-    pub fn ghost(
-        &self,
-        finalized_msg: Option<&M>,
-        senders_weights: &SendersWeight<M::Sender>,
-    ) -> Option<M> {
-        match self.get_subtree_weights(finalized_msg, senders_weights) {
-            Ok(subtree_weights) => subtree_weights
-                .iter()
-                .max_by(|(_, &weight0), (_, &weight1)| {
-                    weight0
-                        .partial_cmp(&weight1)
-                    // tie breaker, the unwrap fails because both values are the
-                    // same and we arbitrarily chose a result. TODO this should be
-                    // something deterministic, like blockhash
-                        .unwrap_or(::std::cmp::Ordering::Greater)
-                })
-                .map(|(heaviest_subtree, _)| heaviest_subtree.clone()),
-            Err(_) => None,
-        }
-    }
-
     pub fn get_subtree_weights(
         &self,
         finalized_msg: Option<&M>, // stops sum at finalized_msg
@@ -338,6 +322,41 @@ impl<M: CasperMsg> Debug for Justification<M> {
 //     pub sender_state: SenderState<S>,
 //     // pub equivocators: HashSet<S>,
 // }
+
+pub struct LatestMsgsHonest<M: CasperMsg>(HashSet<M>);
+impl<M: CasperMsg> LatestMsgsHonest<M> {
+    fn new() -> Self {
+        LatestMsgsHonest(HashSet::new())
+    }
+    fn insert(&mut self, msg: M) -> bool {
+        self.0.insert(msg)
+    }
+    pub fn from_latest_msgs(
+        latest_msgs: &LatestMsgs<M>,
+        equivocators: &HashSet<M::Sender>,
+    ) -> Self {
+        latest_msgs
+            .iter()
+            .filter_map(|(sender, msgs)| {
+                if equivocators.contains(sender) || msgs.len() != 1 {
+                    None
+                }
+                else {
+                    msgs.iter().next()
+                }
+            })
+            .fold(LatestMsgsHonest::new(), |mut acc, msg| {
+                acc.insert(msg.clone());
+                acc
+            })
+    }
+    pub fn iter(&self) -> HSetIter<M> {
+        self.0.iter()
+    }
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+}
 
 #[derive(Eq, PartialEq, Clone, Default, Debug)]
 pub struct LatestMsgs<M: CasperMsg>(
@@ -457,6 +476,9 @@ impl<M: CasperMsg> SenderState<M> {
             thr,
             my_last_msg,
         }
+    }
+    pub fn get_equivocators(&self) -> &HashSet<M::Sender> {
+        &self.equivocators
     }
     pub fn get_senders_weights(&self) -> &SendersWeight<M::Sender> {
         &self.senders_weights
