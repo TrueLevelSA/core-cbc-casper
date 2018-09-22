@@ -3,7 +3,7 @@ use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::convert::From;
 use std::iter::{Iterator, FromIterator};
 
-use justification::{Justification, SenderState, LatestMsgs};
+use justification::{Justification, SenderState, LatestMsgsHonest};
 use message::{CasperMsg, Message};
 use senders_weight::SendersWeight;
 use std::sync::Arc;
@@ -100,22 +100,15 @@ impl Block {
         self.0.prevblock.as_ref().cloned()
     }
     pub fn parse_blockchains(
-        latest_msgs: &LatestMsgs<BlockMsg>,
+        latest_msgs: &LatestMsgsHonest<BlockMsg>,
         finalized_msg: Option<&BlockMsg>,
     ) -> (HashMap<Block, HashSet<Block>>, HashSet<Block>) {
         let mut visited: HashMap<Block, HashSet<Block>> = latest_msgs
             .iter()
-            .filter_map(|(_, msgs)| {
-                if msgs.len() == 1 {
-                    msgs.iter().next().map(|msg| {
-                        let parent = Block::from(msg);
-                        let children = HashSet::new();
-                        (parent, children)
-                    })
-                }
-                else {
-                    None
-                }
+            .map(|msg| {
+                let parent = Block::from(msg);
+                let children = HashSet::new();
+                (parent, children)
             })
             .collect();
         let mut queue: VecDeque<Block> = visited.keys().cloned().collect();
@@ -183,7 +176,7 @@ impl Block {
     }
 
     pub fn ghost(
-        latest_msgs: &LatestMsgs<BlockMsg>,
+        latest_msgs: &LatestMsgsHonest<BlockMsg>,
         finalized_msg: Option<&BlockMsg>,
         senders_weights: &SendersWeight<<BlockMsg as CasperMsg>::Sender>,
     ) -> Option<Self> {
@@ -197,7 +190,7 @@ impl Block {
 impl Estimate for Block {
     type M = BlockMsg;
     fn mk_estimate(
-        latest_msgs: &LatestMsgs<Self::M>,
+        latest_msgs: &LatestMsgsHonest<Self::M>,
         finalized_msg: Option<&Self::M>,
         senders_weights: &SendersWeight<
             <<Self as Estimate>::M as CasperMsg>::Sender,
@@ -214,15 +207,7 @@ impl Estimate for Block {
             (_, None) => panic!("incomplete_block is None"),
             (1, Some(incomplete_block)) => {
                 // only msg to built on top, no choice thus no ghost
-                let msg = latest_msgs.iter().next().and_then(|(_, msgs)| {
-                    if msgs.len() == 1 {
-                        msgs.iter().next().cloned()
-                    }
-                    else {
-                        panic!("equivocator")
-                    }
-                });
-
+                let msg = latest_msgs.iter().next().cloned();
                 Self::from_prevblock_msg(msg, incomplete_block).unwrap()
             },
             (_, Some(incomplete_block)) => {
@@ -237,7 +222,6 @@ impl Estimate for Block {
         }
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;

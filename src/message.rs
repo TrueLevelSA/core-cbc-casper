@@ -7,7 +7,7 @@ use std::sync::{Arc};
 use rayon::prelude::*;
 
 use traits::{Estimate, Zero, Sender, Data};
-use justification::{Justification, SenderState, LatestMsgs};
+use justification::{Justification, SenderState};
 use weight_unit::{WeightUnit};
 use senders_weight::SendersWeight;
 
@@ -57,6 +57,7 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         else {
             let estimate = justification.mk_estimate(
                 finalized_msg,
+                sender_state.get_equivocators(),
                 &sender_state.get_senders_weights(),
                 external_data,
             );
@@ -368,13 +369,8 @@ mod message {
         let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
-        let weights = SenderState::new(
-            senders_weights,
-            0.0,
-            None,
-            0.0,
-            HashSet::new(),
-        );
+        let weights =
+            SenderState::new(senders_weights, 0.0, None, 0.0, HashSet::new());
         let mut j0 = Justification::new();
         let (success, _) =
             j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights);
@@ -412,13 +408,8 @@ mod message {
         let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
-        let weights = SenderState::new(
-            senders_weights,
-            0.0,
-            None,
-            0.0,
-            HashSet::new(),
-        );
+        let weights =
+            SenderState::new(senders_weights, 0.0, None, 0.0, HashSet::new());
 
         let mut j0 = Justification::new();
         let (success, _) =
@@ -468,13 +459,8 @@ mod message {
         let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
-        let weights = SenderState::new(
-            senders_weights,
-            0.0,
-            None,
-            0.0,
-            HashSet::new(),
-        );
+        let weights =
+            SenderState::new(senders_weights, 0.0, None, 0.0, HashSet::new());
 
         let mut j0 = Justification::new();
         let (success, _) =
