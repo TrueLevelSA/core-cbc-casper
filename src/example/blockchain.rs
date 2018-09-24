@@ -88,6 +88,34 @@ impl Block {
             Err("Block not valid")
         }
     }
+    pub fn is_member(&self, rhs: &Self) -> bool {
+        self == rhs
+            || rhs
+                .get_prevblock()
+                .as_ref()
+                .map(|prevblock| self.is_member(prevblock))
+                .unwrap_or(false)
+    }
+    pub fn safety_oracle(
+        latest_msgs_honest: &LatestMsgsHonest<BlockMsg>,
+        validator: &<BlockMsg as CasperMsg>::Sender,
+        equivocators: &HashSet<<BlockMsg as CasperMsg>::Sender>,
+        all_honest_senders: &HashSet<<BlockMsg as CasperMsg>::Sender>,
+    ) -> bool {
+        let (val_msgs, rest): (HashSet<_>, HashSet<_>) = latest_msgs_honest
+            .iter()
+            .partition(|&msg| msg.get_sender() == validator);
+        let val_latests_msg: &BlockMsg = *val_msgs.iter().next().unwrap();
+        let msg_for_prop = val_latests_msg
+            .get_finalized_msgs(all_honest_senders)
+            .iter()
+            .next()
+            .cloned()
+            .unwrap();
+        let prop = Block::from(&msg_for_prop);
+        rest.iter()
+            .all(|&msg| prop.is_member(&Block::from(msg)))
+    }
 
     //TODO: this should possibly go to Estimate trait (not sure)
     pub fn set_as_final(&mut self) -> () {
