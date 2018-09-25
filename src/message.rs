@@ -65,6 +65,35 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
             Ok((message, sender_state))
         }
     }
+
+    /// insanely expensive
+    fn equivocates_indirect(
+        &self,
+        rhs: &Self,
+        mut equivocators: HashSet<<Self as CasperMsg>::Sender>,
+    ) -> (bool, HashSet<<Self as CasperMsg>::Sender>) {
+        let res = self.equivocates(rhs);
+        let init = if res {
+            equivocators.insert(self.get_sender().clone());
+            (true, equivocators)
+        }
+        else {
+            (false, equivocators)
+        };
+        self.get_justification().iter().fold(
+            init,
+            |(acc_res, acc_equivocators), self_prime| {
+                // note the rotation between rhs and self, done because
+                // descending only on self, thus rhs has to become self on the
+                // recursion to get its justification visited
+                let (res, equivocators) = rhs
+                    .equivocates_indirect(self_prime, acc_equivocators.clone());
+                let acc_equivocators =
+                    acc_equivocators.union(&equivocators).cloned().collect();
+                (acc_res || res, acc_equivocators)
+            },
+        )
+    }
     fn equivocates(&self, rhs: &Self) -> bool {
         self != rhs
             && self.get_sender() == rhs.get_sender()
@@ -100,7 +129,7 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     /// returns the dag tip-most safe messages. a safe message is defined as one
     /// that was seen by all senders (with non-zero weight in senders_weights)
     /// and all senders saw each other seeing each other messages.
-    fn get_finalized_msgs(
+    fn get_msg_for_proposition(
         &self,
         all_senders: &HashSet<Self::Sender>,
     ) -> HashSet<Self> {
@@ -151,6 +180,13 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
             &original_sender,
         )
     }
+
+    // fn get_msg_for_prop2(
+    //     &self,
+    //     all_senders: &HashSet<Self::Sender>,
+    //     equivocators: : &HashSet<Self::Sender>,
+
+    // )
 
     /// returns the dag tip-most safe messages. a safe message is defined as one
     /// that was seen by more than a given thr of total weight units. TODO: not
@@ -468,12 +504,20 @@ mod message {
         assert!(success);
         let (m0, _) =
             &Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
+
+        let (m1, _) =
+            &Message::from_msgs(1, vec![v0], None, &weights, None).unwrap();
         assert!(!v0.equivocates(v0), "should be all good");
         assert!(!v1.equivocates(m0), "should be all good");
         assert!(!m0.equivocates(v1), "should be all good");
         assert!(v0.equivocates(v0_prime), "should be a direct equivocation");
         assert!(
             m0.equivocates(v0_prime),
+            "should be an indirect equivocation, equivocates to m0 through v0"
+        );
+
+        assert!(
+            m1.equivocates_indirect(v0_prime, HashSet::new()).0,
             "should be an indirect equivocation, equivocates to m0 through v0"
         );
     }
@@ -560,7 +604,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         // sender0        v0---m0        m2---
         // sender1               \--m1--/
         let v0 = &VoteCount::create_vote_msg(sender1, false);
-        let safe_msgs = v0.get_finalized_msgs(senders);
+        let safe_msgs = v0.get_msg_for_proposition(senders);
         assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0");
 
         let (m0, weights) = &mut Message::from_msgs(
@@ -586,7 +630,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
             None as Option<VoteCount>,
         ).unwrap();
 
-        let safe_msgs = m2.get_finalized_msgs(senders);
+        let safe_msgs = m2.get_msg_for_proposition(senders);
 
         assert!(safe_msgs.len() == 1);
         println!("------------");
@@ -616,7 +660,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         // sender0        v0---m0        m2---
         // sender1               \--m1--/
         let v0 = &VoteCount::create_vote_msg(sender0, false);
-        let safe_msgs = v0.get_finalized_msgs(senders);
+        let safe_msgs = v0.get_msg_for_proposition(senders);
         assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0");
 
         let (m0, weights) = &Message::from_msgs(
@@ -626,7 +670,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
             &weights,
             None as Option<VoteCount>,
         ).unwrap();
-        let safe_msgs = m0.get_finalized_msgs(senders);
+        let safe_msgs = m0.get_msg_for_proposition(senders);
         assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0 and m0");
 
         let (m1, weights) = &Message::from_msgs(
@@ -636,7 +680,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
             &weights,
             None as Option<VoteCount>,
         ).unwrap();
-        let safe_msgs = m1.get_finalized_msgs(senders);
+        let safe_msgs = m1.get_msg_for_proposition(senders);
         assert_eq!(
             safe_msgs.len(),
             0,
@@ -651,7 +695,7 @@ necessarly seen sender1 seeing v0 and m0, thus not yet safe"
             &weights,
             None as Option<VoteCount>,
         ).unwrap();
-        let safe_msgs = m2.get_finalized_msgs(senders);
+        let safe_msgs = m2.get_msg_for_proposition(senders);
         assert_eq!(
             safe_msgs,
             [m0.clone()].iter().cloned().collect(),
@@ -670,7 +714,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
             &weights,
             None as Option<VoteCount>,
         ).unwrap();
-        let safe_msgs = m0.get_finalized_msgs(senders);
+        let safe_msgs = m0.get_msg_for_proposition(senders);
         assert_eq!(
             safe_msgs.len(),
             0,
@@ -684,7 +728,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
             &weights,
             None as Option<VoteCount>,
         ).unwrap();
-        let safe_msgs = m1.get_finalized_msgs(senders);
+        let safe_msgs = m1.get_msg_for_proposition(senders);
 
         assert_eq!(
             safe_msgs,
@@ -700,7 +744,7 @@ necessarly seen sender1 seeing v0 and m0, just v1 is safe"
             &weights,
             None as Option<VoteCount>,
         ).unwrap();
-        let safe_msgs = m2.get_finalized_msgs(senders);
+        let safe_msgs = m2.get_msg_for_proposition(senders);
         assert_eq!(
             safe_msgs,
             [m0.clone()].iter().cloned().collect(),

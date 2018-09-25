@@ -74,17 +74,20 @@ impl<M: CasperMsg> Justification<M> {
     /// here. i believe the weight of an equivocator has to be set to ZERO
     /// immediately upon finding an equivocation
     fn get_equivocators(&self, msg_new: &M) -> HashSet<M::Sender> {
-        self.par_iter()
+        self.iter()
             .filter_map(|msg_old| {
-                if msg_old.equivocates(&msg_new) {
-                    let equivocator = msg_old.get_sender();
-                    Some(equivocator.clone())
+                let (has_equivocation, equivocators) =
+                    msg_old.equivocates_indirect(&msg_new, HashSet::new());
+                if has_equivocation {
+                    Some(equivocators)
                 }
                 else {
                     None
                 }
             })
-            .collect()
+            .fold(HashSet::new(), |acc, equivocators| {
+                acc.union(&equivocators).cloned().collect()
+            })
     }
 
     /// insert msgs to the Justification, accepting up to $thr$ faults by
@@ -108,8 +111,11 @@ impl<M: CasperMsg> Justification<M> {
                 .enumerate()
                 .filter_map(|(outer_i, &msg)| {
                     // equivocations in relation to state
-                    let state_equivocators: HashSet<_> =
-                        justification.get_equivocators(msg);
+                    let state_equivocators: HashSet<_> = justification
+                        .get_equivocators(msg)
+                        .iter()
+                        .cloned()
+                        .collect();
 
                     // equivocations present within the current latest_msgs set that
                     // we're trying to insert to the state
@@ -333,6 +339,7 @@ impl<M: CasperMsg> LatestMsgsHonest<M> {
     }
     pub fn from_latest_msgs(
         latest_msgs: &LatestMsgs<M>,
+
         equivocators: &HashSet<M::Sender>,
     ) -> Self {
         latest_msgs
