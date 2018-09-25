@@ -107,7 +107,7 @@ impl Block {
             .partition(|&msg| msg.get_sender() == validator);
         let val_latests_msg: &BlockMsg = *val_msgs.iter().next().unwrap();
         let msg_for_prop = val_latests_msg
-            .get_finalized_msgs(all_honest_senders)
+            .get_msg_for_proposition(all_honest_senders)
             .iter()
             .next()
             .cloned()
