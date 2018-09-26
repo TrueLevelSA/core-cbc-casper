@@ -61,7 +61,10 @@ impl Estimate for u32 {
                 .and_then(|m| senders_weights.get_weight(m.get_sender()))
                 .unwrap_or(WeightUnit::ZERO)
         }
-        *current_msg.unwrap().get_estimate()
+        match current_msg {
+            Err(_) => 0,
+            Ok(m) => *m.get_estimate()
+        }
     }
 }
 
@@ -88,6 +91,19 @@ fn equal_weight() {
         None,
         1.0,            // subjective fault weight threshold
         HashSet::new(), // equivocators
+    );
+
+    assert_eq!(
+        u32::mk_estimate(
+            &LatestMsgsHonest::from_latest_msgs(
+                &LatestMsgs::from(&Justification::new()),
+                sender_state.get_equivocators()
+            ),
+            None,
+            &senders_weights,
+            None
+        ),
+        0
     );
 
     let m0 = IntegerMsg::new(senders[0], Justification::new(), 1);
