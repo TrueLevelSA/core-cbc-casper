@@ -41,15 +41,7 @@ impl Estimate for u32 {
                 },
             ));
         msgs_sorted_by_estimate.sort_unstable_by(|a, b| {
-            senders_weights
-                .get_weight(a.get_sender())
-                .unwrap_or(WeightUnit::ZERO)
-                .partial_cmp(
-                    &senders_weights
-                        .get_weight(b.get_sender())
-                        .unwrap_or(WeightUnit::ZERO),
-                )
-                .unwrap_or(::std::cmp::Ordering::Greater)
+            a.get_estimate().cmp(&b.get_estimate())
         });
         let total_weight = msgs_sorted_by_estimate.iter().fold(
             WeightUnit::ZERO,
@@ -60,14 +52,15 @@ impl Estimate for u32 {
             },
         );
         let mut running_weight = 0.0;
-        let mut current_msg = msgs_sorted_by_estimate.iter();
+        let mut msg_iter = msgs_sorted_by_estimate.iter();
+        let mut current_msg:Result<&&IntegerMsg, &str> = Err("no msg");
         while running_weight / total_weight < 0.5 {
-            running_weight += current_msg
-                .next()
-                .ok_or("no next msg")
+            current_msg = msg_iter.next().ok_or("no next msg");
+            running_weight +=
+                current_msg
                 .and_then(|m| senders_weights.get_weight(m.get_sender()))
                 .unwrap_or(WeightUnit::ZERO)
         }
-        *current_msg.next().unwrap().get_estimate()
+        *current_msg.unwrap().get_estimate()
     }
 }
