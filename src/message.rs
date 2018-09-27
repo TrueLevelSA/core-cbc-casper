@@ -31,10 +31,10 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
 
     // Following methods are actual implementations
 
-    /// create a new msg from latest_messages
+    /// create a msg from newly received messages
     fn from_msgs(
         sender: Self::Sender,
-        latest_msgs: Vec<&Self>,
+        new_msgs: Vec<&Self>,
         finalized_msg: Option<&Self>,
         sender_state: &SenderState<Self>,
         external_data: Option<<<Self as CasperMsg>::Estimate as Data>::Data>,
@@ -42,15 +42,21 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         // // TODO eventually comment out these lines, and FIXME tests
         // // check whether two messages from same sender
         // let mut senders = HashSet::new();
-        // let dup_senders = latest_msgs.iter().any(|msg| !senders.insert(msg.get_sender()));
+        // let dup_senders = new_msgs.iter().any(|msg| !senders.insert(msg.get_sender()));
         // assert!(!dup_senders, "A sender can only have one, and only one, latest message");
 
         // dedup by putting msgs into a hashset
-        let latest_msgs: HashSet<_> = latest_msgs.iter().cloned().collect();
+        let new_msgs: HashSet<_> = new_msgs.iter().cloned().collect();
 
         let mut justification = Justification::new();
+        sender_state.get_my_last_msg().as_ref().map_or_else(
+            || println!("No commitment to any previous state!"),
+            |my_last_msg| {
+                justification.insert(my_last_msg.clone());
+            },
+        );
         let (success, sender_state) =
-            justification.faulty_inserts(latest_msgs, &sender_state);
+            justification.faulty_inserts(new_msgs, &sender_state);
         if !success {
             Err("None of the messages could be added to the state!")
         }
@@ -72,8 +78,8 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         rhs: &Self,
         mut equivocators: HashSet<<Self as CasperMsg>::Sender>,
     ) -> (bool, HashSet<<Self as CasperMsg>::Sender>) {
-        let res = self.equivocates(rhs);
-        let init = if res {
+        let is_equivocation = self.equivocates(rhs);
+        let init = if is_equivocation {
             equivocators.insert(self.get_sender().clone());
             (true, equivocators)
         }
@@ -82,15 +88,15 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         };
         self.get_justification().iter().fold(
             init,
-            |(acc_res, acc_equivocators), self_prime| {
+            |(acc_has_equivocations, acc_equivocators), self_prime| {
                 // note the rotation between rhs and self, done because
                 // descending only on self, thus rhs has to become self on the
                 // recursion to get its justification visited
-                let (res, equivocators) = rhs
+                let (has_equivocation, equivocators) = rhs
                     .equivocates_indirect(self_prime, acc_equivocators.clone());
                 let acc_equivocators =
                     acc_equivocators.union(&equivocators).cloned().collect();
-                (acc_res || res, acc_equivocators)
+                (acc_has_equivocations || has_equivocation, acc_equivocators)
             },
         )
     }
@@ -405,8 +411,13 @@ mod message {
         let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
-        let weights =
-            SenderState::new(senders_weights, 0.0, None, 0.0, HashSet::new());
+        let weights = SenderState::new(
+            senders_weights,
+            Some(0.0),
+            None,
+            0.0,
+            HashSet::new(),
+        );
         let mut j0 = Justification::new();
         let (success, _) =
             j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights);
@@ -444,8 +455,13 @@ mod message {
         let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
-        let weights =
-            SenderState::new(senders_weights, 0.0, None, 0.0, HashSet::new());
+        let weights = SenderState::new(
+            senders_weights,
+            Some(0.0),
+            None,
+            0.0,
+            HashSet::new(),
+        );
 
         let mut j0 = Justification::new();
         let (success, _) =
@@ -495,8 +511,13 @@ mod message {
         let senders_weights = SendersWeight::new(
             [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
         );
-        let weights =
-            SenderState::new(senders_weights, 0.0, None, 0.0, HashSet::new());
+        let weights = SenderState::new(
+            senders_weights,
+            Some(0.0),
+            None,
+            0.0,
+            HashSet::new(),
+        );
 
         let mut j0 = Justification::new();
         let (success, _) =
@@ -531,7 +552,7 @@ mod message {
 
         let weights = SenderState::new(
             senders_weights.clone(),
-            0.0,
+            Some(0.0),
             None,
             0.0,
             HashSet::new(),
@@ -594,7 +615,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         );
         let weights = SenderState::new(
             senders_weights.clone(),
-            0.0,
+            Some(0.0),
             None,
             0.0,
             HashSet::new(),
@@ -650,7 +671,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         );
         let weights = SenderState::new(
             senders_weights.clone(),
-            0.0,
+            Some(0.0),
             None,
             0.0,
             HashSet::new(),
