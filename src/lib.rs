@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 extern crate rayon;
+extern crate digest;
 
 pub mod weight_unit;
 pub mod message;
