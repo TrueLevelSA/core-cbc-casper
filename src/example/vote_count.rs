@@ -164,7 +164,7 @@ mod count_votes {
         let v1 = &VoteCount::create_vote_msg(1, true);
         let mut j0 = Justification::new();
         let weights =
-            SenderState::new(senders_weights, 0.0, None, 2.0, HashSet::new());
+            SenderState::new(senders_weights, Some(0.0), None, 2.0, HashSet::new());
         let (success, _) =
             j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights);
         assert!(success);
