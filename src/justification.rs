@@ -397,7 +397,7 @@ impl<M: CasperMsg> LatestMsgs<M> {
     }
     pub fn update(&mut self, new_message: &M) -> bool {
         let sender: &M::Sender = new_message.get_sender();
-        if let Some(latest_msgs_from_sender) = self.clone().get(sender) {
+        if let Some(latest_msgs_from_sender) = self.get(sender).cloned() {
             let later_than_new: HashSet<M> = latest_msgs_from_sender
                 .iter()
                 .filter(|current_message| current_message.depends(new_message))
