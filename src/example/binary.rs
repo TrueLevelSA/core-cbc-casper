@@ -61,6 +61,7 @@ fn equal_weight() {
         senders_weights.clone(),
         Some(0.0), // state fault weight
         None,
+        LatestMsgs::new(),
         1.0,            // subjective fault weight threshold
         HashSet::new(), // equivocators
     );
@@ -144,6 +145,7 @@ fn vote_swaying() {
         senders_weights.clone(),
         Some(0.0), // state fault weight
         None,
+        LatestMsgs::new(),
         1.0,            // subjective fault weight threshold
         HashSet::new(), // equivocators
     );

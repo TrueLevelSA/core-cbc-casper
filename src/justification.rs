@@ -163,7 +163,7 @@ impl<M: CasperMsg> Justification<M> {
             (false, sender_state.clone()),
             |(success, sender_state), &msg| {
                 let (success_prime, sender_state_prime) =
-                    self.faulty_insert_with_slash(msg, &sender_state);
+                    self.faulty_insert_with_slash(msg, sender_state);
                 (success || success_prime, sender_state_prime)
             },
         )
@@ -180,7 +180,7 @@ impl<M: CasperMsg> Justification<M> {
         let sender_state = sender_state.clone();
         let msg_equivocators_overhead: HashSet<_> = self.get_equivocators(msg)
             .iter()
-        // take only the msg_eoquivocators_overhead that are not yet on the
+        // take only the msg_equivocators_overhead that are not yet on the
         // equivocator set as the others already have their weight counted into
         // the state fault count
             .filter(|equivocator| !sender_state.equivocators.contains(equivocator))
@@ -231,30 +231,19 @@ impl<M: CasperMsg> Justification<M> {
     pub fn faulty_insert_with_slash(
         &mut self,
         msg: &M,
-        sender_state: &SenderState<M>,
+        mut sender_state: SenderState<M>,
     ) -> (bool, SenderState<M>) {
-        let msg_equivocators: HashSet<_> = self.get_equivocators(msg);
-
-        let SenderState {
-            mut senders_weights,
-            mut equivocators,
-            ..
-        } = sender_state.clone();
-        equivocators = equivocators.union(&msg_equivocators).cloned().collect();
-
-        msg_equivocators.iter().for_each(|equivocator| {
-            senders_weights.insert(equivocator.clone(), WeightUnit::ZERO);
-        });
-
+        let is_equivocation = sender_state.latest_msgs.equivocate(msg);
+        if is_equivocation {
+            let sender = msg.get_sender();
+            sender_state.equivocators.insert(sender.clone());
+            sender_state
+                .senders_weights
+                .insert(sender.clone(), WeightUnit::ZERO);
+        }
+        sender_state.latest_msgs.update(msg);
         let success = self.insert(msg.clone());
-        (
-            success,
-            SenderState {
-                equivocators,
-                senders_weights,
-                ..sender_state.clone()
-            },
-        )
+        (success, sender_state)
     }
 
     pub fn get_subtree_weights(
@@ -447,6 +436,13 @@ impl<M: CasperMsg> LatestMsgs<M> {
             true
         }
     }
+    fn equivocate(&self, msg_new: &M) -> bool {
+        self.get(msg_new.get_sender())
+            .map(|latest_msgs| {
+                latest_msgs.iter().any(|m| m.equivocates(&msg_new))
+            })
+            .unwrap_or(false)
+    }
 }
 
 impl<'z, M: CasperMsg> From<&'z Justification<M>> for LatestMsgs<M> {
@@ -485,6 +481,7 @@ pub struct SenderState<M: CasperMsg> {
     thr: WeightUnit,
     senders_weights: SendersWeight<M::Sender>,
     my_last_msg: Option<M>,
+    latest_msgs: LatestMsgs<M>,
     equivocators: HashSet<M::Sender>, // FIXME: put it here as its needed on the same context as
 }
 
@@ -493,6 +490,7 @@ impl<M: CasperMsg> SenderState<M> {
         senders_weights: SendersWeight<M::Sender>,
         state_fault_weight: Option<WeightUnit>,
         my_last_msg: Option<M>,
+        latest_msgs: LatestMsgs<M>,
         thr: WeightUnit,
         equivocators: HashSet<M::Sender>,
     ) -> Self {
@@ -502,6 +500,7 @@ impl<M: CasperMsg> SenderState<M> {
             state_fault_weight,
             thr,
             my_last_msg,
+            latest_msgs,
         }
     }
     pub fn get_equivocators(&self) -> &HashSet<M::Sender> {
@@ -610,6 +609,7 @@ mod justification {
             my_last_msg: None,
             thr: 3.0,
             equivocators: HashSet::new(),
+            latest_msgs: LatestMsgs::new(),
         };
         let mut j = Justification::new();
         let sorted_msgs = j.sort_by_faultweight(
@@ -645,6 +645,7 @@ mod justification {
             my_last_msg: None,
             thr: 0.0,
             equivocators: HashSet::new(),
+            latest_msgs: LatestMsgs::new(),
         };
         let (success, _) =
             j0.faulty_inserts([v0].iter().cloned().collect(), &weights);
@@ -666,6 +667,7 @@ mod justification {
                 my_last_msg: None,
                 thr: 0.0,
                 equivocators: HashSet::new(),
+                latest_msgs: LatestMsgs::new(),
             },
         );
         assert!(success);
@@ -677,6 +679,7 @@ mod justification {
                 my_last_msg: None,
                 thr: 0.0,
                 equivocators: HashSet::new(),
+                latest_msgs: LatestMsgs::new(),
             },
         );
         assert!(success);
@@ -688,6 +691,7 @@ mod justification {
                 my_last_msg: None,
                 thr: 0.0,
                 equivocators: HashSet::new(),
+                latest_msgs: LatestMsgs::new(),
             },
         );
         assert!(
@@ -702,6 +706,7 @@ mod justification {
                 my_last_msg: None,
                 thr: 1.0,
                 equivocators: HashSet::new(),
+                latest_msgs: LatestMsgs::new(),
             },
         );
         assert!(success,
@@ -715,6 +720,7 @@ mod justification {
                 my_last_msg: None,
                 thr: 1.0,
                 equivocators: HashSet::new(),
+                latest_msgs: LatestMsgs::new(),
             },
         );
         assert_eq!(
@@ -732,6 +738,7 @@ state_fault_weight should be incremented to 1.0"
                 my_last_msg: None,
                 thr: 1.0,
                 equivocators: HashSet::new(),
+                latest_msgs: LatestMsgs::new(),
             },
         );
         assert!(!success,
@@ -745,6 +752,7 @@ state_fault_weight should be incremented to 1.0"
                 my_last_msg: None,
                 thr: 1.0,
                 equivocators: HashSet::new(),
+                latest_msgs: LatestMsgs::new(),
             },
         );
         assert_eq!(sender_state.state_fault_weight, Some(0.1),
@@ -758,6 +766,7 @@ state_fault_weight should be incremented to 1.0"
                 my_last_msg: None,
                 thr: 2.0,
                 equivocators: HashSet::new(),
+                latest_msgs: LatestMsgs::new(),
             },
         );
         assert!(success,
@@ -774,6 +783,7 @@ state_fault_weight should be incremented to 1.0"
                 my_last_msg: None,
                 thr: 2.0,
                 equivocators: HashSet::new(),
+                latest_msgs: LatestMsgs::new(),
             },
         );
         assert!(
@@ -788,6 +798,7 @@ state_fault_weight should be incremented to 1.0"
                 my_last_msg: None,
                 thr: 2.0,
                 equivocators: HashSet::new(),
+                latest_msgs: LatestMsgs::new(),
             },
         );
         assert_eq!(
