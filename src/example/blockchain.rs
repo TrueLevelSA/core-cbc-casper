@@ -3,7 +3,7 @@ use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::convert::From;
 use std::iter::{Iterator, FromIterator};
 
-use justification::{Justification, SenderState, LatestMsgsHonest};
+use justification::{Justification, SenderState, LatestMsgsHonest, LatestMsgs};
 use message::{CasperMsg, Message};
 use senders_weight::SendersWeight;
 use std::sync::Arc;
@@ -274,6 +274,7 @@ mod tests {
             senders_weights.clone(),
             Some(0.0),            // state fault weight
             None,           // latest messages
+            LatestMsgs::new(),
             1.0,            // subjective fault weight threshold
             HashSet::new(), // equivocators
         );
@@ -404,6 +405,7 @@ mod tests {
             senders_weights.clone(),
             Some(0.0),            // state fault weight
             None,           // latest messages
+            LatestMsgs::new(),
             1.0,            // subjective fault weight threshold
             HashSet::new(), // equivocators
         );

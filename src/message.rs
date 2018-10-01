@@ -7,7 +7,7 @@ use std::sync::{Arc};
 use rayon::prelude::*;
 
 use traits::{Estimate, Zero, Sender, Data};
-use justification::{Justification, SenderState};
+use justification::{Justification, SenderState, LatestMsgs};
 use weight_unit::{WeightUnit};
 use senders_weight::SendersWeight;
 
@@ -415,6 +415,7 @@ mod message {
             senders_weights,
             Some(0.0),
             None,
+            LatestMsgs::new(),
             0.0,
             HashSet::new(),
         );
@@ -459,6 +460,7 @@ mod message {
             senders_weights,
             Some(0.0),
             None,
+            LatestMsgs::new(),
             0.0,
             HashSet::new(),
         );
@@ -515,6 +517,7 @@ mod message {
             senders_weights,
             Some(0.0),
             None,
+            LatestMsgs::new(),
             0.0,
             HashSet::new(),
         );
@@ -554,6 +557,7 @@ mod message {
             senders_weights.clone(),
             Some(0.0),
             None,
+            LatestMsgs::new(),
             0.0,
             HashSet::new(),
         );
@@ -617,6 +621,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
             senders_weights.clone(),
             Some(0.0),
             None,
+            LatestMsgs::new(),
             0.0,
             HashSet::new(),
         );
@@ -673,6 +678,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
             senders_weights.clone(),
             Some(0.0),
             None,
+            LatestMsgs::new(),
             0.0,
             HashSet::new(),
         );
