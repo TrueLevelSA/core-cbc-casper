@@ -348,7 +348,6 @@ impl<M: CasperMsg> LatestMsgsHonest<M> {
     }
     pub fn from_latest_msgs(
         latest_msgs: &LatestMsgs<M>,
-
         equivocators: &HashSet<M::Sender>,
     ) -> Self {
         latest_msgs
@@ -371,6 +370,19 @@ impl<M: CasperMsg> LatestMsgsHonest<M> {
     }
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+    pub fn mk_estimate(
+        &self,
+        finalized_msg: Option<&M>,
+        senders_weights: &SendersWeight<<M as CasperMsg>::Sender>,
+        data: Option<<<M as CasperMsg>::Estimate as Data>::Data>,
+    ) -> M::Estimate {
+        M::Estimate::mk_estimate(
+            &self,
+            finalized_msg,
+            senders_weights,
+            data,
+        )
     }
 }
 
@@ -511,6 +523,9 @@ impl<M: CasperMsg> SenderState<M> {
     }
     pub fn get_my_last_msg(&self) -> &Option<M> {
         &self.my_last_msg
+    }
+    pub fn get_latest_msgs(&self) -> &LatestMsgs<M> {
+        &self.latest_msgs
     }
 }
 

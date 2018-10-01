@@ -258,7 +258,7 @@ mod tests {
     fn example_usage() {
         let (sender0, sender1, sender2, sender3, sender4) = (0, 1, 2, 3, 4); // miner identities
         let (weight0, weight1, weight2, weight3, weight4) =
-            (1.0, 1.0, 2.0, 1.0, 1.1); // and their corresponding weights
+            (1.0, 1.0, 2.0, 1.0, 1.1); // and their corresponding sender_state
         let senders_weights = SendersWeight::new(
             [
                 (sender0, weight0),
@@ -270,7 +270,7 @@ mod tests {
                 .cloned()
                 .collect(),
         );
-        let weights = SenderState::new(
+        let sender_state = SenderState::new(
             senders_weights.clone(),
             Some(0.0),            // state fault weight
             None,           // latest messages
@@ -309,27 +309,27 @@ mod tests {
             "genesis block with None as prevblock"
         );
         let proto_b1 = Block::new(None, sender1, txs.clone());
-        let (m1, weights) = BlockMsg::from_msgs(
+        let (m1, sender_state1) = BlockMsg::from_msgs(
             proto_b1.get_sender(),
             vec![&genesis_block_msg],
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
-            &weights,
+            &sender_state,
             Some(proto_b1), // data
         ).unwrap();
         let proto_b2 = Block::new(None, sender2, txs.clone());
-        let (m2, weights) = BlockMsg::from_msgs(
+        let (m2, sender_state2) = BlockMsg::from_msgs(
             proto_b2.get_sender(),
             vec![&genesis_block_msg],
             None,
-            &weights,
+            &sender_state,
             Some(proto_b2),
         ).unwrap();
         let proto_b3 = Block::new(None, sender3, txs.clone());
-        let (m3, weights) = BlockMsg::from_msgs(
+        let (m3, sender_state3) = BlockMsg::from_msgs(
             proto_b3.get_sender(),
             vec![&m1, &m2],
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
-            &weights,
+            &sender_state,
             Some(proto_b3),
         ).unwrap();
 
@@ -340,11 +340,11 @@ mod tests {
         );
 
         let proto_b4 = Block::new(None, sender4, txs.clone());
-        let (m4, weights) = BlockMsg::from_msgs(
+        let (m4, sender_state4) = BlockMsg::from_msgs(
             proto_b4.get_sender(),
             vec![&m1],
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
-            &weights,
+            &sender_state,
             Some(proto_b4),
         ).unwrap();
 
@@ -357,11 +357,11 @@ mod tests {
         let proto_b5 = Block::new(None, sender0, txs.clone());
         // println!("\n3 {:?}", m3);
         // println!("\n4 {:?}", m4);
-        let (m5, weights) = BlockMsg::from_msgs(
+        let (m5, sender_state) = BlockMsg::from_msgs(
             proto_b5.get_sender(),
             vec![&m3, &m2],
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
-            &weights,
+            &sender_state,
             Some(proto_b5),
         ).unwrap();
         // println!("\nm5 {:?}", m5);
@@ -387,7 +387,7 @@ mod tests {
         let (senderg, sender0, sender1, sender2, sender3, sender4, sender5) =
             (0, 1, 2, 3, 4, 5, 6); // miner identities
         let (weightg, weight0, weight1, weight2, weight3, weight4, weight5) =
-            (1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.0); // and their corresponding weights
+            (1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.0); // and their corresponding sender_state
         let senders_weights = SendersWeight::new(
             [
                 (senderg, weightg),
@@ -401,7 +401,7 @@ mod tests {
                 .cloned()
                 .collect(),
         );
-        let weights = SenderState::new(
+        let sender_state = SenderState::new(
             senders_weights.clone(),
             Some(0.0),            // state fault weight
             None,           // latest messages
@@ -427,27 +427,27 @@ mod tests {
         //     "genesis block with None as prevblock"
         // );
         let proto_b0 = Block::new(None, sender0, txs.clone());
-        let (m0, weights) = BlockMsg::from_msgs(
+        let (m0, sender_state) = BlockMsg::from_msgs(
             proto_b0.get_sender(),
             vec![&genesis_block_msg],
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
-            &weights,
+            &sender_state,
             Some(proto_b0), // data
         ).unwrap();
         let proto_b1 = Block::new(None, sender1, txs.clone());
-        let (m1, weights) = BlockMsg::from_msgs(
+        let (m1, sender_state) = BlockMsg::from_msgs(
             proto_b1.get_sender(),
             vec![&m0],
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
-            &weights,
+            &sender_state,
             Some(proto_b1),
         ).unwrap();
         let proto_b2 = Block::new(None, sender2, txs.clone());
-        let (m2, weights) = BlockMsg::from_msgs(
+        let (m2, sender_state) = BlockMsg::from_msgs(
             proto_b2.get_sender(),
             vec![&genesis_block_msg],
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
-            &weights,
+            &sender_state,
             Some(proto_b2),
         ).unwrap();
 
@@ -458,11 +458,11 @@ mod tests {
         // );
 
         let proto_b3 = Block::new(None, sender3, txs.clone());
-        let (m3, weights) = BlockMsg::from_msgs(
+        let (m3, sender_state) = BlockMsg::from_msgs(
             proto_b3.get_sender(),
             vec![&m2],
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
-            &weights,
+            &sender_state,
             Some(proto_b3),
         ).unwrap();
 
@@ -475,11 +475,11 @@ mod tests {
         let proto_b4 = Block::new(None, sender4, txs.clone());
         // println!("\n3 {:?}", m2);
         // println!("\n4 {:?}", m3);
-        let (m4, weights) = BlockMsg::from_msgs(
+        let (m4, sender_state) = BlockMsg::from_msgs(
             proto_b4.get_sender(),
             vec![&m2],
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
-            &weights,
+            &sender_state,
             Some(proto_b4),
         ).unwrap();
         // assert_eq!(
@@ -490,11 +490,11 @@ mod tests {
 
         let proto_b5 = Block::new(None, sender5, txs.clone());
 
-        let (m5, weights) = BlockMsg::from_msgs(
+        let (m5, sender_state) = BlockMsg::from_msgs(
             proto_b5.get_sender(),
             vec![&m0, &m1, &m2, &m3, &m4],
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
-            &weights,
+            &sender_state,
             Some(proto_b5),
         ).unwrap();
 

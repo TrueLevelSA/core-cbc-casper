@@ -7,7 +7,7 @@ use std::sync::{Arc};
 use rayon::prelude::*;
 
 use traits::{Estimate, Zero, Sender, Data};
-use justification::{Justification, SenderState, LatestMsgs};
+use justification::{Justification, SenderState, LatestMsgs, LatestMsgsHonest};
 use weight_unit::{WeightUnit};
 use senders_weight::SendersWeight;
 
@@ -61,9 +61,12 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
             Err("None of the messages could be added to the state!")
         }
         else {
-            let estimate = justification.mk_estimate(
-                finalized_msg,
+            let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(
+                sender_state.get_latest_msgs(),
                 sender_state.get_equivocators(),
+            );
+            let estimate = latest_msgs_honest.mk_estimate(
+                finalized_msg,
                 &sender_state.get_senders_weights(),
                 external_data,
             );
