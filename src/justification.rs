@@ -618,7 +618,7 @@ mod justification {
         let v1_prime = &VoteCount::create_vote_msg(1, false);
         let v2 = &VoteCount::create_vote_msg(2, true);
         let v2_prime = &VoteCount::create_vote_msg(2, false);
-        let weights = SenderState {
+        let sender_state = SenderState {
             senders_weights: senders_weights.clone(),
             state_fault_weight: Some(0.0),
             my_last_msg: None,
@@ -629,21 +629,21 @@ mod justification {
         let mut j = Justification::new();
         let sorted_msgs = j.sort_by_faultweight(
             senders_weights,
-            weights.get_equivocators().clone(),
+            sender_state.get_equivocators().clone(),
             vec![v2, v2_prime, v1, v1_prime, v0, v0_prime]
                 .iter()
                 .cloned()
                 .collect(),
         );
-        let (_, weights) = sorted_msgs.iter().fold(
-            (false, weights),
-            |(success, weights), m| {
-                let (s, w) = j.faulty_insert(m, &weights);
+        let (_, sender_state) = sorted_msgs.iter().fold(
+            (false, sender_state),
+            |(success, sender_state), m| {
+                let (s, w) = j.faulty_insert(m, &sender_state);
                 (s || success, w)
             },
         );
         assert_eq!(j.len(), 5);
-        assert_eq!(weights.state_fault_weight, Some(3.0));
+        assert_eq!(sender_state.state_fault_weight, Some(3.0));
     }
     #[test]
     fn faulty_inserts() {
@@ -654,7 +654,7 @@ mod justification {
         let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
         let v1 = &VoteCount::create_vote_msg(1, true);
         let mut j0 = Justification::new();
-        let weights = SenderState {
+        let sender_state = SenderState {
             senders_weights: senders_weights.clone(),
             state_fault_weight: Some(0.0),
             my_last_msg: None,
@@ -663,13 +663,13 @@ mod justification {
             latest_msgs: LatestMsgs::new(),
         };
         let (success, _) =
-            j0.faulty_inserts([v0].iter().cloned().collect(), &weights);
+            j0.faulty_inserts([v0].iter().cloned().collect(), &sender_state);
         assert!(success);
         let (m0, _weights) = &Message::from_msgs(
             0,
             vec![v0],
             None,
-            &weights,
+            &sender_state,
             None as Option<VoteCount>,
         ).unwrap();
         // let m0 = &Message::new(0, justification, estimate);
