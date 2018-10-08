@@ -165,7 +165,7 @@ mod count_votes {
         let mut j0 = Justification::new();
         let weights = SenderState::new(
             senders_weights,
-            Some(0.0),
+            (0.0),
             None,
             LatestMsgs::new(),
             2.0,

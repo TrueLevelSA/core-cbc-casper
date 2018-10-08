@@ -272,7 +272,7 @@ mod tests {
         );
         let sender_state = SenderState::new(
             senders_weights.clone(),
-            Some(0.0),            // state fault weight
+            (0.0),            // state fault weight
             None,           // latest messages
             LatestMsgs::new(),
             1.0,            // subjective fault weight threshold
@@ -403,7 +403,7 @@ mod tests {
         );
         let sender_state = SenderState::new(
             senders_weights.clone(),
-            Some(0.0),            // state fault weight
+            (0.0),            // state fault weight
             None,           // latest messages
             LatestMsgs::new(),
             1.0,            // subjective fault weight threshold
