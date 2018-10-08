@@ -83,8 +83,7 @@ impl Block {
 
         if Block::is_valid(&block) {
             Ok(block)
-        }
-        else {
+        } else {
             Err("Block not valid")
         }
     }
@@ -97,25 +96,97 @@ impl Block {
                 .unwrap_or(false)
     }
     pub fn safety_oracle(
+        block: Block,
         latest_msgs_honest: &LatestMsgsHonest<BlockMsg>,
-        validator: &<BlockMsg as CasperMsg>::Sender,
         equivocators: &HashSet<<BlockMsg as CasperMsg>::Sender>,
-        all_honest_senders: &HashSet<<BlockMsg as CasperMsg>::Sender>,
     ) -> bool {
-        let (val_msgs, rest): (HashSet<_>, HashSet<_>) = latest_msgs_honest
+        fn latest_in_justification(
+            j: &Justification<BlockMsg>,
+            equivocators: &HashSet<<BlockMsg as CasperMsg>::Sender>,
+        ) -> HashMap<<BlockMsg as CasperMsg>::Sender, BlockMsg> {
+            LatestMsgsHonest::from_latest_msgs(
+                &LatestMsgs::from(j),
+                equivocators,
+            ).iter()
+                .map(|m| (m.get_sender().clone(), m.clone()))
+                .collect()
+        }
+        let latest_containing_block: HashSet<&BlockMsg> = latest_msgs_honest
             .iter()
-            .partition(|&msg| msg.get_sender() == validator);
-        let val_latests_msg: &BlockMsg = *val_msgs.iter().next().unwrap();
-        let msg_for_prop = val_latests_msg
-            .get_msg_for_proposition(all_honest_senders)
+            .filter(|&msg| block.is_member(&Block::from(msg)))
+            .collect();
+        let latest_in_sender_view: HashMap<
+            <BlockMsg as CasperMsg>::Sender,
+            HashMap<<BlockMsg as CasperMsg>::Sender, BlockMsg>,
+        > = latest_containing_block
             .iter()
-            .next()
-            .cloned()
-            .unwrap();
-        let prop = Block::from(&msg_for_prop);
-        rest.iter()
-            .all(|&msg| prop.is_member(&Block::from(msg)))
+            .map(|m| {
+                (
+                    m.get_sender().clone(),
+                    latest_in_justification(
+                        m.get_justification(),
+                        equivocators,
+                    ),
+                )
+            })
+            .collect();
+        let latest_agreeing_in_sender_view: HashMap<
+            <BlockMsg as CasperMsg>::Sender,
+            HashMap<&<BlockMsg as CasperMsg>::Sender, &BlockMsg>,
+        > = latest_in_sender_view
+            .iter()
+            .map(|(sender, view)| {
+                (
+                    sender.clone(),
+                    view.iter()
+                        .filter(|(_sender, msg)| {
+                            block.is_member(&Block::from(*msg))
+                        })
+                        .collect(),
+                )
+            })
+            .collect();
+        let _neighbours: HashMap<
+            <BlockMsg as CasperMsg>::Sender,
+            HashSet<&<BlockMsg as CasperMsg>::Sender>,
+        > = latest_agreeing_in_sender_view
+            .iter()
+            .map(|(sender, seen_agreeing)| {
+                (
+                    sender.clone(),
+                    seen_agreeing
+                        .keys()
+                        .filter(|senderb| {
+                            latest_agreeing_in_sender_view[senderb]
+                                .contains_key(&sender.clone())
+                        })
+                        .cloned()
+                        .collect(),
+                )
+            })
+            .collect();
+        true
     }
+    // pub fn safety_oracle(
+    //     latest_msgs_honest: &LatestMsgsHonest<BlockMsg>,
+    //     validator: &<BlockMsg as CasperMsg>::Sender,
+    //     equivocators: &HashSet<<BlockMsg as CasperMsg>::Sender>,
+    //     all_honest_senders: &HashSet<<BlockMsg as CasperMsg>::Sender>,
+    // ) -> bool {
+    //     let (val_msgs, rest): (HashSet<_>, HashSet<_>) = latest_msgs_honest
+    //         .iter()
+    //         .partition(|&msg| msg.get_sender() == validator);
+    //     let val_latests_msg: &BlockMsg = *val_msgs.iter().next().unwrap();
+    //     let msg_for_prop = val_latests_msg
+    //         .get_msg_for_proposition(all_honest_senders)
+    //         .iter()
+    //         .next()
+    //         .cloned()
+    //         .unwrap();
+    //     let prop = Block::from(&msg_for_prop);
+    //     rest.iter()
+    //         .all(|&msg| prop.is_member(&Block::from(msg)))
+    // }
 
     //TODO: this should possibly go to Estimate trait (not sure)
     pub fn set_as_final(&mut self) -> () {
@@ -149,18 +220,17 @@ impl Block {
                         visited.get_mut(&parent).map(|parents_children| {
                             parents_children.insert(child);
                         });
-                    }
-                    else {
+                    } else {
                         // println!("didnt visit parent before, set initial state, and push to queue");
                         let mut parents_children = HashSet::new();
                         parents_children.insert(child);
                         visited.insert(parent.clone(), parents_children);
                         queue.push_back(parent);
                     }
-                },
+                }
                 None => {
                     genesis.insert(child);
-                },
+                }
             };
         }
         (visited, genesis)
@@ -185,8 +255,7 @@ impl Block {
                 // TODO: break ties with blockhash
                 if weight > b_weight {
                     (Some(block.clone()), weight, children.clone())
-                }
-                else {
+                } else {
                     (b_block, b_weight, b_children)
                 }
             })
@@ -195,8 +264,7 @@ impl Block {
             if b_children.is_empty() {
                 // base case
                 Some((b_block, b_weight, b_children))
-            }
-            else {
+            } else {
                 // recurse
                 Self::pick_heaviest(&b_children, visited, &weights)
             }
@@ -237,7 +305,7 @@ impl Estimate for Block {
                 // only msg to built on top, no choice thus no ghost
                 let msg = latest_msgs.iter().next().cloned();
                 Self::from_prevblock_msg(msg, incomplete_block).unwrap()
-            },
+            }
             (_, Some(incomplete_block)) => {
                 let prevblock =
                     Block::ghost(latest_msgs, finalized_msg, senders_weights);
@@ -246,7 +314,7 @@ impl Estimate for Block {
                     ..(**incomplete_block.0).clone()
                 });
                 block
-            },
+            }
         }
     }
 }
@@ -272,8 +340,8 @@ mod tests {
         );
         let sender_state = SenderState::new(
             senders_weights.clone(),
-            (0.0),            // state fault weight
-            None,           // latest messages
+            (0.0), // state fault weight
+            None,  // latest messages
             LatestMsgs::new(),
             1.0,            // subjective fault weight threshold
             HashSet::new(), // equivocators
@@ -403,8 +471,8 @@ mod tests {
         );
         let sender_state = SenderState::new(
             senders_weights.clone(),
-            (0.0),            // state fault weight
-            None,           // latest messages
+            (0.0), // state fault weight
+            None,  // latest messages
             LatestMsgs::new(),
             1.0,            // subjective fault weight threshold
             HashSet::new(), // equivocators
