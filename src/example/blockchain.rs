@@ -95,11 +95,13 @@ impl Block {
                 .map(|prevblock| self.is_member(prevblock))
                 .unwrap_or(false)
     }
-    pub fn safety_oracle(
+    pub fn safety_oracles(
         block: Block,
         latest_msgs_honest: &LatestMsgsHonest<BlockMsg>,
         equivocators: &HashSet<<BlockMsg as CasperMsg>::Sender>,
-    ) -> bool {
+        safety_oracle_threshold: WeightUnit,
+        weights: &SendersWeight<Validator>,
+    ) -> Vec<HashSet<<BlockMsg as CasperMsg>::Sender>> {
         fn latest_in_justification(
             j: &Justification<BlockMsg>,
             equivocators: &HashSet<<BlockMsg as CasperMsg>::Sender>,
@@ -146,7 +148,7 @@ impl Block {
                 )
             })
             .collect();
-        let _neighbours: HashMap<
+        let neighbours: HashMap<
             <BlockMsg as CasperMsg>::Sender,
             HashSet<&<BlockMsg as CasperMsg>::Sender>,
         > = latest_agreeing_in_sender_view
@@ -165,7 +167,60 @@ impl Block {
                 )
             })
             .collect();
-        true
+        fn bron_kerbosch<'z>(
+            r: HashSet<&'z <BlockMsg as CasperMsg>::Sender>,
+            p: HashSet<&'z <BlockMsg as CasperMsg>::Sender>,
+            x: HashSet<&<BlockMsg as CasperMsg>::Sender>,
+            mx_clqs: &mut Vec<HashSet<<BlockMsg as CasperMsg>::Sender>>,
+            neighbours: HashMap<
+                <BlockMsg as CasperMsg>::Sender,
+                HashSet<&'z <BlockMsg as CasperMsg>::Sender>,
+            >,
+        ) {
+            if p.is_empty() && x.is_empty() {
+                let rnew: HashSet<
+                    <BlockMsg as CasperMsg>::Sender,
+                > = r.iter().cloned().map(|x| x.clone()).collect();
+                mx_clqs.push(rnew);
+            } else {
+                let piter = p.clone();
+                let mut p = p.clone();
+                let mut x = x.clone();
+                piter.iter().for_each(|i| {
+                    p.remove(i);
+                    let mut rnew = r.clone();
+                    rnew.insert(i.clone());
+                    let pnew: HashSet<
+                        &<BlockMsg as CasperMsg>::Sender,
+                    > = p.intersection(&neighbours[i]).cloned().collect();
+                    let xnew: HashSet<
+                        &<BlockMsg as CasperMsg>::Sender,
+                    > = x.intersection(&neighbours[i]).cloned().collect();
+                    x.insert(i);
+                    bron_kerbosch(rnew, pnew, xnew, mx_clqs, neighbours.clone())
+                })
+            }
+        }
+        let p = neighbours.iter().fold(HashSet::new(), |acc, (_sender, x)| {
+            acc.union(x).cloned().collect()
+        });
+        let mut mx_clqs = Vec::new();
+        bron_kerbosch(
+            HashSet::new(),
+            p,
+            HashSet::new(),
+            &mut mx_clqs,
+            neighbours,
+        );
+        mx_clqs
+            .iter()
+            .filter(|x| {
+                x.iter().fold(WeightUnit::ZERO, |acc, sender| {
+                    acc + weights.get_weight(sender).unwrap_or(::std::f64::NAN)
+                }) > safety_oracle_threshold
+            })
+            .cloned()
+            .collect()
     }
     // pub fn safety_oracle(
     //     latest_msgs_honest: &LatestMsgsHonest<BlockMsg>,
