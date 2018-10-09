@@ -149,13 +149,13 @@ impl Block {
             })
             .collect();
         let neighbours: HashMap<
-            <BlockMsg as CasperMsg>::Sender,
+            &<BlockMsg as CasperMsg>::Sender,
             HashSet<&<BlockMsg as CasperMsg>::Sender>,
         > = latest_agreeing_in_sender_view
             .iter()
             .map(|(sender, seen_agreeing)| {
                 (
-                    sender.clone(),
+                    sender,
                     seen_agreeing
                         .keys()
                         .filter(|senderb| {
@@ -173,7 +173,7 @@ impl Block {
             x: HashSet<&<BlockMsg as CasperMsg>::Sender>,
             mx_clqs: &mut Vec<HashSet<<BlockMsg as CasperMsg>::Sender>>,
             neighbours: HashMap<
-                <BlockMsg as CasperMsg>::Sender,
+                &'z <BlockMsg as CasperMsg>::Sender,
                 HashSet<&'z <BlockMsg as CasperMsg>::Sender>,
             >,
         ) {
