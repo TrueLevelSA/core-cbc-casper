@@ -9,5 +9,5 @@ pub mod justification;
 pub mod senders_weight;
 pub mod traits;
 
-mod example;
+pub mod example;
 
