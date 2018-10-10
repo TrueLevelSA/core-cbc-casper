@@ -170,12 +170,12 @@ impl Block {
             if p.is_empty() && x.is_empty() {
                 let rnew: BTreeSet<
                     <BlockMsg as CasperMsg>::Sender,
-                > = r.iter().cloned().map(|x| x.clone()).collect();
+                > = r.into_iter().map(|x| x.clone()).collect();
                 mx_clqs.insert(rnew);
             } else {
                 let piter = p.clone();
-                let mut p = p.clone();
-                let mut x = x.clone();
+                let mut p = p;
+                let mut x = x;
                 piter.into_iter().for_each(|i| {
                     p.remove(i);
                     let mut rnew = r.clone();
@@ -203,13 +203,12 @@ impl Block {
             neighbours,
         );
         mx_clqs
-            .iter()
+            .into_iter()
             .filter(|x| {
                 x.iter().fold(WeightUnit::ZERO, |acc, sender| {
                     acc + weights.get_weight(sender).unwrap_or(::std::f64::NAN)
                 }) > safety_oracle_threshold
             })
-            .cloned()
             .collect()
     }
     // pub fn safety_oracle(
