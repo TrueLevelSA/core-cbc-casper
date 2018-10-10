@@ -165,8 +165,7 @@ impl Block {
                 )
             })
             .collect();
-        println!("neighbours: {:?}", neighbours);
-
+        // println!("neighbours: {:?}", neighbours);
         fn bron_kerbosch<'z>(
             r: HashSet<&'z <BlockMsg as CasperMsg>::Sender>,
             p: HashSet<&'z <BlockMsg as CasperMsg>::Sender>,
@@ -177,7 +176,7 @@ impl Block {
                 HashSet<&'z <BlockMsg as CasperMsg>::Sender>,
             >,
         ) {
-            println!("recursed");
+            // println!("recursed");
             if p.is_empty() && x.is_empty() {
                 let rnew: BTreeSet<
                     <BlockMsg as CasperMsg>::Sender,
