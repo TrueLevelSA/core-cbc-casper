@@ -707,11 +707,10 @@ mod tests {
             Some(proto_b3.clone()),
         ).unwrap();
 
-
         // clique, since both senders have seen each other having proto_b0 in the chain
         assert_eq!(
             Block::safety_oracles(
-                proto_b0,
+                proto_b0.clone(),
                 &LatestMsgsHonest::from_latest_msgs(
                     sender_state.get_latest_msgs(),
                     sender_state.get_equivocators()
@@ -722,5 +721,63 @@ mod tests {
             ),
             HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1]])])
         );
-    }
+
+        let proto_b4 = Block::new(Some(proto_b3.clone()), senders[2], txs.clone());
+        let (m4, sender_state) = BlockMsg::from_msgs(
+            proto_b4.get_sender(),
+            vec![&m3],
+            None,
+            &sender_state,
+            Some(proto_b4.clone()),
+        ).unwrap();
+
+        let proto_b5 = Block::new(Some(proto_b4.clone()), senders[1], txs.clone());
+        let (m5, sender_state) = BlockMsg::from_msgs(
+            proto_b5.get_sender(),
+            vec![&m4],
+            None,
+            &sender_state,
+            Some(proto_b5.clone()),
+        ).unwrap();
+
+        // no second clique yet, since senders[2] has not seen senders[1] seeing senders[2] having proto_b0.clone() in the chain
+        assert_eq!(
+            Block::safety_oracles(
+                proto_b0.clone(),
+                &LatestMsgsHonest::from_latest_msgs(
+                    sender_state.get_latest_msgs(),
+                    sender_state.get_equivocators()
+                ),
+                sender_state.get_equivocators(),
+                1.0,
+                &senders_weights
+            ),
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1]])])
+        );
+
+        let proto_b6 = Block::new(Some(proto_b5.clone()), senders[2], txs.clone());
+        let (m6, sender_state) = BlockMsg::from_msgs(
+            proto_b6.get_sender(),
+            vec![&m5],
+            None,
+            &sender_state,
+            Some(proto_b5.clone()),
+        ).unwrap();
+
+        // have two cliques now
+        assert_eq!(
+            Block::safety_oracles(
+                proto_b0.clone(),
+                &LatestMsgsHonest::from_latest_msgs(
+                    sender_state.get_latest_msgs(),
+                    sender_state.get_equivocators()
+                ),
+                sender_state.get_equivocators(),
+                1.0,
+                &senders_weights
+            ),
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1]]),
+                                    BTreeSet::from_iter(vec![senders[1], senders[2]])])
+        );
+      }
 }
