@@ -627,14 +627,14 @@ mod tests {
             &Block::new(Some(Block::from(&m4)), sender5, txs.clone()),
             "should build on top of "
         );
-
     }
 
     #[test]
     fn safety_oracles() {
         let nodes = 3;
         let senders: Vec<u32> = (0..nodes).collect();
-        let weights: Vec<f64> = iter::repeat(1.0).take(nodes as usize).collect();
+        let weights: Vec<f64> =
+            iter::repeat(1.0).take(nodes as usize).collect();
 
         let senders_weights = SendersWeight::new(
             senders
@@ -646,8 +646,8 @@ mod tests {
 
         let sender_state = SenderState::new(
             senders_weights.clone(),
-            0.0, // state fault weight
-            None,  // latest messages
+            0.0,  // state fault weight
+            None, // latest messages
             LatestMsgs::new(),
             1.0,            // subjective fault weight threshold
             HashSet::new(), // equivocators
@@ -662,10 +662,10 @@ mod tests {
             txs: txs.clone(),
         });
         let latest_msgs = Justification::new();
-        let m0 =
-            BlockMsg::new(senders[0], latest_msgs, proto_b0.clone());
+        let m0 = BlockMsg::new(senders[0], latest_msgs, proto_b0.clone());
 
-        let proto_b1 = Block::new(Some(proto_b0.clone()), senders[1], txs.clone());
+        let proto_b1 =
+            Block::new(Some(proto_b0.clone()), senders[1], txs.clone());
         let (m1, sender_state) = BlockMsg::from_msgs(
             proto_b1.get_sender(),
             vec![&m0],
@@ -674,7 +674,8 @@ mod tests {
             Some(proto_b1.clone()),
         ).unwrap();
 
-        let proto_b2 = Block::new(Some(proto_b1.clone()), senders[0], txs.clone());
+        let proto_b2 =
+            Block::new(Some(proto_b1.clone()), senders[0], txs.clone());
         let (m2, sender_state) = BlockMsg::from_msgs(
             proto_b2.get_sender(),
             vec![&m1],
@@ -698,7 +699,8 @@ mod tests {
             HashSet::new()
         );
 
-        let proto_b3 = Block::new(Some(proto_b2.clone()), senders[1], txs.clone());
+        let proto_b3 =
+            Block::new(Some(proto_b2.clone()), senders[1], txs.clone());
         let (m3, sender_state) = BlockMsg::from_msgs(
             proto_b3.get_sender(),
             vec![&m2],
@@ -719,10 +721,13 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1]])])
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![
+                senders[0], senders[1],
+            ])])
         );
 
-        let proto_b4 = Block::new(Some(proto_b3.clone()), senders[2], txs.clone());
+        let proto_b4 =
+            Block::new(Some(proto_b3.clone()), senders[2], txs.clone());
         let (m4, sender_state) = BlockMsg::from_msgs(
             proto_b4.get_sender(),
             vec![&m3],
@@ -731,7 +736,8 @@ mod tests {
             Some(proto_b4.clone()),
         ).unwrap();
 
-        let proto_b5 = Block::new(Some(proto_b4.clone()), senders[1], txs.clone());
+        let proto_b5 =
+            Block::new(Some(proto_b4.clone()), senders[1], txs.clone());
         let (m5, sender_state) = BlockMsg::from_msgs(
             proto_b5.get_sender(),
             vec![&m4],
@@ -752,10 +758,13 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1]])])
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![
+                senders[0], senders[1],
+            ])])
         );
 
-        let proto_b6 = Block::new(Some(proto_b5.clone()), senders[2], txs.clone());
+        let proto_b6 =
+            Block::new(Some(proto_b5.clone()), senders[2], txs.clone());
         let (m6, sender_state) = BlockMsg::from_msgs(
             proto_b6.get_sender(),
             vec![&m5],
@@ -776,8 +785,10 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1]]),
-                                    BTreeSet::from_iter(vec![senders[1], senders[2]])])
+            HashSet::from_iter(vec![
+                BTreeSet::from_iter(vec![senders[0], senders[1]]),
+                BTreeSet::from_iter(vec![senders[1], senders[2]]),
+            ])
         );
-      }
+    }
 }
