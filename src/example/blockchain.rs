@@ -847,9 +847,9 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            HashSet::from_iter(vec![
-                BTreeSet::from_iter(vec![senders[1], senders[2]]),
-            ])
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![
+                senders[1], senders[2],
+            ])])
         );
 
         let proto_b7 =
@@ -894,9 +894,9 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            HashSet::from_iter(vec![
-                BTreeSet::from_iter(vec![senders[0], senders[1], senders[2]]),
-            ])
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![
+                senders[0], senders[1], senders[2],
+            ])])
         );
         assert_eq!(
             Block::safety_oracles(
@@ -909,9 +909,9 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            HashSet::from_iter(vec![
-                BTreeSet::from_iter(vec![senders[0], senders[1], senders[2]]),
-            ])
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![
+                senders[0], senders[1], senders[2],
+            ])])
         );
     }
 }
