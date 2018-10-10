@@ -155,6 +155,7 @@ impl Block {
                 )
             })
             .collect();
+        println!("neighbours: {:?}", neighbours);
         fn bron_kerbosch<'z>(
             r: HashSet<&'z <BlockMsg as CasperMsg>::Sender>,
             p: HashSet<&'z <BlockMsg as CasperMsg>::Sender>,
@@ -165,6 +166,7 @@ impl Block {
                 HashSet<&'z <BlockMsg as CasperMsg>::Sender>,
             >,
         ) {
+            println!("recursed");
             if p.is_empty() && x.is_empty() {
                 let rnew: BTreeSet<
                     <BlockMsg as CasperMsg>::Sender,
@@ -808,6 +810,68 @@ mod tests {
             ),
             HashSet::from_iter(vec![
                 BTreeSet::from_iter(vec![senders[1], senders[2]]),
+            ])
+        );
+
+        let proto_b7 =
+            Block::new(Some(proto_b6.clone()), senders[0], txs.clone());
+        let (m7, sender_state) = BlockMsg::from_msgs(
+            proto_b7.get_sender(),
+            vec![&m6],
+            None,
+            &sender_state,
+            Some(proto_b6.clone()),
+        ).unwrap();
+
+        let proto_b8 =
+            Block::new(Some(proto_b7.clone()), senders[2], txs.clone());
+        let (m8, sender_state) = BlockMsg::from_msgs(
+            proto_b8.get_sender(),
+            vec![&m7],
+            None,
+            &sender_state,
+            Some(proto_b7.clone()),
+        ).unwrap();
+
+        let proto_b9 =
+            Block::new(Some(proto_b8.clone()), senders[0], txs.clone());
+        let (m8, sender_state) = BlockMsg::from_msgs(
+            proto_b9.get_sender(),
+            vec![&m8],
+            None,
+            &sender_state,
+            Some(proto_b8.clone()),
+        ).unwrap();
+
+        // now entire network is clique
+        assert_eq!(
+            Block::safety_oracles(
+                proto_b0.clone(),
+                &LatestMsgsHonest::from_latest_msgs(
+                    sender_state.get_latest_msgs(),
+                    sender_state.get_equivocators()
+                ),
+                sender_state.get_equivocators(),
+                1.0,
+                &senders_weights
+            ),
+            HashSet::from_iter(vec![
+                BTreeSet::from_iter(vec![senders[0], senders[1], senders[2]]),
+            ])
+        );
+        assert_eq!(
+            Block::safety_oracles(
+                proto_b2.clone(),
+                &LatestMsgsHonest::from_latest_msgs(
+                    sender_state.get_latest_msgs(),
+                    sender_state.get_equivocators()
+                ),
+                sender_state.get_equivocators(),
+                1.0,
+                &senders_weights
+            ),
+            HashSet::from_iter(vec![
+                BTreeSet::from_iter(vec![senders[0], senders[1], senders[2]]),
             ])
         );
     }
