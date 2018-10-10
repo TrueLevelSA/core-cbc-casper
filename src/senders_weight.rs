@@ -18,17 +18,24 @@ impl<S: Sender> SendersWeight<S> {
     pub fn new(senders_weight: HashMap<S, WeightUnit>) -> Self {
         SendersWeight(Arc::new(RwLock::new(senders_weight)))
     }
-
     pub fn read(&self) -> LockResult<RwLockReadGuard<HashMap<S, WeightUnit>>> {
         self.0.read()
     }
-
     pub fn write(
         &self,
     ) -> LockResult<RwLockWriteGuard<HashMap<S, WeightUnit>>> {
         self.0.write()
     }
-
+    /// returns success of insertion. failure happens if cannot unwrap self
+    pub fn insert(&mut self, k: S, v: WeightUnit) -> bool {
+        self.write()
+            .ok()
+            .map(|mut h| {
+                h.insert(k, v);
+                true
+            })
+            .unwrap_or(false)
+    }
     /// picks senders with positive weights
     pub fn get_senders(&self) -> Result<HashSet<S>, &'static str> {
         self.read().map_err(|_| "Can't unwrap SendersWeight").map(

@@ -4,7 +4,7 @@ use std::fmt::{Debug, Formatter, Result};
 
 use traits::{Zero, Estimate, Sender, Data};
 use message::{Message, CasperMsg};
-use justification::{Justification, LatestMsgsHonest};
+use justification::{Justification, LatestMsgsHonest, LatestMsgs};
 use senders_weight::{SendersWeight};
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default)]
 pub struct VoteCount {
@@ -163,8 +163,14 @@ mod count_votes {
         let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
         let v1 = &VoteCount::create_vote_msg(1, true);
         let mut j0 = Justification::new();
-        let weights =
-            SenderState::new(senders_weights, 0.0, None, 2.0, HashSet::new());
+        let weights = SenderState::new(
+            senders_weights,
+            (0.0),
+            None,
+            LatestMsgs::new(),
+            2.0,
+            HashSet::new(),
+        );
         let (success, _) =
             j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights);
         assert!(success);

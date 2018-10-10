@@ -6,7 +6,7 @@ use std::fmt::{Debug, Formatter};
 // use std::io::{Error};
 
 use rayon::collections::btree_set::Iter as ParIter;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator};
 
 use message::{CasperMsg, Message};
 use weight_unit::{WeightUnit};
@@ -69,24 +69,6 @@ impl<M: CasperMsg> Justification<M> {
     }
 
     // Custom functions
-    /// get the additional equivocators upon insertion of msg to the state. note
-    /// that if equivocator is a recurrent equivocator, it will be found again
-    /// here. i believe the weight of an equivocator has to be set to ZERO
-    /// immediately upon finding an equivocation
-    fn get_equivocators(&self, msg_new: &M) -> HashSet<M::Sender> {
-        self.par_iter()
-            .filter_map(|msg_old| {
-                if msg_old.equivocates(&msg_new) {
-                    let equivocator = msg_old.get_sender();
-                    Some(equivocator.clone())
-                }
-                else {
-                    None
-                }
-            })
-            .collect()
-    }
-
     /// insert msgs to the Justification, accepting up to $thr$ faults by
     /// weight, returns success=true if at least one msg of the set gets
     /// successfully included to the justification
@@ -95,130 +77,81 @@ impl<M: CasperMsg> Justification<M> {
         msgs: HashSet<&M>,
         sender_state: &SenderState<M>,
     ) -> (bool, SenderState<M>) {
-        /// get msgs and fault weight overhead and equivocators overhead sorted
-        /// by fault weight overhead
-        fn sort_by_faultweight<'z, M: CasperMsg>(
-            justification: &Justification<M>,
-            senders_weights: SendersWeight<M::Sender>,
-            equivocators: HashSet<M::Sender>,
-            msgs: HashSet<&'z M>,
-        ) -> Vec<&'z M> {
-            let mut msgs_sorted_by_faultw: Vec<_> = msgs
-                .iter()
-                .enumerate()
-                .filter_map(|(outer_i, &msg)| {
-                    // equivocations in relation to state
-                    let state_equivocators: HashSet<_> =
-                        justification.get_equivocators(msg);
-
-                    // equivocations present within the current latest_msgs set that
-                    // we're trying to insert to the state
-                    let pairwise_equivocators: HashSet<_> = msgs
-                        .iter()
-                    // ensures we check only once per pair [(a, b)] and not
-                    // [(a, b), (b, a)]
-                        .skip(outer_i)
-                        .filter_map(|m| {
-                            if m.equivocates(msg) { Some(m.get_sender().clone()) }
-                            else { None }
-                        })
-                        .collect();
-
-                    let msg_equivocators: HashSet<_> = state_equivocators
-                        .union(&pairwise_equivocators)
-                    // take only the equivocators that are not yet on the
-                    // equivocator set as the others already have their
-                    // weight counted into the state fault count
-                        .filter(|equivocator| !equivocators.contains(equivocator))
-                        .cloned()
-                        .collect();
-                    let msg_faultweight_overhead =
-                        senders_weights.sum_weight_senders(&msg_equivocators);
-                    // sum_weight_senders returns nan if a sender is not found
-                    if msg_faultweight_overhead.is_nan() {
-                        None
-                    }
-                    else {
-                        Some((msg, msg_faultweight_overhead))
-                    }
-                })
-                .collect();
-            let _ = msgs_sorted_by_faultw.sort_unstable_by(
-                |(_, w0), (_, w1)| {
-                    w0.partial_cmp(w1).unwrap_or(::std::cmp::Ordering::Greater) // tie breaker
-                },
-            );
-
-            // return a Vec<CasperMsg>
-            msgs_sorted_by_faultw
-                .iter()
-                .map(|(m, _)| m)
-                .cloned()
-                .collect()
-        }
-
+        let msgs = sender_state.sort_by_faultweight(msgs);
         // do the actual insertions to the state
-        sort_by_faultweight(
-            &self,
-            sender_state.senders_weights.clone(),
-            sender_state.equivocators.clone(),
-            msgs,
-        ).iter()
-            .fold(
-                (false, sender_state.clone()),
-                |(success, sender_state), &msg| {
-                    let (success_prime, sender_state_prime) =
-                        self.faulty_insert(msg, &sender_state);
-                    (success || success_prime, sender_state_prime)
-                },
-            )
+        msgs.iter().fold(
+            (false, sender_state.clone()),
+            |(success, sender_state), &msg| {
+                let (success_prime, sender_state_prime) =
+                    self.faulty_insert(msg, &sender_state);
+                (success || success_prime, sender_state_prime)
+            },
+        )
     }
 
+    /// this function makes no assumption on how to treat the equivocator. it
+    /// adds the msg to the justification only if it will not cross the fault
+    /// tolerance thr
     pub fn faulty_insert(
         &mut self,
         msg: &M,
         sender_state: &SenderState<M>,
     ) -> (bool, SenderState<M>) {
-        let sender_state = sender_state.clone();
-        let msg_equivocators_overhead: HashSet<_> = self.get_equivocators(msg)
-            .iter()
-        // take only the msg_eoquivocators_overhead that are not yet on the
-        // equivocator set as the others already have their weight counted into
-        // the state fault count
-            .filter(|equivocator| !sender_state.equivocators.contains(equivocator))
-            .cloned()
-            .collect();
-        let msg_fault_weight_overhead = sender_state
+        let mut sender_state = sender_state.clone();
+        let is_equivocation = sender_state.latest_msgs.equivocate(msg);
+        let sender = msg.get_sender();
+        let sender_weight = sender_state
             .senders_weights
-            .sum_weight_senders(&msg_equivocators_overhead);
-        let new_fault_weight =
-            sender_state.state_fault_weight + msg_fault_weight_overhead;
-        let equivocators = sender_state
-            .equivocators
-            .union(&msg_equivocators_overhead)
-            .cloned()
-            .collect();
-
-        if new_fault_weight <= sender_state.thr {
-            let success = self.insert(msg.clone());
-            let sender_state = if success {
-                SenderState {
-                    state_fault_weight: new_fault_weight,
-                    equivocators,
-                    ..sender_state
+            .get_weight(sender)
+            .unwrap_or(::std::f64::INFINITY);
+        let already_in_equivocators =
+            sender_state.equivocators.contains(sender);
+        match (is_equivocation, already_in_equivocators) {
+            (false, _) | (true, true) => {
+                let success = self.insert(msg.clone());
+                if success {
+                    sender_state.latest_msgs.update(msg);
                 }
-            }
-            else {
-                sender_state
-            };
+                (success, sender_state)
+            },
+            (true, false) =>
+                if sender_weight + sender_state.state_fault_weight
+                    <= sender_state.thr
+                {
+                    let success = self.insert(msg.clone());
+                    if success {
+                        sender_state.latest_msgs.update(msg);
+                        if sender_state.equivocators.insert(sender.clone()) {
+                            sender_state.state_fault_weight += sender_weight;
+                        }
+                    }
+                    (success, sender_state)
+                }
+                else {
+                    (false, sender_state)
+                },
+        }
+    }
 
-            (success, sender_state)
+    /// this function sets the weight of the equivocator to zero right away
+    /// (returned on SenderState) and add his message to the state, since now his
+    /// equivocation doesnt count to the state fault weight anymore
+    pub fn faulty_insert_with_slash(
+        &mut self,
+        msg: &M,
+        mut sender_state: SenderState<M>,
+    ) -> (bool, SenderState<M>) {
+        let is_equivocation = sender_state.latest_msgs.equivocate(msg);
+        if is_equivocation {
+            let sender = msg.get_sender();
+            sender_state.equivocators.insert(sender.clone());
+            sender_state
+                .senders_weights
+                .insert(sender.clone(), WeightUnit::ZERO);
         }
-        // conflicting message NOT added to the set as it crosses the fault
-        // weight thr OR msg_fault_weight_overhead is NAN (from the unwrap)
-        else {
-            (false, sender_state)
-        }
+        sender_state.latest_msgs.update(msg);
+        let success = self.insert(msg.clone());
+        (success, sender_state)
     }
 
     pub fn get_subtree_weights(
@@ -313,16 +246,6 @@ impl<M: CasperMsg> Debug for Justification<M> {
     }
 }
 
-// FIXME: success should probably be out of this struct, as this struct can be
-// used to keep track of state cummulatively and success is related to a single
-// insertion
-
-// pub struct FaultyInsertResult<S: Sender> {
-//     pub success: bool,
-//     pub sender_state: SenderState<S>,
-//     // pub equivocators: HashSet<S>,
-// }
-
 pub struct LatestMsgsHonest<M: CasperMsg>(HashSet<M>);
 impl<M: CasperMsg> LatestMsgsHonest<M> {
     fn new() -> Self {
@@ -355,6 +278,14 @@ impl<M: CasperMsg> LatestMsgsHonest<M> {
     }
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+    pub fn mk_estimate(
+        &self,
+        finalized_msg: Option<&M>,
+        senders_weights: &SendersWeight<<M as CasperMsg>::Sender>,
+        data: Option<<<M as CasperMsg>::Estimate as Data>::Data>,
+    ) -> M::Estimate {
+        M::Estimate::mk_estimate(&self, finalized_msg, senders_weights, data)
     }
 }
 
@@ -390,7 +321,7 @@ impl<M: CasperMsg> LatestMsgs<M> {
     }
     pub fn update(&mut self, new_message: &M) -> bool {
         let sender: &M::Sender = new_message.get_sender();
-        if let Some(latest_msgs_from_sender) = self.clone().get(sender) {
+        if let Some(latest_msgs_from_sender) = self.get(sender).cloned() {
             let later_than_new: HashSet<M> = latest_msgs_from_sender
                 .iter()
                 .filter(|current_message| current_message.depends(new_message))
@@ -419,6 +350,13 @@ impl<M: CasperMsg> LatestMsgs<M> {
             );
             true
         }
+    }
+    fn equivocate(&self, msg_new: &M) -> bool {
+        self.get(msg_new.get_sender())
+            .map(|latest_msgs| {
+                latest_msgs.iter().any(|m| m.equivocates(&msg_new))
+            })
+            .unwrap_or(false)
     }
 }
 
@@ -454,10 +392,11 @@ impl<'z, M: CasperMsg> From<&'z Justification<M>> for LatestMsgs<M> {
 
 #[derive(Debug, Clone)]
 pub struct SenderState<M: CasperMsg> {
-    senders_weights: SendersWeight<M::Sender>,
     state_fault_weight: WeightUnit,
-    my_last_msg: Option<M>,
     thr: WeightUnit,
+    senders_weights: SendersWeight<M::Sender>,
+    my_last_msg: Option<M>,
+    latest_msgs: LatestMsgs<M>,
     equivocators: HashSet<M::Sender>, // FIXME: put it here as its needed on the same context as
 }
 
@@ -466,6 +405,7 @@ impl<M: CasperMsg> SenderState<M> {
         senders_weights: SendersWeight<M::Sender>,
         state_fault_weight: WeightUnit,
         my_last_msg: Option<M>,
+        latest_msgs: LatestMsgs<M>,
         thr: WeightUnit,
         equivocators: HashSet<M::Sender>,
     ) -> Self {
@@ -475,6 +415,7 @@ impl<M: CasperMsg> SenderState<M> {
             state_fault_weight,
             thr,
             my_last_msg,
+            latest_msgs,
         }
     }
     pub fn get_equivocators(&self) -> &HashSet<M::Sender> {
@@ -482,6 +423,57 @@ impl<M: CasperMsg> SenderState<M> {
     }
     pub fn get_senders_weights(&self) -> &SendersWeight<M::Sender> {
         &self.senders_weights
+    }
+    pub fn get_my_last_msg(&self) -> &Option<M> {
+        &self.my_last_msg
+    }
+    pub fn get_latest_msgs(&self) -> &LatestMsgs<M> {
+        &self.latest_msgs
+    }
+
+    /// get msgs and fault weight overhead and equivocators overhead sorted
+    /// by fault weight overhead
+    fn sort_by_faultweight<'z>(&self, msgs: HashSet<&'z M>) -> Vec<&'z M> {
+        let mut msgs_sorted_by_faultw: Vec<_> = msgs
+            .iter()
+            .filter_map(|&msg| {
+                // equivocations in relation to state
+                let sender = msg.get_sender();
+                let state_equivocator = if self.latest_msgs.equivocate(msg)
+                    && !self.equivocators.contains(sender)
+                {
+                    Some(sender.clone())
+                }
+                else {
+                    None
+                };
+                let msg_faultweight_overhead = state_equivocator
+                    .as_ref()
+                    .map(|sender| {
+                        self.senders_weights
+                            .get_weight(sender)
+                            .unwrap_or(::std::f64::NAN)
+                    })
+                    .unwrap_or(WeightUnit::ZERO);
+                // sum_weight_senders returns nan if a sender is not found
+                if msg_faultweight_overhead.is_nan() {
+                    None
+                }
+                else {
+                    Some((msg, msg_faultweight_overhead))
+                }
+            })
+            .collect();
+        let _ = msgs_sorted_by_faultw.sort_unstable_by(|(_, w0), (_, w1)| {
+            w0.partial_cmp(w1).unwrap_or(::std::cmp::Ordering::Greater) // tie breaker
+        });
+
+        // return a Vec<CasperMsg>
+        msgs_sorted_by_faultw
+            .iter()
+            .map(|(m, _)| m)
+            .cloned()
+            .collect()
     }
 }
 
@@ -562,35 +554,44 @@ mod justification {
         assert_eq!(weight, &30.0);
     }
 
-    #[test]
-    fn faulty_inserts_sorted() {
-        let senders_weights = SendersWeight::new(
-            [(0, 1.0), (1, 2.0), (2, 3.0)].iter().cloned().collect(),
-        );
+    // #[test]
+    // fn faulty_inserts_sorted() {
+    //     let senders_weights = SendersWeight::new(
+    //         [(0, 1.0), (1, 2.0), (2, 3.0)].iter().cloned().collect(),
+    //     );
 
-        let v0 = &VoteCount::create_vote_msg(0, false);
-        let v0_prime = &VoteCount::create_vote_msg(0, true);
-        let v1 = &VoteCount::create_vote_msg(1, true);
-        let v1_prime = &VoteCount::create_vote_msg(1, false);
-        let v2 = &VoteCount::create_vote_msg(2, true);
-        let v2_prime = &VoteCount::create_vote_msg(2, false); // equivocating vote
-        let weights = SenderState {
-            senders_weights: senders_weights.clone(),
-            state_fault_weight: 0.0,
-            my_last_msg: None,
-            thr: 3.0,
-            equivocators: HashSet::new(),
-        };
-        let (m0, weights) = &Message::from_msgs(
-            0,
-            vec![v2, v2_prime, v1, v1_prime, v0, v0_prime],
-            None,
-            &weights,
-            None as Option<VoteCount>,
-        ).unwrap();
-        assert_eq!(m0.get_justification().len(), 5);
-        assert_eq!(weights.state_fault_weight, 3.0);
-    }
+    //     let v0 = &VoteCount::create_vote_msg(0, false);
+    //     let v0_prime = &VoteCount::create_vote_msg(0, true);
+    //     let v1 = &VoteCount::create_vote_msg(1, true);
+    //     let v1_prime = &VoteCount::create_vote_msg(1, false);
+    //     let v2 = &VoteCount::create_vote_msg(2, true);
+    //     let v2_prime = &VoteCount::create_vote_msg(2, false);
+    //     let sender_state = SenderState {
+    //         senders_weights: senders_weights.clone(),
+    //         state_fault_weight: (0.0),
+    //         my_last_msg: None,
+    //         thr: 3.0,
+    //         equivocators: HashSet::new(),
+    //         latest_msgs: LatestMsgs::new(),
+    //     };
+    //     let mut j = Justification::new();
+    //     let sorted_msgs = j.sort_by_faultweight(
+    //         &sender_state,
+    //         vec![v2, v2_prime, v1, v1_prime, v0, v0_prime]
+    //             .iter()
+    //             .cloned()
+    //             .collect(),
+    //     );
+    //     let (_, sender_state) = sorted_msgs.iter().fold(
+    //         (false, sender_state),
+    //         |(success, sender_state), m| {
+    //             let (s, w) = j.faulty_insert(m, &sender_state);
+    //             (s || success, w)
+    //         },
+    //     );
+    //     assert_eq!(j.len(), 5);
+    //     assert_eq!(sender_state.state_fault_weight, 3.0);
+    // }
     #[test]
     fn faulty_inserts() {
         let senders_weights = SendersWeight::new(
@@ -600,124 +601,92 @@ mod justification {
         let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
         let v1 = &VoteCount::create_vote_msg(1, true);
         let mut j0 = Justification::new();
-        let weights = SenderState {
+        let sender_state = SenderState {
             senders_weights: senders_weights.clone(),
-            state_fault_weight: 0.0,
+            state_fault_weight: (0.0),
             my_last_msg: None,
             thr: 0.0,
             equivocators: HashSet::new(),
+            latest_msgs: LatestMsgs::new(),
         };
-        let (success, _) =
-            j0.faulty_inserts([v0].iter().cloned().collect(), &weights);
+        let (success, sender_state) =
+            j0.faulty_inserts([v0].iter().cloned().collect(), &sender_state);
         assert!(success);
         let (m0, _weights) = &Message::from_msgs(
             0,
             vec![v0],
             None,
-            &weights,
+            &sender_state,
             None as Option<VoteCount>,
         ).unwrap();
         // let m0 = &Message::new(0, justification, estimate);
         let mut j1 = Justification::new();
-        let (success, _) = j1.faulty_inserts(
-            vec![v1].iter().cloned().collect(),
-            &SenderState {
-                senders_weights: senders_weights.clone(),
-                state_fault_weight: 0.0,
-                my_last_msg: None,
-                thr: 0.0,
-                equivocators: HashSet::new(),
-            },
-        );
+        let (success, sender_state) = j1
+            .faulty_inserts(vec![v1].iter().cloned().collect(), &sender_state);
         assert!(success);
-        let (success, _) = j1.faulty_inserts(
-            vec![m0].iter().cloned().collect(),
-            &SenderState {
-                senders_weights: senders_weights.clone(),
-                state_fault_weight: 0.0,
-                my_last_msg: None,
-                thr: 0.0,
-                equivocators: HashSet::new(),
-            },
-        );
+        let (success, sender_state) = j1
+            .faulty_inserts(vec![m0].iter().cloned().collect(), &sender_state);
         assert!(success);
-        let (success, _) = j1.faulty_inserts(
-            vec![v0_prime].iter().cloned().collect(),
-            &SenderState {
-                senders_weights: senders_weights.clone(),
-                state_fault_weight: 0.0,
-                my_last_msg: None,
-                thr: 0.0,
-                equivocators: HashSet::new(),
-            },
-        );
+        let (success, sender_state) = j1.faulty_insert(v0_prime, &sender_state);
         assert!(
             !success,
             "$v0_prime$ should conflict with $v0$ through $m0$, and we should reject as our fault tolerance thr is zero"
         );
-        let (success, _) = j1.clone().faulty_inserts(
-            vec![v0_prime].iter().cloned().collect(),
+        let (success, _) = j1.clone().faulty_insert(
+            v0_prime,
             &SenderState {
                 senders_weights: senders_weights.clone(),
-                state_fault_weight: 0.0,
+                state_fault_weight: (0.0),
                 my_last_msg: None,
                 thr: 1.0,
                 equivocators: HashSet::new(),
+                latest_msgs: LatestMsgs::new(),
             },
         );
         assert!(success,
             "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set"
         );
-        let (_, sender_state) = j1.clone().faulty_inserts(
-            vec![v0_prime].iter().cloned().collect(),
+        let (_, sender_state2) = j1.clone().faulty_insert(
+            v0_prime,
             &SenderState {
-                senders_weights: senders_weights.clone(),
-                state_fault_weight: 0.0,
-                my_last_msg: None,
                 thr: 1.0,
-                equivocators: HashSet::new(),
+                ..sender_state.clone()
             },
         );
         assert_eq!(
-            sender_state.state_fault_weight, 1.0,
+            sender_state2.state_fault_weight, 1.0,
             "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept
 this fault as it doesnt cross the fault threshold for the set, and thus the
 state_fault_weight should be incremented to 1.0"
         );
-        let (success, _) = j1.clone().faulty_inserts(
-            vec![v0_prime].iter().cloned().collect(),
+        let (success, _) = j1.clone().faulty_insert(
+            v0_prime,
             &SenderState {
-                senders_weights: senders_weights.clone(),
-                state_fault_weight: 0.1,
-                my_last_msg: None,
+                state_fault_weight: (0.1),
                 thr: 1.0,
-                equivocators: HashSet::new(),
+                ..sender_state.clone()
             },
         );
         assert!(!success,
             "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as the fault threshold gets crossed for the set"
         );
-        let (_, sender_state) = j1.clone().faulty_inserts(
-            vec![v0_prime].iter().cloned().collect(),
+        let (_, sender_state2) = j1.clone().faulty_insert(
+            v0_prime,
             &SenderState {
-                senders_weights: senders_weights.clone(),
-                state_fault_weight: 0.1,
-                my_last_msg: None,
+                state_fault_weight: (0.1),
                 thr: 1.0,
-                equivocators: HashSet::new(),
+                ..sender_state.clone()
             },
         );
-        assert_eq!(sender_state.state_fault_weight, 0.1,
+        assert_eq!(sender_state2.state_fault_weight, 0.1,
             "$v0_prime$ conflicts with $v0$ through $m0$, and we should NOT accept this fault as the fault threshold gets crossed for the set, and thus the state_fault_weight should not be incremented"
         );
-        let (success, _) = j1.clone().faulty_inserts(
-            vec![v0_prime].iter().cloned().collect(),
+        let (success, _) = j1.clone().faulty_insert(
+            v0_prime,
             &SenderState {
-                senders_weights: senders_weights.clone(),
-                state_fault_weight: 1.0,
-                my_last_msg: None,
+                state_fault_weight: (1.0),
                 thr: 2.0,
-                equivocators: HashSet::new(),
+                ..sender_state.clone()
             },
         );
         assert!(success,
@@ -726,28 +695,28 @@ state_fault_weight should be incremented to 1.0"
 
         let senders_weights = SendersWeight::new([].iter().cloned().collect());
         // bug found
-        let (success, _) = j1.clone().faulty_inserts(
-            vec![v0_prime].iter().cloned().collect(),
+        let (success, _) = j1.clone().faulty_insert(
+            v0_prime,
             &SenderState {
                 senders_weights: senders_weights.clone(),
                 state_fault_weight: 1.0,
-                my_last_msg: None,
                 thr: 2.0,
-                equivocators: HashSet::new(),
+                ..sender_state.clone()
             },
         );
         assert!(
             !success,
             "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we can't know the weight of the sender, which could be Infinity"
         );
-        let (_, sender_state) = j1.clone().faulty_inserts(
-            vec![v0_prime].iter().cloned().collect(),
+        let (_, sender_state) = j1.clone().faulty_insert(
+            v0_prime,
             &SenderState {
                 senders_weights: senders_weights.clone(),
-                state_fault_weight: 1.0,
+                state_fault_weight: (1.0),
                 my_last_msg: None,
                 thr: 2.0,
                 equivocators: HashSet::new(),
+                latest_msgs: LatestMsgs::new(),
             },
         );
         assert_eq!(
