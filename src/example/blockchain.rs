@@ -760,7 +760,7 @@ mod tests {
             Some(proto_b5.clone()),
         ).unwrap();
 
-        // have two cliques now
+        // have two cliques on proto_b0 now
         assert_eq!(
             Block::safety_oracles(
                 proto_b0.clone(),
@@ -774,6 +774,39 @@ mod tests {
             ),
             HashSet::from_iter(vec![
                 BTreeSet::from_iter(vec![senders[0], senders[1]]),
+                BTreeSet::from_iter(vec![senders[1], senders[2]]),
+            ])
+        );
+        // also have two cliques on proto_b1
+        assert_eq!(
+            Block::safety_oracles(
+                proto_b1.clone(),
+                &LatestMsgsHonest::from_latest_msgs(
+                    sender_state.get_latest_msgs(),
+                    sender_state.get_equivocators()
+                ),
+                sender_state.get_equivocators(),
+                1.0,
+                &senders_weights
+            ),
+            HashSet::from_iter(vec![
+                BTreeSet::from_iter(vec![senders[0], senders[1]]),
+                BTreeSet::from_iter(vec![senders[1], senders[2]]),
+            ])
+        );
+        // on proto_b2, only have clique {1, 2}
+        assert_eq!(
+            Block::safety_oracles(
+                proto_b2.clone(),
+                &LatestMsgsHonest::from_latest_msgs(
+                    sender_state.get_latest_msgs(),
+                    sender_state.get_equivocators()
+                ),
+                sender_state.get_equivocators(),
+                1.0,
+                &senders_weights
+            ),
+            HashSet::from_iter(vec![
                 BTreeSet::from_iter(vec![senders[1], senders[2]]),
             ])
         );
