@@ -166,14 +166,14 @@ impl Block {
             })
             .collect();
         // println!("neighbours: {:?}", neighbours);
-        fn bron_kerbosch<'z>(
-            r: HashSet<&'z <BlockMsg as CasperMsg>::Sender>,
-            p: HashSet<&'z <BlockMsg as CasperMsg>::Sender>,
+        fn bron_kerbosch(
+            r: HashSet<&<BlockMsg as CasperMsg>::Sender>,
+            p: HashSet<&<BlockMsg as CasperMsg>::Sender>,
             x: HashSet<&<BlockMsg as CasperMsg>::Sender>,
             mx_clqs: &mut HashSet<BTreeSet<<BlockMsg as CasperMsg>::Sender>>,
             neighbours: HashMap<
-                &'z <BlockMsg as CasperMsg>::Sender,
-                HashSet<&'z <BlockMsg as CasperMsg>::Sender>,
+                &<BlockMsg as CasperMsg>::Sender,
+                HashSet<&<BlockMsg as CasperMsg>::Sender>,
             >,
         ) {
             // println!("recursed");
@@ -186,10 +186,10 @@ impl Block {
                 let piter = p.clone();
                 let mut p = p.clone();
                 let mut x = x.clone();
-                piter.iter().for_each(|i| {
+                piter.into_iter().for_each(|i| {
                     p.remove(i);
                     let mut rnew = r.clone();
-                    rnew.insert(i.clone());
+                    rnew.insert(i);
                     let pnew: HashSet<
                         &<BlockMsg as CasperMsg>::Sender,
                     > = p.intersection(&neighbours[i]).cloned().collect();
