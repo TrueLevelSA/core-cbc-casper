@@ -102,7 +102,7 @@ impl Block {
         equivocators: &HashSet<<BlockMsg as CasperMsg>::Sender>,
         safety_oracle_threshold: WeightUnit,
         weights: &SendersWeight<Validator>,
-    ) -> Vec<HashSet<<BlockMsg as CasperMsg>::Sender>> {
+    ) -> HashSet<BTreeSet<<BlockMsg as CasperMsg>::Sender>> {
         fn latest_in_justification(
             j: &Justification<BlockMsg>,
             equivocators: &HashSet<<BlockMsg as CasperMsg>::Sender>,
@@ -172,17 +172,17 @@ impl Block {
             r: HashSet<&'z <BlockMsg as CasperMsg>::Sender>,
             p: HashSet<&'z <BlockMsg as CasperMsg>::Sender>,
             x: HashSet<&<BlockMsg as CasperMsg>::Sender>,
-            mx_clqs: &mut Vec<HashSet<<BlockMsg as CasperMsg>::Sender>>,
+            mx_clqs: &mut HashSet<BTreeSet<<BlockMsg as CasperMsg>::Sender>>,
             neighbours: HashMap<
                 &'z <BlockMsg as CasperMsg>::Sender,
                 HashSet<&'z <BlockMsg as CasperMsg>::Sender>,
             >,
         ) {
             if p.is_empty() && x.is_empty() {
-                let rnew: HashSet<
+                let rnew: BTreeSet<
                     <BlockMsg as CasperMsg>::Sender,
                 > = r.iter().cloned().map(|x| x.clone()).collect();
-                mx_clqs.push(rnew);
+                mx_clqs.insert(rnew);
             } else {
                 let piter = p.clone();
                 let mut p = p.clone();
@@ -205,7 +205,7 @@ impl Block {
         let p = neighbours.iter().fold(HashSet::new(), |acc, (_sender, x)| {
             acc.union(x).cloned().collect()
         });
-        let mut mx_clqs = Vec::new();
+        let mut mx_clqs = HashSet::new();
         bron_kerbosch(
             HashSet::new(),
             p,
@@ -695,7 +695,7 @@ mod tests {
                 2.0,
                 &senders_weights
             ),
-            vec![]
+            HashSet::new()
         );
 
         let proto_b3 = Block::new(Some(proto_b2.clone()), senders[1], txs.clone());
@@ -720,7 +720,7 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            vec![HashSet::from_iter(vec![senders[0], senders[1]])]
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1]])])
         );
     }
 }
