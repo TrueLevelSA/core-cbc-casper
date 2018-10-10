@@ -118,7 +118,7 @@ impl Block {
             .iter()
             .filter(|&msg| block.is_member(&Block::from(msg)))
             .collect();
-        let latest_in_sender_view: HashMap<
+        let latest_agreeing_in_sender_view: HashMap<
             <BlockMsg as CasperMsg>::Sender,
             HashMap<<BlockMsg as CasperMsg>::Sender, BlockMsg>,
         > = latest_containing_block
@@ -129,21 +129,9 @@ impl Block {
                     latest_in_justification(
                         m.get_justification(),
                         equivocators,
-                    ),
-                )
-            })
-            .collect();
-        let latest_agreeing_in_sender_view: HashMap<
-            <BlockMsg as CasperMsg>::Sender,
-            HashMap<&<BlockMsg as CasperMsg>::Sender, &BlockMsg>,
-        > = latest_in_sender_view
-            .iter()
-            .map(|(sender, view)| {
-                (
-                    sender.clone(),
-                    view.iter()
+                    ).into_iter()
                         .filter(|(_sender, msg)| {
-                            block.is_member(&Block::from(*msg))
+                            block.is_member(&Block::from(msg))
                         })
                         .collect(),
                 )
@@ -163,7 +151,6 @@ impl Block {
                             latest_agreeing_in_sender_view[senderb]
                                 .contains_key(&sender.clone())
                         })
-                        .cloned()
                         .collect(),
                 )
             })
