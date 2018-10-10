@@ -2,6 +2,7 @@ use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::convert::From;
 use std::iter::{Iterator, FromIterator};
+use std::iter;
 
 use justification::{Justification, SenderState, LatestMsgsHonest, LatestMsgs};
 use message::{CasperMsg, Message};
@@ -631,18 +632,18 @@ mod tests {
 
     #[test]
     fn safety_oracles() {
-        let (sender0, sender1) =
-            (0, 1); // miner identities
-        let (weight0, weight1) =
-            (1.0, 1.0); // and their corresponding sender_state
+        let nodes = 3;
+        let senders: Vec<u32> = (0..nodes).collect();
+        let weights: Vec<f64> = iter::repeat(1.0).take(nodes as usize).collect();
+
         let senders_weights = SendersWeight::new(
-            [
-                (sender0, weight0),
-                (sender1, weight1),
-            ].iter()
+            senders
+                .iter()
                 .cloned()
+                .zip(weights.iter().cloned())
                 .collect(),
         );
+
         let sender_state = SenderState::new(
             senders_weights.clone(),
             0.0, // state fault weight
@@ -657,31 +658,32 @@ mod tests {
         // block dag
         let proto_b0 = Block::from(ProtoBlock {
             prevblock: None,
-            sender: sender0,
+            sender: senders[0],
             txs: txs.clone(),
         });
         let latest_msgs = Justification::new();
         let m0 =
-            BlockMsg::new(sender0, latest_msgs, proto_b0.clone());
+            BlockMsg::new(senders[0], latest_msgs, proto_b0.clone());
 
-        let proto_b1 = Block::new(Some(proto_b0.clone()), sender1, txs.clone());
+        let proto_b1 = Block::new(Some(proto_b0.clone()), senders[1], txs.clone());
         let (m1, sender_state) = BlockMsg::from_msgs(
             proto_b1.get_sender(),
             vec![&m0],
-            Some(&m0), // finalized_msg, could be m0
+            None,
             &sender_state,
             Some(proto_b1.clone()),
         ).unwrap();
-        let proto_b2 = Block::new(Some(proto_b1.clone()), sender0, txs.clone());
+
+        let proto_b2 = Block::new(Some(proto_b1.clone()), senders[0], txs.clone());
         let (m2, sender_state) = BlockMsg::from_msgs(
             proto_b2.get_sender(),
-            vec![&m0, &m1],
-            Some(&m0), // finalized_msg, could be m0
+            vec![&m1],
+            None,
             &sender_state,
             Some(proto_b2.clone()),
         ).unwrap();
 
-        // no clique yet, since sender1 has not seen sender0 seeing sender1 having proto_b0 in the chain
+        // no clique yet, since senders[1] has not seen senders[0] seeing senders[1] having proto_b0 in the chain
         assert_eq!(
             Block::safety_oracles(
                 proto_b0.clone(),
@@ -696,11 +698,11 @@ mod tests {
             vec![]
         );
 
-        let proto_b3 = Block::new(Some(proto_b2.clone()), sender1, txs.clone());
-        let (_m3, sender_state) = BlockMsg::from_msgs(
+        let proto_b3 = Block::new(Some(proto_b2.clone()), senders[1], txs.clone());
+        let (m3, sender_state) = BlockMsg::from_msgs(
             proto_b3.get_sender(),
-            vec![&m0, &m1, &m2],
-            Some(&m0), // finalized_msg, could be m0
+            vec![&m2],
+            None,
             &sender_state,
             Some(proto_b3.clone()),
         ).unwrap();
@@ -718,7 +720,7 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            vec![HashSet::from_iter(vec![sender0, sender1])]
+            vec![HashSet::from_iter(vec![senders[0], senders[1]])]
         );
     }
 }
