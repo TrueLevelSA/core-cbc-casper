@@ -457,7 +457,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(1000))]
         #[test]
-        fn detect_equivocation(ref vote_tuple in votes(5, 1)) {
+        fn detect_equivocation(ref vote_tuple in votes(5, 5)) {
             let (messages, equivocators, nodes) = vote_tuple;
             let nodes = nodes.clone();
             let senders: Vec<u32> = (0..nodes as u32).collect();
@@ -478,18 +478,30 @@ mod tests {
                 0.0,
                 HashSet::new(),
             );
+
+            // here, only take one equivocation
+            let single_equivocation: Vec<_> = messages[..nodes+1].iter().map(|message| message).collect();
+            let equivocator = messages[nodes].get_sender();
+            let (m0, _) =
+                &Message::from_msgs(0, single_equivocation.clone(), None, &sender_state, None)
+                .unwrap();
+            let equivocations: Vec<_> = single_equivocation.iter().filter(|message| message.equivocates(&m0)).collect();
+            assert!(if *equivocator == 0 {equivocations.len() == 1} else {equivocations.len() == 0}, "should detect sender 0 equivocating if sender 0 equivocates");
+            // the following commented test should fail
+            // assert_eq!(equivocations.len(), 1, "should detect sender 0 equivocating if sender 0 equivocates");
+
             let (m0, _) =
                 &Message::from_msgs(0, messages.iter().map(|message| message).collect(), None, &sender_state, None)
                 .unwrap();
             let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
-            assert!(if equivocators.contains(&0) {equivocations.len() == 1} else {equivocations.len() == 0}, "should detect sender 0 equivocating if sender 0 equivocates");
+            assert_eq!(equivocations.len(), 1, "should detect sender 0 equivocating if sender 0 equivocates");
 
             let sender_state = SenderState::new(
                 senders_weights,
                 0.0,
                 None,
                 LatestMsgs::new(),
-                1.0,
+                equivocators.len() as f64,
                 HashSet::new(),
             );
             let (m0, _) =
