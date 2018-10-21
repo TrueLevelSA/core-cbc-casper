@@ -5,6 +5,9 @@ use std::sync::{Arc, RwLock};
 // use std::io::{Error};
 
 use rayon::prelude::*;
+use proptest::prelude::*;
+
+use proptest::test_runner::Config;
 
 use traits::{Estimate, Zero, Sender, Data};
 use justification::{Justification, SenderState, LatestMsgsHonest};
@@ -102,8 +105,7 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         let init = if is_equivocation {
             equivocators.insert(self.get_sender().clone());
             (true, equivocators)
-        }
-        else {
+        } else {
             (false, equivocators)
         };
         self.get_justification().iter().fold(
@@ -327,9 +329,9 @@ where
 // documented
 
 enum MsgStatus {
-    Unchecked,
-    Valid,
-    Invalid,
+Unchecked,
+Valid,
+Invalid,
 }
 
 struct Message<E, S, D>
@@ -436,6 +438,26 @@ mod tests {
 
     use std::{f64};
     use super::*;
+
+    prop_compose! {
+        fn votes(senders: usize)
+            (votes in prop::collection::vec(prop::bool::weighted(0.3), senders))
+             -> Vec<bool> {
+                votes
+            }
+    }
+
+    proptest! {
+        #![proptest_config(Config::with_cases(1))]
+        #[test]
+        fn gen_votes(ref votes in votes(5)) {
+            votes.iter()
+                .enumerate()
+                .for_each(|(sender, vote)|
+                          println!("{:?}",
+                                   VoteCount::create_vote_msg(sender as u32, vote.clone())))
+        }
+    }
 
     #[test]
     fn debug() {
