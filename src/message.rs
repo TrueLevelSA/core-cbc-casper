@@ -448,8 +448,16 @@ mod tests {
              -> (Vec<Message<VoteCount, u32>>, HashSet<u32>, usize)
         {
             let mut messages = vec![];
-            votes.iter().enumerate().for_each(|(sender, vote)| {messages.push(VoteCount::create_vote_msg(sender as u32, vote.clone()));});
-            equivocators.iter().for_each(|equivocator| {let vote = !votes[*equivocator as usize]; messages.push(VoteCount::create_vote_msg(*equivocator as u32, vote))});
+            votes
+                .iter()
+                .enumerate()
+                .for_each(|(sender, vote)|
+                          {messages.push(VoteCount::create_vote_msg(sender as u32, vote.clone()))});
+            equivocators
+                .iter()
+                .for_each(|equivocator|
+                          {let vote = !votes[*equivocator as usize];
+                           messages.push(VoteCount::create_vote_msg(*equivocator as u32, vote))});
             (messages, equivocators, senders)
         }
     }
