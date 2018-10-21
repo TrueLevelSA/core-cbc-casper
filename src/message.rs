@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::sync::{Arc, RwLock};
+use std::iter;
 // use std::io::{Error};
 
 use rayon::prelude::*;
@@ -440,22 +441,63 @@ mod tests {
     use super::*;
 
     prop_compose! {
-        fn votes(senders: usize)
-            (votes in prop::collection::vec(prop::bool::weighted(0.3), senders))
-             -> Vec<bool> {
-                votes
+        fn votes(senders: usize, equivocations: usize)
+            (votes in prop::collection::vec(prop::bool::weighted(0.3), senders),
+             equivocators in prop::collection::hash_set(0..senders, equivocations))
+             -> HashMap<u32, HashSet<bool>> {
+                let mut votemap = HashMap::new();
+                votes.iter().enumerate().for_each(|(sender, vote)| {let mut singleton = HashSet::new(); singleton.insert(vote.clone()); votemap.insert(sender as u32, singleton);});
+                equivocators.iter().for_each(|equivocator| {let mut equivocation = HashSet::new(); equivocation.insert(true); equivocation.insert(false); votemap.insert(*equivocator as u32, equivocation);});
+                votemap
             }
     }
 
     proptest! {
-        #![proptest_config(Config::with_cases(1))]
+        #![proptest_config(Config::with_cases(1000))]
         #[test]
-        fn gen_votes(ref votes in votes(5)) {
-            votes.iter()
-                .enumerate()
-                .for_each(|(sender, vote)|
-                          println!("{:?}",
-                                   VoteCount::create_vote_msg(sender as u32, vote.clone())))
+        fn detect_equivocation(ref votes in votes(5, 1)) {
+            let mut messages = vec![];
+            votes.iter().for_each(|(sender, votes)|
+                                  {votes.iter().for_each(|vote|
+                                                         {messages.push(VoteCount::create_vote_msg(*sender, vote.clone()));});});
+            let nodes = 5;
+            let senders: Vec<u32> = (0..nodes).collect();
+            let weights: Vec<f64> =
+                iter::repeat(1.0).take(nodes as usize).collect();
+            let senders_weights = SendersWeight::new(
+                senders
+                    .iter()
+                    .cloned()
+                    .zip(weights.iter().cloned())
+                    .collect(),
+            );
+            let sender_state = SenderState::new(
+                senders_weights.clone(),
+                0.0,
+                None,
+                LatestMsgs::new(),
+                0.0,
+                HashSet::new(),
+            );
+            let (m0, _) =
+                &Message::from_msgs(0, messages.iter().map(|message| message).collect(), None, &sender_state, None)
+                .unwrap();
+            let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
+            assert!(if votes[&0].len() > 1 {equivocations.len() == 1} else {equivocations.len() == 0}, "should detect sender 0 equivocating if sender 0 equivocates");
+
+            let sender_state = SenderState::new(
+                senders_weights,
+                0.0,
+                None,
+                LatestMsgs::new(),
+                1.0,
+                HashSet::new(),
+            );
+            let (m0, _) =
+                &Message::from_msgs(0, messages.iter().map(|message| message).collect(), None, &sender_state, None)
+                .unwrap();
+            let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
+            assert_eq!(equivocations.len(), 0, "equivocation absorbed in threshold");
         }
     }
 
