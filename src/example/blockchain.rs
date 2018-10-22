@@ -46,6 +46,7 @@ impl From<ProtoBlock> for Block {
         Block(Box::new(Arc::new(protoblock)))
     }
 }
+
 impl<'z> From<&'z BlockMsg> for Block {
     fn from(msg: &BlockMsg) -> Self {
         msg.get_estimate().clone()
@@ -64,12 +65,15 @@ impl Block {
             txs,
         })
     }
+
     pub fn get_txs(&self) -> &BTreeSet<Tx> {
         &self.0.txs
     }
+
     pub fn get_sender(&self) -> Validator {
         self.0.sender
     }
+
     pub fn from_prevblock_msg(
         prevblock_msg: Option<BlockMsg>,
         // a incomplete_block is a block with a None prevblock (ie, Estimate) AND is
@@ -88,6 +92,7 @@ impl Block {
             Err("Block not valid")
         }
     }
+
     pub fn is_member(&self, rhs: &Self) -> bool {
         self == rhs
             || rhs
@@ -96,6 +101,7 @@ impl Block {
                 .map(|prevblock| self.is_member(prevblock))
                 .unwrap_or(false)
     }
+
     pub fn safety_oracles(
         block: Block,
         latest_msgs_honest: &LatestMsgsHonest<BlockMsg>,
@@ -156,6 +162,7 @@ impl Block {
             })
             .collect();
         println!("neighbours: {:?}", neighbours);
+
         fn bron_kerbosch<'z>(
             r: HashSet<&'z <BlockMsg as CasperMsg>::Sender>,
             p: HashSet<&'z <BlockMsg as CasperMsg>::Sender>,
@@ -191,10 +198,13 @@ impl Block {
                 })
             }
         }
+
         let p = neighbours.iter().fold(HashSet::new(), |acc, (_sender, x)| {
             acc.union(x).cloned().collect()
         });
+
         let mut mx_clqs = HashSet::new();
+
         bron_kerbosch(
             HashSet::new(),
             p,
@@ -202,6 +212,7 @@ impl Block {
             &mut mx_clqs,
             neighbours,
         );
+
         mx_clqs
             .iter()
             .filter(|x| {
@@ -243,6 +254,7 @@ impl Block {
     pub fn get_prevblock(&self) -> Option<Self> {
         self.0.prevblock.as_ref().cloned()
     }
+
     pub fn parse_blockchains(
         latest_msgs: &LatestMsgsHonest<BlockMsg>,
         finalized_msg: Option<&BlockMsg>,
@@ -330,6 +342,7 @@ impl Block {
 
 impl Estimate for Block {
     type M = BlockMsg;
+
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         finalized_msg: Option<&Self::M>,
@@ -421,6 +434,7 @@ mod tests {
             &genesis_block,
             "genesis block with None as prevblock"
         );
+
         let proto_b1 = Block::new(None, sender1, txs.clone());
         let (m1, sender_state1) = BlockMsg::from_msgs(
             proto_b1.get_sender(),
@@ -429,6 +443,7 @@ mod tests {
             &sender_state,
             Some(proto_b1), // data
         ).unwrap();
+
         let proto_b2 = Block::new(None, sender2, txs.clone());
         let (m2, sender_state2) = BlockMsg::from_msgs(
             proto_b2.get_sender(),
@@ -437,6 +452,7 @@ mod tests {
             &sender_state,
             Some(proto_b2),
         ).unwrap();
+
         let proto_b3 = Block::new(None, sender3, txs.clone());
         let (m3, sender_state3) = BlockMsg::from_msgs(
             proto_b3.get_sender(),
@@ -501,6 +517,7 @@ mod tests {
             (0, 1, 2, 3, 4, 5, 6); // miner identities
         let (weightg, weight0, weight1, weight2, weight3, weight4, weight5) =
             (1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.0); // and their corresponding sender_state
+
         let senders_weights = SendersWeight::new(
             [
                 (senderg, weightg),
@@ -514,6 +531,7 @@ mod tests {
                 .cloned()
                 .collect(),
         );
+
         let sender_state = SenderState::new(
             senders_weights.clone(),
             (0.0), // state fault weight
@@ -547,6 +565,7 @@ mod tests {
             &sender_state,
             Some(proto_b0), // data
         ).unwrap();
+
         let proto_b1 = Block::new(None, sender1, txs.clone());
         let (m1, sender_state) = BlockMsg::from_msgs(
             proto_b1.get_sender(),
@@ -555,6 +574,7 @@ mod tests {
             &sender_state,
             Some(proto_b1),
         ).unwrap();
+
         let proto_b2 = Block::new(None, sender2, txs.clone());
         let (m2, sender_state) = BlockMsg::from_msgs(
             proto_b2.get_sender(),

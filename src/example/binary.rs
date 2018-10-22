@@ -13,6 +13,7 @@ impl Data for bool {
         true // FIXME
     }
 }
+
 impl Estimate for bool {
     type M = BinaryMsg;
     fn mk_estimate(

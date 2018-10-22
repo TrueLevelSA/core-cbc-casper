@@ -21,6 +21,7 @@ impl<M: CasperMsg> Justification<M> {
     pub fn new() -> Self {
         Justification(BTreeSet::new())
     }
+
     pub fn from_msgs(
         msgs: Vec<M>,
         sender_state: &SenderState<M>,
@@ -30,21 +31,27 @@ impl<M: CasperMsg> Justification<M> {
         let (_, sender_state) = j.faulty_inserts(msgs, sender_state);
         (j, sender_state)
     }
+
     pub fn iter(&self) -> Iter<M> {
         self.0.iter()
     }
+
     pub fn par_iter(&self) -> ParIter<M> {
         self.0.par_iter()
     }
+
     pub fn contains(&self, msg: &M) -> bool {
         self.0.contains(msg)
     }
+
     pub fn len(&self) -> usize {
         self.0.len()
     }
+
     pub fn insert(&mut self, msg: M) -> bool {
         self.0.insert(msg)
     }
+
     fn head(&self) -> Option<&M> {
         self.0.iter().next()
     }
@@ -251,9 +258,11 @@ impl<M: CasperMsg> LatestMsgsHonest<M> {
     fn new() -> Self {
         LatestMsgsHonest(HashSet::new())
     }
+
     fn insert(&mut self, msg: M) -> bool {
         self.0.insert(msg)
     }
+
     pub fn from_latest_msgs(
         latest_msgs: &LatestMsgs<M>,
         equivocators: &HashSet<M::Sender>,
@@ -273,12 +282,15 @@ impl<M: CasperMsg> LatestMsgsHonest<M> {
                 acc
             })
     }
+
     pub fn iter(&self) -> HSetIter<M> {
         self.0.iter()
     }
+
     pub fn len(&self) -> usize {
         self.0.len()
     }
+
     pub fn mk_estimate(
         &self,
         finalized_msg: Option<&M>,
@@ -293,10 +305,12 @@ impl<M: CasperMsg> LatestMsgsHonest<M> {
 pub struct LatestMsgs<M: CasperMsg>(
     HashMap<<M as CasperMsg>::Sender, HashSet<M>>,
 );
+
 impl<M: CasperMsg> LatestMsgs<M> {
     pub fn new() -> Self {
         LatestMsgs(HashMap::new())
     }
+
     pub fn insert(
         &mut self,
         k: M::Sender,
@@ -304,21 +318,27 @@ impl<M: CasperMsg> LatestMsgs<M> {
     ) -> Option<HashSet<M>> {
         self.0.insert(k, v)
     }
+
     pub fn contains_key(&self, k: &M::Sender) -> bool {
         self.0.contains_key(k)
     }
+
     pub fn get(&self, k: &M::Sender) -> Option<&HashSet<M>> {
         self.0.get(k)
     }
+
     pub fn iter(&self) -> HashIter<M::Sender, HashSet<M>> {
         self.0.iter()
     }
+
     pub fn len(&self) -> usize {
         self.0.len()
     }
+
     pub fn keys(&self) -> Keys<M::Sender, HashSet<M>> {
         self.0.keys()
     }
+
     pub fn update(&mut self, new_message: &M) -> bool {
         let sender: &M::Sender = new_message.get_sender();
         if let Some(latest_msgs_from_sender) = self.get(sender).cloned() {
@@ -351,6 +371,7 @@ impl<M: CasperMsg> LatestMsgs<M> {
             true
         }
     }
+
     fn equivocate(&self, msg_new: &M) -> bool {
         self.get(msg_new.get_sender())
             .map(|latest_msgs| {
@@ -418,15 +439,19 @@ impl<M: CasperMsg> SenderState<M> {
             latest_msgs,
         }
     }
+
     pub fn get_equivocators(&self) -> &HashSet<M::Sender> {
         &self.equivocators
     }
+
     pub fn get_senders_weights(&self) -> &SendersWeight<M::Sender> {
         &self.senders_weights
     }
+
     pub fn get_my_last_msg(&self) -> &Option<M> {
         &self.my_last_msg
     }
+
     pub fn get_latest_msgs(&self) -> &LatestMsgs<M> {
         &self.latest_msgs
     }
@@ -513,11 +538,13 @@ mod justification {
         // weights:       2               6               14               30
         let mut justification = Justification::new();
         assert!(justification.insert(genesis_msg.clone()));
+
         let subtree_weights = justification
             .get_subtree_weights(None, &senders_weights)
             .unwrap();
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &2.0);
+
         let proto_b1 = Block::new(None, sender1, txs.clone());
         let b1 =
             Block::from_prevblock_msg(Some(genesis_msg), proto_b1).unwrap();
@@ -525,28 +552,33 @@ mod justification {
 
         let mut justification = Justification::new();
         assert!(justification.insert(m1.clone()));
+
         let subtree_weights = justification
             .get_subtree_weights(None, &senders_weights)
             .unwrap();
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &6.0);
+
         let proto_b2 = Block::new(None, sender2, txs.clone());
         let b2 = Block::from_prevblock_msg(Some(m1), proto_b2).unwrap();
         let m2 = BlockMsg::new(sender2, justification, b2);
 
         let mut justification = Justification::new();
         assert!(justification.insert(m2.clone()));
+
         let subtree_weights = justification
             .get_subtree_weights(None, &senders_weights)
             .unwrap();
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &14.0);
+
         let proto_b3 = Block::new(None, sender3, txs);
         let b3 = Block::from_prevblock_msg(Some(m2), proto_b3).unwrap();
         let m3 = BlockMsg::new(sender3, justification, b3);
 
         let mut justification = Justification::new();
         assert!(justification.insert(m3.clone()));
+
         let subtree_weights = justification
             .get_subtree_weights(None, &senders_weights)
             .unwrap();
@@ -601,6 +633,7 @@ mod justification {
         let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
         let v1 = &VoteCount::create_vote_msg(1, true);
         let mut j0 = Justification::new();
+
         let sender_state = SenderState {
             senders_weights: senders_weights.clone(),
             state_fault_weight: (0.0),
@@ -609,9 +642,11 @@ mod justification {
             equivocators: HashSet::new(),
             latest_msgs: LatestMsgs::new(),
         };
+
         let (success, sender_state) =
             j0.faulty_inserts([v0].iter().cloned().collect(), &sender_state);
         assert!(success);
+
         let (m0, _weights) = &Message::from_msgs(
             0,
             vec![v0],
@@ -619,19 +654,23 @@ mod justification {
             &sender_state,
             None as Option<VoteCount>,
         ).unwrap();
+
         // let m0 = &Message::new(0, justification, estimate);
         let mut j1 = Justification::new();
         let (success, sender_state) = j1
             .faulty_inserts(vec![v1].iter().cloned().collect(), &sender_state);
         assert!(success);
+
         let (success, sender_state) = j1
             .faulty_inserts(vec![m0].iter().cloned().collect(), &sender_state);
         assert!(success);
+
         let (success, sender_state) = j1.faulty_insert(v0_prime, &sender_state);
         assert!(
             !success,
             "$v0_prime$ should conflict with $v0$ through $m0$, and we should reject as our fault tolerance thr is zero"
         );
+
         let (success, _) = j1.clone().faulty_insert(
             v0_prime,
             &SenderState {
@@ -646,6 +685,7 @@ mod justification {
         assert!(success,
             "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set"
         );
+
         let (_, sender_state2) = j1.clone().faulty_insert(
             v0_prime,
             &SenderState {
@@ -659,6 +699,7 @@ mod justification {
 this fault as it doesnt cross the fault threshold for the set, and thus the
 state_fault_weight should be incremented to 1.0"
         );
+
         let (success, _) = j1.clone().faulty_insert(
             v0_prime,
             &SenderState {
@@ -670,6 +711,7 @@ state_fault_weight should be incremented to 1.0"
         assert!(!success,
             "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as the fault threshold gets crossed for the set"
         );
+
         let (_, sender_state2) = j1.clone().faulty_insert(
             v0_prime,
             &SenderState {
@@ -681,6 +723,7 @@ state_fault_weight should be incremented to 1.0"
         assert_eq!(sender_state2.state_fault_weight, 0.1,
             "$v0_prime$ conflicts with $v0$ through $m0$, and we should NOT accept this fault as the fault threshold gets crossed for the set, and thus the state_fault_weight should not be incremented"
         );
+
         let (success, _) = j1.clone().faulty_insert(
             v0_prime,
             &SenderState {
@@ -708,6 +751,7 @@ state_fault_weight should be incremented to 1.0"
             !success,
             "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we can't know the weight of the sender, which could be Infinity"
         );
+
         let (_, sender_state) = j1.clone().faulty_insert(
             v0_prime,
             &SenderState {

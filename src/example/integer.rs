@@ -21,6 +21,7 @@ impl Data for u32 {
 
 impl Estimate for u32 {
     type M = IntegerMsg;
+
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         _finalized_msg: Option<&Self::M>,
@@ -129,6 +130,7 @@ fn equal_weight() {
         ),
         1
     );
+
     j0.faulty_insert(&m2, &sender_state);
     assert_eq!(
         j0.mk_estimate(
@@ -139,6 +141,7 @@ fn equal_weight() {
         ),
         2
     );
+
     j0.faulty_insert(&m3, &sender_state);
     assert_eq!(
         j0.mk_estimate(
