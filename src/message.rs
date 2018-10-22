@@ -7,7 +7,7 @@ use std::sync::{Arc};
 use rayon::prelude::*;
 
 use traits::{Estimate, Zero, Sender, Data};
-use justification::{Justification, SenderState, LatestMsgs, LatestMsgsHonest};
+use justification::{Justification, SenderState, LatestMsgsHonest};
 use weight_unit::{WeightUnit};
 use senders_weight::SendersWeight;
 

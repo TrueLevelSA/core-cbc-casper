@@ -1,6 +1,6 @@
 use traits::{Estimate, Data, Zero};
 use message::{CasperMsg, Message};
-use justification::{LatestMsgsHonest, LatestMsgs};
+use justification::{LatestMsgsHonest};
 use senders_weight::{SendersWeight};
 use weight_unit::{WeightUnit};
 use std::collections::HashSet;

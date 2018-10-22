@@ -1,14 +1,11 @@
-use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::convert::From;
-use std::iter::{Iterator, FromIterator};
-use std::iter;
+use std::iter::{Iterator};
 
-use justification::{Justification, SenderState, LatestMsgsHonest, LatestMsgs};
+use justification::{Justification, LatestMsgsHonest, LatestMsgs};
 use message::{CasperMsg, Message};
 use senders_weight::SendersWeight;
 use std::sync::Arc;
-use std::cmp::Ordering::{Equal, Greater, Less};
 use traits::{Data, Estimate, Zero};
 use weight_unit::WeightUnit;
 type Validator = u32;
@@ -257,7 +254,7 @@ impl Block {
 
     pub fn parse_blockchains(
         latest_msgs: &LatestMsgsHonest<BlockMsg>,
-        finalized_msg: Option<&BlockMsg>,
+        _finalized_msg: Option<&BlockMsg>,
     ) -> (HashMap<Block, HashSet<Block>>, HashSet<Block>) {
         let mut visited: HashMap<Block, HashSet<Block>> = latest_msgs
             .iter()

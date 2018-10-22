@@ -4,7 +4,7 @@ use std::fmt::{Debug, Formatter, Result};
 
 use traits::{Zero, Estimate, Sender, Data};
 use message::{Message, CasperMsg};
-use justification::{Justification, LatestMsgsHonest, LatestMsgs};
+use justification::{Justification, LatestMsgsHonest};
 use senders_weight::{SendersWeight};
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default)]
 pub struct VoteCount {
@@ -149,7 +149,6 @@ impl Estimate for VoteCount {
 }
 
 mod count_votes {
-    use super::*;
 
     #[test]
     fn count_votes() {

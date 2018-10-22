@@ -3,12 +3,11 @@ use std::collections::hash_map::{Iter as HashIter, Keys};
 use std::collections::hash_set::{Iter as HSetIter};
 use std::collections::btree_set::Iter;
 use std::fmt::{Debug, Formatter};
-// use std::io::{Error};
 
 use rayon::collections::btree_set::Iter as ParIter;
 use rayon::iter::{IntoParallelRefIterator};
 
-use message::{CasperMsg, Message};
+use message::{CasperMsg};
 use weight_unit::{WeightUnit};
 use traits::{Zero, Estimate, Data};
 use senders_weight::SendersWeight;

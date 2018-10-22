@@ -5,8 +5,6 @@ use message::{CasperMsg};
 use justification::{LatestMsgsHonest};
 use senders_weight::{SendersWeight};
 
-use digest::Digest;
-
 pub trait Estimate: Hash + Clone + Ord + Send + Sync + Debug + Data {
     type M: CasperMsg<Estimate = Self>;
     fn mk_estimate(
