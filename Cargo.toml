@@ -7,6 +7,7 @@ authors = ["pZ4 <pz4@getnada.com>"]
 rayon = "*"
 digest = "0.7"
 proptest = "0.6.0"
+rand = "*"
 
 [dev-dependencies]
 quickcheck = "*"

@@ -2,6 +2,7 @@
 
 extern crate rayon;
 extern crate digest;
+extern crate rand;
 #[macro_use] extern crate proptest;
 
 pub mod weight_unit;

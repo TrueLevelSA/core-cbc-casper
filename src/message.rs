@@ -3,12 +3,14 @@ use std::hash::{Hash, Hasher};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::sync::{Arc, RwLock};
 use std::iter;
+use std::iter::FromIterator;
 // use std::io::{Error};
 
 use rayon::prelude::*;
 use proptest::prelude::*;
 
 use proptest::test_runner::Config;
+use rand::{thread_rng, Rng};
 
 use traits::{Estimate, Zero, Sender, Data};
 use justification::{Justification, SenderState, LatestMsgsHonest};
@@ -443,10 +445,14 @@ mod tests {
     prop_compose! {
         fn votes(senders: usize, equivocations: usize)
             (votes in prop::collection::vec(prop::bool::weighted(0.3), senders as usize),
-             equivocators in prop::collection::hash_set(0..senders as u32, equivocations),
+             equivocations in Just(equivocations),
              senders in Just(senders))
              -> (Vec<Message<VoteCount, u32>>, HashSet<u32>, usize)
         {
+            let mut validators: Vec<u32> = (0..senders as u32).collect();
+            thread_rng().shuffle(&mut validators);
+            let equivocators: HashSet<u32> = HashSet::from_iter(validators[0..equivocations].iter().cloned());
+
             let mut messages = vec![];
             votes
                 .iter()
