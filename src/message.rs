@@ -473,11 +473,10 @@ mod tests {
 
     prop_compose! {
         fn chain(validator_count: usize)
-            (validator_count in Just(validator_count),
-             votes in prop::collection::vec(prop::bool::ANY, validator_count))
+            (votes in prop::collection::vec(prop::bool::ANY, validator_count))
              -> Vec<BTreeMap<u32, bool>> {
                 let mut state = BTreeMap::new();
-                let validators: Vec<u32> = (0..validator_count as u32).collect();
+                let validators: Vec<u32> = (0..votes.len() as u32).collect();
 
                 validators.iter().for_each(|validator| {
                     state.insert(*validator, votes[*validator as usize]);
