@@ -470,37 +470,40 @@ mod tests {
             .boxed()
     }
 
-    #[test]
-    fn increment_chain() {
-        let mut state = BTreeMap::new();
-        let validators: Vec<u32> = (0..5).collect();
-        let votes = vec![true, true, false, false, false];
 
-        validators.iter().for_each(|validator| {
-            state.insert(*validator, votes[*validator as usize]);
-        });
+    prop_compose! {
+        fn chain(validator_count: usize)
+            (validator_count in Just(validator_count),
+             votes in prop::collection::vec(prop::bool::ANY, validator_count))
+             -> Vec<BTreeMap<u32, bool>> {
+                let mut state = BTreeMap::new();
+                let validators: Vec<u32> = (0..validator_count as u32).collect();
 
-        println!("{:?}", state);
+                validators.iter().for_each(|validator| {
+                    state.insert(*validator, votes[*validator as usize]);
+                });
 
-        let state_lazy_sequence = iter::repeat_with(|| {
-            let mut runner = TestRunner::default();
-            state = message_event(state.clone())
-                .new_value(&mut runner)
-                .unwrap()
-                .current();
-            state.clone()
-        });
+                let chain = iter::repeat_with(|| {
+                    let mut runner = TestRunner::default();
+                    state = message_event(state.clone())
+                        .new_value(&mut runner)
+                        .unwrap()
+                        .current();
+                    state.clone()
+                });
+                Vec::from_iter(chain.take_while(|state| {
+                    let vals: HashSet<&bool> =
+                        HashSet::from_iter(state.values().collect::<Vec<_>>());
+                    vals.len() > 1
+                }))
+            }
+    }
 
-        let state_sequence =
-            Vec::from_iter(state_lazy_sequence.take_while(|state| {
-                let vals: HashSet<&bool> =
-                    HashSet::from_iter(state.values().collect::<Vec<_>>());
-                vals.len() > 1
-            }));
-
-        state_sequence
-            .iter()
-            .for_each(|state| println!("{:?}", state));
+    proptest! {
+        #[test]
+        fn increment_chain(ref chain in chain(200)) {
+            println!("{:?}", chain.len());
+        }
     }
 
     fn increment(basis: u32) -> BoxedStrategy<u32> {
