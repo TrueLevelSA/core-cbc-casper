@@ -472,7 +472,6 @@ mod tests {
 
     #[test]
     fn increment_chain() {
-        let mut runner = TestRunner::default();
         let mut state = BTreeMap::new();
         let validators: Vec<u32> = (0..5).collect();
         let votes = vec![true, true, false, false, false];
@@ -480,17 +479,19 @@ mod tests {
         validators.iter().for_each(|validator| {
             state.insert(*validator, votes[*validator as usize]);
         });
+
         println!("{:?}", state);
-        let state = message_event(state)
-            .new_value(&mut runner)
-            .unwrap()
-            .current();
-        println!("{:?}", state);
-        let state = message_event(state)
-            .new_value(&mut runner)
-            .unwrap()
-            .current();
-        println!("{:?}", state);
+        let mut state_sequence = iter::repeat_with(|| {
+            let mut runner = TestRunner::default();
+            state = message_event(state.clone())
+                .new_value(&mut runner)
+                .unwrap()
+                .current();
+            state.clone()
+        });
+        for _ in 0..5 {
+            println!("{:?}", state_sequence.next())
+        }
     }
 
     fn increment(basis: u32) -> BoxedStrategy<u32> {
