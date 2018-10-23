@@ -10,6 +10,8 @@ use rayon::prelude::*;
 use proptest::prelude::*;
 
 use proptest::test_runner::Config;
+use proptest::test_runner::TestRunner;
+use proptest::strategy::ValueTree;
 use rand::{thread_rng, Rng};
 
 use traits::{Estimate, Zero, Sender, Data};
@@ -441,6 +443,21 @@ mod tests {
 
     use std::{f64};
     use super::*;
+
+    fn increment(basis: u32) -> BoxedStrategy<u32> {
+        (1..2u32).prop_map(move |int| int + basis).boxed()
+    }
+
+    #[test]
+    fn increment_int() {
+        let mut runner = TestRunner::default();
+        let mut val = (0..10u32).new_value(&mut runner).unwrap().current();
+        println!("{:?}", val);
+        val = increment(val)
+            .new_value(&mut runner)
+            .unwrap().current();
+        println!("{:?}", val);
+    }
 
     prop_compose! {
         fn votes(senders: usize, equivocations: usize)
