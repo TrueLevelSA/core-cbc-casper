@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::sync::{Arc, RwLock};
@@ -443,6 +443,55 @@ mod tests {
 
     use std::{f64};
     use super::*;
+
+    fn add_message<'z>(
+        state: &'z mut BTreeMap<u32, bool>,
+        sender: u32,
+        recipients: HashSet<u32>,
+    ) -> &'z BTreeMap<u32, bool> {
+        // println!("{:?} {:?}", sender, recipients);
+        recipients.iter().for_each(|recipient| {
+            let message = state[&sender].clone();
+            state.insert(*recipient, message);
+        });
+        state
+    }
+
+    fn message_event(
+        state: BTreeMap<u32, bool>,
+    ) -> BoxedStrategy<BTreeMap<u32, bool>> {
+        (
+            0..state.len(),
+            prop::collection::hash_set(0..state.len() as u32, 0..state.len()),
+            Just(state),
+        ).prop_map(|(sender, receivers, mut state)| {
+                add_message(&mut state, sender as u32, receivers).clone()
+            })
+            .boxed()
+    }
+
+    #[test]
+    fn increment_chain() {
+        let mut runner = TestRunner::default();
+        let mut state = BTreeMap::new();
+        let validators: Vec<u32> = (0..5).collect();
+        let votes = vec![true, true, false, false, false];
+
+        validators.iter().for_each(|validator| {
+            state.insert(*validator, votes[*validator as usize]);
+        });
+        println!("{:?}", state);
+        let state = message_event(state)
+            .new_value(&mut runner)
+            .unwrap()
+            .current();
+        println!("{:?}", state);
+        let state = message_event(state)
+            .new_value(&mut runner)
+            .unwrap()
+            .current();
+        println!("{:?}", state);
+    }
 
     fn increment(basis: u32) -> BoxedStrategy<u32> {
         (1..2u32).prop_map(move |int| int + basis).boxed()
