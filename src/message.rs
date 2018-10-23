@@ -481,7 +481,8 @@ mod tests {
         });
 
         println!("{:?}", state);
-        let mut state_sequence = iter::repeat_with(|| {
+
+        let state_lazy_sequence = iter::repeat_with(|| {
             let mut runner = TestRunner::default();
             state = message_event(state.clone())
                 .new_value(&mut runner)
@@ -489,9 +490,17 @@ mod tests {
                 .current();
             state.clone()
         });
-        for _ in 0..5 {
-            println!("{:?}", state_sequence.next())
-        }
+
+        let state_sequence =
+            Vec::from_iter(state_lazy_sequence.take_while(|state| {
+                let vals: HashSet<&bool> =
+                    HashSet::from_iter(state.values().collect::<Vec<_>>());
+                vals.len() > 1
+            }));
+
+        state_sequence
+            .iter()
+            .for_each(|state| println!("{:?}", state));
     }
 
     fn increment(basis: u32) -> BoxedStrategy<u32> {
@@ -503,9 +512,7 @@ mod tests {
         let mut runner = TestRunner::default();
         let mut val = (0..10u32).new_value(&mut runner).unwrap().current();
         println!("{:?}", val);
-        val = increment(val)
-            .new_value(&mut runner)
-            .unwrap().current();
+        val = increment(val).new_value(&mut runner).unwrap().current();
         println!("{:?}", val);
     }
 
