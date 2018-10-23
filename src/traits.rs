@@ -5,8 +5,14 @@ use message::{CasperMsg};
 use justification::{LatestMsgsHonest};
 use senders_weight::{SendersWeight};
 
+
+/// Describes an estimate, or a value of the consensus at a certain time
 pub trait Estimate: Hash + Clone + Ord + Send + Sync + Debug + Data {
     type M: CasperMsg<Estimate = Self>;
+
+    /// Choses an estimate from a set of latest messages 
+    /// The finalized_msg value can be used in order not to recursively 
+    /// go back to the genesis
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         finalized_msg: Option<&Self::M>,
@@ -22,8 +28,11 @@ pub trait Data {
 
 pub trait Sender: Hash + Clone + Ord + Eq + Send + Sync + Debug {}
 
+/// Define how to compare the trait type to zero
 pub trait Zero<T: PartialEq> {
     const ZERO: T;
+
+    /// returns whether or not the value is equal to zero
     fn is_zero(val: &T) -> bool {
         val == &Self::ZERO
     }

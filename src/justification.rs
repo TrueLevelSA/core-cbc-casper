@@ -12,15 +12,21 @@ use weight_unit::{WeightUnit};
 use traits::{Zero, Estimate, Data};
 use senders_weight::SendersWeight;
 
+
+/// Struct that holds the set of the CasperMsgs that justify
+/// the current message
+/// Works like a BTreeSet
 #[derive(Eq, Ord, PartialOrd, PartialEq, Clone, Default, Hash)]
 pub struct Justification<M: CasperMsg>(BTreeSet<M>);
 
 impl<M: CasperMsg> Justification<M> {
-    // Re-exports from BTreeSet wrapping M
+    /// Re-exports from BTreeSet wrapping M
     pub fn new() -> Self {
         Justification(BTreeSet::new())
     }
 
+    /// creates a new Justification instance from a Vec of CasperMsg 
+    /// and a SenderState
     pub fn from_msgs(
         msgs: Vec<M>,
         sender_state: &SenderState<M>,
@@ -51,11 +57,13 @@ impl<M: CasperMsg> Justification<M> {
         self.0.insert(msg)
     }
 
+    /// Since it's backed by a BTreeSet, we can have the "smallest" 
+    /// message first
     fn head(&self) -> Option<&M> {
         self.0.iter().next()
     }
 
-    // reexport from Estimate impl
+    /// reexport from Estimate impl
     pub fn mk_estimate(
         &self,
         finalized_msg: Option<&M>,
@@ -75,6 +83,7 @@ impl<M: CasperMsg> Justification<M> {
     }
 
     // Custom functions
+
     /// insert msgs to the Justification, accepting up to $thr$ faults by
     /// weight, returns success=true if at least one msg of the set gets
     /// successfully included to the justification
@@ -410,17 +419,24 @@ impl<'z, M: CasperMsg> From<&'z Justification<M>> for LatestMsgs<M> {
 //     }
 // }
 
+/// struct that stores the inner state of the sender
 #[derive(Debug, Clone)]
 pub struct SenderState<M: CasperMsg> {
+    /// current state total fault weight
     state_fault_weight: WeightUnit,
+    /// fault tolerance threshold
     thr: WeightUnit,
+    /// current validator set, mapped to their respective weights 
     senders_weights: SendersWeight<M::Sender>,
+    /// this sender's last message 
+    /// TODO: better name?
     my_last_msg: Option<M>,
     latest_msgs: LatestMsgs<M>,
     equivocators: HashSet<M::Sender>, // FIXME: put it here as its needed on the same context as
 }
 
 impl<M: CasperMsg> SenderState<M> {
+
     pub fn new(
         senders_weights: SendersWeight<M::Sender>,
         state_fault_weight: WeightUnit,
@@ -506,6 +522,7 @@ mod justification {
     use super::*;
 
     use example::vote_count::{VoteCount};
+    use message::Message;
 
     #[test]
     fn children_weight() {

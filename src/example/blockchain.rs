@@ -375,7 +375,11 @@ impl Estimate for Block {
 }
 #[cfg(test)]
 mod tests {
+    use std::iter;
+    use std::iter::{FromIterator};
+
     use super::*;
+    use ::justification::{Justification, LatestMsgs, SenderState};
 
     #[test]
     fn example_usage() {
@@ -395,7 +399,7 @@ mod tests {
         );
         let sender_state = SenderState::new(
             senders_weights.clone(),
-            (0.0), // state fault weight
+            0.0, // state fault weight
             None,  // latest messages
             LatestMsgs::new(),
             1.0,            // subjective fault weight threshold
@@ -433,7 +437,7 @@ mod tests {
         );
 
         let proto_b1 = Block::new(None, sender1, txs.clone());
-        let (m1, sender_state1) = BlockMsg::from_msgs(
+        let (m1, _) = BlockMsg::from_msgs(
             proto_b1.get_sender(),
             vec![&genesis_block_msg],
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
@@ -442,7 +446,7 @@ mod tests {
         ).unwrap();
 
         let proto_b2 = Block::new(None, sender2, txs.clone());
-        let (m2, sender_state2) = BlockMsg::from_msgs(
+        let (m2, _) = BlockMsg::from_msgs(
             proto_b2.get_sender(),
             vec![&genesis_block_msg],
             None,
@@ -451,7 +455,7 @@ mod tests {
         ).unwrap();
 
         let proto_b3 = Block::new(None, sender3, txs.clone());
-        let (m3, sender_state3) = BlockMsg::from_msgs(
+        let (m3, _) = BlockMsg::from_msgs(
             proto_b3.get_sender(),
             vec![&m1, &m2],
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
@@ -466,7 +470,7 @@ mod tests {
         );
 
         let proto_b4 = Block::new(None, sender4, txs.clone());
-        let (m4, sender_state4) = BlockMsg::from_msgs(
+        let (m4, _) = BlockMsg::from_msgs(
             proto_b4.get_sender(),
             vec![&m1],
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
@@ -483,7 +487,7 @@ mod tests {
         let proto_b5 = Block::new(None, sender0, txs.clone());
         // println!("\n3 {:?}", m3);
         // println!("\n4 {:?}", m4);
-        let (m5, sender_state) = BlockMsg::from_msgs(
+        let (m5, _) = BlockMsg::from_msgs(
             proto_b5.get_sender(),
             vec![&m3, &m2],
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
@@ -500,7 +504,7 @@ mod tests {
             "should build on top of "
         );
 
-        let mut block = Block::from(&m3);
+        let block = Block::from(&m3);
         assert_eq!(
             block,
             Block::new(Some(Block::from(&m2)), sender3, txs.clone()),
@@ -531,7 +535,7 @@ mod tests {
 
         let sender_state = SenderState::new(
             senders_weights.clone(),
-            (0.0), // state fault weight
+            0.0, // state fault weight
             None,  // latest messages
             LatestMsgs::new(),
             1.0,            // subjective fault weight threshold
@@ -620,7 +624,7 @@ mod tests {
 
         let proto_b5 = Block::new(None, sender5, txs.clone());
 
-        let (m5, sender_state) = BlockMsg::from_msgs(
+        let (m5, _) = BlockMsg::from_msgs(
             proto_b5.get_sender(),
             vec![&m0, &m1, &m2, &m3, &m4],
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
@@ -852,7 +856,7 @@ mod tests {
 
         let proto_b9 =
             Block::new(Some(proto_b8.clone()), senders[0], txs.clone());
-        let (m8, sender_state) = BlockMsg::from_msgs(
+        let (_, sender_state) = BlockMsg::from_msgs(
             proto_b9.get_sender(),
             vec![&m8],
             None,

@@ -11,17 +11,23 @@ use justification::{Justification, SenderState, LatestMsgsHonest};
 use weight_unit::{WeightUnit};
 use senders_weight::SendersWeight;
 
+/// A Casper Message, that can will be sent over the network
+/// and used as a justification for a more recent message
 pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     // To be implemented on concrete struct
     type Sender: Sender;
     type Estimate: Estimate<M = Self>;
 
+    /// returns the validator who sent this message
     fn get_sender(&self) -> &Self::Sender;
 
+    /// returns the estimate of this message 
     fn get_estimate(&self) -> &Self::Estimate;
 
+    /// returns the justification of this message 
     fn get_justification<'z>(&'z self) -> &'z Justification<Self>;
 
+    /// creates a new instance of this message
     fn new(
         sender: Self::Sender,
         justification: Justification<Self>,
@@ -37,6 +43,7 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     // Following methods are actual implementations
 
     /// create a msg from newly received messages
+    /// finalized_msg allows to shortcut the recursive checks
     fn from_msgs(
         sender: Self::Sender,
         new_msgs: Vec<&Self>,
@@ -51,6 +58,7 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         // assert!(!dup_senders, "A sender can only have one, and only one, latest message");
 
         // dedup by putting msgs into a hashset
+        // TODO DL: why don't we directly ask for a hashset instead of a Vec?
         let new_msgs: HashSet<_> = new_msgs.iter().cloned().collect();
 
         let mut justification = Justification::new();
@@ -60,21 +68,25 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
                 justification.insert(my_last_msg.clone());
             },
         );
+
+        // tries to insert new messages in the justification
         let (success, sender_state) =
             justification.faulty_inserts(new_msgs, &sender_state);
+
         if !success {
             Err("None of the messages could be added to the state!")
-        }
-        else {
+        } else {
             let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(
                 sender_state.get_latest_msgs(),
                 sender_state.get_equivocators(),
             );
+
             let estimate = latest_msgs_honest.mk_estimate(
                 finalized_msg,
                 &sender_state.get_senders_weights(),
                 external_data,
             );
+
             let message = Self::new(sender, justification, estimate);
             Ok((message, sender_state))
         }
@@ -109,6 +121,7 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         )
     }
 
+    /// Literal definition of the equivocation
     fn equivocates(&self, rhs: &Self) -> bool {
         self != rhs
             && self.get_sender() == rhs.get_sender()
@@ -116,6 +129,8 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
             && !self.depends(rhs)
     }
 
+    /// checks whether self depends on rhs
+    /// returns true if rhs is somewhere in the justification of self
     fn depends(&self, rhs: &Self) -> bool {
         // TODO: this can be done with inner recursion function to keep track of
         // what was visited
@@ -132,13 +147,17 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         // thus, highly parallelizable. when it shortcuts, because in one thread
         // a dependency was found, the function returns true and all the
         // computation on the other threads will be canceled.
+        // TODO DL: bad idea to spawn threads recursively and without upper bound
         let justification = self.get_justification();
+
+        // literal definition of dependency
         justification.contains(rhs)
             || justification
                 .par_iter()
                 .any(|self_prime| self_prime.depends(rhs))
     }
 
+    /// checks whether ther is a circular dependency between self and rhs
     fn is_circular(&self, rhs: &Self) -> bool {
         rhs.depends(self) && self.depends(rhs)
     }
@@ -150,40 +169,42 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         &self,
         all_senders: &HashSet<Self::Sender>,
     ) -> HashSet<Self> {
+         
         fn recursor<M>(
             m: &M,
             all_senders: &HashSet<M::Sender>,
             mut senders_referred: HashSet<M::Sender>,
-            safe_ms: HashSet<M>,
+            safe_msgs: HashSet<M>,
             original_sender: &M::Sender,
         ) -> HashSet<M>
         where
             M: CasperMsg,
         {
             m.get_justification().iter().fold(
-                safe_ms,
-                |mut safe_ms_prime, m_prime| {
+                safe_msgs,
+                |mut safe_msgs_prime, msg_prime| {
                     // base case
                     if &senders_referred == all_senders
-                        && original_sender == m_prime.get_sender()
+                        && original_sender == msg_prime.get_sender()
                     {
-                        let _ = safe_ms_prime.insert(m_prime.clone());
-                        safe_ms_prime
+                        let _ = safe_msgs_prime.insert(msg_prime.clone());
+                        safe_msgs_prime
                     }
                     else {
                         let _ = senders_referred
-                            .insert(m_prime.get_sender().clone());
+                            .insert(msg_prime.get_sender().clone());
                         recursor(
-                            m_prime,
+                            msg_prime,
                             all_senders,
                             senders_referred.clone(),
-                            safe_ms_prime,
+                            safe_msgs_prime,
                             original_sender,
                         )
                     }
-                },
+                }
             )
         };
+
         // initial state, trigger recursion
         let original_sender = self.get_sender();
         let senders_refered =
@@ -401,6 +422,7 @@ where
 mod message {
     use example::vote_count::{VoteCount};
     use senders_weight::{SendersWeight};
+    use justification::{LatestMsgs};
 
     use std::{f64};
     use super::*;
@@ -428,7 +450,7 @@ mod message {
 
         let sender_state = SenderState::new(
             senders_weights,
-            (0.0),
+            0.0,
             None,
             LatestMsgs::new(),
             0.0,
@@ -482,7 +504,7 @@ mod message {
 
         let sender_state = SenderState::new(
             senders_weights,
-            (0.0),
+            0.0,
             None,
             LatestMsgs::new(),
             0.0,
@@ -545,7 +567,7 @@ mod message {
         );
         let sender_state = SenderState::new(
             senders_weights,
-            (0.0),
+            0.0,
             None,
             LatestMsgs::new(),
             0.0,
@@ -589,7 +611,7 @@ mod message {
 
         let sender_state = SenderState::new(
             senders_weights.clone(),
-            (0.0),
+            0.0,
             None,
             LatestMsgs::new(),
             0.0,
@@ -654,7 +676,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         );
         let sender_state = SenderState::new(
             senders_weights.clone(),
-            (0.0),
+            0.0,
             None,
             LatestMsgs::new(),
             0.0,
@@ -684,7 +706,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
             None as Option<VoteCount>,
         ).unwrap();
 
-        let (m2, sender_state) = &Message::from_msgs(
+        let (m2, _) = &Message::from_msgs(
             sender0,
             vec![m1],
             None,
@@ -739,7 +761,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         let safe_msgs = m0.get_msg_for_proposition(senders);
         assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0 and m0");
 
-        let (m1, sender_state1) = &Message::from_msgs(
+        let (m1, _) = &Message::from_msgs(
             sender1,
             vec![m0],
             None,
@@ -755,7 +777,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
 necessarly seen sender1 seeing v0 and m0, thus not yet safe"
         );
 
-        let (m2, sender_state0) = &Message::from_msgs(
+        let (m2, _) = &Message::from_msgs(
             sender0,
             vec![m1],
             None,
@@ -791,7 +813,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
             "sender0 saw v0, v1 and m0, and sender1 saw only v1"
         );
 
-        let (m1, sender_state1) = &Message::from_msgs(
+        let (m1, _) = &Message::from_msgs(
             sender1,
             vec![m0],
             None,

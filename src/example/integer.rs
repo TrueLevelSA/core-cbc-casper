@@ -72,7 +72,7 @@ impl Estimate for u32 {
 #[test]
 fn equal_weight() {
     use senders_weight::SendersWeight;
-    use justification::{SenderState,Justification};
+    use justification::{SenderState, Justification, LatestMsgs};
     use std::collections::{HashSet};
 
     let senders: Vec<u32> = (0..4).collect();
@@ -88,7 +88,7 @@ fn equal_weight() {
 
     let sender_state = SenderState::new(
         senders_weights.clone(),
-        (0.0), // state fault weight
+        0.0, // state fault weight
         None,
         LatestMsgs::new(),
         1.0,            // subjective fault weight threshold

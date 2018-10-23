@@ -148,7 +148,14 @@ impl Estimate for VoteCount {
     }
 }
 
+#[cfg(tests)]
 mod count_votes {
+
+    use std::collections::HashSet;
+
+    use super::VoteCount;
+    use message::{CasperMsg, Message};
+    use justification::{Justification, LatestMsgs};
 
     #[test]
     fn count_votes() {
@@ -166,7 +173,7 @@ mod count_votes {
 
         let weights = SenderState::new(
             senders_weights,
-            (0.0),
+            0.0,
             None,
             LatestMsgs::new(),
             2.0,
