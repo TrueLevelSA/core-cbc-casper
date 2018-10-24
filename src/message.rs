@@ -472,8 +472,9 @@ mod tests {
 
 
     prop_compose! {
-        fn chain(validator_count: usize)
-            (votes in prop::collection::vec(prop::bool::ANY, validator_count))
+        fn chain(validator_max_count: usize)
+            (validators in 1..validator_max_count)
+            (votes in prop::collection::vec(prop::bool::ANY, validators))
              -> Vec<BTreeMap<u32, bool>> {
                 let mut state = BTreeMap::new();
                 let validators: Vec<u32> = (0..votes.len() as u32).collect();
@@ -491,17 +492,22 @@ mod tests {
                     state.clone()
                 });
                 Vec::from_iter(chain.take_while(|state| {
-                    let vals: HashSet<&bool> =
+                    let bool_vals: HashSet<&bool> =
                         HashSet::from_iter(state.values().collect::<Vec<_>>());
-                    vals.len() > 1
+                    bool_vals.len() > 1
                 }))
             }
     }
 
     proptest! {
         #[test]
-        fn increment_chain(ref chain in chain(200)) {
-            println!("{:?}", chain.len());
+        fn increment_chain(ref chain in chain(2000)) {
+            // total messages until unilateral consensus
+            println!("{} validators -> {:?} message(s)",
+                     match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
+                     {"0" => "Unknown",
+                      a => a},
+                     chain.len() + 1);
         }
     }
 
