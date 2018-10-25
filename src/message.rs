@@ -516,24 +516,9 @@ mod tests {
                     state.clone()
                 });
                 Vec::from_iter(chain.take_while(|state| {
-                    let m:HashSet<_> = state.iter().map(|(sender, sender_state)| {
-                        let l: Vec<_> = sender_state.get_latest_msgs().values().collect();
-                        let k = l.iter().fold(vec![], |mut vec, x| {vec.extend(x.into_iter()); vec});
-                        let (m0, _) =
-                            Message::from_msgs(*sender,
-                                               k,
-                                               None,
-                                               sender_state,
-                                               None)
-                            .unwrap_or((Message::new(0, Justification::new(), VoteCount::ZERO), SenderState::new(
-                                senders_weights.clone(),
-                                0.0,
-                                None,
-                                LatestMsgs::new(),
-                                0.0,
-                                HashSet::new(),
-                            )));
-                        m0.get_estimate().clone()
+                    let m:HashSet<_> = state.iter().map(|(_, sender_state)| {
+                        let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(sender_state.get_latest_msgs(), &HashSet::new());
+                        latest_honest_msgs.mk_estimate(None, &senders_weights, None)
                     }).collect();
                 m.len() != 1}))
             }
