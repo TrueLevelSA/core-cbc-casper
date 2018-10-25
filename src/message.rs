@@ -445,10 +445,10 @@ mod tests {
     use super::*;
 
     fn add_message<'z>(
-        state: &'z mut BTreeMap<u32, bool>,
+        state: &'z mut BTreeMap<u32, SenderState<Message<VoteCount, u32>>>,
         sender: u32,
         recipients: HashSet<u32>,
-    ) -> &'z BTreeMap<u32, bool> {
+    ) -> &'z BTreeMap<u32, SenderState<Message<VoteCount, u32>>> {
         // println!("{:?} {:?}", sender, recipients);
         recipients.iter().for_each(|recipient| {
             let message = state[&sender].clone();
@@ -458,8 +458,8 @@ mod tests {
     }
 
     fn message_event(
-        state: BTreeMap<u32, bool>,
-    ) -> BoxedStrategy<BTreeMap<u32, bool>> {
+        state: BTreeMap<u32, SenderState<Message<VoteCount, u32>>>,
+    ) -> BoxedStrategy<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>> {
         (
             0..state.len(),
             prop::collection::hash_set(0..state.len() as u32, 0..state.len()),
@@ -475,12 +475,36 @@ mod tests {
         fn chain(validator_max_count: usize)
             (validators in 1..validator_max_count)
             (votes in prop::collection::vec(prop::bool::ANY, validators))
-             -> Vec<BTreeMap<u32, bool>> {
+             -> Vec<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>> {
                 let mut state = BTreeMap::new();
                 let validators: Vec<u32> = (0..votes.len() as u32).collect();
 
+                let weights: Vec<f64> =
+                    iter::repeat(1.0).take(votes.len() as usize).collect();
+
+                let senders_weights = SendersWeight::new(
+                    validators
+                        .iter()
+                        .cloned()
+                        .zip(weights.iter().cloned())
+                        .collect(),
+                );
+
                 validators.iter().for_each(|validator| {
-                    state.insert(*validator, votes[*validator as usize]);
+                    let mut latest = LatestMsgs::new();
+                    let mut l = HashSet::new();
+                    let q = VoteCount::create_vote_msg(*validator, votes[*validator as usize]);
+                    l.insert(q);
+                    latest.insert(*validator, l);
+                    state.insert(*validator,
+                                 SenderState::new(
+                                     senders_weights.clone(),
+                                     0.0,
+                                     None,
+                                     latest,
+                                     0.0,
+                                     HashSet::new(),
+                                 ));
                 });
 
                 let chain = iter::repeat_with(|| {
@@ -492,16 +516,33 @@ mod tests {
                     state.clone()
                 });
                 Vec::from_iter(chain.take_while(|state| {
-                    let bool_vals: HashSet<&bool> =
-                        HashSet::from_iter(state.values().collect::<Vec<_>>());
-                    bool_vals.len() > 1
-                }))
+                    let m:HashSet<_> = state.iter().map(|(sender, sender_state)| {
+                        let l: Vec<_> = sender_state.get_latest_msgs().values().collect();
+                        let k = l.iter().fold(vec![], |mut vec, x| {vec.extend(x.into_iter()); vec});
+                        let (m0, _) =
+                            Message::from_msgs(*sender,
+                                               k,
+                                               None,
+                                               sender_state,
+                                               None)
+                            .unwrap_or((Message::new(0, Justification::new(), VoteCount::ZERO), SenderState::new(
+                                senders_weights.clone(),
+                                0.0,
+                                None,
+                                LatestMsgs::new(),
+                                0.0,
+                                HashSet::new(),
+                            )));
+                        m0.get_estimate().clone()
+                    }).collect();
+                m.len() != 1}))
             }
     }
 
     proptest! {
+        #![proptest_config(Config::with_cases(100))]
         #[test]
-        fn increment_chain(ref chain in chain(2000)) {
+        fn increment_chain(ref chain in chain(4)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()

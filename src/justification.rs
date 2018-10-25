@@ -1,5 +1,5 @@
 use std::collections::{BTreeSet, HashSet, HashMap, VecDeque};
-use std::collections::hash_map::{Iter as HashIter, Keys};
+use std::collections::hash_map::{Iter as HashIter, Keys, Values};
 use std::collections::hash_set::{Iter as HSetIter};
 use std::collections::btree_set::Iter;
 use std::fmt::{Debug, Formatter};
@@ -367,6 +367,10 @@ impl<M: CasperMsg> LatestMsgs<M> {
 
     pub fn keys(&self) -> Keys<M::Sender, HashSet<M>> {
         self.0.keys()
+    }
+
+    pub fn values(&self) -> Values<'_, M::Sender, HashSet<M>> {
+        self.0.values()
     }
 
     /// update the data structure by adding a new message
