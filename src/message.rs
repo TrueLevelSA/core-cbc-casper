@@ -459,7 +459,8 @@ mod tests {
 
     fn message_event(
         state: BTreeMap<u32, SenderState<Message<VoteCount, u32>>>,
-    ) -> BoxedStrategy<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>> {
+    ) -> BoxedStrategy<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>>
+    {
         (
             0..state.len(),
             prop::collection::hash_set(0..state.len() as u32, 0..state.len()),
@@ -491,17 +492,14 @@ mod tests {
                 );
 
                 validators.iter().for_each(|validator| {
-                    let mut latest = LatestMsgs::new();
-                    let mut l = HashSet::new();
-                    let q = VoteCount::create_vote_msg(*validator, votes[*validator as usize]);
-                    l.insert(q);
-                    latest.insert(*validator, l);
+                    let mut j = Justification::new();
+                    j.insert(VoteCount::create_vote_msg(*validator, votes[*validator as usize]));
                     state.insert(*validator,
                                  SenderState::new(
                                      senders_weights.clone(),
                                      0.0,
                                      None,
-                                     latest,
+                                     LatestMsgs::from(&j),
                                      0.0,
                                      HashSet::new(),
                                  ));
