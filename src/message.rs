@@ -71,7 +71,8 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
 
         let mut justification = Justification::new();
         sender_state.get_my_last_msg().as_ref().map_or_else(
-            || println!("No commitment to any previous state!"),
+            // || println!("No commitment to any previous state!"),
+            || (),
             |my_last_msg| {
                 justification.insert(my_last_msg.clone());
             },

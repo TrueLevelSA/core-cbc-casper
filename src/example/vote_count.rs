@@ -95,7 +95,7 @@ impl VoteCount {
                                 },
                                 // add the vote
                                 None => {
-                                    println!("no_equiv: {:?}", equivocation);
+                                    // println!("no_equiv: {:?}", equivocation);
                                     acc_prime.insert((*m).clone())
                                 },
                             };
