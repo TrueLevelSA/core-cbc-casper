@@ -12,7 +12,6 @@ type Validator = u32;
 
 /// a genesis block should be a block with estimate Block with prevblock =
 /// None and data. data will be the unique identifier of this blockchain
-
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Debug, Hash)]
 struct ProtoBlock {
     prevblock: Option<Block>,
@@ -20,6 +19,7 @@ struct ProtoBlock {
     txs: BTreeSet<Tx>,
 }
 
+/// Boxing of a block, will be implemented as a CasperMsg
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Debug)]
 pub struct Block(Box<Arc<ProtoBlock>>);
 
@@ -37,7 +37,6 @@ impl Data for Block {
 //// this type can be used to create a look up for what msgs are referred by
 //// what validators
 // type ReferredValidators = HashMap<Block, HashSet<Validator>>;
-
 impl From<ProtoBlock> for Block {
     fn from(protoblock: ProtoBlock) -> Self {
         Block(Box::new(Arc::new(protoblock)))
@@ -71,6 +70,7 @@ impl Block {
         self.0.sender
     }
 
+    /// Create a new block from a prevblock message and an incomplete block 
     pub fn from_prevblock_msg(
         prevblock_msg: Option<BlockMsg>,
         // a incomplete_block is a block with a None prevblock (ie, Estimate) AND is
@@ -90,6 +90,7 @@ impl Block {
         }
     }
 
+    /// Math definition of blockchain membership
     pub fn is_member(&self, rhs: &Self) -> bool {
         self == rhs
             || rhs
@@ -373,6 +374,7 @@ impl Estimate for Block {
         }
     }
 }
+
 #[cfg(test)]
 mod tests {
     use std::iter;

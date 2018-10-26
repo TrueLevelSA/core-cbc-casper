@@ -114,14 +114,20 @@ impl<M: CasperMsg> Justification<M> {
     ) -> (bool, SenderState<M>) {
         let mut sender_state = sender_state.clone();
         let is_equivocation = sender_state.latest_msgs.equivocate(msg);
+
         let sender = msg.get_sender();
         let sender_weight = sender_state
             .senders_weights
             .get_weight(sender)
             .unwrap_or(::std::f64::INFINITY);
+
         let already_in_equivocators =
             sender_state.equivocators.contains(sender);
+
         match (is_equivocation, already_in_equivocators) {
+            // if it's already equivocating and listed as such, 
+            // or not equivocating at all, an insertion can be
+            // done without more checks
             (false, _) | (true, true) => {
                 let success = self.insert(msg.clone());
                 if success {
@@ -129,7 +135,9 @@ impl<M: CasperMsg> Justification<M> {
                 }
                 (success, sender_state)
             },
-            (true, false) =>
+            // in the other case, we have to check that the threshold is not 
+            // reached
+            (true, false) => {
                 if sender_weight + sender_state.state_fault_weight
                     <= sender_state.thr
                 {
@@ -141,10 +149,10 @@ impl<M: CasperMsg> Justification<M> {
                         }
                     }
                     (success, sender_state)
-                }
-                else {
+                } else {
                     (false, sender_state)
-                },
+                }
+            },
         }
     }
 
@@ -196,8 +204,7 @@ impl<M: CasperMsg> Justification<M> {
                         .unwrap_or(false)
                     {
                         weight_referred
-                    }
-                    else {
+                    } else {
                         let sender_current = m_prime.get_sender();
                         // it fails to insert sender_current, if sender_current is
                         // already in set
@@ -208,8 +215,7 @@ impl<M: CasperMsg> Justification<M> {
                                 + senders_weights
                                     .get_weight(&sender_current)
                                     .unwrap_or(WeightUnit::ZERO)
-                        }
-                        else {
+                        } else {
                             weight_referred
                         };
 
@@ -261,16 +267,21 @@ impl<M: CasperMsg> Debug for Justification<M> {
     }
 }
 
+/// Set of latest honest messages
 pub struct LatestMsgsHonest<M: CasperMsg>(HashSet<M>);
+
 impl<M: CasperMsg> LatestMsgsHonest<M> {
+    /// Create an empty set
     fn new() -> Self {
         LatestMsgsHonest(HashSet::new())
     }
 
+    /// Insert message to the set
     fn insert(&mut self, msg: M) -> bool {
         self.0.insert(msg)
     }
 
+    /// Filters the latest messages 
     pub fn from_latest_msgs(
         latest_msgs: &LatestMsgs<M>,
         equivocators: &HashSet<M::Sender>,
@@ -309,16 +320,22 @@ impl<M: CasperMsg> LatestMsgsHonest<M> {
     }
 }
 
+/// Mapping between senders and their latests messages
+/// Latest messages from a sender are all its messages that are not 
+/// in the dependency of an other of its messages
 #[derive(Eq, PartialEq, Clone, Default, Debug)]
 pub struct LatestMsgs<M: CasperMsg>(
     HashMap<<M as CasperMsg>::Sender, HashSet<M>>,
 );
 
 impl<M: CasperMsg> LatestMsgs<M> {
+
+    /// Create an empty map
     pub fn new() -> Self {
         LatestMsgs(HashMap::new())
     }
 
+    /// instert a new set of messages for a sender
     pub fn insert(
         &mut self,
         k: M::Sender,
@@ -327,10 +344,12 @@ impl<M: CasperMsg> LatestMsgs<M> {
         self.0.insert(k, v)
     }
 
+    /// checks whether a sender is already contained in the map
     pub fn contains_key(&self, k: &M::Sender) -> bool {
         self.0.contains_key(k)
     }
 
+    /// get a set of messages sent by the sender
     pub fn get(&self, k: &M::Sender) -> Option<&HashSet<M>> {
         self.0.get(k)
     }
@@ -347,14 +366,22 @@ impl<M: CasperMsg> LatestMsgs<M> {
         self.0.keys()
     }
 
+    /// update the data structure by adding a new message
+    /// return true if new_message is a valid latest message,
+    /// aka the first message of a sender or a message that is not 
+    /// in the justification of the existing latest messages
     pub fn update(&mut self, new_message: &M) -> bool {
         let sender: &M::Sender = new_message.get_sender();
         if let Some(latest_msgs_from_sender) = self.get(sender).cloned() {
+
+            // get the list of messages that depend on new_message
             let later_than_new: HashSet<M> = latest_msgs_from_sender
                 .iter()
                 .filter(|current_message| current_message.depends(new_message))
                 .cloned()
                 .collect();
+            // if there is no such messages, filter out messages that new_message
+            // includes in its dependency
             if later_than_new.is_empty() {
                 let mut new_later_than: HashSet<M> = latest_msgs_from_sender
                     .iter()
@@ -366,12 +393,12 @@ impl<M: CasperMsg> LatestMsgs<M> {
                 new_later_than.insert(new_message.clone());
                 self.insert(sender.clone(), new_later_than);
                 true
-            }
-            else {
+            } else {
+                // if not, new_message is not a latest message
                 false
             }
-        }
-        else {
+        } else {
+            // no message found for this sender, so new_message is the latest
             self.insert(
                 sender.clone(),
                 [new_message.clone()].iter().cloned().collect(),
@@ -380,6 +407,7 @@ impl<M: CasperMsg> LatestMsgs<M> {
         }
     }
 
+    /// checks whether msg_mew is               
     fn equivocate(&self, msg_new: &M) -> bool {
         self.get(msg_new.get_sender())
             .map(|latest_msgs| {
@@ -390,6 +418,8 @@ impl<M: CasperMsg> LatestMsgs<M> {
 }
 
 impl<'z, M: CasperMsg> From<&'z Justification<M>> for LatestMsgs<M> {
+
+    /// extract the latest messages from a justification
     fn from(j: &Justification<M>) -> Self {
         let mut latest_msgs: LatestMsgs<M> = LatestMsgs::new();
         let mut queue: VecDeque<(M)> = j.iter().cloned().collect();
@@ -480,13 +510,12 @@ impl<M: CasperMsg> SenderState<M> {
                 // equivocations in relation to state
                 let sender = msg.get_sender();
                 let state_equivocator = if self.latest_msgs.equivocate(msg)
-                    && !self.equivocators.contains(sender)
-                {
+                    && !self.equivocators.contains(sender) {
                     Some(sender.clone())
-                }
-                else {
+                } else {
                     None
                 };
+
                 let msg_faultweight_overhead = state_equivocator
                     .as_ref()
                     .map(|sender| {
@@ -495,15 +524,16 @@ impl<M: CasperMsg> SenderState<M> {
                             .unwrap_or(::std::f64::NAN)
                     })
                     .unwrap_or(WeightUnit::ZERO);
+
                 // sum_weight_senders returns nan if a sender is not found
                 if msg_faultweight_overhead.is_nan() {
                     None
-                }
-                else {
+                } else {
                     Some((msg, msg_faultweight_overhead))
                 }
             })
             .collect();
+
         let _ = msgs_sorted_by_faultw.sort_unstable_by(|(_, w0), (_, w1)| {
             w0.partial_cmp(w1).unwrap_or(::std::cmp::Ordering::Greater) // tie breaker
         });
@@ -518,7 +548,7 @@ impl<M: CasperMsg> SenderState<M> {
 }
 
 #[cfg(test)]
-mod justification {
+mod tests {
     use super::*;
 
     use example::vote_count::{VoteCount};

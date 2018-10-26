@@ -21,8 +21,11 @@ pub trait Estimate: Hash + Clone + Ord + Send + Sync + Debug + Data {
     ) -> Self;
 }
 
+/// Describes data added to the messages
 pub trait Data {
     type Data;
+
+    /// Checks whether this data is valid
     fn is_valid(&Self::Data) -> bool;
 }
 

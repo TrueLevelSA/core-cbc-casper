@@ -19,6 +19,7 @@ impl Data for u32 {
     }
 }
 
+/// the goal here is to find the weighted median of all the values
 impl Estimate for u32 {
     type M = IntegerMsg;
 
@@ -44,6 +45,9 @@ impl Estimate for u32 {
         msgs_sorted_by_estimate.sort_unstable_by(|a, b| {
             a.get_estimate().cmp(&b.get_estimate())
         });
+
+        // get the total weight of the senders of the messages
+        // in the set
         let total_weight = msgs_sorted_by_estimate.iter().fold(
             WeightUnit::ZERO,
             |acc, x| {
@@ -52,9 +56,14 @@ impl Estimate for u32 {
                     .unwrap_or(WeightUnit::ZERO)
             },
         );
+
         let mut running_weight = 0.0;
         let mut msg_iter = msgs_sorted_by_estimate.iter();
         let mut current_msg:Result<&&IntegerMsg, &str> = Err("no msg");
+
+        // since the messages are ordered according to their estimates,
+        // whichever estimate is found after iterating over half of the total weight
+        // is the consensus
         while running_weight / total_weight < 0.5 {
             current_msg = msg_iter.next().ok_or("no next msg");
             running_weight +=
@@ -62,6 +71,8 @@ impl Estimate for u32 {
                 .and_then(|m| senders_weights.get_weight(m.get_sender()))
                 .unwrap_or(WeightUnit::ZERO)
         }
+
+        // return said estimate
         match current_msg {
             Err(_) => 0,
             Ok(m) => *m.get_estimate()

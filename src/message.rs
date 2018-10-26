@@ -21,10 +21,10 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     /// returns the validator who sent this message
     fn get_sender(&self) -> &Self::Sender;
 
-    /// returns the estimate of this message 
+    /// returns the estimate of this message
     fn get_estimate(&self) -> &Self::Estimate;
 
-    /// returns the justification of this message 
+    /// returns the justification of this message
     fn get_justification<'z>(&'z self) -> &'z Justification<Self>;
 
     /// creates a new instance of this message
@@ -121,7 +121,7 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         )
     }
 
-    /// Literal definition of the equivocation
+    /// Math definition of the equivocation
     fn equivocates(&self, rhs: &Self) -> bool {
         self != rhs
             && self.get_sender() == rhs.get_sender()
@@ -131,6 +131,7 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
 
     /// checks whether self depends on rhs
     /// returns true if rhs is somewhere in the justification of self
+    /// TODO DL: for clarity: rename to "depends_on"?
     fn depends(&self, rhs: &Self) -> bool {
         // TODO: this can be done with inner recursion function to keep track of
         // what was visited
@@ -150,7 +151,7 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         // TODO DL: bad idea to spawn threads recursively and without upper bound
         let justification = self.get_justification();
 
-        // literal definition of dependency
+        // Math definition of dependency
         justification.contains(rhs)
             || justification
                 .par_iter()
@@ -169,7 +170,8 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         &self,
         all_senders: &HashSet<Self::Sender>,
     ) -> HashSet<Self> {
-         
+
+        /// recursively looks for all tips of the dag
         fn recursor<M>(
             m: &M,
             all_senders: &HashSet<M::Sender>,
@@ -193,6 +195,7 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
                     else {
                         let _ = senders_referred
                             .insert(msg_prime.get_sender().clone());
+
                         recursor(
                             msg_prime,
                             all_senders,
@@ -253,8 +256,7 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
                         let _ = safe_msg_weight_prime
                             .insert(m.clone(), weight_referred);
                         safe_msg_weight_prime
-                    }
-                    else {
+                    } else {
                         let sender_current = m_prime.get_sender();
                         let weight_referred = if senders_referred
                             .insert(sender_current.clone())
@@ -263,8 +265,7 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
                                 + senders_weights
                                     .get_weight(&sender_current)
                                     .unwrap_or(WeightUnit::ZERO)
-                        }
-                        else {
+                        } else {
                             weight_referred
                         };
 
@@ -280,10 +281,12 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
                 },
             )
         };
+
         // initial state, trigger recursion
         let senders_referred = [].iter().cloned().collect();
         let weight_referred = WeightUnit::ZERO;
         let safe_msg_weight = HashMap::new();
+
         recursor(
             self,
             senders_weights,
@@ -295,6 +298,7 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
     }
 }
 
+/// Mathematical definition of a casper message
 #[derive(Clone, Default, Eq, PartialEq, PartialOrd, Ord)]
 struct ProtoMsg<E, S>
 where
@@ -306,6 +310,7 @@ where
     justification: Justification<Message<E, S>>,
 }
 
+/// Boxing of a ProtoMsg, that will implement the trait CasperMsg
 #[derive(Eq, Ord, PartialOrd, Clone, Default)]
 pub struct Message<E, S>(Box<Arc<ProtoMsg<E, S>>>)
 where
@@ -419,7 +424,7 @@ where
 }
 
 #[cfg(test)]
-mod message {
+mod tests {
     use example::vote_count::{VoteCount};
     use senders_weight::{SendersWeight};
     use justification::{LatestMsgs};
@@ -440,6 +445,7 @@ mod message {
         let v1 = &VoteCount::create_vote_msg(1, true);
         let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
         let v0_idem = &VoteCount::create_vote_msg(0, false);
+
         assert!(v0 == v0_idem, "v0 and v0_idem should be equal");
         assert!(v0 != v0_prime, "v0 and v0_prime should NOT be equal");
         assert!(v0 != v1, "v0 and v1 should NOT be equal");
@@ -473,6 +479,7 @@ mod message {
         // let m0 = &Message::new(0, justification, estimate);
 
         let mut j1 = Justification::new();
+
         let (success, _) = j1
             .faulty_inserts(vec![v0].iter().cloned().collect(), &sender_state);
         assert!(success);
@@ -519,6 +526,7 @@ mod message {
         let (m0, _) =
             &Message::from_msgs(0, vec![v0], None, &sender_state, None)
                 .unwrap();
+
         assert!(
             !v0.depends(v0_prime),
             "v0 does NOT depends on v0_prime as they are equivocating"
@@ -551,6 +559,7 @@ mod message {
         let (m1, _) =
             &Message::from_msgs(0, vec![v0, m0], None, &sender_state, None)
                 .unwrap();
+
         assert!(m1.depends(m0), "m1 DOES depent on m0");
         assert!(!m0.depends(m1), "but m0 does NOT depend on m1");
         assert!(m1.depends(v0), "m1 depends on v0 through m0");

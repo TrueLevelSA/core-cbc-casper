@@ -54,6 +54,8 @@ impl VoteCount {
         }
     }
 
+    /// Creates a new empty vote message, issued by the sender
+    /// with no justification
     pub fn create_vote_msg(sender: u32, vote: bool) -> Message<Self, u32> {
         let justification = Justification::new();
         let estimate = match vote {
@@ -64,6 +66,7 @@ impl VoteCount {
         Message::new(sender, justification, estimate)
     }
 
+    /// 
     fn get_vote_msgs(
         latest_msgs: &LatestMsgsHonest<Message<Self, Voter>>,
     ) -> HashSet<Message<Self, Voter>> {
@@ -114,7 +117,9 @@ impl VoteCount {
 }
 
 type Voter = u32;
+
 impl Sender for Voter {}
+
 impl Data for VoteCount {
     type Data = VoteCount;
     fn is_valid(_data: &Self::Data) -> bool {
@@ -153,7 +158,7 @@ mod count_votes {
 
     use std::collections::HashSet;
 
-    use super::VoteCount;
+    use super::*;
     use message::{CasperMsg, Message};
     use justification::{Justification, LatestMsgs};
 

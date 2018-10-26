@@ -90,7 +90,7 @@ impl<S: Sender> SendersWeight<S> {
 }
 
 #[cfg(test)]
-mod sender_weight {
+mod tests {
     use super::*;
 
     #[test]
