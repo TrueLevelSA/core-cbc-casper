@@ -507,8 +507,8 @@ mod tests {
                                  ));
                 });
 
+                let mut runner = TestRunner::default();
                 let chain = iter::repeat_with(|| {
-                    let mut runner = TestRunner::default();
                     state = message_event(state.clone())
                         .new_value(&mut runner)
                         .unwrap()
