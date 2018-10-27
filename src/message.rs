@@ -515,7 +515,7 @@ mod tests {
     where
         F: Fn(&mut Vec<u32>) -> BoxedStrategy<u32>,
     {
-        (prop::sample::select((0..validator_max_count).collect::<Vec<usize>>()))
+        (prop::sample::select((1..validator_max_count).collect::<Vec<usize>>()))
             .prop_flat_map(|validators| {
                 (prop::collection::vec(prop::bool::ANY, validators))
             })
