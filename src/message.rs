@@ -464,7 +464,7 @@ mod tests {
     {
         (
             0..state.len(),
-            prop::collection::hash_set(0..state.len() as u32, 0..state.len()),
+            prop::collection::hash_set(0..state.len() as u32, 1..state.len()+1),
             Just(state),
         ).prop_map(|(sender, receivers, mut state)| {
             add_message(&mut state, sender as u32, receivers).clone()
