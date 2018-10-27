@@ -451,8 +451,12 @@ mod tests {
         recipients: HashSet<u32>,
     ) -> &'z BTreeMap<u32, SenderState<Message<VoteCount, u32>>> {
         // println!("{:?} {:?}", sender, recipients);
+        let (justification, sender_state) = Justification::from_msgs(LatestMsgsHonest::from_latest_msgs(&state[&sender].get_latest_msgs(), &HashSet::new()).iter().cloned().collect(), &state[&sender]);
+        let m = Message::new(sender, justification, VoteCount::ZERO);
+        let (_, sender_state) = Justification::from_msgs(LatestMsgsHonest::from_latest_msgs(sender_state.get_latest_msgs(), &HashSet::new()).iter().cloned().collect(), &sender_state);
+        state.insert(sender, sender_state);
         recipients.iter().for_each(|recipient| {
-            let (_, recipient_state) = Justification::from_msgs(vec![state[&sender].get_my_last_msg().clone().unwrap()], &state[recipient]);
+            let (_, recipient_state) = Justification::from_msgs(vec![m.clone()], &state[recipient]);
             state.insert(*recipient, recipient_state);
         });
         state
@@ -463,11 +467,12 @@ mod tests {
     ) -> BoxedStrategy<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>>
     {
         (
-            0..state.len(),
+            0..state.len() as u32,
             prop::collection::hash_set(0..state.len() as u32, 1..state.len()+1),
             Just(state),
         ).prop_map(|(sender, receivers, mut state)| {
-            add_message(&mut state, sender as u32, receivers).clone()
+            // let receivers = state.keys().cloned().collect();
+            add_message(&mut state, sender, receivers).clone()
             })
             .boxed()
     }
@@ -479,6 +484,7 @@ mod tests {
             (votes in prop::collection::vec(prop::bool::ANY, validators))
              -> Vec<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>> {
                 let mut state = BTreeMap::new();
+                println!("{:?}: {:?}", votes.len(), votes);
                 let validators: Vec<u32> = (0..votes.len() as u32).collect();
 
                 let weights: Vec<f64> =
@@ -520,6 +526,7 @@ mod tests {
                         let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(sender_state.get_latest_msgs(), &HashSet::new());
                         latest_honest_msgs.mk_estimate(None, &senders_weights, None)
                     }).collect();
+                    // println!("{:?}", m);
                 m.len() != 1}))
             }
     }
@@ -527,7 +534,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(1))]
         #[test]
-        fn increment_chain(ref chain in chain(40)) {
+        fn increment_chain(ref chain in chain(8)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
