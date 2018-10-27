@@ -489,17 +489,24 @@ mod tests {
         prop::sample::select(val.clone()).boxed()
     }
 
+    fn all_receivers(val: &Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
+        let v = HashSet::from_iter(val.iter().cloned());
+        Just(v).boxed()
+    }
+
+    fn some_receivers(val: &Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
+        prop::collection::hash_set(prop::sample::select(val.clone()), 1..(val.len() + 1)).boxed()
+    }
+
     fn message_event(
         state: BTreeMap<u32, SenderState<Message<VoteCount, u32>>>,
         sender_strategy: BoxedStrategy<u32>,
+        receiver_strategy: BoxedStrategy<HashSet<u32>>,
     ) -> BoxedStrategy<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>>
     {
         (
             sender_strategy,
-            prop::collection::hash_set(
-                0..state.len() as u32,
-                1..state.len() + 1,
-            ),
+            receiver_strategy,
             Just(state),
         ).prop_map(|(sender, receivers, mut state)| {
                 // let receivers = state.keys().cloned().collect();
@@ -508,12 +515,14 @@ mod tests {
             .boxed()
     }
 
-    fn chain<F: 'static>(
+    fn chain<F: 'static, G: 'static>(
         validator_max_count: usize,
         message_producer_strategy: F,
+        message_receiver_strategy: G,
     ) -> BoxedStrategy<Vec<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>>>
     where
         F: Fn(&mut Vec<u32>) -> BoxedStrategy<u32>,
+        G: Fn(&Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
     {
         (prop::sample::select((1..validator_max_count).collect::<Vec<usize>>()))
             .prop_flat_map(|validators| {
@@ -560,7 +569,8 @@ mod tests {
                 let chain = iter::repeat_with(|| {
                     let sender_strategy =
                         message_producer_strategy(&mut senders);
-                    state = message_event(state.clone(), sender_strategy)
+                    let receiver_strategy = message_receiver_strategy(&senders);
+                    state = message_event(state.clone(), sender_strategy, receiver_strategy)
                         .new_value(&mut runner)
                         .unwrap()
                         .current();
@@ -590,9 +600,19 @@ mod tests {
     }
 
     proptest! {
+        #![proptest_config(Config::with_cases(30))]
+            #[test]
+            fn increment_chain_round_robin(ref chain in chain(10, round_robin, all_receivers)) {
+                assert_eq!(chain.last().unwrap_or(&BTreeMap::new()).keys().len(),
+                           if chain.len() > 0 {chain.len() + 1} else {0},
+                           "round robin with n validators should converge in n messages")
+                    }
+    }
+
+    proptest! {
         #![proptest_config(Config::with_cases(1))]
         #[test]
-        fn increment_chain(ref chain in chain(20, arbitrary_in_set)) {
+        fn increment_chain_arbitrary_messenger(ref chain in chain(8, arbitrary_in_set, some_receivers)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
