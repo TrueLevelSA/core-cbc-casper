@@ -495,7 +495,10 @@ mod tests {
     }
 
     fn some_receivers(val: &Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
-        prop::collection::hash_set(prop::sample::select(val.clone()), 1..(val.len() + 1)).boxed()
+        prop::collection::hash_set(
+            prop::sample::select(val.clone()),
+            1..(val.len() + 1),
+        ).boxed()
     }
 
     fn message_event(
@@ -504,11 +507,8 @@ mod tests {
         receiver_strategy: BoxedStrategy<HashSet<u32>>,
     ) -> BoxedStrategy<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>>
     {
-        (
-            sender_strategy,
-            receiver_strategy,
-            Just(state),
-        ).prop_map(|(sender, receivers, mut state)| {
+        (sender_strategy, receiver_strategy, Just(state))
+            .prop_map(|(sender, receivers, mut state)| {
                 // let receivers = state.keys().cloned().collect();
                 add_message(&mut state, sender, receivers).clone()
             })
@@ -570,8 +570,11 @@ mod tests {
                     let sender_strategy =
                         message_producer_strategy(&mut senders);
                     let receiver_strategy = message_receiver_strategy(&senders);
-                    state = message_event(state.clone(), sender_strategy, receiver_strategy)
-                        .new_value(&mut runner)
+                    state = message_event(
+                        state.clone(),
+                        sender_strategy,
+                        receiver_strategy,
+                    ).new_value(&mut runner)
                         .unwrap()
                         .current();
                     state.clone()
