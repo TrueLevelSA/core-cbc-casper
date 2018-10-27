@@ -451,101 +451,142 @@ mod tests {
         recipients: HashSet<u32>,
     ) -> &'z BTreeMap<u32, SenderState<Message<VoteCount, u32>>> {
         // println!("{:?} {:?}", sender, recipients);
-        let (justification, sender_state) = Justification::from_msgs(LatestMsgsHonest::from_latest_msgs(&state[&sender].get_latest_msgs(), &HashSet::new()).iter().cloned().collect(), &state[&sender]);
+        let (justification, sender_state) = Justification::from_msgs(
+            LatestMsgsHonest::from_latest_msgs(
+                &state[&sender].get_latest_msgs(),
+                &HashSet::new(),
+            ).iter()
+                .cloned()
+                .collect(),
+            &state[&sender],
+        );
         let m = Message::new(sender, justification, VoteCount::ZERO);
-        let (_, sender_state) = Justification::from_msgs(LatestMsgsHonest::from_latest_msgs(sender_state.get_latest_msgs(), &HashSet::new()).iter().cloned().collect(), &sender_state);
+        let (_, sender_state) = Justification::from_msgs(
+            LatestMsgsHonest::from_latest_msgs(
+                sender_state.get_latest_msgs(),
+                &HashSet::new(),
+            ).iter()
+                .cloned()
+                .collect(),
+            &sender_state,
+        );
         state.insert(sender, sender_state);
         recipients.iter().for_each(|recipient| {
-            let (_, recipient_state) = Justification::from_msgs(vec![m.clone()], &state[recipient]);
+            let (_, recipient_state) =
+                Justification::from_msgs(vec![m.clone()], &state[recipient]);
             state.insert(*recipient, recipient_state);
         });
         state
     }
 
-    fn round_robin(
-        val: &mut Vec<u32>
-    ) -> BoxedStrategy<u32> {
+    fn round_robin(val: &mut Vec<u32>) -> BoxedStrategy<u32> {
         let v = val.pop().unwrap();
         val.insert(0, v);
         Just(v).boxed()
     }
 
-    fn arbitrary_in_set(
-        val: &mut Vec<u32>
-    ) -> BoxedStrategy<u32> {
+    fn arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<u32> {
         prop::sample::select(val.clone()).boxed()
     }
 
     fn message_event(
         state: BTreeMap<u32, SenderState<Message<VoteCount, u32>>>,
-        sender_strategy: BoxedStrategy<u32>
+        sender_strategy: BoxedStrategy<u32>,
     ) -> BoxedStrategy<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>>
     {
         (
             sender_strategy,
-            prop::collection::hash_set(0..state.len() as u32, 1..state.len()+1),
+            prop::collection::hash_set(
+                0..state.len() as u32,
+                1..state.len() + 1,
+            ),
             Just(state),
         ).prop_map(|(sender, receivers, mut state)| {
-            // let receivers = state.keys().cloned().collect();
-            add_message(&mut state, sender, receivers).clone()
+                // let receivers = state.keys().cloned().collect();
+                add_message(&mut state, sender, receivers).clone()
             })
             .boxed()
     }
 
-    fn chain<F: 'static>(validator_max_count: usize, message_producer_strategy: F)
-                         -> BoxedStrategy<Vec<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>>>
-    where F: Fn(&mut Vec<u32>) -> BoxedStrategy<u32>
+    fn chain<F: 'static>(
+        validator_max_count: usize,
+        message_producer_strategy: F,
+    ) -> BoxedStrategy<Vec<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>>>
+    where
+        F: Fn(&mut Vec<u32>) -> BoxedStrategy<u32>,
     {
-        ((prop::sample::select((0..validator_max_count).collect::<Vec<usize>>()))).prop_flat_map(|validators|
-                                                                                                 (prop::collection::vec(prop::bool::ANY, validators))).prop_map(
-            move |votes|
-            {let mut state = BTreeMap::new();
-             println!("{:?}: {:?}", votes.len(), votes);
-             let validators: Vec<u32> = (0..votes.len() as u32).collect();
+        (prop::sample::select((0..validator_max_count).collect::<Vec<usize>>()))
+            .prop_flat_map(|validators| {
+                (prop::collection::vec(prop::bool::ANY, validators))
+            })
+            .prop_map(move |votes| {
+                let mut state = BTreeMap::new();
+                println!("{:?}: {:?}", votes.len(), votes);
+                let validators: Vec<u32> = (0..votes.len() as u32).collect();
 
-             let weights: Vec<f64> =
-             iter::repeat(1.0).take(votes.len() as usize).collect();
+                let weights: Vec<f64> =
+                    iter::repeat(1.0).take(votes.len() as usize).collect();
 
-             let senders_weights = SendersWeight::new(
-                 validators
-                     .iter()
-                     .cloned()
-                     .zip(weights.iter().cloned())
-                     .collect(),
-             );
+                let senders_weights = SendersWeight::new(
+                    validators
+                        .iter()
+                        .cloned()
+                        .zip(weights.iter().cloned())
+                        .collect(),
+                );
 
-             validators.iter().for_each(|validator| {
-                 let mut j = Justification::new();
-                 let m = VoteCount::create_vote_msg(*validator, votes[*validator as usize]);
-                 j.insert(m.clone());
-                 state.insert(*validator,
-                              SenderState::new(
-                                  senders_weights.clone(),
-                                  0.0,
-                                  Some(m),
-                                  LatestMsgs::from(&j),
-                                  0.0,
-                                  HashSet::new(),
-                              ));
-             });
+                validators.iter().for_each(|validator| {
+                    let mut j = Justification::new();
+                    let m = VoteCount::create_vote_msg(
+                        *validator,
+                        votes[*validator as usize],
+                    );
+                    j.insert(m.clone());
+                    state.insert(
+                        *validator,
+                        SenderState::new(
+                            senders_weights.clone(),
+                            0.0,
+                            Some(m),
+                            LatestMsgs::from(&j),
+                            0.0,
+                            HashSet::new(),
+                        ),
+                    );
+                });
 
-             let mut runner = TestRunner::default();
-             let mut senders:Vec<_> = state.keys().cloned().collect();
-             let chain = iter::repeat_with(|| {
-                 let sender_strategy = message_producer_strategy(&mut senders);
-                 state = message_event(state.clone(), sender_strategy)
-                     .new_value(&mut runner)
-                     .unwrap()
-                     .current();
-                 state.clone()
-             });
-             Vec::from_iter(chain.take_while(|state| {
-                 let m:HashSet<_> = state.iter().map(|(_, sender_state)| {
-                     let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(sender_state.get_latest_msgs(), &HashSet::new());
-                     latest_honest_msgs.mk_estimate(None, &senders_weights, None)
-                 }).collect();
-                 // println!("{:?}", m);
-                 m.len() != 1}))}).boxed()
+                let mut runner = TestRunner::default();
+                let mut senders: Vec<_> = state.keys().cloned().collect();
+                let chain = iter::repeat_with(|| {
+                    let sender_strategy =
+                        message_producer_strategy(&mut senders);
+                    state = message_event(state.clone(), sender_strategy)
+                        .new_value(&mut runner)
+                        .unwrap()
+                        .current();
+                    state.clone()
+                });
+                Vec::from_iter(chain.take_while(|state| {
+                    let m: HashSet<_> = state
+                        .iter()
+                        .map(|(_, sender_state)| {
+                            let latest_honest_msgs =
+                                LatestMsgsHonest::from_latest_msgs(
+                                    sender_state.get_latest_msgs(),
+                                    &HashSet::new(),
+                                );
+                            latest_honest_msgs.mk_estimate(
+                                None,
+                                &senders_weights,
+                                None,
+                            )
+                        })
+                        .collect();
+                    // println!("{:?}", m);
+                    m.len() != 1
+                }))
+            })
+            .boxed()
     }
 
     proptest! {
