@@ -492,60 +492,60 @@ mod tests {
             .boxed()
     }
 
-        fn chain(validator_max_count: usize)
+    fn chain(validator_max_count: usize)
              -> BoxedStrategy<Vec<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>>> {
-            ((prop::sample::select((0..validator_max_count).collect::<Vec<usize>>()))).prop_flat_map(|validators|
-                                                                                                     (prop::collection::vec(prop::bool::ANY, validators))).prop_map(
-                |votes|
-                {let mut state = BTreeMap::new();
-                println!("{:?}: {:?}", votes.len(), votes);
-                let validators: Vec<u32> = (0..votes.len() as u32).collect();
+        ((prop::sample::select((0..validator_max_count).collect::<Vec<usize>>()))).prop_flat_map(|validators|
+                                                                                                 (prop::collection::vec(prop::bool::ANY, validators))).prop_map(
+            |votes|
+            {let mut state = BTreeMap::new();
+             println!("{:?}: {:?}", votes.len(), votes);
+             let validators: Vec<u32> = (0..votes.len() as u32).collect();
 
-                let weights: Vec<f64> =
-                    iter::repeat(1.0).take(votes.len() as usize).collect();
+             let weights: Vec<f64> =
+             iter::repeat(1.0).take(votes.len() as usize).collect();
 
-                let senders_weights = SendersWeight::new(
-                    validators
-                        .iter()
-                        .cloned()
-                        .zip(weights.iter().cloned())
-                        .collect(),
-                );
+             let senders_weights = SendersWeight::new(
+                 validators
+                     .iter()
+                     .cloned()
+                     .zip(weights.iter().cloned())
+                     .collect(),
+             );
 
-                validators.iter().for_each(|validator| {
-                    let mut j = Justification::new();
-                    let m = VoteCount::create_vote_msg(*validator, votes[*validator as usize]);
-                    j.insert(m.clone());
-                    state.insert(*validator,
-                                 SenderState::new(
-                                     senders_weights.clone(),
-                                     0.0,
-                                     Some(m),
-                                     LatestMsgs::from(&j),
-                                     0.0,
-                                     HashSet::new(),
-                                 ));
-                });
+             validators.iter().for_each(|validator| {
+                 let mut j = Justification::new();
+                 let m = VoteCount::create_vote_msg(*validator, votes[*validator as usize]);
+                 j.insert(m.clone());
+                 state.insert(*validator,
+                              SenderState::new(
+                                  senders_weights.clone(),
+                                  0.0,
+                                  Some(m),
+                                  LatestMsgs::from(&j),
+                                  0.0,
+                                  HashSet::new(),
+                              ));
+             });
 
-                let mut runner = TestRunner::default();
-                let mut senders:Vec<_> = state.keys().cloned().collect();
-                let chain = iter::repeat_with(|| {
-                    // let sender_strategy = arbitrary_in_set(&senders);
-                    let sender_strategy = round_robin(&mut senders);
-                    state = message_event(state.clone(), sender_strategy)
-                        .new_value(&mut runner)
-                        .unwrap()
-                        .current();
-                    state.clone()
-                });
-                Vec::from_iter(chain.take_while(|state| {
-                    let m:HashSet<_> = state.iter().map(|(_, sender_state)| {
-                        let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(sender_state.get_latest_msgs(), &HashSet::new());
-                        latest_honest_msgs.mk_estimate(None, &senders_weights, None)
-                    }).collect();
-                    // println!("{:?}", m);
-                    m.len() != 1}))}).boxed()
-            }
+             let mut runner = TestRunner::default();
+             let mut senders:Vec<_> = state.keys().cloned().collect();
+             let chain = iter::repeat_with(|| {
+                 // let sender_strategy = arbitrary_in_set(&senders);
+                 let sender_strategy = round_robin(&mut senders);
+                 state = message_event(state.clone(), sender_strategy)
+                     .new_value(&mut runner)
+                     .unwrap()
+                     .current();
+                 state.clone()
+             });
+             Vec::from_iter(chain.take_while(|state| {
+                 let m:HashSet<_> = state.iter().map(|(_, sender_state)| {
+                     let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(sender_state.get_latest_msgs(), &HashSet::new());
+                     latest_honest_msgs.mk_estimate(None, &senders_weights, None)
+                 }).collect();
+                 // println!("{:?}", m);
+                 m.len() != 1}))}).boxed()
+    }
 
     proptest! {
         #![proptest_config(Config::with_cases(1))]
