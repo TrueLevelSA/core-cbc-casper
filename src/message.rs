@@ -471,7 +471,7 @@ mod tests {
     }
 
     fn arbitrary_in_set(
-        val: &Vec<u32>
+        val: &mut Vec<u32>
     ) -> BoxedStrategy<u32> {
         prop::sample::select(val.clone()).boxed()
     }
@@ -492,11 +492,13 @@ mod tests {
             .boxed()
     }
 
-    fn chain(validator_max_count: usize)
-             -> BoxedStrategy<Vec<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>>> {
+    fn chain<F: 'static>(validator_max_count: usize, message_producer_strategy: F)
+                         -> BoxedStrategy<Vec<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>>>
+    where F: Fn(&mut Vec<u32>) -> BoxedStrategy<u32>
+    {
         ((prop::sample::select((0..validator_max_count).collect::<Vec<usize>>()))).prop_flat_map(|validators|
                                                                                                  (prop::collection::vec(prop::bool::ANY, validators))).prop_map(
-            |votes|
+            move |votes|
             {let mut state = BTreeMap::new();
              println!("{:?}: {:?}", votes.len(), votes);
              let validators: Vec<u32> = (0..votes.len() as u32).collect();
@@ -530,8 +532,7 @@ mod tests {
              let mut runner = TestRunner::default();
              let mut senders:Vec<_> = state.keys().cloned().collect();
              let chain = iter::repeat_with(|| {
-                 // let sender_strategy = arbitrary_in_set(&senders);
-                 let sender_strategy = round_robin(&mut senders);
+                 let sender_strategy = message_producer_strategy(&mut senders);
                  state = message_event(state.clone(), sender_strategy)
                      .new_value(&mut runner)
                      .unwrap()
@@ -550,7 +551,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(1))]
         #[test]
-        fn increment_chain(ref chain in chain(8)) {
+        fn increment_chain(ref chain in chain(20, arbitrary_in_set)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
