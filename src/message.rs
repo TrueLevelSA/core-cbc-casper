@@ -462,12 +462,27 @@ mod tests {
         state
     }
 
+    fn round_robin(
+        val: &mut Vec<u32>
+    ) -> BoxedStrategy<u32> {
+        let v = val.pop().unwrap();
+        val.insert(0, v);
+        Just(v).boxed()
+    }
+
+    fn arbitrary_in_set(
+        val: &Vec<u32>
+    ) -> BoxedStrategy<u32> {
+        prop::sample::select(val.clone()).boxed()
+    }
+
     fn message_event(
         state: BTreeMap<u32, SenderState<Message<VoteCount, u32>>>,
+        sender_strategy: BoxedStrategy<u32>
     ) -> BoxedStrategy<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>>
     {
         (
-            0..state.len() as u32,
+            sender_strategy,
             prop::collection::hash_set(0..state.len() as u32, 1..state.len()+1),
             Just(state),
         ).prop_map(|(sender, receivers, mut state)| {
@@ -514,8 +529,11 @@ mod tests {
                 });
 
                 let mut runner = TestRunner::default();
+                let mut senders:Vec<_> = state.keys().cloned().collect();
                 let chain = iter::repeat_with(|| {
-                    state = message_event(state.clone())
+                    // let sender_strategy = arbitrary_in_set(&senders);
+                    let sender_strategy = round_robin(&mut senders);
+                    state = message_event(state.clone(), sender_strategy)
                         .new_value(&mut runner)
                         .unwrap()
                         .current();
