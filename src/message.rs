@@ -492,13 +492,12 @@ mod tests {
             .boxed()
     }
 
-
-    prop_compose! {
         fn chain(validator_max_count: usize)
-            (validators in 1..validator_max_count)
-            (votes in prop::collection::vec(prop::bool::ANY, validators))
-             -> Vec<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>> {
-                let mut state = BTreeMap::new();
+             -> BoxedStrategy<Vec<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>>> {
+            ((prop::sample::select((0..validator_max_count).collect::<Vec<usize>>()))).prop_flat_map(|validators|
+                                                                                                     (prop::collection::vec(prop::bool::ANY, validators))).prop_map(
+                |votes|
+                {let mut state = BTreeMap::new();
                 println!("{:?}: {:?}", votes.len(), votes);
                 let validators: Vec<u32> = (0..votes.len() as u32).collect();
 
@@ -545,9 +544,8 @@ mod tests {
                         latest_honest_msgs.mk_estimate(None, &senders_weights, None)
                     }).collect();
                     // println!("{:?}", m);
-                m.len() != 1}))
+                    m.len() != 1}))}).boxed()
             }
-    }
 
     proptest! {
         #![proptest_config(Config::with_cases(1))]
