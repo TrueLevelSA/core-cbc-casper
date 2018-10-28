@@ -515,14 +515,37 @@ mod tests {
             .boxed()
     }
 
-    fn chain<F: 'static, G: 'static>(
+    fn full_consensus(
+        state: BTreeMap<u32, SenderState<Message<VoteCount, u32>>>,
+        senders_weights: &SendersWeight<u32>,
+    ) -> bool {
+        let m: HashSet<_> = state
+            .iter()
+            .map(|(_, sender_state)| {
+                let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
+                    sender_state.get_latest_msgs(),
+                    &HashSet::new(),
+                );
+                latest_honest_msgs.mk_estimate(None, senders_weights, None)
+            })
+            .collect();
+        // println!("{:?}", m);
+        m.len() == 1
+    }
+
+    fn chain<F: 'static, G: 'static, H: 'static>(
         validator_max_count: usize,
         message_producer_strategy: F,
         message_receiver_strategy: G,
+        consensus_satisfied: H,
     ) -> BoxedStrategy<Vec<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>>>
     where
         F: Fn(&mut Vec<u32>) -> BoxedStrategy<u32>,
         G: Fn(&Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
+        H: Fn(
+            BTreeMap<u32, SenderState<Message<VoteCount, u32>>>,
+            &SendersWeight<u32>,
+        ) -> bool,
     {
         (prop::sample::select((1..validator_max_count).collect::<Vec<usize>>()))
             .prop_flat_map(|validators| {
@@ -580,23 +603,7 @@ mod tests {
                     state.clone()
                 });
                 Vec::from_iter(chain.take_while(|state| {
-                    let m: HashSet<_> = state
-                        .iter()
-                        .map(|(_, sender_state)| {
-                            let latest_honest_msgs =
-                                LatestMsgsHonest::from_latest_msgs(
-                                    sender_state.get_latest_msgs(),
-                                    &HashSet::new(),
-                                );
-                            latest_honest_msgs.mk_estimate(
-                                None,
-                                &senders_weights,
-                                None,
-                            )
-                        })
-                        .collect();
-                    // println!("{:?}", m);
-                    m.len() != 1
+                    !consensus_satisfied(state.clone(), &senders_weights)
                 }))
             })
             .boxed()
@@ -605,7 +612,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(30))]
             #[test]
-            fn increment_chain_round_robin(ref chain in chain(10, round_robin, all_receivers)) {
+            fn increment_chain_round_robin(ref chain in chain(10, round_robin, all_receivers, full_consensus)) {
                 assert_eq!(chain.last().unwrap_or(&BTreeMap::new()).keys().len(),
                            if chain.len() > 0 {chain.len() + 1} else {0},
                            "round robin with n validators should converge in n messages")
@@ -615,7 +622,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(1))]
         #[test]
-        fn increment_chain_arbitrary_messenger(ref chain in chain(8, arbitrary_in_set, some_receivers)) {
+        fn increment_chain_arbitrary_messenger(ref chain in chain(8, arbitrary_in_set, some_receivers, full_consensus)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
