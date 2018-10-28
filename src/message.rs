@@ -445,7 +445,7 @@ mod tests {
     use std::{f64};
     use super::*;
 
-    fn add_message<'z>(
+    fn add_message_vote_count<'z>(
         state: &'z mut BTreeMap<u32, SenderState<Message<VoteCount, u32>>>,
         sender: u32,
         recipients: HashSet<u32>,
@@ -508,7 +508,7 @@ mod tests {
         ).boxed()
     }
 
-    fn message_event(
+    fn message_event_vote_count(
         state: BTreeMap<u32, SenderState<Message<VoteCount, u32>>>,
         sender_strategy: BoxedStrategy<u32>,
         receiver_strategy: BoxedStrategy<HashSet<u32>>,
@@ -517,12 +517,12 @@ mod tests {
         (sender_strategy, receiver_strategy, Just(state))
             .prop_map(|(sender, receivers, mut state)| {
                 // let receivers = state.keys().cloned().collect();
-                add_message(&mut state, sender, receivers).clone()
+                add_message_vote_count(&mut state, sender, receivers).clone()
             })
             .boxed()
     }
 
-    fn full_consensus(
+    fn full_consensus_vote_count(
         state: BTreeMap<u32, SenderState<Message<VoteCount, u32>>>,
     ) -> bool {
         let m: HashSet<_> = state
@@ -543,7 +543,7 @@ mod tests {
         m.len() == 1
     }
 
-    fn chain<F: 'static, G: 'static, H: 'static>(
+    fn chain_vote_count<F: 'static, G: 'static, H: 'static>(
         validator_max_count: usize,
         message_producer_strategy: F,
         message_receiver_strategy: G,
@@ -600,7 +600,7 @@ mod tests {
                     let sender_strategy =
                         message_producer_strategy(&mut senders);
                     let receiver_strategy = message_receiver_strategy(&senders);
-                    state = message_event(
+                    state = message_event_vote_count(
                         state.clone(),
                         sender_strategy,
                         receiver_strategy,
@@ -621,7 +621,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(30))]
             #[test]
-            fn increment_chain_round_robin(ref chain in chain(10, round_robin, all_receivers, full_consensus)) {
+            fn increment_chain_round_robin(ref chain in chain_vote_count(15, round_robin, all_receivers, full_consensus_vote_count)) {
                 assert_eq!(chain.last().unwrap_or(&BTreeMap::new()).keys().len(),
                            if chain.len() > 0 {chain.len() + 1} else {0},
                            "round robin with n validators should converge in n messages")
@@ -631,7 +631,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(1))]
         #[test]
-        fn increment_chain_arbitrary_messenger(ref chain in chain(8, arbitrary_in_set, some_receivers, full_consensus)) {
+        fn increment_chain_arbitrary_messenger(ref chain in chain_vote_count(8, arbitrary_in_set, some_receivers, full_consensus_vote_count)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
