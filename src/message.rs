@@ -651,6 +651,22 @@ mod tests {
     }
 
     proptest! {
+        #![proptest_config(Config::with_cases(10))]
+        #[test]
+        fn round_robin_integer(ref chain in chain(prop::num::u32::ANY.boxed(), 2000, round_robin, all_receivers, full_consensus)) {
+            // total messages until unilateral consensus
+            println!("{} validators -> {:?} message(s)",
+                     match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
+                     {"0" => "Unknown",
+                      a => a},
+                     chain.len() + 1);
+            assert!(chain.last().unwrap_or(&BTreeMap::new()).keys().len() >=
+                    chain.len(),
+                    "round robin with n validators should converge in at most n messages")
+        }
+    }
+
+    proptest! {
         #![proptest_config(Config::with_cases(1))]
         #[test]
         fn arbitrary_messenger_vote_count(ref chain in chain(VoteCount::arbitrary(), 8, arbitrary_in_set, some_receivers, full_consensus)) {
@@ -667,6 +683,19 @@ mod tests {
         #![proptest_config(Config::with_cases(1))]
         #[test]
         fn arbitrary_messenger_binary(ref chain in chain(prop::bool::ANY.boxed(), 100, arbitrary_in_set, some_receivers, full_consensus)) {
+            // total messages until unilateral consensus
+            println!("{} validators -> {:?} message(s)",
+                     match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
+                     {"0" => "Unknown",
+                      a => a},
+                     chain.len() + 1);
+        }
+    }
+
+    proptest! {
+        #![proptest_config(Config::with_cases(1))]
+        #[test]
+        fn arbitrary_messenger_integer(ref chain in chain(prop::num::u32::ANY.boxed(), 50, arbitrary_in_set, some_receivers, full_consensus)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
