@@ -524,30 +524,10 @@ mod tests {
             .boxed()
     }
 
-    fn full_consensus_vote_count(
-        state: BTreeMap<u32, SenderState<Message<VoteCount, u32>>>,
-    ) -> bool {
-        let m: HashSet<_> = state
-            .iter()
-            .map(|(_, sender_state)| {
-                let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
-                    sender_state.get_latest_msgs(),
-                    &HashSet::new(),
-                );
-                latest_honest_msgs.mk_estimate(
-                    None,
-                    sender_state.get_senders_weights(),
-                    None,
-                )
-            })
-            .collect();
-        // println!("{:?}", m);
-        m.len() == 1
-    }
-
-    fn full_consensus_binary(
-        state: BTreeMap<u32, SenderState<Message<bool, u32>>>,
-    ) -> bool {
+    fn full_consensus<M>(
+        state: BTreeMap<M::Sender, SenderState<M>>,
+    ) -> bool
+    where M:CasperMsg {
         let m: HashSet<_> = state
             .iter()
             .map(|(_, sender_state)| {
@@ -720,7 +700,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(30))]
             #[test]
-            fn increment_chain_round_robin_vote_count(ref chain in chain_vote_count(15, round_robin, all_receivers, full_consensus_vote_count)) {
+            fn increment_chain_round_robin_vote_count(ref chain in chain_vote_count(15, round_robin, all_receivers, full_consensus)) {
                 assert_eq!(chain.last().unwrap_or(&BTreeMap::new()).keys().len(),
                            if chain.len() > 0 {chain.len() + 1} else {0},
                            "round robin with n validators should converge in n messages")
@@ -730,7 +710,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(30))]
         #[test]
-        fn increment_chain_round_robin_binary(ref chain in chain_binary(15, round_robin, all_receivers, full_consensus_binary)) {
+        fn increment_chain_round_robin_binary(ref chain in chain_binary(15, round_robin, all_receivers, full_consensus)) {
             assert!(chain.last().unwrap_or(&BTreeMap::new()).keys().len() >=
                        chain.len(),
                        "round robin with n validators should converge in at most n messages")
@@ -740,7 +720,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(1))]
         #[test]
-        fn increment_chain_arbitrary_messenger_vote_count(ref chain in chain_vote_count(8, arbitrary_in_set, some_receivers, full_consensus_vote_count)) {
+        fn increment_chain_arbitrary_messenger_vote_count(ref chain in chain_vote_count(8, arbitrary_in_set, some_receivers, full_consensus)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
@@ -753,7 +733,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(1))]
         #[test]
-        fn increment_chain_arbitrary_messenger_binary(ref chain in chain_binary(100, arbitrary_in_set, some_receivers, full_consensus_binary)) {
+        fn increment_chain_arbitrary_messenger_binary(ref chain in chain_binary(100, arbitrary_in_set, some_receivers, full_consensus)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
