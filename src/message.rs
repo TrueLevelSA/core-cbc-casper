@@ -510,12 +510,12 @@ mod tests {
         ).boxed()
     }
 
-    fn message_event_vote_count(
-        state: BTreeMap<u32, SenderState<Message<VoteCount, u32>>>,
-        sender_strategy: BoxedStrategy<u32>,
-        receiver_strategy: BoxedStrategy<HashSet<u32>>,
-    ) -> BoxedStrategy<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>>
-    {
+    fn message_event<M: 'static>(
+        state: BTreeMap<M::Sender, SenderState<M>>,
+        sender_strategy: BoxedStrategy<M::Sender>,
+        receiver_strategy: BoxedStrategy<HashSet<M::Sender>>,
+    ) -> BoxedStrategy<BTreeMap<M::Sender, SenderState<M>>>
+    where M: CasperMsg {
         (sender_strategy, receiver_strategy, Just(state))
             .prop_map(|(sender, receivers, mut state)| {
                 // let receivers = state.keys().cloned().collect();
@@ -636,7 +636,7 @@ mod tests {
                     let sender_strategy =
                         message_producer_strategy(&mut senders);
                     let receiver_strategy = message_receiver_strategy(&senders);
-                    state = message_event_vote_count(
+                    state = message_event(
                         state.clone(),
                         sender_strategy,
                         receiver_strategy,
@@ -712,7 +712,7 @@ mod tests {
                     let sender_strategy =
                         message_producer_strategy(&mut senders);
                     let receiver_strategy = message_receiver_strategy(&senders);
-                    state = message_event_binary(
+                    state = message_event(
                         state.clone(),
                         sender_strategy,
                         receiver_strategy,
