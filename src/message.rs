@@ -781,6 +781,16 @@ mod tests {
     }
 
     proptest! {
+        #![proptest_config(Config::with_cases(30))]
+        #[test]
+        fn increment_chain_round_robin_binary(ref chain in chain_binary(15, round_robin, all_receivers, full_consensus_binary)) {
+            assert!(chain.last().unwrap_or(&BTreeMap::new()).keys().len() >=
+                       chain.len(),
+                       "round robin with n validators should converge in at most n messages")
+        }
+    }
+
+    proptest! {
         #![proptest_config(Config::with_cases(1))]
         #[test]
         fn increment_chain_arbitrary_messenger_vote_count(ref chain in chain_vote_count(8, arbitrary_in_set, some_receivers, full_consensus_vote_count)) {
