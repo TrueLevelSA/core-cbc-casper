@@ -488,47 +488,6 @@ mod tests {
         state
     }
 
-    fn add_message_binary<'z>(
-        state: &'z mut BTreeMap<u32, SenderState<Message<bool, u32>>>,
-        sender: u32,
-        recipients: HashSet<u32>,
-    ) -> &'z BTreeMap<u32, SenderState<Message<bool, u32>>> {
-        // println!("{:?} {:?}", sender, recipients);
-        let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
-            &state[&sender].get_latest_msgs(),
-            &HashSet::new(),
-        );
-        let (justification, sender_state) = Justification::from_msgs(
-            latest_honest_msgs.iter().cloned().collect(),
-            &state[&sender],
-        );
-        let m = Message::new(
-            sender,
-            justification,
-            latest_honest_msgs.mk_estimate(
-                None,
-                state[&sender].get_senders_weights(),
-                None,
-            ),
-        );
-        let (_, sender_state) = Justification::from_msgs(
-            LatestMsgsHonest::from_latest_msgs(
-                sender_state.get_latest_msgs(),
-                &HashSet::new(),
-            ).iter()
-                .cloned()
-                .collect(),
-            &sender_state,
-        );
-        state.insert(sender, sender_state);
-        recipients.iter().for_each(|recipient| {
-            let (_, recipient_state) =
-                Justification::from_msgs(vec![m.clone()], &state[recipient]);
-            state.insert(*recipient, recipient_state);
-        });
-        state
-    }
-
     fn round_robin(val: &mut Vec<u32>) -> BoxedStrategy<u32> {
         let v = val.pop().unwrap();
         val.insert(0, v);
