@@ -33,6 +33,12 @@ impl Debug for VoteCount {
 }
 
 impl VoteCount {
+    pub fn new(yes_count: u32, no_count: u32) -> Self {
+        VoteCount {
+            yes: yes_count,
+            no: no_count,
+        }
+    }
     // makes sure nobody adds more than one vote to their unjustified VoteCount
     // object. if they did, their vote is invalid and will be ignored
     fn is_valid_vote(vote: &Self) -> bool {

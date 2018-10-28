@@ -559,7 +559,7 @@ mod tests {
     {
         (prop::sample::select((1..validator_max_count).collect::<Vec<usize>>()))
             .prop_flat_map(|validators| {
-                (prop::collection::vec(prop::bool::ANY, validators))
+                (prop::collection::vec(prop::sample::select(vec![VoteCount::new(1,0), VoteCount::new(0,1)]), validators))
             })
             .prop_map(move |votes| {
                 let mut state = BTreeMap::new();
@@ -579,9 +579,10 @@ mod tests {
 
                 validators.iter().for_each(|validator| {
                     let mut j = Justification::new();
-                    let m = VoteCount::create_vote_msg(
+                    let m = Message::new(
                         *validator,
-                        votes[*validator as usize],
+                        j.clone(),
+                        votes[*validator as usize].clone(),
                     );
                     j.insert(m.clone());
                     state.insert(
