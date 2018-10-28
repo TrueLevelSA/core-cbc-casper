@@ -2,6 +2,8 @@ use std::collections::{HashSet};
 use std::ops::{Add};
 use std::fmt::{Debug, Formatter, Result};
 
+use proptest::prelude::*;
+
 use traits::{Zero, Estimate, Sender, Data};
 use message::{Message, CasperMsg};
 use justification::{Justification, LatestMsgsHonest};
@@ -33,11 +35,11 @@ impl Debug for VoteCount {
 }
 
 impl VoteCount {
-    pub fn new(yes_count: u32, no_count: u32) -> Self {
-        VoteCount {
-            yes: yes_count,
-            no: no_count,
-        }
+    pub fn arbitrary() -> BoxedStrategy<Self> {
+        prop::sample::select(vec![
+            VoteCount { yes: 1, no: 0 },
+            VoteCount { yes: 0, no: 1 },
+        ]).boxed()
     }
     // makes sure nobody adds more than one vote to their unjustified VoteCount
     // object. if they did, their vote is invalid and will be ignored

@@ -633,7 +633,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(30))]
             #[test]
-        fn increment_chain_round_robin_vote_count(ref chain in chain(prop::sample::select(vec![VoteCount::new(1,0), VoteCount::new(0,1)]).boxed(), 15, round_robin, all_receivers, full_consensus)) {
+        fn increment_chain_round_robin_vote_count(ref chain in chain(VoteCount::arbitrary(), 15, round_robin, all_receivers, full_consensus)) {
                 assert_eq!(chain.last().unwrap_or(&BTreeMap::new()).keys().len(),
                            if chain.len() > 0 {chain.len() + 1} else {0},
                            "round robin with n validators should converge in n messages")
@@ -653,7 +653,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(1))]
         #[test]
-        fn increment_chain_arbitrary_messenger_vote_count(ref chain in chain(prop::sample::select(vec![VoteCount::new(1,0), VoteCount::new(0,1)]).boxed(), 8, arbitrary_in_set, some_receivers, full_consensus)) {
+        fn increment_chain_arbitrary_messenger_vote_count(ref chain in chain(VoteCount::arbitrary(), 8, arbitrary_in_set, some_receivers, full_consensus)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
