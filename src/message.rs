@@ -486,6 +486,47 @@ mod tests {
         state
     }
 
+    fn add_message_binary<'z>(
+        state: &'z mut BTreeMap<u32, SenderState<Message<VoteCount, u32>>>,
+        sender: u32,
+        recipients: HashSet<u32>,
+    ) -> &'z BTreeMap<u32, SenderState<Message<VoteCount, u32>>> {
+        // println!("{:?} {:?}", sender, recipients);
+        let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
+            &state[&sender].get_latest_msgs(),
+            &HashSet::new(),
+        );
+        let (justification, sender_state) = Justification::from_msgs(
+            latest_honest_msgs.iter().cloned().collect(),
+            &state[&sender],
+        );
+        let m = Message::new(
+            sender,
+            justification,
+            latest_honest_msgs.mk_estimate(
+                None,
+                state[&sender].get_senders_weights(),
+                None,
+            ),
+        );
+        let (_, sender_state) = Justification::from_msgs(
+            LatestMsgsHonest::from_latest_msgs(
+                sender_state.get_latest_msgs(),
+                &HashSet::new(),
+            ).iter()
+                .cloned()
+                .collect(),
+            &sender_state,
+        );
+        state.insert(sender, sender_state);
+        recipients.iter().for_each(|recipient| {
+            let (_, recipient_state) =
+                Justification::from_msgs(vec![m.clone()], &state[recipient]);
+            state.insert(*recipient, recipient_state);
+        });
+        state
+    }
+
     fn round_robin(val: &mut Vec<u32>) -> BoxedStrategy<u32> {
         let v = val.pop().unwrap();
         val.insert(0, v);
@@ -522,7 +563,42 @@ mod tests {
             .boxed()
     }
 
+    fn message_event_binary(
+        state: BTreeMap<u32, SenderState<Message<VoteCount, u32>>>,
+        sender_strategy: BoxedStrategy<u32>,
+        receiver_strategy: BoxedStrategy<HashSet<u32>>,
+    ) -> BoxedStrategy<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>>
+    {
+        (sender_strategy, receiver_strategy, Just(state))
+            .prop_map(|(sender, receivers, mut state)| {
+                // let receivers = state.keys().cloned().collect();
+                add_message_binary(&mut state, sender, receivers).clone()
+            })
+            .boxed()
+    }
+
     fn full_consensus_vote_count(
+        state: BTreeMap<u32, SenderState<Message<VoteCount, u32>>>,
+    ) -> bool {
+        let m: HashSet<_> = state
+            .iter()
+            .map(|(_, sender_state)| {
+                let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
+                    sender_state.get_latest_msgs(),
+                    &HashSet::new(),
+                );
+                latest_honest_msgs.mk_estimate(
+                    None,
+                    sender_state.get_senders_weights(),
+                    None,
+                )
+            })
+            .collect();
+        // println!("{:?}", m);
+        m.len() == 1
+    }
+
+    fn full_consensus_binary(
         state: BTreeMap<u32, SenderState<Message<VoteCount, u32>>>,
     ) -> bool {
         let m: HashSet<_> = state
@@ -618,10 +694,85 @@ mod tests {
             .boxed()
     }
 
+    fn chain_binary<F: 'static, G: 'static, H: 'static>(
+        validator_max_count: usize,
+        message_producer_strategy: F,
+        message_receiver_strategy: G,
+        consensus_satisfied: H,
+    ) -> BoxedStrategy<Vec<BTreeMap<u32, SenderState<Message<VoteCount, u32>>>>>
+    where
+        F: Fn(&mut Vec<u32>) -> BoxedStrategy<u32>,
+        G: Fn(&Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
+        H: Fn(BTreeMap<u32, SenderState<Message<VoteCount, u32>>>) -> bool,
+    {
+        (prop::sample::select((1..validator_max_count).collect::<Vec<usize>>()))
+            .prop_flat_map(|validators| {
+                (prop::collection::vec(prop::bool::ANY, validators))
+            })
+            .prop_map(move |votes| {
+                let mut state = BTreeMap::new();
+                println!("{:?}: {:?}", votes.len(), votes);
+                let validators: Vec<u32> = (0..votes.len() as u32).collect();
+
+                let weights: Vec<f64> =
+                    iter::repeat(1.0).take(votes.len() as usize).collect();
+
+                let senders_weights = SendersWeight::new(
+                    validators
+                        .iter()
+                        .cloned()
+                        .zip(weights.iter().cloned())
+                        .collect(),
+                );
+
+                validators.iter().for_each(|validator| {
+                    let mut j = Justification::new();
+                    let m = VoteCount::create_vote_msg(
+                        *validator,
+                        votes[*validator as usize],
+                    );
+                    j.insert(m.clone());
+                    state.insert(
+                        *validator,
+                        SenderState::new(
+                            senders_weights.clone(),
+                            0.0,
+                            Some(m),
+                            LatestMsgs::from(&j),
+                            0.0,
+                            HashSet::new(),
+                        ),
+                    );
+                });
+
+                let mut runner = TestRunner::default();
+                let mut senders: Vec<_> = state.keys().cloned().collect();
+                let chain = iter::repeat_with(|| {
+                    let sender_strategy =
+                        message_producer_strategy(&mut senders);
+                    let receiver_strategy = message_receiver_strategy(&senders);
+                    state = message_event_binary(
+                        state.clone(),
+                        sender_strategy,
+                        receiver_strategy,
+                    ).new_value(&mut runner)
+                        .unwrap()
+                        .current();
+                    state.clone()
+                });
+                Vec::from_iter(
+                    chain.take_while(|state| {
+                        !consensus_satisfied(state.clone())
+                    }),
+                )
+            })
+            .boxed()
+    }
+
     proptest! {
         #![proptest_config(Config::with_cases(30))]
             #[test]
-            fn increment_chain_round_robin(ref chain in chain_vote_count(15, round_robin, all_receivers, full_consensus_vote_count)) {
+            fn increment_chain_round_robin_vote_count(ref chain in chain_vote_count(15, round_robin, all_receivers, full_consensus_vote_count)) {
                 assert_eq!(chain.last().unwrap_or(&BTreeMap::new()).keys().len(),
                            if chain.len() > 0 {chain.len() + 1} else {0},
                            "round robin with n validators should converge in n messages")
@@ -631,7 +782,20 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(1))]
         #[test]
-        fn increment_chain_arbitrary_messenger(ref chain in chain_vote_count(8, arbitrary_in_set, some_receivers, full_consensus_vote_count)) {
+        fn increment_chain_arbitrary_messenger_vote_count(ref chain in chain_vote_count(8, arbitrary_in_set, some_receivers, full_consensus_vote_count)) {
+            // total messages until unilateral consensus
+            println!("{} validators -> {:?} message(s)",
+                     match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
+                     {"0" => "Unknown",
+                      a => a},
+                     chain.len() + 1);
+        }
+    }
+
+    proptest! {
+        #![proptest_config(Config::with_cases(1))]
+        #[test]
+        fn increment_chain_arbitrary_messenger_binary(ref chain in chain_binary(8, arbitrary_in_set, some_receivers, full_consensus_binary)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
