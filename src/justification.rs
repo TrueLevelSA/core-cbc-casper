@@ -418,6 +418,14 @@ impl<M: CasperMsg> SenderState<M> {
             latest_msgs,
         }
     }
+    pub fn update(&mut self, new: Self) {
+		    self.senders_weights = new.senders_weights;
+        self.equivocators = new.equivocators;
+        self.state_fault_weight = new.state_fault_weight;
+        self.thr = new.thr;
+        self.my_last_msg = new.my_last_msg;
+        self.latest_msgs = new.latest_msgs;
+    }
     pub fn get_equivocators(&self) -> &HashSet<M::Sender> {
         &self.equivocators
     }
