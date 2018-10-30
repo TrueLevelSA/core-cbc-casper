@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::sync::{Arc, RwLock};
@@ -441,6 +441,7 @@ mod tests {
     use example::vote_count::{VoteCount};
     use senders_weight::{SendersWeight};
     use justification::{LatestMsgs};
+    use example::blockchain::*;
 
     use std::{f64};
     use super::*;
@@ -545,7 +546,7 @@ mod tests {
                 )
             })
             .collect();
-        // println!("{:?}", m);
+        println!("{:?}", m);
         m.len() == 1
     }
 
@@ -628,6 +629,32 @@ mod tests {
                 )
             })
             .boxed()
+    }
+
+
+    fn arbitrary_blockchain() -> BoxedStrategy<Block> {
+        let genesis_block = Block::from(ProtoBlock {
+            prevblock: None,
+            sender: 42,
+            txs: BTreeSet::new(),
+        });
+        Just(genesis_block).boxed()
+    }
+
+    proptest! {
+        #![proptest_config(Config::with_cases(1))]
+        #[test]
+        fn round_robin_blockchain(ref chain in chain(arbitrary_blockchain(), 3, round_robin, all_receivers, full_consensus)) {
+            // total messages until unilateral consensus
+            println!("{} validators -> {:?} message(s)",
+                     match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
+                     {"0" => "Unknown",
+                      a => a},
+                     chain.len() + 1);
+            assert!(chain.last().unwrap_or(&BTreeMap::new()).keys().len() >=
+                    chain.len(),
+                    "round robin with n validators should converge in at most n messages")
+        }
     }
 
     proptest! {

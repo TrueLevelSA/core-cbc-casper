@@ -13,10 +13,10 @@ type Validator = u32;
 /// a genesis block should be a block with estimate Block with prevblock =
 /// None and data. data will be the unique identifier of this blockchain
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Debug, Hash)]
-struct ProtoBlock {
-    prevblock: Option<Block>,
-    sender: Validator,
-    txs: BTreeSet<Tx>,
+pub struct ProtoBlock {
+    pub prevblock: Option<Block>,
+    pub sender: Validator,
+    pub txs: BTreeSet<Tx>,
 }
 
 /// Boxing of a block, will be implemented as a CasperMsg
@@ -372,7 +372,12 @@ impl Estimate for Block {
             (0, _) => panic!(
                 "Needs at least one latest message to be able to pick one"
             ),
-            (_, None) => panic!("incomplete_block is None"),
+            // (_, None) => panic!("incomplete_block is None"),
+            (_, None) => {
+                let protob = Block::new(None, 1, BTreeSet::new());
+                let msg = latest_msgs.iter().next().cloned();
+                Self::from_prevblock_msg(msg, protob).unwrap()
+            },
             (1, Some(incomplete_block)) => {
                 // only msg to built on top, no choice thus no ghost
                 let msg = latest_msgs.iter().next().cloned();
