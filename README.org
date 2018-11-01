@@ -14,23 +14,26 @@ can create a protocol of the casper family of protocols fairly easy based upon
 this library.
 
 The design decision was to be as general as possible, and leave all the specific
-stuff for the implementer of the protocol. For the time being, we aimed at
+stuff for the implementer of the protocol. For the time being, we aim at
 mathematical correctness, and mostly purely functional protocol executions,
 rather than on performance.
 
-Basically the developer has to implement the CasperMsg trait in order to
-benefit from the casper-cbc safety proofs. But in order to implement that trait,
-he will have to fulfill many other conditions, such as implement the Estimate
-trait for the estimate and Data trait if the estimate carries data. Data trait
-is controversial and might get dropped. And also implement the Sender trait.
+To benefit from the casper-cbc safety proofs this library builds upon, developers
+using this library have to implement the CasperMsg trait. The CasperMsg trait in turn
+requires implementing other traits in this library, such as the Sender trait for validators,
+the Estimate trait for the estimate, and the Data trait if the estimate carries data.
+Note that the Data trait is a controversial addition of the library and might get dropped
+in a revision of this library.
 
 One generic type implementing the CasperMsg trait, namely Message, is also
 provided that helps getting to a compliant CasperMsg trait concrete
 implementation easily.
 
-We present an example of a naive blockchain implementation, a binary consensus,
-and an integer consensus using this library, that use the generic type
-Message<Estimate, Sender> implementation to generate the protocols.
+We present examples of naive consenus protocols: a binary consensus,
+and an integer consensus that use the generic type Message<Estimate, Sender>
+implementation to generate the protocols.
+
+We also present an example blockchain implementation.
 
 In order to get started using the library, the best way is to study the examples
 folder. This library is experimental and might change dramatically.
