@@ -34,9 +34,11 @@ impl Data for Block {
         true // FIXME
     }
 }
+
 //// this type can be used to create a look up for what msgs are referred by
 //// what validators
 // type ReferredValidators = HashMap<Block, HashSet<Validator>>;
+
 impl From<ProtoBlock> for Block {
     fn from(protoblock: ProtoBlock) -> Self {
         Block(Box::new(Arc::new(protoblock)))
@@ -107,6 +109,7 @@ impl Block {
         safety_oracle_threshold: WeightUnit,
         weights: &SendersWeight<Validator>,
     ) -> HashSet<BTreeSet<<BlockMsg as CasperMsg>::Sender>> {
+
         fn latest_in_justification(
             j: &Justification<BlockMsg>,
             equivocators: &HashSet<<BlockMsg as CasperMsg>::Sender>,
@@ -118,10 +121,12 @@ impl Block {
                 .map(|m| (m.get_sender().clone(), m.clone()))
                 .collect()
         }
+
         let latest_containing_block: HashSet<&BlockMsg> = latest_msgs_honest
             .iter()
             .filter(|&msg| block.is_member(&Block::from(msg)))
             .collect();
+
         let latest_agreeing_in_sender_view: HashMap<
             <BlockMsg as CasperMsg>::Sender,
             HashMap<<BlockMsg as CasperMsg>::Sender, BlockMsg>,
@@ -141,6 +146,7 @@ impl Block {
                 )
             })
             .collect();
+
         let neighbours: HashMap<
             &<BlockMsg as CasperMsg>::Sender,
             HashSet<&<BlockMsg as CasperMsg>::Sender>,
@@ -253,10 +259,17 @@ impl Block {
         self.0.prevblock.as_ref().cloned()
     }
 
+    /// parses blockchain using the latest honest messages
+    /// the return value is a tuple containing a map and a set
+    /// the hashmap maps blocks to their respective children
+    /// the set contains all the blocks that have the genesis as their
+    /// prevblock (aka all the children of the genesis block)
     pub fn parse_blockchains(
         latest_msgs: &LatestMsgsHonest<BlockMsg>,
         _finalized_msg: Option<&BlockMsg>,
     ) -> (HashMap<Block, HashSet<Block>>, HashSet<Block>) {
+
+        // start at the tip of the blockchain
         let mut visited: HashMap<Block, HashSet<Block>> = latest_msgs
             .iter()
             .map(|msg| {
@@ -265,24 +278,29 @@ impl Block {
                 (parent, children)
             })
             .collect();
+
         let mut queue: VecDeque<Block> = visited.keys().cloned().collect();
         let mut genesis: HashSet<Block> = HashSet::new();
+
+        // while there is still unvisited blocks
         while let Some(child) = queue.pop_front() {
             match child.get_prevblock() {
+                // if the prevblock is set, update the visited map
                 Some(parent) => {
                     if visited.contains_key(&parent) {
-                        // println!("visited parent before, fork found");
+                        // visited parent before, fork found
                         visited.get_mut(&parent).map(|parents_children| {
                             parents_children.insert(child);
                         });
                     } else {
-                        // println!("didnt visit parent before, set initial state, and push to queue");
+                        // didnt visit parent before, set initial state, and push to queue
                         let mut parents_children = HashSet::new();
                         parents_children.insert(child);
                         visited.insert(parent.clone(), parents_children);
                         queue.push_back(parent);
                     }
                 }
+                // if not, update the genesis set, as a None prevblock indicates the genesis
                 None => {
                     genesis.insert(child);
                 }
