@@ -431,7 +431,7 @@ impl<M: CasperMsg> SenderState<M> {
         &self.latest_msgs
     }
 
-    pub fn get_latest_msgs_mut(&mut self) -> &mut LatestMsgs<M> {
+    pub fn get_latest_msgs_as_mut(&mut self) -> &mut LatestMsgs<M> {
         &mut self.latest_msgs
     }
 
