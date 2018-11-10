@@ -87,6 +87,12 @@ impl<S: Sender> SendersWeight<S> {
             acc + self.get_weight(sender).unwrap_or(::std::f64::NAN)
         })
     }
+
+    pub fn sum_all_weights(&self) -> WeightUnit {
+        self.get_senders().unwrap().iter().fold(WeightUnit::ZERO, |acc, sender| {
+            acc + self.get_weight(sender).unwrap_or(::std::f64::NAN)
+        })
+    }
 }
 
 #[cfg(test)]

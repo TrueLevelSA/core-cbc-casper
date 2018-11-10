@@ -428,10 +428,11 @@ where
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(
             f,
-            "M{:?}({:?}) -> {:?}",
+            "M{:?}({:?})",
+            // "M{:?}({:?}) -> {:?}",
             self.get_sender(),
             self.get_estimate().clone(),
-            self.get_justification()
+            // self.get_justification()
         )
     }
 }
@@ -450,8 +451,7 @@ mod tests {
         state: &'z mut BTreeMap<u32, SenderState<BlockMsg>>,
         sender: u32,
         recipients: HashSet<u32>,
-    ) -> &'z BTreeMap<u32, SenderState<BlockMsg>>
-    {
+    ) -> &'z BTreeMap<u32, SenderState<BlockMsg>> {
         // println!("{:?} {:?}", sender, recipients);
         let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
             &state[&sender].get_latest_msgs(),
@@ -461,15 +461,21 @@ mod tests {
             latest_honest_msgs.iter().cloned().collect(),
             &state[&sender],
         );
-        let m = BlockMsg::new(
-            sender.clone(),
-            justification,
-            latest_honest_msgs.mk_estimate(
-                None,
-                state[&sender].get_senders_weights(),
-                Some(Block::new(None, sender.clone(), BTreeSet::new())),
-            ),
+        // let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
+        //     &state[&sender].get_latest_msgs(),
+        //     &HashSet::new(),
+        // );
+        // let ghost = Block::ghost(&latest_honest_msgs, None, state[&sender].get_senders_weights());
+        let estimate = latest_honest_msgs.mk_estimate(
+            None,
+            state[&sender].get_senders_weights(),
+            Some(Block::new(None, sender.clone(), BTreeSet::new())),
         );
+        // println!("Sender: {:?}", sender);
+        // println!("Ghost calc: {:?}", ghost);
+        // println!("Justification: {:?}", justification);
+        let m = BlockMsg::new(sender.clone(), justification, estimate);
+        // println!("Message added: {:?}\n", m);
         let (_, sender_state) = Justification::from_msgs(
             LatestMsgsHonest::from_latest_msgs(
                 sender_state.get_latest_msgs(),
@@ -485,6 +491,7 @@ mod tests {
                 Justification::from_msgs(vec![m.clone()], &state[recipient]);
             state.insert(recipient.clone(), recipient_state);
         });
+        // println!("Message added: {:?}\n", m);
         state
     }
 
@@ -499,33 +506,63 @@ mod tests {
     }
 
     fn all_receivers(val: &Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
-        let v = HashSet::from_iter(val.iter().cloned());
+        let mut v = HashSet::from_iter(val.iter().cloned());
+        // v.remove(&0);
         Just(v).boxed()
     }
 
     fn some_receivers(val: &Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
+        // let x = vec![0,1];
+        // let res = prop::collection::hash_set(
+        //     prop::sample::select(val.clone()),
+        //     1..(val.len()),
+        // ).boxed();
         prop::collection::hash_set(
             prop::sample::select(val.clone()),
-            1..(val.len() + 1),
+            0..(val.len()),
         ).boxed()
+    }
+
+    // fn some_deceivers(val: &'static Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
+    fn some_deceivers(val: &Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
+        // let mut v = HashSet::from_iter(val.iter().cloned());
+        // let validators: Vec<usize> = (1..val.len()).collect();
+        // prop::sample::select(validators).prop_flat_map(move |size|
+        //     prop::sample::subsequence(val.clone(), size)
+        //         .prop_map(|subsequence| {
+        //             HashSet::from_iter(subsequence.iter().cloned())
+        //         }))
+        //     .boxed()
+        let mut rng = thread_rng();
+        let gen = rng.gen_range(0, val.len());
+
+        // println!("Input: {:?}", val);
+        // println!("Result: {:?}", gen);
+        // let validators: Vec<usize> = (1..val.len()).collect();
+        let res = prop::sample::subsequence(val.clone(), gen)
+            .prop_map(|subsequence| {
+                HashSet::from_iter(subsequence.iter().cloned())
+            })
+            .boxed();
+        res
     }
 
     fn message_event(
         state: BTreeMap<u32, SenderState<BlockMsg>>,
         sender_strategy: BoxedStrategy<u32>,
         receiver_strategy: BoxedStrategy<HashSet<u32>>,
-    ) -> BoxedStrategy<BTreeMap<u32, SenderState<BlockMsg>>>
-    {
+    ) -> BoxedStrategy<BTreeMap<u32, SenderState<BlockMsg>>> {
         (sender_strategy, receiver_strategy, Just(state))
-            .prop_map(|(sender, receivers, mut state)| {
+            .prop_map(|(sender, mut receivers, mut state)| {
                 // let receivers = state.keys().cloned().collect();
+                // println!("receivers: {:?}", receivers);
+                if !receivers.contains(&sender) {receivers.insert(sender);}
                 add_message(&mut state, sender, receivers).clone()
             })
             .boxed()
     }
 
-    fn full_consensus(state: BTreeMap<u32, SenderState<BlockMsg>>) -> bool
-    {
+    fn full_consensus(state: BTreeMap<u32, SenderState<BlockMsg>>) -> bool {
         let m: HashSet<_> = state
             .iter()
             .map(|(_, sender_state)| {
@@ -542,6 +579,107 @@ mod tests {
             .collect();
         println!("{:?}", m);
         m.len() == 1
+    }
+
+    fn safety_oracle(state: BTreeMap<u32, SenderState<BlockMsg>>) -> bool {
+        let m: HashSet<_> = state
+            .iter()
+            .map(|(_, sender_state)| {
+                let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
+                    sender_state.get_latest_msgs(),
+                    &HashSet::new(),
+                );
+                let genesis_block = Block::from(ProtoBlock {
+                    prevblock: None,
+                    sender: 0,
+                    txs: BTreeSet::new(),
+                });
+                // println!(
+                //     "Cliques: {:?}\n",
+                //     Block::safety_oracles(
+                //         genesis_block.clone(),
+                //         &latest_honest_msgs,
+                //         &HashSet::new(),
+                //         0.0,
+                //         sender_state.get_senders_weights()
+                //     )
+                // );
+                let safety_threshold =
+                    (sender_state.get_senders_weights().sum_all_weights())
+                        / 2.0;
+                // println!(
+                //     "Safety oracles: {:?}\n",
+                //     Block::safety_oracles(
+                //         genesis_block.clone(),
+                //         &latest_honest_msgs,
+                //         &HashSet::new(),
+                //         safety_threshold,
+                //         sender_state.get_senders_weights()
+                //     )
+                // );
+                Block::safety_oracles(
+                    genesis_block,
+                    &latest_honest_msgs,
+                    &HashSet::new(),
+                    safety_threshold,
+                    sender_state.get_senders_weights(),
+                ) != BTreeSet::new()
+            })
+            .collect();
+        m.contains(&true)
+    }
+
+    fn safety_oracle_verbatim(state: BTreeMap<u32, SenderState<BlockMsg>>) -> Vec<Vec<Vec<u32>>> {
+        // println!("here");
+        let m: Vec<_> = state
+            .iter()
+            .map(|(sender, sender_state)| {
+                let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
+                    sender_state.get_latest_msgs(),
+                    &HashSet::new(),
+                );
+                let genesis_block = Block::from(ProtoBlock {
+                    prevblock: None,
+                    sender: 0,
+                    txs: BTreeSet::new(),
+                });
+                // println!(
+                //     "Clikues: {:?}\n",
+                //     Block::safety_oracles(
+                //         genesis_block.clone(),
+                //         &latest_honest_msgs,
+                //         &HashSet::new(),
+                //         0.0,
+                //         sender_state.get_senders_weights()
+                //     )
+                // );
+                let safety_threshold =
+                    (sender_state.get_senders_weights().sum_all_weights())
+                        / 2.0;
+                // println!(
+                //     "Safety oracles: {:?}\n",
+                //     Block::safety_oracles(
+                //         genesis_block.clone(),
+                //         &latest_honest_msgs,
+                //         &HashSet::new(),
+                //         safety_threshold,
+                //         sender_state.get_senders_weights()
+                //     )
+                // );
+                let a = Block::safety_oracles(
+                    genesis_block,
+                    &latest_honest_msgs,
+                    &HashSet::new(),
+                    0.0,
+                    sender_state.get_senders_weights(),
+                );
+                let c = a.clone();
+                let b: Vec<BTreeSet<u32>> = Vec::from_iter(c.iter().cloned());
+                let d: Vec<Vec<u32>> = b.iter().map(|btree| Vec::from_iter(btree.iter().cloned())).collect();
+                d
+            })
+            .collect();
+        m
     }
 
     fn chain<F: 'static, G: 'static, H: 'static>(
@@ -565,7 +703,7 @@ mod tests {
             })
             .prop_map(move |votes| {
                 let mut state = BTreeMap::new();
-                println!("{:?}: {:?}", votes.len(), votes);
+                // println!("{:?}: {:?}", votes.len(), votes);
                 let validators: Vec<u32> = (0..votes.len() as u32).collect();
 
                 let weights: Vec<f64> =
@@ -601,8 +739,11 @@ mod tests {
                 });
 
                 let mut runner = TestRunner::default();
-                let mut senders: Vec<_> = state.keys().cloned().collect();
+                // let mut senders: Vec<_> = state.keys().cloned().collect();
+                let mut senders = validators.clone();
+                // println!("k");
                 let chain = iter::repeat_with(|| {
+                    // println!("a");
                     let sender_strategy =
                         message_producer_strategy(&mut senders);
                     let receiver_strategy = message_receiver_strategy(&senders);
@@ -613,40 +754,59 @@ mod tests {
                     ).new_value(&mut runner)
                         .unwrap()
                         .current();
-                    state.clone()
+                    // println!("b");
+                    let k = state.clone();
+                    // println!("b'");
+                    k
                 });
-                Vec::from_iter(
-                    chain.take_while(|state| {
-                        !consensus_satisfied(state.clone())
-                    }),
-                )
+                let mut have_consensus = false;
+                let mut cont = true;
+                Vec::from_iter(chain.take_while(|state| {
+                    // count += 1;
+                    // count < 4 && !consensus_satisfied(state.clone())
+                    if have_consensus {cont = false}
+                    // let x = state.clone();
+                    // println!("{:?}", x);
+                    if consensus_satisfied(state.clone()) {have_consensus = true}
+                    // println!("d");
+                    cont
+                }))
             })
             .boxed()
     }
 
-
     fn arbitrary_blockchain() -> BoxedStrategy<Block> {
         let genesis_block = Block::from(ProtoBlock {
             prevblock: None,
-            sender: 42,
+            sender: 0,
             txs: BTreeSet::new(),
         });
         Just(genesis_block).boxed()
     }
 
     proptest! {
-        #![proptest_config(Config::with_cases(1))]
+        #![proptest_config(Config::with_cases(100))]
         #[test]
-        fn round_robin_blockchain(ref chain in chain(arbitrary_blockchain(), 2, round_robin, all_receivers, full_consensus)) {
+        fn round_robin_blockchain(ref chain in chain(arbitrary_blockchain(), 6, arbitrary_in_set, all_receivers, safety_oracle)) {
+        // fn round_robin_blockchain(ref chain in chain(arbitrary_blockchain(), 9, round_robin, all_receivers, safety_oracle)) {
             // total messages until unilateral consensus
-            println!("{} validators -> {:?} message(s)",
-                     match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
-                     {"0" => "Unknown",
-                      a => a},
-                     chain.len() + 1);
-            assert!(chain.last().unwrap_or(&BTreeMap::new()).keys().len() >=
-                    chain.len(),
-                    "round robin with n validators should converge in at most n messages")
+            println!("new chain");
+            chain.iter().for_each(|state| {println!("{{lms: {:?},", state.iter().map(|(_, sender_state)|
+                                                                             sender_state.get_latest_msgs()).collect::<Vec<_>>());
+                                           println!("sendercount: {:?},", state.keys().len());
+                                           print!("clqs: ");
+                                           // safety_oracle_verbatim(state.clone()).iter().for_each(|clq| print!("{:?},", clq));
+                                           println!("{:?}a}}", safety_oracle_verbatim(state.clone()));
+                                           // println!("clqs: quwel{:?}quwela}}", safety_oracle_verbatim(state.clone()))
+            });
+            // println!("{} validators -> {:?} message(s)",
+            //          match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
+            //          {"0" => "Unknown",
+            //           a => a},
+            //          chain.len() + 1);
+            // assert!(chain.last().unwrap_or(&BTreeMap::new()).keys().len() >=
+            //         chain.len(),
+            //         "round robin with n validators should converge in at most n messages")
         }
     }
 
