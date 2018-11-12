@@ -454,7 +454,7 @@ mod tests {
         recipients: HashSet<M::Sender>,
     ) -> &'z BTreeMap<M::Sender, SenderState<M>>
     where
-        M: CasperMsg
+        M: CasperMsg,
     {
         let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
             &state[&sender].get_latest_msgs(),
@@ -521,7 +521,9 @@ mod tests {
     {
         (sender_strategy, receiver_strategy, Just(state))
             .prop_map(|(sender, mut receivers, mut state)| {
-                if !receivers.contains(&sender) {receivers.insert(sender.clone());}
+                if !receivers.contains(&sender) {
+                    receivers.insert(sender.clone());
+                }
                 add_message(&mut state, sender, receivers).clone()
             })
             .boxed()
@@ -529,7 +531,7 @@ mod tests {
 
     fn full_consensus<M>(state: BTreeMap<M::Sender, SenderState<M>>) -> bool
     where
-        M: CasperMsg
+        M: CasperMsg,
     {
         let m: HashSet<_> = state
             .iter()
@@ -578,8 +580,10 @@ mod tests {
         m.contains(&true)
     }
 
-    fn safety_oracle_verbatim_collection(state: BTreeMap<u32, SenderState<BlockMsg>>) -> Vec<Vec<Vec<u32>>> {
-        let m: Vec<_> = state
+    fn safety_oracle_verbatim_collection(
+        state: BTreeMap<u32, SenderState<BlockMsg>>,
+    ) -> Vec<Vec<Vec<u32>>> {
+        state
             .iter()
             .map(|(_, sender_state)| {
                 let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
@@ -598,12 +602,17 @@ mod tests {
                     0.0,
                     sender_state.get_senders_weights(),
                 );
-                let safety_oracles_vec_of_btrees: Vec<BTreeSet<u32>> = Vec::from_iter(safety_oracles.iter().cloned());
-                let safety_oracles_vec_of_vecs: Vec<Vec<u32>> = safety_oracles_vec_of_btrees.iter().map(|btree| Vec::from_iter(btree.iter().cloned())).collect();
+                let safety_oracles_vec_of_btrees: Vec<
+                    BTreeSet<u32>,
+                > = Vec::from_iter(safety_oracles.iter().cloned());
+                let safety_oracles_vec_of_vecs: Vec<Vec<u32>> =
+                    safety_oracles_vec_of_btrees
+                        .iter()
+                        .map(|btree| Vec::from_iter(btree.iter().cloned()))
+                        .collect();
                 safety_oracles_vec_of_vecs
             })
-            .collect();
-        m
+            .collect()
     }
 
     fn chain<E: 'static, F: 'static, G: 'static, H: 'static>(
@@ -681,8 +690,12 @@ mod tests {
                 let mut have_consensus = false;
                 let mut cont = true;
                 Vec::from_iter(chain.take_while(|state| {
-                    if have_consensus {cont = false}
-                    if consensus_satisfied(state.clone()) {have_consensus = true}
+                    if have_consensus {
+                        cont = false
+                    }
+                    if consensus_satisfied(state.clone()) {
+                        have_consensus = true
+                    }
                     cont
                 }))
             })
