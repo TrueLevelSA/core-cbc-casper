@@ -456,7 +456,6 @@ mod tests {
     where
         M: CasperMsg
     {
-        // println!("{:?} {:?}", sender, recipients);
         let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
             &state[&sender].get_latest_msgs(),
             &HashSet::new(),
@@ -465,22 +464,13 @@ mod tests {
             latest_honest_msgs.iter().cloned().collect(),
             &state[&sender],
         );
-        // let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
-        //     &state[&sender].get_latest_msgs(),
-        //     &HashSet::new(),
-        // );
-        // let ghost = Block::ghost(&latest_honest_msgs, None, state[&sender].get_senders_weights());
         let estimate = latest_honest_msgs.mk_estimate(
             None,
             Some(sender.clone()),
             state[&sender].get_senders_weights(),
             None,
         );
-        // println!("Sender: {:?}", sender);
-        // println!("Ghost calc: {:?}", ghost);
-        // println!("Justification: {:?}", justification);
         let m = M::new(sender.clone(), justification, estimate);
-        // println!("Message added: {:?}\n", m);
         let (_, sender_state) = Justification::from_msgs(
             LatestMsgsHonest::from_latest_msgs(
                 sender_state.get_latest_msgs(),
@@ -496,7 +486,6 @@ mod tests {
                 Justification::from_msgs(vec![m.clone()], &state[recipient]);
             state.insert(recipient.clone(), recipient_state);
         });
-        // println!("Message added: {:?}\n", m);
         state
     }
 
@@ -532,8 +521,6 @@ mod tests {
     {
         (sender_strategy, receiver_strategy, Just(state))
             .prop_map(|(sender, mut receivers, mut state)| {
-                // let receivers = state.keys().cloned().collect();
-                // println!("receivers: {:?}", receivers);
                 if !receivers.contains(&sender) {receivers.insert(sender.clone());}
                 add_message(&mut state, sender, receivers).clone()
             })
@@ -576,29 +563,9 @@ mod tests {
                     sender: 0,
                     txs: BTreeSet::new(),
                 });
-                // println!(
-                //     "Cliques: {:?}\n",
-                //     Block::safety_oracles(
-                //         genesis_block.clone(),
-                //         &latest_honest_msgs,
-                //         &HashSet::new(),
-                //         0.0,
-                //         sender_state.get_senders_weights()
-                //     )
-                // );
                 let safety_threshold =
                     (sender_state.get_senders_weights().sum_all_weights())
                         / 2.0;
-                // println!(
-                //     "Safety oracles: {:?}\n",
-                //     Block::safety_oracles(
-                //         genesis_block.clone(),
-                //         &latest_honest_msgs,
-                //         &HashSet::new(),
-                //         safety_threshold,
-                //         sender_state.get_senders_weights()
-                //     )
-                // );
                 Block::safety_oracles(
                     genesis_block,
                     &latest_honest_msgs,
@@ -665,7 +632,6 @@ mod tests {
             })
             .prop_map(move |votes| {
                 let mut state = BTreeMap::new();
-                // println!("{:?}: {:?}", votes.len(), votes);
                 let validators: Vec<u32> = (0..votes.len() as u32).collect();
 
                 let weights: Vec<f64> =
@@ -720,8 +686,6 @@ mod tests {
                 let mut cont = true;
                 Vec::from_iter(chain.take_while(|state| {
                     if have_consensus {cont = false}
-                    // let x = state.clone();
-                    // println!("{:?}", x);
                     if consensus_satisfied(state.clone()) {have_consensus = true}
                     cont
                 }))
@@ -742,25 +706,14 @@ mod tests {
         #![proptest_config(Config::with_cases(100))]
         #[test]
         fn round_robin_blockchain(ref chain in chain(arbitrary_blockchain(), 6, arbitrary_in_set, all_receivers, safety_oracle)) {
-        // fn round_robin_blockchain(ref chain in chain(arbitrary_blockchain(), 9, round_robin, all_receivers, safety_oracle)) {
             // total messages until unilateral consensus
             println!("new chain");
             chain.iter().for_each(|state| {println!("{{lms: {:?},", state.iter().map(|(_, sender_state)|
                                                                              sender_state.get_latest_msgs()).collect::<Vec<_>>());
                                            println!("sendercount: {:?},", state.keys().len());
                                            print!("clqs: ");
-                                           // safety_oracle_verbatim(state.clone()).iter().for_each(|clq| print!("{:?},", clq));
                                            println!("{:?}a}}", safety_oracle_verbatim(state.clone()));
-                                           // println!("clqs: quwel{:?}quwela}}", safety_oracle_verbatim(state.clone()))
             });
-            // println!("{} validators -> {:?} message(s)",
-            //          match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
-            //          {"0" => "Unknown",
-            //           a => a},
-            //          chain.len() + 1);
-            // assert!(chain.last().unwrap_or(&BTreeMap::new()).keys().len() >=
-            //         chain.len(),
-            //         "round robin with n validators should converge in at most n messages")
         }
     }
 
