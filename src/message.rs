@@ -426,6 +426,7 @@ where
     E: Estimate<M = Self>,
     S: Sender,
 {
+    // Note: format used for rendering illustrative gifs from generative tests; modify with care
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(
             f,
