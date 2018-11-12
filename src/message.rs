@@ -691,17 +691,18 @@ mod tests {
         m
     }
 
-    fn chain<F: 'static, G: 'static, H: 'static>(
-        consensus_value_strategy: BoxedStrategy<Block>,
+    fn chain<E: 'static, F: 'static, G: 'static, H: 'static>(
+        consensus_value_strategy: BoxedStrategy<E>,
         validator_max_count: usize,
         message_producer_strategy: F,
         message_receiver_strategy: G,
         consensus_satisfied: H,
-    ) -> BoxedStrategy<Vec<BTreeMap<u32, SenderState<BlockMsg>>>>
+    ) -> BoxedStrategy<Vec<BTreeMap<u32, SenderState<Message<E, u32>>>>>
     where
+        E: Estimate<M = Message<E, u32>>,
         F: Fn(&mut Vec<u32>) -> BoxedStrategy<u32>,
         G: Fn(&Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
-        H: Fn(BTreeMap<u32, SenderState<BlockMsg>>) -> bool,
+        H: Fn(BTreeMap<u32, SenderState<Message<E, u32>>>) -> bool,
     {
         (prop::sample::select((1..validator_max_count).collect::<Vec<usize>>()))
             .prop_flat_map(move |validators| {
