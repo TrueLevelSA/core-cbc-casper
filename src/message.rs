@@ -524,7 +524,7 @@ mod tests {
         // ).boxed();
         prop::collection::hash_set(
             prop::sample::select(val.clone()),
-            0..(val.len()),
+            0..(val.len() + 1),
         ).boxed()
     }
 
