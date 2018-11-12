@@ -511,45 +511,15 @@ mod tests {
     }
 
     fn all_receivers(val: &Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
-        let mut v = HashSet::from_iter(val.iter().cloned());
-        // v.remove(&0);
+        let v = HashSet::from_iter(val.iter().cloned());
         Just(v).boxed()
     }
 
     fn some_receivers(val: &Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
-        // let x = vec![0,1];
-        // let res = prop::collection::hash_set(
-        //     prop::sample::select(val.clone()),
-        //     1..(val.len()),
-        // ).boxed();
         prop::collection::hash_set(
             prop::sample::select(val.clone()),
             0..(val.len() + 1),
         ).boxed()
-    }
-
-    // fn some_deceivers(val: &'static Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
-    fn some_deceivers(val: &Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
-        // let mut v = HashSet::from_iter(val.iter().cloned());
-        // let validators: Vec<usize> = (1..val.len()).collect();
-        // prop::sample::select(validators).prop_flat_map(move |size|
-        //     prop::sample::subsequence(val.clone(), size)
-        //         .prop_map(|subsequence| {
-        //             HashSet::from_iter(subsequence.iter().cloned())
-        //         }))
-        //     .boxed()
-        let mut rng = thread_rng();
-        let gen = rng.gen_range(0, val.len());
-
-        // println!("Input: {:?}", val);
-        // println!("Result: {:?}", gen);
-        // let validators: Vec<usize> = (1..val.len()).collect();
-        let res = prop::sample::subsequence(val.clone(), gen)
-            .prop_map(|subsequence| {
-                HashSet::from_iter(subsequence.iter().cloned())
-            })
-            .boxed();
-        res
     }
 
     fn message_event<M: 'static>(
@@ -642,7 +612,6 @@ mod tests {
     }
 
     fn safety_oracle_verbatim(state: BTreeMap<u32, SenderState<BlockMsg>>) -> Vec<Vec<Vec<u32>>> {
-        // println!("here");
         let m: Vec<_> = state
             .iter()
             .map(|(sender, sender_state)| {
@@ -655,29 +624,9 @@ mod tests {
                     sender: 0,
                     txs: BTreeSet::new(),
                 });
-                // println!(
-                //     "Clikues: {:?}\n",
-                //     Block::safety_oracles(
-                //         genesis_block.clone(),
-                //         &latest_honest_msgs,
-                //         &HashSet::new(),
-                //         0.0,
-                //         sender_state.get_senders_weights()
-                //     )
-                // );
                 let safety_threshold =
                     (sender_state.get_senders_weights().sum_all_weights())
                         / 2.0;
-                // println!(
-                //     "Safety oracles: {:?}\n",
-                //     Block::safety_oracles(
-                //         genesis_block.clone(),
-                //         &latest_honest_msgs,
-                //         &HashSet::new(),
-                //         safety_threshold,
-                //         sender_state.get_senders_weights()
-                //     )
-                // );
                 let a = Block::safety_oracles(
                     genesis_block,
                     &latest_honest_msgs,
@@ -752,11 +701,8 @@ mod tests {
                 });
 
                 let mut runner = TestRunner::default();
-                // let mut senders: Vec<_> = state.keys().cloned().collect();
                 let mut senders = validators.clone();
-                // println!("k");
                 let chain = iter::repeat_with(|| {
-                    // println!("a");
                     let sender_strategy =
                         message_producer_strategy(&mut senders);
                     let receiver_strategy = message_receiver_strategy(&senders);
@@ -767,21 +713,16 @@ mod tests {
                     ).new_value(&mut runner)
                         .unwrap()
                         .current();
-                    // println!("b");
                     let k = state.clone();
-                    // println!("b'");
                     k
                 });
                 let mut have_consensus = false;
                 let mut cont = true;
                 Vec::from_iter(chain.take_while(|state| {
-                    // count += 1;
-                    // count < 4 && !consensus_satisfied(state.clone())
                     if have_consensus {cont = false}
                     // let x = state.clone();
                     // println!("{:?}", x);
                     if consensus_satisfied(state.clone()) {have_consensus = true}
-                    // println!("d");
                     cont
                 }))
             })
