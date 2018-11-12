@@ -578,10 +578,10 @@ mod tests {
         m.contains(&true)
     }
 
-    fn safety_oracle_verbatim(state: BTreeMap<u32, SenderState<BlockMsg>>) -> Vec<Vec<Vec<u32>>> {
+    fn safety_oracle_verbatim_collection(state: BTreeMap<u32, SenderState<BlockMsg>>) -> Vec<Vec<Vec<u32>>> {
         let m: Vec<_> = state
             .iter()
-            .map(|(sender, sender_state)| {
+            .map(|(_, sender_state)| {
                 let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
                     sender_state.get_latest_msgs(),
                     &HashSet::new(),
@@ -591,20 +591,16 @@ mod tests {
                     sender: 0,
                     txs: BTreeSet::new(),
                 });
-                let safety_threshold =
-                    (sender_state.get_senders_weights().sum_all_weights())
-                        / 2.0;
-                let a = Block::safety_oracles(
+                let safety_oracles = Block::safety_oracles(
                     genesis_block,
                     &latest_honest_msgs,
                     &HashSet::new(),
                     0.0,
                     sender_state.get_senders_weights(),
                 );
-                let c = a.clone();
-                let b: Vec<BTreeSet<u32>> = Vec::from_iter(c.iter().cloned());
-                let d: Vec<Vec<u32>> = b.iter().map(|btree| Vec::from_iter(btree.iter().cloned())).collect();
-                d
+                let safety_oracles_vec_of_btrees: Vec<BTreeSet<u32>> = Vec::from_iter(safety_oracles.iter().cloned());
+                let safety_oracles_vec_of_vecs: Vec<Vec<u32>> = safety_oracles_vec_of_btrees.iter().map(|btree| Vec::from_iter(btree.iter().cloned())).collect();
+                safety_oracles_vec_of_vecs
             })
             .collect();
         m
@@ -712,7 +708,7 @@ mod tests {
                                                                              sender_state.get_latest_msgs()).collect::<Vec<_>>());
                                            println!("sendercount: {:?},", state.keys().len());
                                            print!("clqs: ");
-                                           println!("{:?}a}}", safety_oracle_verbatim(state.clone()));
+                                           println!("{:?}a}}", safety_oracle_verbatim_collection(state.clone()));
             });
         }
     }
@@ -745,7 +741,7 @@ mod tests {
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
                      {"0" => "Unknown",
-                      a => a},
+                      x => x},
                      chain.len() + 1);
             assert!(chain.last().unwrap_or(&BTreeMap::new()).keys().len() >=
                     chain.len(),
@@ -761,7 +757,7 @@ mod tests {
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
                      {"0" => "Unknown",
-                      a => a},
+                      x => x},
                      chain.len() + 1);
         }
     }
@@ -774,7 +770,7 @@ mod tests {
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
                      {"0" => "Unknown",
-                      a => a},
+                      x => x},
                      chain.len() + 1);
         }
     }
@@ -787,7 +783,7 @@ mod tests {
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
                      {"0" => "Unknown",
-                      a => a},
+                      x => x},
                      chain.len() + 1);
         }
     }
