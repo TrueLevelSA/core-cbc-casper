@@ -801,19 +801,6 @@ mod tests {
         }
     }
 
-    fn increment(basis: u32) -> BoxedStrategy<u32> {
-        (1..2u32).prop_map(move |int| int + basis).boxed()
-    }
-
-    #[test]
-    fn increment_int() {
-        let mut runner = TestRunner::default();
-        let mut val = (0..10u32).new_value(&mut runner).unwrap().current();
-        println!("{:?}", val);
-        val = increment(val).new_value(&mut runner).unwrap().current();
-        println!("{:?}", val);
-    }
-
     prop_compose! {
         fn votes(senders: usize, equivocations: usize)
             (votes in prop::collection::vec(prop::bool::weighted(0.3), senders as usize),
