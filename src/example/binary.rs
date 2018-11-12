@@ -22,6 +22,7 @@ impl Estimate for bool {
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         _finalized_msg: Option<&Self::M>,
+        _sender: Option<<<Self as Estimate>::M as CasperMsg>::Sender>,
         senders_weights: &SendersWeight<
             <<Self as Estimate>::M as CasperMsg>::Sender,
         >,
@@ -96,6 +97,7 @@ mod tests {
                     sender_state.get_equivocators()
                 ),
                 None,
+                None,
                 &senders_weights,
                 None
             ),
@@ -108,6 +110,7 @@ mod tests {
             j0.mk_estimate(
                 None,
                 sender_state.get_equivocators(),
+                None,
                 &senders_weights,
                 None
             ),
@@ -119,6 +122,7 @@ mod tests {
             j0.mk_estimate(
                 None,
                 sender_state.get_equivocators(),
+                None,
                 &senders_weights,
                 None
             ),
@@ -129,6 +133,7 @@ mod tests {
             j0.mk_estimate(
                 None,
                 sender_state.get_equivocators(),
+                None,
                 &senders_weights,
                 None
             ),
@@ -174,6 +179,7 @@ mod tests {
             j0.mk_estimate(
                 None,
                 sender_state.get_equivocators(),
+                None,
                 &senders_weights,
                 None
             ),
@@ -195,6 +201,7 @@ mod tests {
             j0.mk_estimate(
                 None,
                 sender_state.get_equivocators(),
+                None,
                 &senders_weights,
                 None
             ),

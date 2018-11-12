@@ -16,6 +16,7 @@ pub trait Estimate: Hash + Clone + Ord + Send + Sync + Debug + Data {
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         finalized_msg: Option<&Self::M>,
+        sender: Option<<<Self as Estimate>::M as CasperMsg>::Sender>,
         senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
         external_data: Option<<Self as Data>::Data>,
     ) -> Self;
