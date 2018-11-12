@@ -381,9 +381,8 @@ impl Estimate for Block {
             (0, _) => panic!(
                 "Needs at least one latest message to be able to pick one"
             ),
-            // (_, None) => panic!("incomplete_block is None"),
             (_, None) => {
-                let protob = Block::new(None, 1, BTreeSet::new());
+                let protob = Block::new(None, sender.unwrap_or(0), BTreeSet::new());
                 let msg = latest_msgs.iter().next().cloned();
                 Self::from_prevblock_msg(msg, protob).unwrap()
             },
