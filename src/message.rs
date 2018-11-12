@@ -552,16 +552,19 @@ mod tests {
         res
     }
 
-    fn message_event(
-        state: BTreeMap<u32, SenderState<BlockMsg>>,
-        sender_strategy: BoxedStrategy<u32>,
-        receiver_strategy: BoxedStrategy<HashSet<u32>>,
-    ) -> BoxedStrategy<BTreeMap<u32, SenderState<BlockMsg>>> {
+    fn message_event<M: 'static>(
+        state: BTreeMap<M::Sender, SenderState<M>>,
+        sender_strategy: BoxedStrategy<M::Sender>,
+        receiver_strategy: BoxedStrategy<HashSet<M::Sender>>,
+    ) -> BoxedStrategy<BTreeMap<M::Sender, SenderState<M>>>
+    where
+        M: CasperMsg,
+    {
         (sender_strategy, receiver_strategy, Just(state))
             .prop_map(|(sender, mut receivers, mut state)| {
                 // let receivers = state.keys().cloned().collect();
                 // println!("receivers: {:?}", receivers);
-                if !receivers.contains(&sender) {receivers.insert(sender);}
+                if !receivers.contains(&sender) {receivers.insert(sender.clone());}
                 add_message(&mut state, sender, receivers).clone()
             })
             .boxed()
