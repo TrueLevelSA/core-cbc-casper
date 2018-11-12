@@ -756,7 +756,7 @@ mod tests {
                      match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
                      {"0" => "Unknown",
                       x => x},
-                     chain.len() + 1);
+                     chain.len());
             assert!(chain.last().unwrap_or(&BTreeMap::new()).keys().len() >=
                     chain.len(),
                     "round robin with n validators should converge in at most n messages")
@@ -772,7 +772,7 @@ mod tests {
                      match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
                      {"0" => "Unknown",
                       x => x},
-                     chain.len() + 1);
+                     chain.len());
         }
     }
 
@@ -785,7 +785,7 @@ mod tests {
                      match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
                      {"0" => "Unknown",
                       x => x},
-                     chain.len() + 1);
+                     chain.len());
         }
     }
 
@@ -798,7 +798,7 @@ mod tests {
                      match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
                      {"0" => "Unknown",
                       x => x},
-                     chain.len() + 1);
+                     chain.len());
         }
     }
 
