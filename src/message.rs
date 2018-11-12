@@ -828,7 +828,7 @@ mod tests {
         #[test]
         fn round_robin_vote_count(ref chain in chain(VoteCount::arbitrary(), 15, round_robin, all_receivers, full_consensus)) {
             assert_eq!(chain.last().unwrap_or(&BTreeMap::new()).keys().len(),
-                       if chain.len() > 0 {chain.len() + 1} else {0},
+                       if chain.len() > 0 {chain.len()} else {0},
                        "round robin with n validators should converge in n messages")
         }
     }
