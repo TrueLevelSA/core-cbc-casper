@@ -554,7 +554,7 @@ mod tests {
     }
 
     fn safety_oracle(state: BTreeMap<u32, SenderState<BlockMsg>>) -> bool {
-        let m: HashSet<_> = state
+        let safety_oracle_detected: HashSet<bool> = state
             .iter()
             .map(|(_, sender_state)| {
                 let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
@@ -578,10 +578,10 @@ mod tests {
                 ) != BTreeSet::new()
             })
             .collect();
-        m.contains(&true)
+        safety_oracle_detected.contains(&true)
     }
 
-    fn safety_oracle_verbatim_collection(
+    fn clique_collection(
         state: BTreeMap<u32, SenderState<BlockMsg>>,
     ) -> Vec<Vec<Vec<u32>>> {
         state
@@ -600,6 +600,7 @@ mod tests {
                     genesis_block,
                     &latest_honest_msgs,
                     &HashSet::new(),
+                    // cliques, not safety oracles, because our threshold is 0
                     0.0,
                     sender_state.get_senders_weights(),
                 );
@@ -714,14 +715,14 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(100))]
         #[test]
-        fn round_robin_blockchain(ref chain in chain(arbitrary_blockchain(), 6, arbitrary_in_set, all_receivers, safety_oracle)) {
+        fn blockchain(ref chain in chain(arbitrary_blockchain(), 6, round_robin, all_receivers, safety_oracle)) {
             // total messages until unilateral consensus
             println!("new chain");
             chain.iter().for_each(|state| {println!("{{lms: {:?},", state.iter().map(|(_, sender_state)|
                                                                              sender_state.get_latest_msgs()).collect::<Vec<_>>());
                                            println!("sendercount: {:?},", state.keys().len());
                                            print!("clqs: ");
-                                           println!("{:?}}},", safety_oracle_verbatim_collection(state.clone()));
+                                           println!("{:?}}},", clique_collection(state.clone()));
             });
         }
     }
