@@ -587,15 +587,15 @@ mod tests {
         state
             .iter()
             .map(|(_, sender_state)| {
-                let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
-                    sender_state.get_latest_msgs(),
-                    &HashSet::new(),
-                );
                 let genesis_block = Block::from(ProtoBlock {
                     prevblock: None,
                     sender: 0,
                     txs: BTreeSet::new(),
                 });
+                let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
+                    sender_state.get_latest_msgs(),
+                    &HashSet::new(),
+                );
                 let safety_oracles = Block::safety_oracles(
                     genesis_block,
                     &latest_honest_msgs,
