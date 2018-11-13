@@ -685,19 +685,18 @@ mod tests {
                     ).new_value(&mut runner)
                         .unwrap()
                         .current();
-                    let k = state.clone();
-                    k
+                    state.clone()
                 });
                 let mut have_consensus = false;
-                let mut cont = true;
                 Vec::from_iter(chain.take_while(|state| {
                     if have_consensus {
-                        cont = false
+                        false
+                    } else {
+                        if consensus_satisfied(state.clone()) {
+                            have_consensus = true
+                        }
+                        true
                     }
-                    if consensus_satisfied(state.clone()) {
-                        have_consensus = true
-                    }
-                    cont
                 }))
             })
             .boxed()
@@ -722,7 +721,7 @@ mod tests {
                                                                              sender_state.get_latest_msgs()).collect::<Vec<_>>());
                                            println!("sendercount: {:?},", state.keys().len());
                                            print!("clqs: ");
-                                           println!("{:?}a}}", safety_oracle_verbatim_collection(state.clone()));
+                                           println!("{:?}}},", safety_oracle_verbatim_collection(state.clone()));
             });
         }
     }
