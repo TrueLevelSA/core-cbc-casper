@@ -15,17 +15,30 @@ pub struct SendersWeight<S: Sender>(Arc<RwLock<HashMap<S, WeightUnit>>>);
 // }
 
 impl<S: Sender> SendersWeight<S> {
+
+    /// creates a new SendersWeight from a HashMap 
     pub fn new(senders_weight: HashMap<S, WeightUnit>) -> Self {
         SendersWeight(Arc::new(RwLock::new(senders_weight)))
     }
-    pub fn read(&self) -> LockResult<RwLockReadGuard<HashMap<S, WeightUnit>>> {
+
+    /// same as RwLock read() function
+    /// basically locks the Rwlock with read access
+    /// TODO DL: why was this public? shouldn't it be that it's only accessed from
+    /// insert and get_senders?
+    fn read(&self) -> LockResult<RwLockReadGuard<HashMap<S, WeightUnit>>> {
         self.0.read()
     }
-    pub fn write(
+
+    /// same as RwLock write() function
+    /// basically locks the RwLock with write access 
+    /// TODO DL: why was this public? shouldn't it be that it's only accessed from
+    /// insert and get_senders?
+    fn write(
         &self,
     ) -> LockResult<RwLockWriteGuard<HashMap<S, WeightUnit>>> {
         self.0.write()
     }
+
     /// returns success of insertion. failure happens if cannot unwrap self
     pub fn insert(&mut self, k: S, v: WeightUnit) -> bool {
         self.write()
@@ -36,6 +49,7 @@ impl<S: Sender> SendersWeight<S> {
             })
             .unwrap_or(false)
     }
+
     /// picks senders with positive weights
     pub fn get_senders(&self) -> Result<HashSet<S>, &'static str> {
         self.read().map_err(|_| "Can't unwrap SendersWeight").map(
@@ -55,6 +69,9 @@ impl<S: Sender> SendersWeight<S> {
         )
     }
 
+    /// Gets the weight of the sender
+    /// Returns an Error in case there is a reading error 
+    /// or the sender does not exist
     pub fn get_weight(&self, sender: &S) -> Result<WeightUnit, &'static str> {
         self.read()
             .map_err(|_| "Can't unwrap SendersWeight")
@@ -64,6 +81,7 @@ impl<S: Sender> SendersWeight<S> {
             })
     }
 
+    /// returns the total weight of all the senders 
     pub fn sum_weight_senders(&self, senders: &HashSet<S>) -> WeightUnit {
         senders.iter().fold(WeightUnit::ZERO, |acc, sender| {
             acc + self.get_weight(sender).unwrap_or(::std::f64::NAN)
@@ -72,7 +90,7 @@ impl<S: Sender> SendersWeight<S> {
 }
 
 #[cfg(test)]
-mod sender_weight {
+mod tests {
     use super::*;
 
     #[test]

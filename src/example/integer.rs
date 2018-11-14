@@ -1,6 +1,6 @@
 use traits::{Estimate, Data, Zero};
 use message::{CasperMsg, Message};
-use justification::{LatestMsgsHonest, LatestMsgs};
+use justification::{LatestMsgsHonest};
 use senders_weight::{SendersWeight};
 use weight_unit::{WeightUnit};
 use std::collections::HashSet;
@@ -19,8 +19,10 @@ impl Data for u32 {
     }
 }
 
+/// the goal here is to find the weighted median of all the values
 impl Estimate for u32 {
     type M = IntegerMsg;
+
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         _finalized_msg: Option<&Self::M>,
@@ -43,6 +45,9 @@ impl Estimate for u32 {
         msgs_sorted_by_estimate.sort_unstable_by(|a, b| {
             a.get_estimate().cmp(&b.get_estimate())
         });
+
+        // get the total weight of the senders of the messages
+        // in the set
         let total_weight = msgs_sorted_by_estimate.iter().fold(
             WeightUnit::ZERO,
             |acc, x| {
@@ -51,9 +56,14 @@ impl Estimate for u32 {
                     .unwrap_or(WeightUnit::ZERO)
             },
         );
+
         let mut running_weight = 0.0;
         let mut msg_iter = msgs_sorted_by_estimate.iter();
         let mut current_msg:Result<&&IntegerMsg, &str> = Err("no msg");
+
+        // since the messages are ordered according to their estimates,
+        // whichever estimate is found after iterating over half of the total weight
+        // is the consensus
         while running_weight / total_weight < 0.5 {
             current_msg = msg_iter.next().ok_or("no next msg");
             running_weight +=
@@ -61,6 +71,8 @@ impl Estimate for u32 {
                 .and_then(|m| senders_weights.get_weight(m.get_sender()))
                 .unwrap_or(WeightUnit::ZERO)
         }
+
+        // return said estimate
         match current_msg {
             Err(_) => 0,
             Ok(m) => *m.get_estimate()
@@ -68,85 +80,270 @@ impl Estimate for u32 {
     }
 }
 
-#[test]
-fn equal_weight() {
-    use senders_weight::SendersWeight;
-    use justification::{SenderState,Justification};
+#[cfg(test)]
+mod tests{
     use std::collections::{HashSet};
 
-    let senders: Vec<u32> = (0..4).collect();
-    let weights = [1.0, 1.0, 1.0, 1.0];
+    use super::*;
+    use senders_weight::SendersWeight;
+    use justification::{SenderState, Justification, LatestMsgs};
 
-    let senders_weights = SendersWeight::new(
-        senders
-            .iter()
-            .cloned()
-            .zip(weights.iter().cloned())
-            .collect(),
-    );
+    #[test]
+    fn equal_weight() {
+        let senders: Vec<u32> = (0..4).collect();
+        let weights = [1.0, 1.0, 1.0, 1.0];
 
-    let sender_state = SenderState::new(
-        senders_weights.clone(),
-        (0.0), // state fault weight
-        None,
-        LatestMsgs::new(),
-        1.0,            // subjective fault weight threshold
-        HashSet::new(), // equivocators
-    );
+        let senders_weights = SendersWeight::new(
+            senders
+                .iter()
+                .cloned()
+                .zip(weights.iter().cloned())
+                .collect(),
+        );
 
-    assert_eq!(
-        u32::mk_estimate(
-            &LatestMsgsHonest::from_latest_msgs(
-                &LatestMsgs::from(&Justification::new()),
-                sender_state.get_equivocators()
+        let sender_state = SenderState::new(
+            senders_weights.clone(),
+            0.0, // state fault weight
+            None,
+            LatestMsgs::new(),
+            1.0,            // subjective fault weight threshold
+            HashSet::new(), // equivocators
+        );
+
+        assert_eq!(
+            u32::mk_estimate(
+                &LatestMsgsHonest::from_latest_msgs(
+                    &LatestMsgs::from(&Justification::new()),
+                    sender_state.get_equivocators()
+                ),
+                None,
+                &senders_weights,
+                None
             ),
-            None,
-            &senders_weights,
-            None
-        ),
-        0
-    );
+            0
+        );
 
-    let m0 = IntegerMsg::new(senders[0], Justification::new(), 1);
-    let m1 = IntegerMsg::new(senders[1], Justification::new(), 2);
-    let m2 = IntegerMsg::new(senders[2], Justification::new(), 3);
-    let (m3, _) = IntegerMsg::from_msgs(
-        senders[0],
-        vec![&m0, &m1],
-        None,
-        &sender_state,
-        None,
-    ).unwrap();
+        let m0 = IntegerMsg::new(senders[0], Justification::new(), 1);
+        let m1 = IntegerMsg::new(senders[1], Justification::new(), 2);
+        let m2 = IntegerMsg::new(senders[2], Justification::new(), 3);
+        let (m3, _) = IntegerMsg::from_msgs(
+            senders[0],
+            vec![&m0, &m1],
+            None,
+            &sender_state,
+            None,
+        ).unwrap();
 
-    let (mut j0, _) =
-        Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
-    assert_eq!(
-        j0.mk_estimate(
+        let (mut j0, _) =
+            Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
+        assert_eq!(
+            j0.mk_estimate(
+                None,
+                sender_state.get_equivocators(),
+                &senders_weights,
+                None
+            ),
+            1
+        );
+
+        j0.faulty_insert(&m2, &sender_state);
+        assert_eq!(
+            j0.mk_estimate(
+                None,
+                sender_state.get_equivocators(),
+                &senders_weights,
+                None
+            ),
+            2
+        );
+
+        j0.faulty_insert(&m3, &sender_state);
+        assert_eq!(
+            j0.mk_estimate(
+                None,
+                sender_state.get_equivocators(),
+                &senders_weights,
+                None
+            ),
+            2
+        );
+    }
+
+    /// the 1st validator has most of the weight
+    #[test]
+    fn uneven_weights_1() {
+        let senders: Vec<u32> = (0..4).collect();
+        let weights = [4.0, 1.0, 1.0, 1.0];
+
+        let senders_weights = SendersWeight::new(
+            senders
+                .iter()
+                .cloned()
+                .zip(weights.iter().cloned())
+                .collect(),
+        );
+
+        let sender_state = SenderState::new(
+            senders_weights.clone(),
+            0.0, // state fault weight
             None,
-            sender_state.get_equivocators(),
-            &senders_weights,
-            None
-        ),
-        1
-    );
-    j0.faulty_insert(&m2, &sender_state);
-    assert_eq!(
-        j0.mk_estimate(
+            LatestMsgs::new(),
+            1.0,            // subjective fault weight threshold
+            HashSet::new(), // equivocators
+        );
+
+        assert_eq!(
+            u32::mk_estimate(
+                &LatestMsgsHonest::from_latest_msgs(
+                    &LatestMsgs::from(&Justification::new()),
+                    sender_state.get_equivocators()
+                ),
+                None,
+                &senders_weights,
+                None
+            ),
+            0
+        );
+
+        let m0 = IntegerMsg::new(senders[0], Justification::new(), 1);
+        let m1 = IntegerMsg::new(senders[1], Justification::new(), 2);
+        let m2 = IntegerMsg::new(senders[2], Justification::new(), 3);
+        let (m3, _) = IntegerMsg::from_msgs(
+            senders[0],
+            vec![&m0, &m1],
             None,
-            sender_state.get_equivocators(),
-            &senders_weights,
-            None
-        ),
-        2
-    );
-    j0.faulty_insert(&m3, &sender_state);
-    assert_eq!(
-        j0.mk_estimate(
+            &sender_state,
             None,
-            sender_state.get_equivocators(),
-            &senders_weights,
-            None
-        ),
-        2
-    );
+        ).unwrap();
+
+        let (mut j0, _) =
+            Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
+        assert_eq!(
+            j0.mk_estimate(
+                None,
+                sender_state.get_equivocators(),
+                &senders_weights,
+                None
+            ),
+            1
+        );
+
+        j0.faulty_insert(&m2, &sender_state);
+        assert_eq!(
+            j0.mk_estimate(
+                None,
+                sender_state.get_equivocators(),
+                &senders_weights,
+                None
+            ),
+            1
+        );
+
+        j0.faulty_insert(&m3, &sender_state);
+        assert_eq!(
+            j0.mk_estimate(
+                None,
+                sender_state.get_equivocators(),
+                &senders_weights,
+                None
+            ),
+            1
+        );
+    }
+
+    /// the 4th validator has most of the weight
+    #[test]
+    fn uneven_weights_4() {
+        let senders: Vec<u32> = (0..4).collect();
+        let weights = [1.0, 1.0, 1.0, 4.0];
+
+        let senders_weights = SendersWeight::new(
+            senders
+                .iter()
+                .cloned()
+                .zip(weights.iter().cloned())
+                .collect(),
+        );
+
+        let sender_state = SenderState::new(
+            senders_weights.clone(),
+            0.0, // state fault weight
+            None,
+            LatestMsgs::new(),
+            1.0,            // subjective fault weight threshold
+            HashSet::new(), // equivocators
+        );
+
+        assert_eq!(
+            u32::mk_estimate(
+                &LatestMsgsHonest::from_latest_msgs(
+                    &LatestMsgs::from(&Justification::new()),
+                    sender_state.get_equivocators()
+                ),
+                None,
+                &senders_weights,
+                None
+            ),
+            0
+        );
+
+        let m0 = IntegerMsg::new(senders[0], Justification::new(), 1);
+        let m1 = IntegerMsg::new(senders[1], Justification::new(), 2);
+        let m2 = IntegerMsg::new(senders[2], Justification::new(), 3);
+        let m3 = IntegerMsg::new(senders[3], Justification::new(), 4);
+
+        let (m4, _) = IntegerMsg::from_msgs(
+            senders[3],
+            vec![&m0, &m1, &m2, &m3],
+            None,
+            &sender_state,
+            None,
+        ).unwrap();
+
+        let (mut j0, _) =
+            Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
+        assert_eq!(
+            j0.mk_estimate(
+                None,
+                sender_state.get_equivocators(),
+                &senders_weights,
+                None
+            ),
+            1
+        );
+
+        j0.faulty_insert(&m2, &sender_state);
+        assert_eq!(
+            j0.mk_estimate(
+                None,
+                sender_state.get_equivocators(),
+                &senders_weights,
+                None
+            ),
+            2
+        );
+
+        j0.faulty_insert(&m3, &sender_state);
+        assert_eq!(
+            j0.mk_estimate(
+                None,
+                sender_state.get_equivocators(),
+                &senders_weights,
+                None
+            ),
+            4
+        );
+
+        j0.faulty_insert(&m4, &sender_state);
+        assert_eq!(
+            j0.mk_estimate(
+                None,
+                sender_state.get_equivocators(),
+                &senders_weights,
+                None
+            ),
+            4
+        );
+
+    }
 }

@@ -1,21 +1,17 @@
-use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::convert::From;
-use std::iter::{Iterator, FromIterator};
-use std::iter;
+use std::iter::{Iterator};
 
-use justification::{Justification, SenderState, LatestMsgsHonest, LatestMsgs};
+use justification::{Justification, LatestMsgsHonest, LatestMsgs};
 use message::{CasperMsg, Message};
 use senders_weight::SendersWeight;
 use std::sync::Arc;
-use std::cmp::Ordering::{Equal, Greater, Less};
 use traits::{Data, Estimate, Zero};
 use weight_unit::WeightUnit;
 type Validator = u32;
 
 /// a genesis block should be a block with estimate Block with prevblock =
 /// None and data. data will be the unique identifier of this blockchain
-
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Debug, Hash)]
 struct ProtoBlock {
     prevblock: Option<Block>,
@@ -23,6 +19,7 @@ struct ProtoBlock {
     txs: BTreeSet<Tx>,
 }
 
+/// Boxing of a block, will be implemented as a CasperMsg
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Debug)]
 pub struct Block(Box<Arc<ProtoBlock>>);
 
@@ -37,6 +34,7 @@ impl Data for Block {
         true // FIXME
     }
 }
+
 //// this type can be used to create a look up for what msgs are referred by
 //// what validators
 // type ReferredValidators = HashMap<Block, HashSet<Validator>>;
@@ -46,6 +44,7 @@ impl From<ProtoBlock> for Block {
         Block(Box::new(Arc::new(protoblock)))
     }
 }
+
 impl<'z> From<&'z BlockMsg> for Block {
     fn from(msg: &BlockMsg) -> Self {
         msg.get_estimate().clone()
@@ -64,12 +63,16 @@ impl Block {
             txs,
         })
     }
+
     pub fn get_txs(&self) -> &BTreeSet<Tx> {
         &self.0.txs
     }
+
     pub fn get_sender(&self) -> Validator {
         self.0.sender
     }
+
+    /// Create a new block from a prevblock message and an incomplete block 
     pub fn from_prevblock_msg(
         prevblock_msg: Option<BlockMsg>,
         // a incomplete_block is a block with a None prevblock (ie, Estimate) AND is
@@ -88,6 +91,8 @@ impl Block {
             Err("Block not valid")
         }
     }
+
+    /// Math definition of blockchain membership
     pub fn is_member(&self, rhs: &Self) -> bool {
         self == rhs
             || rhs
@@ -96,6 +101,7 @@ impl Block {
                 .map(|prevblock| self.is_member(prevblock))
                 .unwrap_or(false)
     }
+
     pub fn safety_oracles(
         block: Block,
         latest_msgs_honest: &LatestMsgsHonest<BlockMsg>,
@@ -103,6 +109,7 @@ impl Block {
         safety_oracle_threshold: WeightUnit,
         weights: &SendersWeight<Validator>,
     ) -> HashSet<BTreeSet<<BlockMsg as CasperMsg>::Sender>> {
+
         fn latest_in_justification(
             j: &Justification<BlockMsg>,
             equivocators: &HashSet<<BlockMsg as CasperMsg>::Sender>,
@@ -114,10 +121,12 @@ impl Block {
                 .map(|m| (m.get_sender().clone(), m.clone()))
                 .collect()
         }
+
         let latest_containing_block: HashSet<&BlockMsg> = latest_msgs_honest
             .iter()
             .filter(|&msg| block.is_member(&Block::from(msg)))
             .collect();
+
         let latest_agreeing_in_sender_view: HashMap<
             <BlockMsg as CasperMsg>::Sender,
             HashMap<<BlockMsg as CasperMsg>::Sender, BlockMsg>,
@@ -137,6 +146,7 @@ impl Block {
                 )
             })
             .collect();
+
         let neighbours: HashMap<
             &<BlockMsg as CasperMsg>::Sender,
             HashSet<&<BlockMsg as CasperMsg>::Sender>,
@@ -156,6 +166,7 @@ impl Block {
             })
             .collect();
         println!("neighbours: {:?}", neighbours);
+
         fn bron_kerbosch<'z>(
             r: HashSet<&'z <BlockMsg as CasperMsg>::Sender>,
             p: HashSet<&'z <BlockMsg as CasperMsg>::Sender>,
@@ -191,10 +202,13 @@ impl Block {
                 })
             }
         }
+
         let p = neighbours.iter().fold(HashSet::new(), |acc, (_sender, x)| {
             acc.union(x).cloned().collect()
         });
+
         let mut mx_clqs = HashSet::new();
+
         bron_kerbosch(
             HashSet::new(),
             p,
@@ -202,6 +216,7 @@ impl Block {
             &mut mx_clqs,
             neighbours,
         );
+
         mx_clqs
             .iter()
             .filter(|x| {
@@ -243,10 +258,18 @@ impl Block {
     pub fn get_prevblock(&self) -> Option<Self> {
         self.0.prevblock.as_ref().cloned()
     }
+
+    /// parses blockchain using the latest honest messages
+    /// the return value is a tuple containing a map and a set
+    /// the hashmap maps blocks to their respective children
+    /// the set contains all the blocks that have the genesis as their
+    /// prevblock (aka all the children of the genesis block)
     pub fn parse_blockchains(
         latest_msgs: &LatestMsgsHonest<BlockMsg>,
-        finalized_msg: Option<&BlockMsg>,
+        _finalized_msg: Option<&BlockMsg>,
     ) -> (HashMap<Block, HashSet<Block>>, HashSet<Block>) {
+
+        // start at the tip of the blockchain
         let mut visited: HashMap<Block, HashSet<Block>> = latest_msgs
             .iter()
             .map(|msg| {
@@ -255,24 +278,29 @@ impl Block {
                 (parent, children)
             })
             .collect();
+
         let mut queue: VecDeque<Block> = visited.keys().cloned().collect();
         let mut genesis: HashSet<Block> = HashSet::new();
+
+        // while there is still unvisited blocks
         while let Some(child) = queue.pop_front() {
             match child.get_prevblock() {
+                // if the prevblock is set, update the visited map
                 Some(parent) => {
                     if visited.contains_key(&parent) {
-                        // println!("visited parent before, fork found");
+                        // visited parent before, fork found
                         visited.get_mut(&parent).map(|parents_children| {
                             parents_children.insert(child);
                         });
                     } else {
-                        // println!("didnt visit parent before, set initial state, and push to queue");
+                        // didnt visit parent before, set initial state, and push to queue
                         let mut parents_children = HashSet::new();
                         parents_children.insert(child);
                         visited.insert(parent.clone(), parents_children);
                         queue.push_back(parent);
                     }
                 }
+                // if not, update the genesis set, as a None prevblock indicates the genesis
                 None => {
                     genesis.insert(child);
                 }
@@ -330,6 +358,7 @@ impl Block {
 
 impl Estimate for Block {
     type M = BlockMsg;
+
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         finalized_msg: Option<&Self::M>,
@@ -363,9 +392,14 @@ impl Estimate for Block {
         }
     }
 }
+
 #[cfg(test)]
 mod tests {
+    use std::iter;
+    use std::iter::{FromIterator};
+
     use super::*;
+    use ::justification::{Justification, LatestMsgs, SenderState};
 
     #[test]
     fn example_usage() {
@@ -385,7 +419,7 @@ mod tests {
         );
         let sender_state = SenderState::new(
             senders_weights.clone(),
-            (0.0), // state fault weight
+            0.0, // state fault weight
             None,  // latest messages
             LatestMsgs::new(),
             1.0,            // subjective fault weight threshold
@@ -421,24 +455,27 @@ mod tests {
             &genesis_block,
             "genesis block with None as prevblock"
         );
+
         let proto_b1 = Block::new(None, sender1, txs.clone());
-        let (m1, sender_state1) = BlockMsg::from_msgs(
+        let (m1, _) = BlockMsg::from_msgs(
             proto_b1.get_sender(),
             vec![&genesis_block_msg],
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b1), // data
         ).unwrap();
+
         let proto_b2 = Block::new(None, sender2, txs.clone());
-        let (m2, sender_state2) = BlockMsg::from_msgs(
+        let (m2, _) = BlockMsg::from_msgs(
             proto_b2.get_sender(),
             vec![&genesis_block_msg],
             None,
             &sender_state,
             Some(proto_b2),
         ).unwrap();
+
         let proto_b3 = Block::new(None, sender3, txs.clone());
-        let (m3, sender_state3) = BlockMsg::from_msgs(
+        let (m3, _) = BlockMsg::from_msgs(
             proto_b3.get_sender(),
             vec![&m1, &m2],
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
@@ -453,7 +490,7 @@ mod tests {
         );
 
         let proto_b4 = Block::new(None, sender4, txs.clone());
-        let (m4, sender_state4) = BlockMsg::from_msgs(
+        let (m4, _) = BlockMsg::from_msgs(
             proto_b4.get_sender(),
             vec![&m1],
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
@@ -470,7 +507,7 @@ mod tests {
         let proto_b5 = Block::new(None, sender0, txs.clone());
         // println!("\n3 {:?}", m3);
         // println!("\n4 {:?}", m4);
-        let (m5, sender_state) = BlockMsg::from_msgs(
+        let (m5, _) = BlockMsg::from_msgs(
             proto_b5.get_sender(),
             vec![&m3, &m2],
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
@@ -487,7 +524,7 @@ mod tests {
             "should build on top of "
         );
 
-        let mut block = Block::from(&m3);
+        let block = Block::from(&m3);
         assert_eq!(
             block,
             Block::new(Some(Block::from(&m2)), sender3, txs.clone()),
@@ -501,6 +538,7 @@ mod tests {
             (0, 1, 2, 3, 4, 5, 6); // miner identities
         let (weightg, weight0, weight1, weight2, weight3, weight4, weight5) =
             (1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.0); // and their corresponding sender_state
+
         let senders_weights = SendersWeight::new(
             [
                 (senderg, weightg),
@@ -514,9 +552,10 @@ mod tests {
                 .cloned()
                 .collect(),
         );
+
         let sender_state = SenderState::new(
             senders_weights.clone(),
-            (0.0), // state fault weight
+            0.0, // state fault weight
             None,  // latest messages
             LatestMsgs::new(),
             1.0,            // subjective fault weight threshold
@@ -547,6 +586,7 @@ mod tests {
             &sender_state,
             Some(proto_b0), // data
         ).unwrap();
+
         let proto_b1 = Block::new(None, sender1, txs.clone());
         let (m1, sender_state) = BlockMsg::from_msgs(
             proto_b1.get_sender(),
@@ -555,6 +595,7 @@ mod tests {
             &sender_state,
             Some(proto_b1),
         ).unwrap();
+
         let proto_b2 = Block::new(None, sender2, txs.clone());
         let (m2, sender_state) = BlockMsg::from_msgs(
             proto_b2.get_sender(),
@@ -603,7 +644,7 @@ mod tests {
 
         let proto_b5 = Block::new(None, sender5, txs.clone());
 
-        let (m5, sender_state) = BlockMsg::from_msgs(
+        let (m5, _) = BlockMsg::from_msgs(
             proto_b5.get_sender(),
             vec![&m0, &m1, &m2, &m3, &m4],
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
@@ -835,7 +876,7 @@ mod tests {
 
         let proto_b9 =
             Block::new(Some(proto_b8.clone()), senders[0], txs.clone());
-        let (m8, sender_state) = BlockMsg::from_msgs(
+        let (_, sender_state) = BlockMsg::from_msgs(
             proto_b9.get_sender(),
             vec![&m8],
             None,
