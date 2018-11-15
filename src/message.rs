@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
-use std::sync::{Arc};
+use std::sync::{Arc, RwLock};
 // use std::io::{Error};
 
 use rayon::prelude::*;
@@ -131,11 +131,7 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
 
     /// checks whether self depends on rhs
     /// returns true if rhs is somewhere in the justification of self
-    /// TODO DL: for clarity: rename to "depends_on"?
     fn depends(&self, rhs: &Self) -> bool {
-        // TODO: this can be done with inner recursion function to keep track of
-        // what was visited
-
         // although the recursion ends supposedly only at genesis message, the
         // trick is the following: it short-circuits while descending on the
         // dependency tree, if it finds a dependent message. when dealing with
@@ -149,13 +145,22 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug {
         // a dependency was found, the function returns true and all the
         // computation on the other threads will be canceled.
         // TODO DL: bad idea to spawn threads recursively and without upper bound
-        let justification = self.get_justification();
+        fn recurse<M: CasperMsg>(lhs: &M, rhs: &M, visited: Arc<RwLock<HashSet<M>>>) -> bool {
+            let justification = lhs.get_justification();
 
-        // Math definition of dependency
-        justification.contains(rhs)
-            || justification
+            // Math definition of dependency
+            justification.contains(rhs)
+                || justification
                 .par_iter()
-                .any(|self_prime| self_prime.depends(rhs))
+                .filter(|lhs_prime| visited.read().map(|v| !v.contains(lhs_prime)).ok().unwrap_or(true))
+                .any(|lhs_prime| {
+                    let visited_prime = visited.clone();
+                    let _ = visited_prime.write().map(|mut v| v.insert(lhs_prime.clone())).ok();
+                    recurse(lhs_prime, rhs, visited_prime)
+                })
+        }
+        let visited = Arc::new(RwLock::new(HashSet::new()));
+        recurse(self, rhs, visited)
     }
 
     /// checks whether ther is a circular dependency between self and rhs
