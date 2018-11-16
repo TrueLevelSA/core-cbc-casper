@@ -232,14 +232,13 @@ impl<M: CasperMsg> Justification<M> {
             )
         };
         // initial state, trigger recursion
-        match &senders_weights.get_senders() {
-            Ok(all_senders) => Ok(self
+        senders_weights.get_senders().map(|all_senders| {
+            self
                 .iter()
                 .map(|m| {
                     let sender_current = m.get_sender();
-                    let senders_referred: HashSet<
-                        M::Sender,
-                    > = [sender_current.clone()].iter().cloned().collect();
+                    let senders_referred: HashSet<_> =
+                        [sender_current.clone()].iter().cloned().collect();
                     let initial_weight = senders_weights
                         .get_weight(&sender_current)
                         .unwrap_or(WeightUnit::ZERO);
@@ -249,15 +248,14 @@ impl<M: CasperMsg> Justification<M> {
                             m,
                             finalized_msg,
                             senders_weights,
-                            all_senders,
+                            &all_senders,
                             senders_referred.clone(),
                             initial_weight,
                         ),
                     )
                 })
-                .collect()),
-            Err(e) => Err(e),
-        }
+                .collect()
+        })
     }
 }
 
@@ -381,14 +379,14 @@ impl<M: CasperMsg> LatestMsgs<M> {
             latest_msgs_from_sender
                 .iter()
                 .fold(false, |acc, old_msg| {
-                    let new_doesnt_dependent_old = !new_msg.depends(old_msg);
+                    let new_independent_from_old = !new_msg.depends(old_msg);
                     // equivocation, old and new do not depend on each other
-                    if new_doesnt_dependent_old && !old_msg.depends(new_msg) {
+                    if new_independent_from_old && !old_msg.depends(new_msg) {
                         self.get_mut(sender).map(|msgs| msgs.insert(new_msg.clone()))
                             .unwrap_or(false) || acc
                     }
                     // new actually older than old
-                    else if new_doesnt_dependent_old {
+                    else if new_independent_from_old {
                         false || acc
                     }
                     // new newer than old
@@ -514,8 +512,8 @@ impl<M: CasperMsg> SenderState<M> {
             .filter_map(|&msg| {
                 // equivocations in relation to state
                 let sender = msg.get_sender();
-                let state_equivocator = if self.latest_msgs.equivocate(msg)
-                    && !self.equivocators.contains(sender) {
+                let state_equivocator = if !self.equivocators.contains(sender)
+                    && self.latest_msgs.equivocate(msg) {
                     Some(sender.clone())
                 } else {
                     None
