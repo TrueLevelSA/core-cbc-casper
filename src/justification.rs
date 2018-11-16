@@ -354,6 +354,11 @@ impl<M: CasperMsg> LatestMsgs<M> {
         self.0.get(k)
     }
 
+    /// get a set of messages sent by the sender as mut
+    pub fn get_mut(&mut self, k: &M::Sender) -> Option<&mut HashSet<M>> {
+        self.0.get_mut(k)
+    }
+
     pub fn iter(&self) -> HashIter<M::Sender, HashSet<M>> {
         self.0.iter()
     }
@@ -370,38 +375,34 @@ impl<M: CasperMsg> LatestMsgs<M> {
     /// return true if new_message is a valid latest message,
     /// aka the first message of a sender or a message that is not 
     /// in the justification of the existing latest messages
-    pub fn update(&mut self, new_message: &M) -> bool {
-        let sender: &M::Sender = new_message.get_sender();
+    pub fn update(&mut self, new_msg: &M) -> bool {
+        let sender = new_msg.get_sender();
         if let Some(latest_msgs_from_sender) = self.get(sender).cloned() {
-
-            // get the list of messages that depend on new_message
-            let later_than_new: HashSet<M> = latest_msgs_from_sender
+            latest_msgs_from_sender
                 .iter()
-                .filter(|current_message| current_message.depends(new_message))
-                .cloned()
-                .collect();
-            // if there is no such messages, filter out messages that new_message
-            // includes in its dependency
-            if later_than_new.is_empty() {
-                let mut new_later_than: HashSet<M> = latest_msgs_from_sender
-                    .iter()
-                    .filter(|current_message| {
-                        !new_message.depends(current_message)
-                    })
-                    .cloned()
-                    .collect();
-                new_later_than.insert(new_message.clone());
-                self.insert(sender.clone(), new_later_than);
-                true
-            } else {
-                // if not, new_message is not a latest message
-                false
-            }
+                .fold(false, |acc, old_msg| {
+                    let new_doesnt_dependent_old = !new_msg.depends(old_msg);
+                    // equivocation, old and new do not depend on each other
+                    if new_doesnt_dependent_old && !old_msg.depends(new_msg) {
+                        self.get_mut(sender).map(|msgs| msgs.insert(new_msg.clone()))
+                            .unwrap_or(false) || acc
+                    }
+                    // new actually older than old
+                    else if new_doesnt_dependent_old {
+                        false || acc
+                    }
+                    // new newer than old
+                    else {
+                        self.get_mut(sender).map(|msgs|
+                            msgs.remove(old_msg) && msgs.insert(new_msg.clone())
+                        ).unwrap_or(false) || acc
+                    }
+                })
         } else {
-            // no message found for this sender, so new_message is the latest
+            // no message found for this sender, so new_msg is the latest
             self.insert(
                 sender.clone(),
-                [new_message.clone()].iter().cloned().collect(),
+                [new_msg.clone()].iter().cloned().collect(),
             );
             true
         }
