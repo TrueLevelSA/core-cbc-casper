@@ -510,30 +510,16 @@ impl<M: CasperMsg> SenderState<M> {
         let mut msgs_sorted_by_faultw: Vec<_> = msgs
             .iter()
             .filter_map(|&msg| {
-                // equivocations in relation to state
                 let sender = msg.get_sender();
-                let state_equivocator = if !self.equivocators.contains(sender)
+                if !self.equivocators.contains(sender)
                     && self.latest_msgs.equivocate(msg) {
-                    Some(sender.clone())
-                } else {
-                    None
-                };
-
-                let msg_faultweight_overhead = state_equivocator
-                    .as_ref()
-                    .map(|sender| {
                         self.senders_weights
                             .get_weight(sender)
-                            .unwrap_or(::std::f64::NAN)
-                    })
-                    .unwrap_or(WeightUnit::ZERO);
-
-                // sum_weight_senders returns nan if a sender is not found
-                if msg_faultweight_overhead.is_nan() {
-                    None
-                } else {
-                    Some((msg, msg_faultweight_overhead))
-                }
+                            .map(|w| (msg, w))
+                            .ok()
+                    } else {
+                        Some((msg, WeightUnit::ZERO))
+                    }
             })
             .collect();
 
