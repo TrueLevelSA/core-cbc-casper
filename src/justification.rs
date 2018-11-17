@@ -421,7 +421,7 @@ impl<'z, M: CasperMsg> From<&'z Justification<M>> for LatestMsgs<M> {
     /// extract the latest messages from a justification
     fn from(j: &Justification<M>) -> Self {
         let mut latest_msgs: LatestMsgs<M> = LatestMsgs::new();
-        let mut queue: VecDeque<(M)> = j.iter().cloned().collect();
+        let mut queue: VecDeque<M> = j.iter().cloned().collect();
         while let Some(msg) = queue.pop_front() {
             if latest_msgs.update(&msg) {
                 msg.get_justification()
@@ -510,6 +510,7 @@ impl<M: CasperMsg> SenderState<M> {
         let mut msgs_sorted_by_faultw: Vec<_> = msgs
             .iter()
             .filter_map(|&msg| {
+                // equivocations in relation to state
                 let sender = msg.get_sender();
                 if !self.equivocators.contains(sender)
                     && self.latest_msgs.equivocate(msg) {
@@ -520,6 +521,7 @@ impl<M: CasperMsg> SenderState<M> {
                     } else {
                         Some((msg, WeightUnit::ZERO))
                     }
+
             })
             .collect();
 
