@@ -457,12 +457,17 @@ where
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
         let mut msg = serializer.serialize_struct("ProtoMsg", 3)?;
-        let j: Vec<_> = self.justification.iter().collect();
+        let j: Vec<_> = self.justification.iter().map(Message::id).collect();
         msg.serialize_field("sender", &self.sender)?;
         msg.serialize_field("estimate", &self.estimate)?;
-        // msg.skip_field("justification")?;
         msg.serialize_field("justification", &j)?;
         msg.end()
+    }
+}
+
+impl serde::Serialize for Hashed {
+    fn serialize<T:serde::Serializer>(&self, serializer: T)-> Result<T::Ok, T::Error> {
+        serializer.serialize_bytes(&self.0)
     }
 }
 
@@ -472,7 +477,13 @@ where
     S: Sender,
 {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
-        serde::Serialize::serialize(&*self.0, serializer)
+        use serde::ser::SerializeStruct;
+        let mut msg = serializer.serialize_struct("ProtoMsg", 3)?;
+        let j: Vec<_> = self.get_justification().iter().map(Self::id).collect();
+        msg.serialize_field("sender", self.get_sender())?;
+        msg.serialize_field("estimate", self.get_estimate())?;
+        msg.serialize_field("justification", &j)?;
+        msg.end()
     }
 }
 
