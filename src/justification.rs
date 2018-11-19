@@ -561,8 +561,7 @@ mod tests {
                 .cloned()
                 .collect(),
         );
-        let txs = BTreeSet::new();
-        let genesis_block = Block::new(None, sender0, txs.clone()); // estimate of the first casper message
+        let genesis_block = Block::new(None, sender0); // estimate of the first casper message
         let justification = Justification::new();
         let genesis_msg =
             BlockMsg::new(sender0, justification, genesis_block.clone());
@@ -582,7 +581,7 @@ mod tests {
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &2.0);
 
-        let proto_b1 = Block::new(None, sender1, txs.clone());
+        let proto_b1 = Block::new(None, sender1);
         let b1 =
             Block::from_prevblock_msg(Some(genesis_msg), proto_b1).unwrap();
         let m1 = BlockMsg::new(sender1, justification, b1);
@@ -596,7 +595,7 @@ mod tests {
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &6.0);
 
-        let proto_b2 = Block::new(None, sender2, txs.clone());
+        let proto_b2 = Block::new(None, sender2);
         let b2 = Block::from_prevblock_msg(Some(m1), proto_b2).unwrap();
         let m2 = BlockMsg::new(sender2, justification, b2);
 
@@ -609,7 +608,7 @@ mod tests {
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &14.0);
 
-        let proto_b3 = Block::new(None, sender3, txs);
+        let proto_b3 = Block::new(None, sender3);
         let b3 = Block::from_prevblock_msg(Some(m2), proto_b3).unwrap();
         let m3 = BlockMsg::new(sender3, justification, b3);
 

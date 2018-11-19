@@ -6,7 +6,7 @@ use traits::{Zero, Estimate, Sender, Data};
 use message::{Message, CasperMsg};
 use justification::{Justification, LatestMsgsHonest};
 use senders_weight::{SendersWeight};
-#[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default)]
+#[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]
 pub struct VoteCount {
     yes: u32,
     no: u32,
