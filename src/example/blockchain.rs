@@ -78,7 +78,7 @@ impl Block {
         self.0.sender
     }
 
-    /// Create a new block from a prevblock message and an incomplete block 
+    /// Create a new block from a prevblock message and an incomplete block
     pub fn from_prevblock_msg(
         prevblock_msg: Option<BlockMsg>,
         // a incomplete_block is a block with a None prevblock (ie, Estimate) AND is
@@ -382,9 +382,10 @@ impl Estimate for Block {
                 "Needs at least one latest message to be able to pick one"
             ),
             (_, None) => {
-                let protob = Block::new(None, sender.unwrap_or(0), BTreeSet::new());
-                let msg = latest_msgs.iter().next().cloned();
-                Self::from_prevblock_msg(msg, protob).unwrap()
+                // no block data provided, thus create empty block building on prevblock from ghost
+                let prevblock =
+                    Block::ghost(latest_msgs, finalized_msg, senders_weights);
+                Block::new(prevblock, sender.unwrap_or(0), BTreeSet::new())
             },
             (1, Some(incomplete_block)) => {
                 // only msg to built on top, no choice thus no ghost
