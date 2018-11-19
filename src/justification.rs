@@ -413,7 +413,7 @@ impl<M: CasperMsg> LatestMsgs<M> {
         }
     }
 
-    /// checks whether msg_mew is               
+    /// checks whether msg_new equivocates with latest msgs
     fn equivocate(&self, msg_new: &M) -> bool {
         self.get(msg_new.get_sender())
             .map(|latest_msgs| {
