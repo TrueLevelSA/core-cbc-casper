@@ -1,0 +1,3 @@
+[submodule "visualization"]
+	path = visualization
+	url = git@gitlab.com:TrueLevel/casper/playground/casper-visualization.git
