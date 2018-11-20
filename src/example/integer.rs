@@ -123,9 +123,9 @@ mod tests{
             0
         );
 
-        let m0 = IntegerMsg::new(senders[0], Justification::new(), 1);
-        let m1 = IntegerMsg::new(senders[1], Justification::new(), 2);
-        let m2 = IntegerMsg::new(senders[2], Justification::new(), 3);
+        let m0 = IntegerMsg::new(senders[0], Justification::new(), 1, None);
+        let m1 = IntegerMsg::new(senders[1], Justification::new(), 2, None);
+        let m2 = IntegerMsg::new(senders[2], Justification::new(), 3, None);
         let (m3, _) = IntegerMsg::from_msgs(
             senders[0],
             vec![&m0, &m1],
@@ -205,9 +205,9 @@ mod tests{
             0
         );
 
-        let m0 = IntegerMsg::new(senders[0], Justification::new(), 1);
-        let m1 = IntegerMsg::new(senders[1], Justification::new(), 2);
-        let m2 = IntegerMsg::new(senders[2], Justification::new(), 3);
+        let m0 = IntegerMsg::new(senders[0], Justification::new(), 1, None);
+        let m1 = IntegerMsg::new(senders[1], Justification::new(), 2, None);
+        let m2 = IntegerMsg::new(senders[2], Justification::new(), 3, None);
         let (m3, _) = IntegerMsg::from_msgs(
             senders[0],
             vec![&m0, &m1],
@@ -287,10 +287,10 @@ mod tests{
             0
         );
 
-        let m0 = IntegerMsg::new(senders[0], Justification::new(), 1);
-        let m1 = IntegerMsg::new(senders[1], Justification::new(), 2);
-        let m2 = IntegerMsg::new(senders[2], Justification::new(), 3);
-        let m3 = IntegerMsg::new(senders[3], Justification::new(), 4);
+        let m0 = IntegerMsg::new(senders[0], Justification::new(), 1, None);
+        let m1 = IntegerMsg::new(senders[1], Justification::new(), 2, None);
+        let m2 = IntegerMsg::new(senders[2], Justification::new(), 3, None);
+        let m3 = IntegerMsg::new(senders[3], Justification::new(), 4, None);
 
         let (m4, _) = IntegerMsg::from_msgs(
             senders[3],

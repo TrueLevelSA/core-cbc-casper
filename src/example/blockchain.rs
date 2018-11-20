@@ -4,25 +4,24 @@ use std::iter::{Iterator};
 
 use justification::{Justification, LatestMsgsHonest, LatestMsgs};
 use message::{CasperMsg, Message};
-use hashed::Hashed;
 use senders_weight::SendersWeight;
 use std::sync::Arc;
-use traits::{Data, Estimate, Zero};
+use traits::{Data, Estimate, Zero, Id};
+use hashed::Hashed;
 use weight_unit::WeightUnit;
 type Validator = u32;
 
 /// a genesis block should be a block with estimate Block with prevblock =
 /// None and data. data will be the unique identifier of this blockchain
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Debug, Hash, serde_derive::Serialize)]
+#[derive(Clone, Eq, PartialEq, Debug, Hash, serde_derive::Serialize)]
 struct ProtoBlock {
     prevblock: Option<Block>,
     sender: Validator,
-    // txs: BTreeSet<Tx>,
 }
 
 /// Boxing of a block, will be implemented as a CasperMsg
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Debug)]
-pub struct Block(Arc<ProtoBlock>);
+#[derive(Clone, Eq, Hash, Debug)]
+pub struct Block((Arc<ProtoBlock>, Hashed));
 
 impl serde::Serialize for Block {
     fn serialize<T: serde::Serializer>(&self, rhs: T) -> Result<T::Ok, T::Error> {
@@ -32,6 +31,14 @@ impl serde::Serialize for Block {
         msg.serialize_field("prevblock", &self.get_prevblock())?;
         msg.end()
     }
+}
+
+impl Id for ProtoBlock {
+    type ID = Hashed;
+}
+
+impl Id for Block {
+    type ID = Hashed;
 }
 
 pub type BlockMsg = Message<Block /*Estimate*/, Validator /*Sender*/>;
@@ -50,9 +57,16 @@ impl Data for Block {
 //// what validators
 // type ReferredValidators = HashMap<Block, HashSet<Validator>>;
 
+impl PartialEq for Block {
+    fn eq(&self, rhs: &Self) -> bool {
+        self.id() == rhs.id()
+    }
+}
+
 impl From<ProtoBlock> for Block {
     fn from(protoblock: ProtoBlock) -> Self {
-        Block(Arc::new(protoblock))
+        let id = protoblock.getid();
+        Block((Arc::new(protoblock), id))
     }
 }
 
@@ -72,9 +86,9 @@ impl Block {
             sender,
         })
     }
-
+    pub fn id(&self) -> &<Self as Id>::ID { &(self.0).1 }
     pub fn get_sender(&self) -> Validator {
-        self.0.sender
+        (self.0).0.sender
     }
 
     /// Create a new block from a prevblock message and an incomplete block 
@@ -87,7 +101,7 @@ impl Block {
         let prevblock = prevblock_msg.map(|m| Block::from(&m));
         let block = Block::from(ProtoBlock {
             prevblock,
-            ..(*incomplete_block.0).clone()
+            ..*(incomplete_block.0).0.clone()
         });
 
         if Block::is_valid(&block) {
@@ -261,7 +275,7 @@ impl Block {
     // }
 
     pub fn get_prevblock(&self) -> Option<Self> {
-        self.0.prevblock.as_ref().cloned()
+        (self.0).0.prevblock.as_ref().cloned()
     }
 
     /// parses blockchain using the latest honest messages
@@ -390,7 +404,7 @@ impl Estimate for Block {
                     Block::ghost(latest_msgs, finalized_msg, senders_weights);
                 let block = Block::from(ProtoBlock {
                     prevblock,
-                    ..(*incomplete_block.0).clone()
+                    ..*(incomplete_block.0).0.clone()
                 });
                 block
             }
@@ -453,7 +467,7 @@ mod tests {
         });
         let latest_msgs = Justification::new();
         let genesis_block_msg =
-            BlockMsg::new(sender0, latest_msgs, genesis_block.clone());
+            BlockMsg::new(sender0, latest_msgs, genesis_block.clone(), None);
         assert_eq!(
             &Block::from(&genesis_block_msg),
             &genesis_block,
@@ -575,7 +589,7 @@ mod tests {
         });
         let latest_msgs = Justification::new();
         let genesis_block_msg =
-            BlockMsg::new(senderg, latest_msgs, genesis_block.clone());
+            BlockMsg::new(senderg, latest_msgs, genesis_block.clone(), None);
         // assert_eq!(
         //     &Block::from(&genesis_block_msg),
         //     &genesis_block,
@@ -694,7 +708,7 @@ mod tests {
             sender: senders[0],
         });
         let latest_msgs = Justification::new();
-        let m0 = BlockMsg::new(senders[0], latest_msgs, proto_b0.clone());
+        let m0 = BlockMsg::new(senders[0], latest_msgs, proto_b0.clone(), None);
 
         let proto_b1 =
             Block::new(Some(proto_b0.clone()), senders[1]);

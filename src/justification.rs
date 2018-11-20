@@ -1,10 +1,8 @@
-use std::collections::{BTreeSet, HashSet, HashMap, VecDeque};
+use std::collections::{HashSet, HashMap, VecDeque};
 use std::collections::hash_map::{Iter as HashIter, Keys};
 use std::collections::hash_set::{Iter as HSetIter};
-use std::collections::btree_set::Iter;
 use std::fmt::{Debug, Formatter};
 
-use rayon::collections::btree_set::Iter as ParIter;
 use rayon::iter::{IntoParallelRefIterator};
 
 use message::{CasperMsg};
@@ -15,12 +13,12 @@ use senders_weight::SendersWeight;
 
 /// Struct that holds the set of the CasperMsgs that justify
 /// the current message
-/// Works like a BTreeSet
-#[derive(Eq, Ord, PartialOrd, PartialEq, Clone, Default, Hash)]
+/// Works like a Vec
+#[derive(Eq, PartialEq, Clone, Default, Hash)]
 pub struct Justification<M: CasperMsg>(Vec<M>);
 
 impl<M: CasperMsg> Justification<M> {
-    /// Re-exports from BTreeSet wrapping M
+    /// Re-exports from Vec wrapping M
     pub fn new() -> Self {
         Justification(Vec::new())
     }
@@ -565,7 +563,7 @@ mod tests {
         let genesis_block = Block::new(None, sender0); // estimate of the first casper message
         let justification = Justification::new();
         let genesis_msg =
-            BlockMsg::new(sender0, justification, genesis_block.clone());
+            BlockMsg::new(sender0, justification, genesis_block.clone(), None);
         assert_eq!(
             genesis_msg.get_estimate(),
             &genesis_block,
@@ -585,7 +583,7 @@ mod tests {
         let proto_b1 = Block::new(None, sender1);
         let b1 =
             Block::from_prevblock_msg(Some(genesis_msg), proto_b1).unwrap();
-        let m1 = BlockMsg::new(sender1, justification, b1);
+        let m1 = BlockMsg::new(sender1, justification, b1, None);
 
         let mut justification = Justification::new();
         assert!(justification.insert(m1.clone()));
@@ -598,7 +596,7 @@ mod tests {
 
         let proto_b2 = Block::new(None, sender2);
         let b2 = Block::from_prevblock_msg(Some(m1), proto_b2).unwrap();
-        let m2 = BlockMsg::new(sender2, justification, b2);
+        let m2 = BlockMsg::new(sender2, justification, b2, None);
 
         let mut justification = Justification::new();
         assert!(justification.insert(m2.clone()));
@@ -611,7 +609,7 @@ mod tests {
 
         let proto_b3 = Block::new(None, sender3);
         let b3 = Block::from_prevblock_msg(Some(m2), proto_b3).unwrap();
-        let m3 = BlockMsg::new(sender3, justification, b3);
+        let m3 = BlockMsg::new(sender3, justification, b3, None);
 
         let mut justification = Justification::new();
         assert!(justification.insert(m3.clone()));

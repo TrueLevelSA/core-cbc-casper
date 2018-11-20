@@ -63,7 +63,7 @@ impl VoteCount {
             false => VoteCount { yes: 0, no: 1 },
         };
 
-        Message::new(sender, justification, estimate)
+        Message::new(sender, justification, estimate, None)
     }
 
     /// 
@@ -84,6 +84,7 @@ impl VoteCount {
                                 m.get_sender().clone(),
                                 m.get_justification().clone(),
                                 VoteCount::toggle_vote(&estimate),
+                                None,
                             );
                             // search for the equivocation of the current latest_msgs
                             match acc_prime.get(&equivocation) {
