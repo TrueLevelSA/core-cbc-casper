@@ -17,12 +17,12 @@ use senders_weight::SendersWeight;
 /// the current message
 /// Works like a BTreeSet
 #[derive(Eq, Ord, PartialOrd, PartialEq, Clone, Default, Hash)]
-pub struct Justification<M: CasperMsg>(BTreeSet<M>);
+pub struct Justification<M: CasperMsg>(Vec<M>);
 
 impl<M: CasperMsg> Justification<M> {
     /// Re-exports from BTreeSet wrapping M
     pub fn new() -> Self {
-        Justification(BTreeSet::new())
+        Justification(Vec::new())
     }
 
     /// creates a new Justification instance from a Vec of CasperMsg 
@@ -37,11 +37,11 @@ impl<M: CasperMsg> Justification<M> {
         (j, sender_state)
     }
 
-    pub fn iter(&self) -> Iter<M> {
+    pub fn iter(&self) -> std::slice::Iter<M> {
         self.0.iter()
     }
 
-    pub fn par_iter(&self) -> ParIter<M> {
+    pub fn par_iter(&self) -> rayon::slice::Iter<M> {
         self.0.par_iter()
     }
 
@@ -54,13 +54,14 @@ impl<M: CasperMsg> Justification<M> {
     }
 
     pub fn insert(&mut self, msg: M) -> bool {
-        self.0.insert(msg)
-    }
-
-    /// Since it's backed by a BTreeSet, we can have the "smallest" 
-    /// message first
-    fn head(&self) -> Option<&M> {
-        self.0.iter().next()
+        if self.contains(&msg)
+            // || self.iter().any(|m| m.get_sender() == msg.get_sender())
+        {
+            false
+        } else {
+            self.0.push(msg);
+            true
+        }
     }
 
     /// reexport from Estimate impl

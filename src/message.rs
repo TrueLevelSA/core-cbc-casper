@@ -36,6 +36,8 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug + Id + serde:
     /// returns the justification of this message
     fn get_justification<'z>(&'z self) -> &'z Justification<Self>;
 
+    fn id(&self) -> &Self::ID;
+
     /// creates a new instance of this message
     fn new(
         sender: Self::Sender,
@@ -236,13 +238,6 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug + Id + serde:
         )
     }
 
-    // fn get_msg_for_prop2(
-    //     &self,
-    //     all_senders: &HashSet<Self::Sender>,
-    //     equivocators: : &HashSet<Self::Sender>,
-
-    // )
-
     /// returns the dag tip-most safe messages. a safe message is defined as one
     /// that was seen by more than a given thr of total weight units. TODO: not
     /// sure about this implementation, i assume its not working correctly.
@@ -358,7 +353,8 @@ where
     S: Sender,
 {
     fn from(msg: ProtoMsg<E, S>) -> Self {
-        Message(Arc::new(msg.clone()), msg.getid())
+        let id = msg.getid();
+        Message(Arc::new(msg), id)
     }
 }
 
@@ -366,7 +362,9 @@ impl<E, S> Id for ProtoMsg<E, S>
 where
     E: Estimate<M = Message<E, S>>,
     S: Sender,
-{ type ID = Hashed; }
+{
+    type ID = Hashed;
+}
 
 impl<E, S> Id for Message<E, S>
 where
@@ -388,7 +386,7 @@ where
         use serde::ser::SerializeStruct;
 
         let mut msg = serializer.serialize_struct("Message", 3)?;
-        let j: Vec<_> = self.justification.iter().map(Message::getid).collect();
+        let j: Vec<_> = self.justification.iter().map(Message::id).collect();
         msg.serialize_field("sender", &self.sender)?;
         msg.serialize_field("estimate", &self.estimate)?;
         msg.serialize_field("justification", &j)?;
@@ -404,7 +402,7 @@ where
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
         let mut msg = serializer.serialize_struct("Message", 3)?;
-        let j: Vec<_> = self.get_justification().iter().map(Self::getid).collect();
+        let j: Vec<_> = self.get_justification().iter().map(Self::id).collect();
         msg.serialize_field("sender", self.get_sender())?;
         msg.serialize_field("estimate", self.get_estimate())?;
         msg.serialize_field("justification", &j)?;
@@ -431,7 +429,7 @@ where
     fn get_justification<'z>(&'z self) -> &'z Justification<Self> {
         &self.0.justification
     }
-
+    fn id(&self) -> &<Self as Id>::ID { &self.1 }
     fn new(sender: S, justification: Justification<Self>, estimate: E) -> Self {
         Message::from(ProtoMsg {
             sender,
@@ -453,7 +451,7 @@ where
     S: Sender,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.getid().hash(state)
+        self.id().hash(state)
     }
 }
 
@@ -463,7 +461,7 @@ where
     S: Sender,
 {
     fn eq(&self, rhs: &Self) -> bool {
-        self.getid() == rhs.getid()
+        self.id() == rhs.id()
     }
 }
 
@@ -876,6 +874,7 @@ parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         ).unwrap();
 
         let safe_msgs = m0.get_msg_for_proposition(senders);
+        println!("safe_msgs: {:?}", safe_msgs);
         assert_eq!(
             safe_msgs.len(),
             0,
