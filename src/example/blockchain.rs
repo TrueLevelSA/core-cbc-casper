@@ -4,9 +4,10 @@ use std::iter::{Iterator};
 
 use justification::{Justification, LatestMsgsHonest, LatestMsgs};
 use message::{CasperMsg, Message};
+use hashed::Hashed;
 use senders_weight::SendersWeight;
 use std::sync::Arc;
-use traits::{Data, Estimate, Zero, Sender};
+use traits::{Data, Estimate, Zero};
 use weight_unit::WeightUnit;
 type Validator = u32;
 
@@ -26,7 +27,7 @@ pub struct Block(Arc<ProtoBlock>);
 impl serde::Serialize for Block {
     fn serialize<T: serde::Serializer>(&self, rhs: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
-        let mut msg = rhs.serialize_struct("ProtoBlock", 2)?;
+        let mut msg = rhs.serialize_struct("Block", 2)?;
         msg.serialize_field("sender", &self.get_sender())?;
         msg.serialize_field("prevblock", &self.get_prevblock())?;
         msg.end()

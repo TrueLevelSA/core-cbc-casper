@@ -6,7 +6,6 @@ extern crate bincode;
 extern crate blake2;
 extern crate itertools;
 
-
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
@@ -15,14 +14,15 @@ use std::sync::{Arc, RwLock};
 
 use rayon::prelude::*;
 
-use traits::{Estimate, Zero, Sender, Data, Id, Serialize};
+use traits::{Estimate, Zero, Sender, Data, Id, };
 use justification::{Justification, SenderState, LatestMsgsHonest};
 use weight_unit::{WeightUnit};
 use senders_weight::SendersWeight;
+use hashed::Hashed;
 
 /// A Casper Message, that can will be sent over the network
 /// and used as a justification for a more recent message
-pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug + Id + Serialize {
+pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug + Id + serde::Serialize {
     // To be implemented on concrete struct
     type Sender: Sender;
     type Estimate: Estimate<M = Self>;
@@ -35,8 +35,6 @@ pub trait CasperMsg: Hash + Ord + Clone + Eq + Sync + Send + Debug + Id + Serial
 
     /// returns the justification of this message
     fn get_justification<'z>(&'z self) -> &'z Justification<Self>;
-
-    fn id(&self) -> &<Self as Id>::ID;
 
     /// creates a new instance of this message
     fn new(
@@ -326,49 +324,6 @@ where
     justification: Justification<Message<E, S>>,
 }
 
-#[derive(Clone)]
-pub struct Hashed([u8 ; 64]);
-
-impl Hash for Hashed {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.hash(state)
-    }
-}
-
-impl PartialOrd for Hashed {
-    fn partial_cmp(&self, rhs: &Self) -> Option<::std::cmp::Ordering>{
-        Some(self.cmp(rhs))
-    }
-}
-
-impl Ord for Hashed {
-    fn cmp(&self, rhs: &Self) -> ::std::cmp::Ordering {
-        let mut iter = Iterator::zip(self.0.iter(), rhs.0.iter());
-        loop {
-            if let Some((l, r)) = &iter.next() {
-                if l > r { break ::std::cmp::Ordering::Greater }
-                else if l < r { break ::std::cmp::Ordering::Less }
-            } else {
-                { break ::std::cmp::Ordering::Equal }
-            };
-        }
-    }
-}
-
-impl Eq for Hashed {}
-impl PartialEq for Hashed{
-    fn eq(&self, rhs: &Self) -> bool {
-        self.0.iter().zip(rhs.0.iter())
-            .all(|(l, r)| l == r)
-    }
-}
-
-impl Default for Hashed {
-    fn default() -> Self {
-        Hashed([0u8 ; 64])
-    }
-}
-
 /// Boxing of a ProtoMsg, that will implement the trait CasperMsg
 #[derive(Eq, Ord, PartialOrd, Clone, Default)]
 pub struct Message<E, S>(Arc<ProtoMsg<E, S>>, Hashed)
@@ -407,21 +362,11 @@ where
     }
 }
 
-
 impl<E, S> Id for ProtoMsg<E, S>
 where
     E: Estimate<M = Message<E, S>>,
     S: Sender,
-{
-    type ID = Hashed;
-
-    fn hash(data: &[u8]) -> Self::ID {
-        use message::blake2::{Blake2b, Digest};
-        let mut res = [0u8; 64];
-        res.copy_from_slice(&Blake2b::digest(data));
-        Hashed(res)
-    }
-}
+{ type ID = Hashed; }
 
 impl<E, S> Id for Message<E, S>
 where
@@ -429,17 +374,11 @@ where
     S: Sender,
 {
     type ID = Hashed;
-
-    fn hash(data: &[u8]) -> Self::ID {
-        use message::blake2::{Blake2b, Digest};
-        let mut res = [0u8; 64];
-        res.copy_from_slice(&Blake2b::digest(data));
-        Hashed(res)
-    }
     fn getid(&self) -> Self::ID {
-        self.id().clone()
+        self.1.clone()
     }
 }
+
 impl<E, S> serde::Serialize for ProtoMsg<E, S>
 where
     E: Estimate<M = Message<E, S>>,
@@ -447,18 +386,13 @@ where
 {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
-        let mut msg = serializer.serialize_struct("ProtoMsg", 3)?;
-        let j: Vec<_> = self.justification.iter().map(Message::id).collect();
+
+        let mut msg = serializer.serialize_struct("Message", 3)?;
+        let j: Vec<_> = self.justification.iter().map(Message::getid).collect();
         msg.serialize_field("sender", &self.sender)?;
         msg.serialize_field("estimate", &self.estimate)?;
         msg.serialize_field("justification", &j)?;
         msg.end()
-    }
-}
-
-impl serde::Serialize for Hashed {
-    fn serialize<T:serde::Serializer>(&self, serializer: T)-> Result<T::Ok, T::Error> {
-        serializer.serialize_bytes(&self.0)
     }
 }
 
@@ -469,32 +403,12 @@ where
 {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
-        let mut msg = serializer.serialize_struct("ProtoMsg", 3)?;
-        let j: Vec<_> = self.get_justification().iter().map(Self::id).collect();
+        let mut msg = serializer.serialize_struct("Message", 3)?;
+        let j: Vec<_> = self.get_justification().iter().map(Self::getid).collect();
         msg.serialize_field("sender", self.get_sender())?;
         msg.serialize_field("estimate", self.get_estimate())?;
         msg.serialize_field("justification", &j)?;
         msg.end()
-    }
-}
-
-impl<E, S> Serialize for ProtoMsg<E, S>
-where
-    E: Estimate<M = Message<E, S>>,
-    S: Sender,
-{
-    fn serialize(&self) -> Vec<u8> {
-        use message::bincode;
-        bincode::serialize(self).unwrap()
-    }
-}
-impl<E, S> Serialize for Message<E, S>
-where
-    E: Estimate<M = Self>,
-    S: Sender,
-{
-    fn serialize(&self) -> Vec<u8> {
-        self.0.serialize()
     }
 }
 
@@ -512,9 +426,6 @@ where
 
     fn get_estimate(&self) -> &Self::Estimate {
         &self.0.estimate
-    }
-    fn id(&self) -> &<Self as Id>::ID {
-        &self.1
     }
 
     fn get_justification<'z>(&'z self) -> &'z Justification<Self> {
@@ -542,11 +453,7 @@ where
     S: Sender,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        // message::Hashed::hash(self.id())
-        self.id().hash(state)
-        // let _ = self.get_sender().hash(state);
-        // let _ = self.get_justification().hash(state);
-        // let _ = self.get_estimate().hash(state); // the hash of the msg does depend on the estimate
+        self.getid().hash(state)
     }
 }
 
@@ -556,7 +463,7 @@ where
     S: Sender,
 {
     fn eq(&self, rhs: &Self) -> bool {
-        self.id() == rhs.id()
+        self.getid() == rhs.getid()
     }
 }
 

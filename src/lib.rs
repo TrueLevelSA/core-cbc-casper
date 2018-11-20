@@ -14,6 +14,7 @@ pub mod message;
 pub mod justification;
 pub mod senders_weight;
 pub mod traits;
+pub mod hashed;
 
 pub mod example;
 
