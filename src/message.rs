@@ -1,15 +1,7 @@
-extern crate serde_derive;
-
-pub extern crate serde;
-extern crate bincode;
-extern crate blake2;
-extern crate itertools;
-
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::sync::{Arc, RwLock};
-// use std::io::{Error};
 
 use rayon::prelude::*;
 
@@ -459,7 +451,8 @@ where
     S: Sender,
 {
     fn eq(&self, rhs: &Self) -> bool {
-        self.id() == rhs.id()
+        Arc::ptr_eq(&self.0, &rhs.0)
+            || self.id() == rhs.id() // should make this line unnecessary
     }
 }
 

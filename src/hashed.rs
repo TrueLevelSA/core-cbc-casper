@@ -1,14 +1,10 @@
-use std::hash::{Hash, Hasher};
-use std::fmt::{Debug, Formatter, Result as FmtResult};
-use rayon::prelude::*;
-
 
 /// structure for carrying hashed data
 #[derive(Clone)]
 pub struct Hashed([u8 ; 64]);
 
-impl Hash for Hashed {
-    fn hash<H: Hasher>(&self, state: &mut H) {
+impl std::hash::Hash for Hashed {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.0.hash(state)
     }
 }
@@ -34,14 +30,14 @@ impl Hash for Hashed {
 //     }
 // }
 
-impl Eq for Hashed {}
-
 impl PartialEq for Hashed{
     fn eq(&self, rhs: &Self) -> bool {
-        self.0.par_iter().zip(rhs.0.par_iter())
+        Iterator::zip(self.0.iter(), rhs.0.iter())
             .all(|(l, r)| l == r)
     }
 }
+
+impl Eq for Hashed {}
 
 impl Default for Hashed {
     fn default() -> Self {
@@ -49,13 +45,13 @@ impl Default for Hashed {
     }
 }
 
-impl Debug for Hashed {
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+impl std::fmt::Debug for Hashed {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         use itertools::Itertools;
         write!(
             f,
-            "H{:?}",
-            self.0.iter().format(""),
+            "0x{:02x}",
+            self.0.iter().take(8).format(""),
         )
     }
 }

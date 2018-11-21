@@ -9,19 +9,31 @@ use std::sync::Arc;
 use traits::{Data, Estimate, Zero, Id};
 use hashed::Hashed;
 use weight_unit::WeightUnit;
+use serde_derive::Serialize;
 type Validator = u32;
 
 /// a genesis block should be a block with estimate Block with prevblock =
 /// None and data. data will be the unique identifier of this blockchain
-#[derive(Clone, Eq, PartialEq, Debug, Hash, serde_derive::Serialize)]
+#[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize)]
 struct ProtoBlock {
     prevblock: Option<Block>,
     sender: Validator,
 }
 
 /// Boxing of a block, will be implemented as a CasperMsg
-#[derive(Clone, Eq, Hash, Debug)]
+#[derive(Clone, Eq, Hash)]
 pub struct Block((Arc<ProtoBlock>, Hashed));
+
+impl std::fmt::Debug for Block {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{:?} -> {:?}",
+            self.id(),
+            self.get_prevblock().as_ref().map(|p| p.id()).unwrap_or(&Hashed::default())
+        )
+    }
+}
 
 impl serde::Serialize for Block {
     fn serialize<T: serde::Serializer>(&self, rhs: T) -> Result<T::Ok, T::Error> {
@@ -43,7 +55,7 @@ impl Id for Block {
 
 pub type BlockMsg = Message<Block /*Estimate*/, Validator /*Sender*/>;
 
-#[derive(Clone, Eq, Debug, Ord, PartialOrd, PartialEq, Hash)]
+#[derive(Clone, Eq, Debug, PartialEq, Hash)]
 pub struct Tx;
 
 impl Data for Block {
@@ -59,7 +71,8 @@ impl Data for Block {
 
 impl PartialEq for Block {
     fn eq(&self, rhs: &Self) -> bool {
-        self.id() == rhs.id()
+        Arc::ptr_eq(self.arc(), rhs.arc())
+            || self.id() == rhs.id()
     }
 }
 
@@ -87,6 +100,7 @@ impl Block {
         })
     }
     pub fn id(&self) -> &<Self as Id>::ID { &(self.0).1 }
+    fn arc(&self) -> &Arc<ProtoBlock> { &(self.0).0 }
     pub fn get_sender(&self) -> Validator {
         (self.0).0.sender
     }
@@ -101,7 +115,7 @@ impl Block {
         let prevblock = prevblock_msg.map(|m| Block::from(&m));
         let block = Block::from(ProtoBlock {
             prevblock,
-            ..*(incomplete_block.0).0.clone()
+            ..(*incomplete_block.arc().clone())
         });
 
         if Block::is_valid(&block) {
@@ -275,7 +289,7 @@ impl Block {
     // }
 
     pub fn get_prevblock(&self) -> Option<Self> {
-        (self.0).0.prevblock.as_ref().cloned()
+        self.arc().prevblock.as_ref().cloned()
     }
 
     /// parses blockchain using the latest honest messages
@@ -404,7 +418,7 @@ impl Estimate for Block {
                     Block::ghost(latest_msgs, finalized_msg, senders_weights);
                 let block = Block::from(ProtoBlock {
                     prevblock,
-                    ..*(incomplete_block.0).0.clone()
+                    ..(*incomplete_block.arc().clone())
                 });
                 block
             }
