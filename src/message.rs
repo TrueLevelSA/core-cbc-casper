@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::sync::{Arc, RwLock};
@@ -450,10 +450,10 @@ mod tests {
     use super::*;
 
     fn add_message<'z, M>(
-        state: &'z mut BTreeMap<M::Sender, SenderState<M>>,
+        state: &'z mut HashMap<M::Sender, SenderState<M>>,
         sender: M::Sender,
         recipients: HashSet<M::Sender>,
-    ) -> &'z BTreeMap<M::Sender, SenderState<M>>
+    ) -> &'z HashMap<M::Sender, SenderState<M>>
     where
         M: CasperMsg,
     {
@@ -513,10 +513,10 @@ mod tests {
     }
 
     fn message_event<M: 'static>(
-        state: BTreeMap<M::Sender, SenderState<M>>,
+        state: HashMap<M::Sender, SenderState<M>>,
         sender_strategy: BoxedStrategy<M::Sender>,
         receiver_strategy: BoxedStrategy<HashSet<M::Sender>>,
-    ) -> BoxedStrategy<BTreeMap<M::Sender, SenderState<M>>>
+    ) -> BoxedStrategy<HashMap<M::Sender, SenderState<M>>>
     where
         M: CasperMsg,
     {
@@ -530,7 +530,7 @@ mod tests {
             .boxed()
     }
 
-    fn full_consensus<M>(state: BTreeMap<M::Sender, SenderState<M>>) -> bool
+    fn full_consensus<M>(state: HashMap<M::Sender, SenderState<M>>) -> bool
     where
         M: CasperMsg,
     {
@@ -553,7 +553,7 @@ mod tests {
         m.len() == 1
     }
 
-    fn safety_oracle(state: BTreeMap<u32, SenderState<BlockMsg>>) -> bool {
+    fn safety_oracle(state: HashMap<u32, SenderState<BlockMsg>>) -> bool {
         let safety_oracle_detected: HashSet<bool> = state
             .iter()
             .map(|(_, sender_state)| {
@@ -582,7 +582,7 @@ mod tests {
     }
 
     fn clique_collection(
-        state: BTreeMap<u32, SenderState<BlockMsg>>,
+        state: HashMap<u32, SenderState<BlockMsg>>,
     ) -> Vec<Vec<Vec<u32>>> {
         state
             .iter()
@@ -623,12 +623,12 @@ mod tests {
         message_producer_strategy: F,
         message_receiver_strategy: G,
         consensus_satisfied: H,
-    ) -> BoxedStrategy<Vec<BTreeMap<u32, SenderState<Message<E, u32>>>>>
+    ) -> BoxedStrategy<Vec<HashMap<u32, SenderState<Message<E, u32>>>>>
     where
         E: Estimate<M = Message<E, u32>>,
         F: Fn(&mut Vec<u32>) -> BoxedStrategy<u32>,
         G: Fn(&Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
-        H: Fn(BTreeMap<u32, SenderState<Message<E, u32>>>) -> bool,
+        H: Fn(HashMap<u32, SenderState<Message<E, u32>>>) -> bool,
     {
         (prop::sample::select((1..validator_max_count).collect::<Vec<usize>>()))
             .prop_flat_map(move |validators| {
@@ -638,7 +638,7 @@ mod tests {
                 ))
             })
             .prop_map(move |votes| {
-                let mut state = BTreeMap::new();
+                let mut state = HashMap::new();
                 let validators: Vec<u32> = (0..votes.len() as u32).collect();
 
                 let weights: Vec<f64> =
@@ -731,7 +731,7 @@ mod tests {
         #![proptest_config(Config::with_cases(30))]
         #[test]
         fn round_robin_vote_count(ref chain in chain(VoteCount::arbitrary(), 15, round_robin, all_receivers, full_consensus)) {
-            assert_eq!(chain.last().unwrap_or(&BTreeMap::new()).keys().len(),
+            assert_eq!(chain.last().unwrap_or(&HashMap::new()).keys().len(),
                        if chain.len() > 0 {chain.len()} else {0},
                        "round robin with n validators should converge in n messages")
         }
@@ -741,7 +741,7 @@ mod tests {
         #![proptest_config(Config::with_cases(30))]
         #[test]
         fn round_robin_binary(ref chain in chain(prop::bool::ANY.boxed(), 15, round_robin, all_receivers, full_consensus)) {
-            assert!(chain.last().unwrap_or(&BTreeMap::new()).keys().len() >=
+            assert!(chain.last().unwrap_or(&HashMap::new()).keys().len() >=
                     chain.len(),
                     "round robin with n validators should converge in at most n messages")
         }
@@ -753,11 +753,11 @@ mod tests {
         fn round_robin_integer(ref chain in chain(prop::num::u32::ANY.boxed(), 2000, round_robin, all_receivers, full_consensus)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
-                     match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
+                     match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
                      {"0" => "Unknown",
                       x => x},
                      chain.len());
-            assert!(chain.last().unwrap_or(&BTreeMap::new()).keys().len() >=
+            assert!(chain.last().unwrap_or(&HashMap::new()).keys().len() >=
                     chain.len(),
                     "round robin with n validators should converge in at most n messages")
         }
@@ -769,7 +769,7 @@ mod tests {
         fn arbitrary_messenger_vote_count(ref chain in chain(VoteCount::arbitrary(), 8, arbitrary_in_set, some_receivers, full_consensus)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
-                     match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
+                     match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
                      {"0" => "Unknown",
                       x => x},
                      chain.len());
@@ -782,7 +782,7 @@ mod tests {
         fn arbitrary_messenger_binary(ref chain in chain(prop::bool::ANY.boxed(), 100, arbitrary_in_set, some_receivers, full_consensus)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
-                     match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
+                     match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
                      {"0" => "Unknown",
                       x => x},
                      chain.len());
@@ -795,7 +795,7 @@ mod tests {
         fn arbitrary_messenger_integer(ref chain in chain(prop::num::u32::ANY.boxed(), 50, arbitrary_in_set, some_receivers, full_consensus)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
-                     match chain.last().unwrap_or(&BTreeMap::new()).keys().len().to_string().as_ref()
+                     match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
                      {"0" => "Unknown",
                       x => x},
                      chain.len());
