@@ -79,9 +79,9 @@ mod tests {
             HashSet::new(), // equivocators
         );
 
-        let m0 = BinaryMsg::new(senders[0], Justification::new(), false);
-        let m1 = BinaryMsg::new(senders[1], Justification::new(), true);
-        let m2 = BinaryMsg::new(senders[2], Justification::new(), false);
+        let m0 = BinaryMsg::new(senders[0], Justification::new(), false, None);
+        let m1 = BinaryMsg::new(senders[1], Justification::new(), true, None);
+        let m2 = BinaryMsg::new(senders[2], Justification::new(), false, None);
         let (m3, _) = BinaryMsg::from_msgs(
             senders[0],
             vec![&m0, &m1],
@@ -163,11 +163,11 @@ mod tests {
             HashSet::new(), // equivocators
         );
 
-        let m0 = BinaryMsg::new(senders[0], Justification::new(), false);
-        let m1 = BinaryMsg::new(senders[1], Justification::new(), true);
-        let m2 = BinaryMsg::new(senders[2], Justification::new(), true);
-        let m3 = BinaryMsg::new(senders[3], Justification::new(), false);
-        let m4 = BinaryMsg::new(senders[4], Justification::new(), false);
+        let m0 = BinaryMsg::new(senders[0], Justification::new(), false, None);
+        let m1 = BinaryMsg::new(senders[1], Justification::new(), true, None);
+        let m2 = BinaryMsg::new(senders[2], Justification::new(), true, None);
+        let m3 = BinaryMsg::new(senders[3], Justification::new(), false, None);
+        let m4 = BinaryMsg::new(senders[4], Justification::new(), false, None);
 
         let (mut j0, _) = Justification::from_msgs(
             vec![m0.clone(), m1.clone(), m2.clone(), m3.clone(), m4.clone()],

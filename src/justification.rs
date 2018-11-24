@@ -1,10 +1,8 @@
 use std::collections::{BTreeSet, HashSet, HashMap, VecDeque};
 use std::collections::hash_map::{Iter as HashIter, Keys, Values};
 use std::collections::hash_set::{Iter as HSetIter};
-use std::collections::btree_set::Iter;
 use std::fmt::{Debug, Formatter};
 
-use rayon::collections::btree_set::Iter as ParIter;
 use rayon::iter::{IntoParallelRefIterator};
 
 use message::{CasperMsg};
@@ -15,14 +13,14 @@ use senders_weight::SendersWeight;
 
 /// Struct that holds the set of the CasperMsgs that justify
 /// the current message
-/// Works like a BTreeSet
-#[derive(Eq, Ord, PartialOrd, PartialEq, Clone, Default, Hash)]
-pub struct Justification<M: CasperMsg>(BTreeSet<M>);
+/// Works like a Vec
+#[derive(Eq, PartialEq, Clone, Default, Hash)]
+pub struct Justification<M: CasperMsg>(Vec<M>);
 
 impl<M: CasperMsg> Justification<M> {
-    /// Re-exports from BTreeSet wrapping M
+    /// Re-exports from Vec wrapping M
     pub fn new() -> Self {
-        Justification(BTreeSet::new())
+        Justification(Vec::new())
     }
 
     /// creates a new Justification instance from a Vec of CasperMsg 
@@ -37,11 +35,11 @@ impl<M: CasperMsg> Justification<M> {
         (j, sender_state)
     }
 
-    pub fn iter(&self) -> Iter<M> {
+    pub fn iter(&self) -> std::slice::Iter<M> {
         self.0.iter()
     }
 
-    pub fn par_iter(&self) -> ParIter<M> {
+    pub fn par_iter(&self) -> rayon::slice::Iter<M> {
         self.0.par_iter()
     }
 
@@ -54,13 +52,14 @@ impl<M: CasperMsg> Justification<M> {
     }
 
     pub fn insert(&mut self, msg: M) -> bool {
-        self.0.insert(msg)
-    }
-
-    /// Since it's backed by a BTreeSet, we can have the "smallest" 
-    /// message first
-    fn head(&self) -> Option<&M> {
-        self.0.iter().next()
+        if self.contains(&msg)
+            // || self.iter().any(|m| m.get_sender() == msg.get_sender())
+        {
+            false
+        } else {
+            self.0.push(msg);
+            true
+        }
     }
 
     /// reexport from Estimate impl
@@ -428,7 +427,7 @@ impl<'z, M: CasperMsg> From<&'z Justification<M>> for LatestMsgs<M> {
     /// extract the latest messages from a justification
     fn from(j: &Justification<M>) -> Self {
         let mut latest_msgs: LatestMsgs<M> = LatestMsgs::new();
-        let mut queue: VecDeque<(M)> = j.iter().cloned().collect();
+        let mut queue: VecDeque<M> = j.iter().cloned().collect();
         while let Some(msg) = queue.pop_front() {
             if latest_msgs.update(&msg) {
                 msg.get_justification()
@@ -517,6 +516,7 @@ impl<M: CasperMsg> SenderState<M> {
         let mut msgs_sorted_by_faultw: Vec<_> = msgs
             .iter()
             .filter_map(|&msg| {
+                // equivocations in relation to state
                 let sender = msg.get_sender();
                 if !self.equivocators.contains(sender)
                     && self.latest_msgs.equivocate(msg) {
@@ -527,6 +527,7 @@ impl<M: CasperMsg> SenderState<M> {
                     } else {
                         Some((msg, WeightUnit::ZERO))
                     }
+
             })
             .collect();
 
@@ -566,11 +567,10 @@ mod tests {
                 .cloned()
                 .collect(),
         );
-        let txs = BTreeSet::new();
-        let genesis_block = Block::new(None, sender0, txs.clone()); // estimate of the first casper message
+        let genesis_block = Block::new(None, sender0); // estimate of the first casper message
         let justification = Justification::new();
         let genesis_msg =
-            BlockMsg::new(sender0, justification, genesis_block.clone());
+            BlockMsg::new(sender0, justification, genesis_block.clone(), None);
         assert_eq!(
             genesis_msg.get_estimate(),
             &genesis_block,
@@ -587,10 +587,10 @@ mod tests {
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &2.0);
 
-        let proto_b1 = Block::new(None, sender1, txs.clone());
+        let proto_b1 = Block::new(None, sender1);
         let b1 =
             Block::from_prevblock_msg(Some(genesis_msg), proto_b1).unwrap();
-        let m1 = BlockMsg::new(sender1, justification, b1);
+        let m1 = BlockMsg::new(sender1, justification, b1, None);
 
         let mut justification = Justification::new();
         assert!(justification.insert(m1.clone()));
@@ -601,9 +601,9 @@ mod tests {
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &6.0);
 
-        let proto_b2 = Block::new(None, sender2, txs.clone());
+        let proto_b2 = Block::new(None, sender2);
         let b2 = Block::from_prevblock_msg(Some(m1), proto_b2).unwrap();
-        let m2 = BlockMsg::new(sender2, justification, b2);
+        let m2 = BlockMsg::new(sender2, justification, b2, None);
 
         let mut justification = Justification::new();
         assert!(justification.insert(m2.clone()));
@@ -614,9 +614,9 @@ mod tests {
         let (_msg, weight) = subtree_weights.iter().next().unwrap();
         assert_eq!(weight, &14.0);
 
-        let proto_b3 = Block::new(None, sender3, txs);
+        let proto_b3 = Block::new(None, sender3);
         let b3 = Block::from_prevblock_msg(Some(m2), proto_b3).unwrap();
-        let m3 = BlockMsg::new(sender3, justification, b3);
+        let m3 = BlockMsg::new(sender3, justification, b3, None);
 
         let mut justification = Justification::new();
         assert!(justification.insert(m3.clone()));
