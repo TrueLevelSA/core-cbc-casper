@@ -16,8 +16,14 @@ type Validator = u32;
 /// None and data. data will be the unique identifier of this blockchain
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize)]
 pub struct ProtoBlock {
-    pub prevblock: Option<Block>,
-    pub sender: Validator,
+    prevblock: Option<Block>,
+    sender: Validator,
+}
+
+impl ProtoBlock {
+    pub fn new(prevblock: Option<Block>, sender: Validator) -> ProtoBlock {
+        ProtoBlock { prevblock, sender }
+    }
 }
 
 /// Boxing of a block, will be implemented as a CasperMsg

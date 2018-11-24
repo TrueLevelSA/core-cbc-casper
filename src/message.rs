@@ -606,10 +606,7 @@ mod tests {
                     sender_state.get_latest_msgs(),
                     &HashSet::new(),
                 );
-                let genesis_block = Block::from(ProtoBlock {
-                    prevblock: None,
-                    sender: 0,
-                });
+                let genesis_block = Block::from(ProtoBlock::new(None, 0));
                 let safety_threshold =
                     (sender_state.get_senders_weights().sum_all_weights())
                         / 2.0;
@@ -631,10 +628,7 @@ mod tests {
         state
             .iter()
             .map(|(_, sender_state)| {
-                let genesis_block = Block::from(ProtoBlock {
-                    prevblock: None,
-                    sender: 0,
-                });
+                let genesis_block = Block::from(ProtoBlock::new(None, 0));
                 let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
                     sender_state.get_latest_msgs(),
                     &HashSet::new(),
@@ -748,10 +742,7 @@ mod tests {
     }
 
     fn arbitrary_blockchain() -> BoxedStrategy<Block> {
-        let genesis_block = Block::from(ProtoBlock {
-            prevblock: None,
-            sender: 0,
-        });
+        let genesis_block = Block::from(ProtoBlock::new(None, 0));
         Just(genesis_block).boxed()
     }
 
