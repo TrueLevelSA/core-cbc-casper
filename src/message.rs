@@ -575,7 +575,7 @@ mod tests {
             .boxed()
     }
 
-    fn full_consensus<M>(state: HashMap<M::Sender, SenderState<M>>) -> bool
+    fn full_consensus<M>(state: &HashMap<M::Sender, SenderState<M>>) -> bool
     where
         M: CasperMsg,
     {
@@ -598,7 +598,7 @@ mod tests {
         m.len() == 1
     }
 
-    fn safety_oracle(state: HashMap<u32, SenderState<BlockMsg>>) -> bool {
+    fn safety_oracle(state: &HashMap<u32, SenderState<BlockMsg>>) -> bool {
         let safety_oracle_detected: HashSet<bool> = state
             .iter()
             .map(|(_, sender_state)| {
@@ -665,7 +665,7 @@ mod tests {
         E: Estimate<M = Message<E, u32>>,
         F: Fn(&mut Vec<u32>) -> BoxedStrategy<u32>,
         G: Fn(&Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
-        H: Fn(HashMap<u32, SenderState<Message<E, u32>>>) -> bool,
+        H: Fn(&HashMap<u32, SenderState<Message<E, u32>>>) -> bool,
     {
         (prop::sample::select((1..validator_max_count).collect::<Vec<usize>>()))
             .prop_flat_map(move |validators| {
@@ -731,7 +731,7 @@ mod tests {
                     if have_consensus {
                         false
                     } else {
-                        if consensus_satisfied(state.clone()) {
+                        if consensus_satisfied(state) {
                             have_consensus = true
                         }
                         true
