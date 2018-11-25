@@ -153,7 +153,7 @@ impl Block {
         equivocators: &HashSet<<BlockMsg as CasperMsg>::Sender>,
         safety_oracle_threshold: WeightUnit,
         weights: &SendersWeight<Validator>,
-    ) -> BTreeSet<BTreeSet<<BlockMsg as CasperMsg>::Sender>> {
+    ) -> HashSet<BTreeSet<<BlockMsg as CasperMsg>::Sender>> {
 
         fn latest_in_justification(
             j: &Justification<BlockMsg>,
@@ -217,7 +217,7 @@ impl Block {
             r: HashSet<&<BlockMsg as CasperMsg>::Sender>,
             p: HashSet<&<BlockMsg as CasperMsg>::Sender>,
             x: HashSet<&<BlockMsg as CasperMsg>::Sender>,
-            mx_clqs: &mut BTreeSet<BTreeSet<<BlockMsg as CasperMsg>::Sender>>,
+            mx_clqs: &mut HashSet<BTreeSet<<BlockMsg as CasperMsg>::Sender>>,
             neighbours: HashMap<
                 &<BlockMsg as CasperMsg>::Sender,
                 HashSet<&<BlockMsg as CasperMsg>::Sender>,
@@ -253,7 +253,7 @@ impl Block {
             acc.union(x).cloned().collect()
         });
 
-        let mut mx_clqs = BTreeSet::new();
+        let mut mx_clqs = HashSet::new();
 
         bron_kerbosch(
             HashSet::new(),
@@ -774,7 +774,7 @@ mod tests {
                 2.0,
                 &senders_weights
             ),
-            BTreeSet::new()
+            HashSet::new()
         );
 
         let proto_b3 =
@@ -799,7 +799,7 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            BTreeSet::from_iter(vec![BTreeSet::from_iter(vec![
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![
                 senders[0], senders[1],
             ])])
         );
@@ -836,7 +836,7 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            BTreeSet::from_iter(vec![BTreeSet::from_iter(vec![
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![
                 senders[0], senders[1],
             ])])
         );
@@ -863,7 +863,7 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            BTreeSet::from_iter(vec![
+            HashSet::from_iter(vec![
                 BTreeSet::from_iter(vec![senders[0], senders[1]]),
                 BTreeSet::from_iter(vec![senders[1], senders[2]]),
             ])
@@ -880,7 +880,7 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            BTreeSet::from_iter(vec![
+            HashSet::from_iter(vec![
                 BTreeSet::from_iter(vec![senders[0], senders[1]]),
                 BTreeSet::from_iter(vec![senders[1], senders[2]]),
             ])
@@ -897,7 +897,7 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            BTreeSet::from_iter(vec![BTreeSet::from_iter(vec![
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![
                 senders[1], senders[2],
             ])])
         );
@@ -944,7 +944,7 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            BTreeSet::from_iter(vec![BTreeSet::from_iter(vec![
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![
                 senders[0], senders[1], senders[2],
             ])])
         );
@@ -959,7 +959,7 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            BTreeSet::from_iter(vec![BTreeSet::from_iter(vec![
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![
                 senders[0], senders[1], senders[2],
             ])])
         );

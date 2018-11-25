@@ -616,7 +616,7 @@ mod tests {
                     &HashSet::new(),
                     safety_threshold,
                     sender_state.get_senders_weights(),
-                ) != BTreeSet::new()
+                ) != HashSet::new()
             })
             .collect();
         safety_oracle_detected.contains(&true)
