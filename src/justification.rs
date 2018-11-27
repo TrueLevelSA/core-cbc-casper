@@ -384,6 +384,7 @@ impl<M: CasperMsg> LatestMsgs<M> {
         if let Some(latest_msgs_from_sender) = self.get(sender).cloned() {
             latest_msgs_from_sender
                 .iter()
+                .filter(|&old_msg| new_msg != old_msg)
                 .fold(false, |acc, old_msg| {
                     let new_independent_from_old = !new_msg.depends(old_msg);
                     // equivocation, old and new do not depend on each other
