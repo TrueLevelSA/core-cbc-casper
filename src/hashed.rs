@@ -9,26 +9,26 @@ impl std::hash::Hash for Hashed {
     }
 }
 
-// impl PartialOrd for Hashed {
-//     fn partial_cmp(&self, rhs: &Self) -> Option<::std::cmp::Ordering>{
-//         Some(self.cmp(rhs))
-//     }
-// }
+impl PartialOrd for Hashed {
+    fn partial_cmp(&self, rhs: &Self) -> Option<::std::cmp::Ordering>{
+        Some(self.cmp(rhs))
+    }
+}
 
-// impl Ord for Hashed {
-//     fn cmp(&self, rhs: &Self) -> ::std::cmp::Ordering {
-//         let mut iter = Iterator::zip(self.0.iter(), rhs.0.iter());
-//         loop {
-//             if let Some((l, r)) = &iter.next() {
-//                 if l > r { break ::std::cmp::Ordering::Greater }
-//                 else if l < r { break ::std::cmp::Ordering::Less }
-//             } else {
-//                 // checked all bytes, and they were all equal
-//                 { break ::std::cmp::Ordering::Equal }
-//             };
-//         }
-//     }
-// }
+impl Ord for Hashed {
+    fn cmp(&self, rhs: &Self) -> ::std::cmp::Ordering {
+        let mut iter = Iterator::zip(self.0.iter(), rhs.0.iter());
+        loop {
+            if let Some((l, r)) = &iter.next() {
+                if l > r { break ::std::cmp::Ordering::Greater }
+                else if l < r { break ::std::cmp::Ordering::Less }
+            } else {
+                // checked all bytes, and they were all equal
+                { break ::std::cmp::Ordering::Equal }
+            };
+        }
+    }
+}
 
 impl PartialEq for Hashed{
     fn eq(&self, rhs: &Self) -> bool {

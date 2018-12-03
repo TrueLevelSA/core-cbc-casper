@@ -5,7 +5,7 @@ use std::iter::{Iterator};
 use justification::{Justification, LatestMsgsHonest, LatestMsgs};
 use message::{CasperMsg, Message};
 use senders_weight::SendersWeight;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use traits::{Data, Estimate, Zero, Id};
 use hashed::Hashed;
 use weight_unit::WeightUnit;
@@ -342,6 +342,20 @@ impl Block {
         (visited, genesis)
     }
 
+    fn collect_validators(
+        blocks: &HashSet<Block>,
+        visited: &HashMap<Block, HashSet<Block>>,
+        acc: Arc<RwLock<HashSet<Validator>>>
+    ) -> Arc<RwLock<HashSet<Validator>>> {
+        blocks.iter().fold(acc, |acc, block| {
+            let _ = acc.write().map(|mut x| x.insert(block.get_sender()));
+            visited.get(&block)
+                .filter(|children| !children.is_empty())
+                .map(|children| Self::collect_validators(children, visited, acc.clone()))
+                .unwrap_or(acc)
+        })
+    }
+
     // find heaviest block
     fn pick_heaviest(
         blocks: &HashSet<Block>,
@@ -349,20 +363,37 @@ impl Block {
         weights: &SendersWeight<Validator>,
     ) -> Option<(Option<Self>, WeightUnit, HashSet<Self>)> {
         let init = Some((None, WeightUnit::ZERO, HashSet::new()));
-        let heaviest_child = blocks.iter().fold(init, |best, block| {
+        let heaviest_child = blocks.iter().fold(init, |best: Option<(Option<Block>, WeightUnit, HashSet<Self>)>, block| {
             best.and_then(|best| {
                 visited.get(&block).map(|children| (best, children))
-            }).map(|((b_block, b_weight, b_children), children)| {
-                let mut referred_senders: HashSet<_> =
-                    children.iter().map(Self::get_sender).collect();
+            }).and_then(|((b_block, b_weight, b_children), children)| {
                 // add current block sender such that its weight counts too
-                referred_senders.insert(block.get_sender());
-                let weight = weights.sum_weight_senders(&referred_senders);
+                let referred_senders: Arc<RwLock<HashSet<_>>> = Arc::new(RwLock::new(
+                    [block.get_sender()].iter().cloned().collect())
+                );
+                let referred_senders =
+                    Self::collect_validators(children, visited, referred_senders);
+                    // children.iter().map(Self::get_sender).collect();
+                let weight = referred_senders.read()
+                    .map(|s| weights.sum_weight_senders(&*s));
+
+                if weight.is_err() {
+                    return None
+                }
+
+                let weight = weight.unwrap();
+
                 // TODO: break ties with blockhash
                 if weight > b_weight {
-                    (Some(block.clone()), weight, children.clone())
+                    Some((Some(block.clone()), weight, children.clone()))
+                } else if weight < b_weight {
+                    Some((b_block, b_weight, b_children))
                 } else {
-                    (b_block, b_weight, b_children)
+                    let ord = b_block.as_ref().map(|b| b.id().cmp(block.id())).unwrap_or(std::cmp::Ordering::Equal);
+                    match ord {
+                        std::cmp::Ordering::Less => Some((b_block, b_weight, b_children)),
+                        _ => Some((Some(block.clone()), weight, children.clone())), // same block on both sides
+                    }
                 }
             })
         });
@@ -673,6 +704,14 @@ mod tests {
         //     "should build on top of "
         // );
 
+
+        println!("genesis {:?}", Block::from(&genesis_block_msg));
+        println!("b0 {:?}", Block::from(&m0));
+        println!("b1 {:?}", Block::from(&m1));
+        println!("b2 {:?}", Block::from(&m2));
+        println!("b3 {:?}", Block::from(&m3));
+        println!("b4 {:?}", Block::from(&m4));
+
         let proto_b5 = Block::new(None, sender5);
 
         let (m5, _) = BlockMsg::from_msgs(
@@ -682,6 +721,8 @@ mod tests {
             &sender_state,
             Some(proto_b5),
         ).unwrap();
+
+        println!("b5 {:?}", Block::from(&m5));
 
         assert_eq!(
             m5.get_estimate(),
