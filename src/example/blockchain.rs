@@ -295,8 +295,8 @@ impl Block {
     /// parses blockchain using the latest honest messages
     /// the return value is a tuple containing a map and a set
     /// the hashmap maps blocks to their respective children
-    /// the set contains all the blocks that have the genesis as their
-    /// prevblock (aka all the children of the genesis block)
+    /// the set contains all the blocks that have a None
+    /// as their prevblock (aka genesis blocks or finalized blocks)
     pub fn parse_blockchains(
         latest_msgs: &LatestMsgsHonest<BlockMsg>,
         _finalized_msg: Option<&BlockMsg>,
