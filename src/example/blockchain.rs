@@ -389,10 +389,11 @@ impl Block {
                 } else if weight < b_weight {
                     Some((b_block, b_weight, b_children))
                 } else {
-                    let ord = b_block.as_ref().map(|b| b.id().cmp(block.id())).unwrap_or(std::cmp::Ordering::Equal);
+                    let ord = b_block.as_ref().map(|b| b.id().cmp(block.id()));
                     match ord {
-                        std::cmp::Ordering::Less => Some((b_block, b_weight, b_children)),
-                        _ => Some((Some(block.clone()), weight, children.clone())), // same block on both sides
+                        Some(std::cmp::Ordering::Less) => Some((b_block, b_weight, b_children)),
+                        Some(std::cmp::Ordering::Greater) => Some((Some(block.clone()), weight, children.clone())),
+                        _ => None,
                     }
                 }
             })
