@@ -102,7 +102,7 @@ impl Block {
     pub fn id(&self) -> &<Self as Id>::ID { &(self.0).1 }
     fn arc(&self) -> &Arc<ProtoBlock> { &(self.0).0 }
     pub fn get_sender(&self) -> Validator {
-        (self.0).0.sender
+        self.arc().sender
     }
 
     /// Create a new block from a prevblock message and an incomplete block 
@@ -368,12 +368,12 @@ impl Block {
                 visited.get(&block).map(|children| (best, children))
             }).and_then(|((b_block, b_weight, b_children), children)| {
                 // add current block sender such that its weight counts too
-                let referred_senders: Arc<RwLock<HashSet<_>>> = Arc::new(RwLock::new(
-                    [block.get_sender()].iter().cloned().collect())
-                );
+                let referred_senders: Arc<RwLock<HashSet<_>>> =
+                    Arc::new(RwLock::new(
+                        [block.get_sender()].iter().cloned().collect())
+                    );
                 let referred_senders =
                     Self::collect_validators(children, visited, referred_senders);
-                    // children.iter().map(Self::get_sender).collect();
                 let weight = referred_senders.read()
                     .map(|s| weights.sum_weight_senders(&*s));
 
@@ -384,15 +384,16 @@ impl Block {
                 let weight = weight.unwrap();
 
                 // TODO: break ties with blockhash
-                if weight > b_weight {
-                    Some((Some(block.clone()), weight, children.clone()))
-                } else if weight < b_weight {
-                    Some((b_block, b_weight, b_children))
-                } else {
+                let res = Some((Some(block.clone()), weight, children.clone()));
+                let b_res = Some((b_block.clone(), b_weight, b_children));
+
+                if weight > b_weight { res }
+                else if weight < b_weight { b_res }
+                else {
                     let ord = b_block.as_ref().map(|b| b.id().cmp(block.id()));
                     match ord {
-                        Some(std::cmp::Ordering::Less) => Some((b_block, b_weight, b_children)),
-                        Some(std::cmp::Ordering::Greater) => Some((Some(block.clone()), weight, children.clone())),
+                        Some(std::cmp::Ordering::Greater) => res,
+                        Some(std::cmp::Ordering::Less) => b_res,
                         _ => None,
                     }
                 }
@@ -714,8 +715,6 @@ mod tests {
             &sender_state,
             Some(proto_b5),
         ).unwrap();
-
-        println!("b5 {:?}", Block::from(&m5));
 
         assert_eq!(
             m5.get_estimate(),
