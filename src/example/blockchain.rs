@@ -315,7 +315,7 @@ impl Block {
     ) -> (HashMap<Block, HashSet<Block>>, HashSet<Block>) {
 
         // start at the tip of the blockchain
-        let mut visited: HashMap<Block, HashSet<Block>> = latest_msgs
+        let mut visited_parents: HashMap<Block, HashSet<Block>> = latest_msgs
             .iter()
             .map(|msg| {
                 let parent = Block::from(msg);
@@ -324,24 +324,24 @@ impl Block {
             })
             .collect();
 
-        let mut queue: VecDeque<Block> = visited.keys().cloned().collect();
+        let mut queue: VecDeque<Block> = visited_parents.keys().cloned().collect();
         let mut genesis: HashSet<Block> = HashSet::new();
 
-        // while there is still unvisited blocks
+        // while there are still unvisited blocks
         while let Some(child) = queue.pop_front() {
             match child.get_prevblock() {
-                // if the prevblock is set, update the visited map
+                // if the prevblock is set, update the visited_parents map
                 Some(parent) => {
-                    if visited.contains_key(&parent) {
-                        // visited parent before, fork found
-                        visited.get_mut(&parent).map(|parents_children| {
+                    if visited_parents.contains_key(&parent) {
+                        // visited parent before, fork found, add new child and don't add parent to queue (since it is already in the queue)
+                        visited_parents.get_mut(&parent).map(|parents_children| {
                             parents_children.insert(child);
                         });
                     } else {
-                        // didnt visit parent before, set initial state, and push to queue
+                        // didn't visit parent before, add it with known child, and push to queue
                         let mut parents_children = HashSet::new();
                         parents_children.insert(child);
-                        visited.insert(parent.clone(), parents_children);
+                        visited_parents.insert(parent.clone(), parents_children);
                         queue.push_back(parent);
                     }
                 }
@@ -351,7 +351,7 @@ impl Block {
                 }
             };
         }
-        (visited, genesis)
+        (visited_parents, genesis)
     }
 
     // find heaviest block
