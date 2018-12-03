@@ -375,7 +375,7 @@ impl Block {
                 let referred_senders =
                     Self::collect_validators(children, visited, referred_senders);
                 let weight = referred_senders.read()
-                    .map(|s| weights.sum_weight_senders(&*s));
+                    .map(|s| weights.sum_weight_senders(&s));
 
                 if weight.is_err() {
                     return None
