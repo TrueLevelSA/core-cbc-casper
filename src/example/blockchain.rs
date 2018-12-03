@@ -363,7 +363,7 @@ impl Block {
         weights: &SendersWeight<Validator>,
     ) -> Option<(Option<Self>, WeightUnit, HashSet<Self>)> {
         let init = Some((None, WeightUnit::ZERO, HashSet::new()));
-        let heaviest_child = blocks.iter().fold(init, |best: Option<(Option<Block>, WeightUnit, HashSet<Self>)>, block| {
+        let heaviest_child = blocks.iter().fold(init, |best, block| {
             best.and_then(|best| {
                 visited.get(&block).map(|children| (best, children))
             }).and_then(|((b_block, b_weight, b_children), children)| {
@@ -703,14 +703,6 @@ mod tests {
         //     &Block::new(Some(Block::from(&m2)), sender4),
         //     "should build on top of "
         // );
-
-
-        println!("genesis {:?}", Block::from(&genesis_block_msg));
-        println!("b0 {:?}", Block::from(&m0));
-        println!("b1 {:?}", Block::from(&m1));
-        println!("b2 {:?}", Block::from(&m2));
-        println!("b3 {:?}", Block::from(&m3));
-        println!("b4 {:?}", Block::from(&m4));
 
         let proto_b5 = Block::new(None, sender5);
 
