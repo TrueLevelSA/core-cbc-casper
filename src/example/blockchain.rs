@@ -383,13 +383,13 @@ impl Block {
 
                 let weight = weight.unwrap();
 
-                // TODO: break ties with blockhash
                 let res = Some((Some(block.clone()), weight, children.clone()));
                 let b_res = Some((b_block.clone(), b_weight, b_children));
 
                 if weight > b_weight { res }
                 else if weight < b_weight { b_res }
                 else {
+                    // break ties with blockhash
                     let ord = b_block.as_ref().map(|b| b.id().cmp(block.id()));
                     match ord {
                         Some(std::cmp::Ordering::Greater) => res,
