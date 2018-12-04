@@ -55,16 +55,6 @@ impl Id for Block {
 
 pub type BlockMsg = Message<Block /*Estimate*/, Validator /*Sender*/>;
 
-#[derive(Clone, Eq, Debug, PartialEq, Hash)]
-pub struct Tx;
-
-impl Data for Block {
-    type Data = Self;
-    fn is_valid(_data: &Self::Data) -> bool {
-        true // FIXME
-    }
-}
-
 //// this type can be used to create a look up for what msgs are referred by
 //// what validators
 // type ReferredValidators = HashMap<Block, HashSet<Validator>>;
@@ -111,18 +101,13 @@ impl Block {
         // a incomplete_block is a block with a None prevblock (ie, Estimate) AND is
         // not a genesis_block
         incomplete_block: Block,
-    ) -> Result<Self, &'static str> {
+    ) -> Self {
         let prevblock = prevblock_msg.map(|m| Block::from(&m));
         let block = Block::from(ProtoBlock {
             prevblock,
             ..(*incomplete_block.arc().clone())
         });
-
-        if Block::is_valid(&block) {
-            Ok(block)
-        } else {
-            Err("Block not valid")
-        }
+        block
     }
 
     /// Math definition of blockchain membership
@@ -444,7 +429,7 @@ impl Estimate for Block {
             (1, Some(incomplete_block)) => {
                 // only msg to built on top, no choice thus no ghost
                 let msg = latest_msgs.iter().next().cloned();
-                Self::from_prevblock_msg(msg, incomplete_block).unwrap()
+                Self::from_prevblock_msg(msg, incomplete_block)
             }
             (_, Some(incomplete_block)) => {
                 let prevblock =

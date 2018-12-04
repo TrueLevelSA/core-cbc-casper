@@ -121,13 +121,6 @@ type Voter = u32;
 
 impl Sender for Voter {}
 
-impl Data for VoteCount {
-    type Data = VoteCount;
-    fn is_valid(_data: &Self::Data) -> bool {
-        unimplemented!()
-    }
-}
-
 impl Estimate for VoteCount {
     // the estimator just counts votes, which in this case are the unjustified
     // msgs

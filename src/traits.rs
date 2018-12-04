@@ -27,12 +27,16 @@ pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + Data + serde::Seri
     ) -> Self;
 }
 
-/// Describes data added to the messages
+/// Describes the accessory data needed for the mk_estimate
 pub trait Data {
     type Data;
 
-    /// Checks whether this data is valid
-    fn is_valid(&Self::Data) -> bool;
+    // /// Checks whether this data is valid
+    // fn is_valid(&Self::Data) -> bool;
+}
+
+impl<T> Data for T {
+    type Data = T;
 }
 
 pub trait Sender: Hash + Clone + Ord + Eq + Send + Sync + Debug + serde::Serialize {}

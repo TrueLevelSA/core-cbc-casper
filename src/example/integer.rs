@@ -12,13 +12,6 @@ pub type IntegerMsg = Message<u32 /*Estimate*/, Validator /*Sender*/>;
 #[derive(Clone, Eq, Debug, Ord, PartialOrd, PartialEq, Hash)]
 pub struct Tx;
 
-impl Data for u32 {
-    type Data = Self;
-    fn is_valid(_data: &Self::Data) -> bool {
-        true // FIXME
-    }
-}
-
 /// the goal here is to find the weighted median of all the values
 impl Estimate for u32 {
     type M = IntegerMsg;
