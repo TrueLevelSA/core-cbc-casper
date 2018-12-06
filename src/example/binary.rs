@@ -8,13 +8,6 @@ type Validator = u32;
 
 pub type BinaryMsg = Message<bool /*Estimate*/, Validator /*Sender*/>;
 
-impl Data for bool {
-    type Data = Self;
-    fn is_valid(_data: &Self::Data) -> bool {
-        true // FIXME
-    }
-}
-
 impl Estimate for bool {
     type M = BinaryMsg;
 

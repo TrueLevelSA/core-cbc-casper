@@ -5,7 +5,7 @@ use std::iter::{Iterator};
 use justification::{Justification, LatestMsgsHonest, LatestMsgs};
 use message::{CasperMsg, Message};
 use senders_weight::SendersWeight;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use traits::{Data, Estimate, Zero, Id};
 use hashed::Hashed;
 use weight_unit::WeightUnit;
@@ -61,22 +61,6 @@ impl Id for Block {
 
 pub type BlockMsg = Message<Block /*Estimate*/, Validator /*Sender*/>;
 
-// impl Debug for BlockMsg {
-//     fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
-//         // write!(f, "{:?}/n{:?}", self.yes, self.no)
-//     }
-// }
-
-#[derive(Clone, Eq, Debug, PartialEq, Hash)]
-pub struct Tx;
-
-impl Data for Block {
-    type Data = Self;
-    fn is_valid(_data: &Self::Data) -> bool {
-        true // FIXME
-    }
-}
-
 //// this type can be used to create a look up for what msgs are referred by
 //// what validators
 // type ReferredValidators = HashMap<Block, HashSet<Validator>>;
@@ -114,7 +98,7 @@ impl Block {
     pub fn id(&self) -> &<Self as Id>::ID { &(self.0).1 }
     fn arc(&self) -> &Arc<ProtoBlock> { &(self.0).0 }
     pub fn get_sender(&self) -> Validator {
-        (self.0).0.sender
+        self.arc().sender
     }
 
     /// Create a new block from a prevblock message and an incomplete block
@@ -123,18 +107,13 @@ impl Block {
         // a incomplete_block is a block with a None prevblock (ie, Estimate) AND is
         // not a genesis_block
         incomplete_block: Block,
-    ) -> Result<Self, &'static str> {
+    ) -> Self {
         let prevblock = prevblock_msg.map(|m| Block::from(&m));
         let block = Block::from(ProtoBlock {
             prevblock,
             ..(*incomplete_block.arc().clone())
         });
-
-        if Block::is_valid(&block) {
-            Ok(block)
-        } else {
-            Err("Block not valid")
-        }
+        block
     }
 
     /// Math definition of blockchain membership
@@ -307,8 +286,8 @@ impl Block {
     /// parses blockchain using the latest honest messages
     /// the return value is a tuple containing a map and a set
     /// the hashmap maps blocks to their respective children
-    /// the set contains all the blocks that have the genesis as their
-    /// prevblock (aka all the children of the genesis block)
+    /// the set contains all the blocks that have a None
+    /// as their prevblock (aka genesis blocks or finalized blocks)
     pub fn parse_blockchains(
         latest_msgs: &LatestMsgsHonest<BlockMsg>,
         _finalized_msg: Option<&BlockMsg>,
@@ -354,6 +333,20 @@ impl Block {
         (visited_parents, genesis)
     }
 
+    fn collect_validators(
+        blocks: &HashSet<Block>,
+        visited: &HashMap<Block, HashSet<Block>>,
+        acc: Arc<RwLock<HashSet<Validator>>>
+    ) -> Arc<RwLock<HashSet<Validator>>> {
+        blocks.iter().fold(acc, |acc, block| {
+            let _ = acc.write().map(|mut x| x.insert(block.get_sender()));
+            visited.get(&block)
+                .filter(|children| !children.is_empty())
+                .map(|children| Self::collect_validators(children, visited, acc.clone()))
+                .unwrap_or(acc)
+        })
+    }
+
     // find heaviest block
     fn pick_heaviest(
         blocks: &HashSet<Block>,
@@ -364,17 +357,36 @@ impl Block {
         let heaviest_child = blocks.iter().fold(init, |best, block| {
             best.and_then(|best| {
                 visited.get(&block).map(|children| (best, children))
-            }).map(|((b_block, b_weight, b_children), children)| {
-                let mut referred_senders: HashSet<_> =
-                    children.iter().map(Self::get_sender).collect();
+            }).and_then(|((b_block, b_weight, b_children), children)| {
                 // add current block sender such that its weight counts too
-                referred_senders.insert(block.get_sender());
-                let weight = weights.sum_weight_senders(&referred_senders);
-                // TODO: break ties with blockhash
-                if weight > b_weight {
-                    (Some(block.clone()), weight, children.clone())
-                } else {
-                    (b_block, b_weight, b_children)
+                let referred_senders: Arc<RwLock<HashSet<_>>> =
+                    Arc::new(RwLock::new(
+                        [block.get_sender()].iter().cloned().collect())
+                    );
+                let referred_senders =
+                    Self::collect_validators(children, visited, referred_senders);
+                let weight = referred_senders.read()
+                    .map(|s| weights.sum_weight_senders(&s));
+
+                if weight.is_err() {
+                    return None
+                }
+
+                let weight = weight.unwrap();
+
+                let res = Some((Some(block.clone()), weight, children.clone()));
+                let b_res = Some((b_block.clone(), b_weight, b_children));
+
+                if weight > b_weight { res }
+                else if weight < b_weight { b_res }
+                else {
+                    // break ties with blockhash
+                    let ord = b_block.as_ref().map(|b| b.id().cmp(block.id()));
+                    match ord {
+                        Some(std::cmp::Ordering::Greater) => res,
+                        Some(std::cmp::Ordering::Less) => b_res,
+                        _ => None,
+                    }
                 }
             })
         });
@@ -429,7 +441,7 @@ impl Estimate for Block {
             (1, Some(incomplete_block)) => {
                 // only msg to built on top, no choice thus no ghost
                 let msg = latest_msgs.iter().next().cloned();
-                Self::from_prevblock_msg(msg, incomplete_block).unwrap()
+                Self::from_prevblock_msg(msg, incomplete_block)
             }
             (_, Some(incomplete_block)) => {
                 let prevblock =
