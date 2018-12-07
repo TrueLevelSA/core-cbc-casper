@@ -6,7 +6,7 @@ use justification::{Justification, LatestMsgsHonest, LatestMsgs};
 use message::{CasperMsg, Message};
 use senders_weight::SendersWeight;
 use std::sync::{Arc, RwLock};
-use traits::{Data, Estimate, Zero, Id};
+use traits::{Data, Estimate, Zero, Id, Sender};
 use hashed::Hashed;
 use weight_unit::WeightUnit;
 use serde_derive::Serialize;
@@ -40,6 +40,13 @@ impl std::fmt::Debug for Block {
         )
     }
 }
+
+impl From<u32> for Block {
+    fn from(sender: u32) -> Self {
+        Block::from(ProtoBlock::new(None, 0))
+    }
+}
+
 
 impl serde::Serialize for Block {
     fn serialize<T: serde::Serializer>(&self, rhs: T) -> Result<T::Ok, T::Error> {
@@ -412,6 +419,18 @@ impl Block {
             .and_then(|(opt_block, ..)| opt_block)
     }
 }
+
+// impl<S: Sender, E: Estimate> From<S> for E {
+//     fn from(sender: S) -> Self {
+//         Block::from(ProtoBlock::new(None, sender as S))
+//     }
+// }
+
+// impl<M: CasperMsg<Sender = Validator, Estimate = Block>> From<M::Sender> for Block {
+//     fn from(sender: M::Sender) -> Self {
+//         Block::from(ProtoBlock::new(None, sender))
+//     }
+// }
 
 impl Estimate for Block {
     type M = BlockMsg;

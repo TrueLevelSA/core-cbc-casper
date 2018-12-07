@@ -16,8 +16,8 @@ extern crate itertools;
 pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + Data + serde::Serialize {
     type M: CasperMsg<Estimate = Self>;
 
-    /// Choses an estimate from a set of latest messages 
-    /// The finalized_msg value can be used in order not to recursively 
+    /// Choses an estimate from a set of latest messages
+    /// The finalized_msg value can be used in order not to recursively
     /// go back to the genesis
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
@@ -29,18 +29,26 @@ pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + Data + serde::Seri
 }
 
 /// Describes the accessory data needed for the mk_estimate
-pub trait Data {
+pub trait Data: From<u32> {
     type Data;
 
     // /// Checks whether this data is valid
     // fn is_valid(&Self::Data) -> bool;
 }
 
-impl<T> Data for T {
+
+impl<T: From<u32>> Data for T {
     type Data = T;
 }
 
-pub trait Sender: Hash + Clone + Ord + Eq + Send + Sync + Debug + serde::Serialize {}
+// impl<S: Sender> From<S> for <Block as Data>::Data {
+//     fn from(sender: S) -> <Block as Data>::Data {
+//         ProtoBlock::new(None, sender)
+//     }
+// }
+
+
+pub trait Sender: Data + Hash + Clone + Ord + Eq + Send + Sync + Debug + serde::Serialize {}
 
 /// Define how to compare the trait type to zero
 pub trait Zero<T: PartialEq> {
