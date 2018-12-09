@@ -68,7 +68,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
         new_msgs: Vec<&Self>,
         finalized_msg: Option<&Self>,
         sender_state: &SenderState<Self>,
-        external_data: Option<<<Self as CasperMsg>::Estimate as Data>::Data>,
+        external_data: Option<<Self::Estimate as Data>::Data>,
     ) -> Result<(Self, SenderState<Self>), &'static str> {
         // // TODO eventually comment out these lines, and FIXME tests
         // // check whether two messages from same sender
@@ -537,6 +537,7 @@ mod tests {
         state: &'z mut HashMap<M::Sender, SenderState<M>>,
         sender: M::Sender,
         recipients: HashSet<M::Sender>,
+        data: Option<<M::Estimate as Data>::Data>,
     ) -> &'z HashMap<M::Sender, SenderState<M>>
     where
         M: CasperMsg,
@@ -557,7 +558,7 @@ mod tests {
             // Some(sender.clone().into()),
             // Some(<<M as CasperMsg>::Estimate as Data>::Data::from(sender.clone() as <<M as CasperMsg>::Estimate as Data>::Data)),
             // Some(<<M as CasperMsg>::Estimate as Data>::Data::from(sender.clone())),
-            Some(<<M as CasperMsg>::Estimate as Data>::Data::from(sender.clone())),
+            data.map(|d| d.into()),
             // None,
         );
         let m = M::new(sender.clone(), justification, estimate, None);

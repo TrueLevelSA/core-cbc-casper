@@ -13,7 +13,7 @@ extern crate blake2;
 extern crate itertools;
 
 /// Describes an estimate, or a value of the consensus at a certain time
-pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + Data + serde::Serialize {
+pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize + From<<Self as Data>::Data> {
     type M: CasperMsg<Estimate = Self>;
 
     /// Choses an estimate from a set of latest messages
@@ -24,12 +24,12 @@ pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + Data + serde::Seri
         finalized_msg: Option<&Self::M>,
         sender: Option<<<Self as Estimate>::M as CasperMsg>::Sender>,
         senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
-        external_data: Option<<Self as Data>::Data>,
+        external_data: Option<<<Self::M as CasperMsg>::Estimate as Data>::Data>,
     ) -> Self;
 }
 
 /// Describes the accessory data needed for the mk_estimate
-pub trait Data: From<u32> {
+pub trait Data: From<<Self as Data>::Data> {
     type Data;
 
     // /// Checks whether this data is valid
@@ -37,7 +37,7 @@ pub trait Data: From<u32> {
 }
 
 
-impl<T: From<u32>> Data for T {
+impl<T: From<T>> Data for T {
     type Data = T;
 }
 
@@ -48,7 +48,7 @@ impl<T: From<u32>> Data for T {
 // }
 
 
-pub trait Sender: Data + Hash + Clone + Ord + Eq + Send + Sync + Debug + serde::Serialize {}
+pub trait Sender: Hash + Clone + Ord + Eq + Send + Sync + Debug + serde::Serialize {}
 
 /// Define how to compare the trait type to zero
 pub trait Zero<T: PartialEq> {
