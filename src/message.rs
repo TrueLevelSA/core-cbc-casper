@@ -412,18 +412,6 @@ where
     }
 }
 
-// impl<E, S> From<S> for <Message<E, S> as CasperMsg>::Estimate
-// impl<E: Data> From<u32> for E
-// where
-//     E: Estimate<M = Self>,
-//     S: Sender,
-// {
-// fn from<E>(sender: u32) -> E {
-//     // VoteCount::ZERO
-//     E::from(sender)
-// }
-// }
-
 impl<E, S> CasperMsg for Message<E, S>
 where
     E: Estimate<M = Self>,
@@ -507,25 +495,6 @@ mod tests {
     use std::{f64};
     use super::*;
 
-    // impl From<<M as CasperMsg>::Sender> for ProtoBlock {
-    // impl<M: CasperMsg> From<M::Sender> for ProtoBlock {
-    //     fn from(sender: u32) -> Self {
-    //         ProtoBlock::new(None, 0)
-    //     }
-    // }
-
-    // impl From<u32> for bool {
-    //     fn from(sender: u32) -> Self {
-    //         false
-    //     }
-    // }
-
-    // impl From<u32> for u32 {
-    //     fn from(sender: u32) -> Self {
-    //         sender
-    //     }
-    // }
-
     fn add_message<'z, M>(
         state: &'z mut HashMap<M::Sender, SenderState<M>>,
         sender: M::Sender,
@@ -547,12 +516,7 @@ mod tests {
             None,
             Some(sender.clone()),
             state[&sender].get_senders_weights(),
-            // Some(<<M as CasperMsg>::Estimate as Data>::Data::from(sender.clone())),
-            // Some(sender.clone().into()),
-            // Some(<<M as CasperMsg>::Estimate as Data>::Data::from(sender.clone() as <<M as CasperMsg>::Estimate as Data>::Data)),
-            // Some(<<M as CasperMsg>::Estimate as Data>::Data::from(sender.clone())),
             data.map(|d| d.into()),
-            // None,
         );
         let m = M::new(sender.clone(), justification, estimate, None);
         let (_, sender_state) = Justification::from_msgs(

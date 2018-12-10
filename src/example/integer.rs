@@ -7,7 +7,6 @@ use std::collections::HashSet;
 use std::iter::FromIterator;
 type Validator = u32;
 
-// #[derive(Clone, Eq, PartialEq, Debug, Hash, serde_derive::Serialize)]
 #[derive(Clone, Eq, Debug, Ord, PartialOrd, PartialEq, Hash, serde_derive::Serialize)]
 pub struct IntegerWrapper (u32);
 

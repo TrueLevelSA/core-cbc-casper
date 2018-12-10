@@ -41,13 +41,6 @@ impl<T: Into<Self>> Data for T {
     type Data = T;
 }
 
-// impl<S: Sender> From<S> for <Block as Data>::Data {
-//     fn from(sender: S) -> <Block as Data>::Data {
-//         ProtoBlock::new(None, sender)
-//     }
-// }
-
-
 pub trait Sender: Hash + Clone + Ord + Eq + Send + Sync + Debug + serde::Serialize {}
 
 /// Define how to compare the trait type to zero

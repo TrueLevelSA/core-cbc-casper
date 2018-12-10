@@ -47,7 +47,6 @@ impl<S: Sender + Into<u32>> From<S> for Block {
     }
 }
 
-
 impl serde::Serialize for Block {
     fn serialize<T: serde::Serializer>(&self, rhs: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
@@ -419,18 +418,6 @@ impl Block {
             .and_then(|(opt_block, ..)| opt_block)
     }
 }
-
-// impl<S: Sender, E: Estimate> From<S> for E {
-//     fn from(sender: S) -> Self {
-//         Block::from(ProtoBlock::new(None, sender as S))
-//     }
-// }
-
-// impl<M: CasperMsg<Sender = Validator, Estimate = Block>> From<M::Sender> for Block {
-//     fn from(sender: M::Sender) -> Self {
-//         Block::from(ProtoBlock::new(None, sender))
-//     }
-// }
 
 impl Estimate for Block {
     type M = BlockMsg;
