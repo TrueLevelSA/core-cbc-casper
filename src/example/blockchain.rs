@@ -432,12 +432,7 @@ impl Estimate for Block {
             (0, _) => panic!(
                 "Needs at least one latest message to be able to pick one"
             ),
-            (_, None) => {
-                // no block data provided, thus create empty block building on prevblock from ghost
-                let prevblock =
-                    Block::ghost(latest_msgs, finalized_msg, senders_weights);
-                Block::new(prevblock, sender.unwrap_or(0))
-            },
+            (_, None) => panic!("incomplete_block is None"),
             (1, Some(incomplete_block)) => {
                 // only msg to built on top, no choice thus no ghost
                 let msg = latest_msgs.iter().next().cloned();
