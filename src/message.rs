@@ -487,6 +487,7 @@ where
 #[cfg(test)]
 mod tests {
     use example::binary::BoolWrapper;
+    use example::integer::IntegerWrapper;
     use example::vote_count::{VoteCount};
     use senders_weight::{SendersWeight};
     use justification::{LatestMsgs};
@@ -775,10 +776,24 @@ mod tests {
         }
     }
 
+    prop_compose! {
+        fn boolwrapper_gen()
+            (boolean in prop::bool::ANY) -> BoolWrapper {
+                BoolWrapper::new(boolean)
+            }
+    }
+
+    prop_compose! {
+        fn integerwrapper_gen()
+            (int in prop::num::u32::ANY) -> IntegerWrapper {
+                IntegerWrapper::new(int)
+            }
+    }
+
     proptest! {
         #![proptest_config(Config::with_cases(30))]
         #[test]
-        fn round_robin_binary(ref chain in chain(prop::bool::ANY.boxed(), 15, round_robin, all_receivers, full_consensus)) {
+        fn round_robin_binary(ref chain in chain(boolwrapper_gen(), 15, round_robin, all_receivers, full_consensus)) {
             assert!(chain.last().unwrap_or(&HashMap::new()).keys().len() >=
                     chain.len(),
                     "round robin with n validators should converge in at most n messages")
@@ -788,7 +803,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(10))]
         #[test]
-        fn round_robin_integer(ref chain in chain(prop::num::u32::ANY.boxed(), 2000, round_robin, all_receivers, full_consensus)) {
+        fn round_robin_integer(ref chain in chain(integerwrapper_gen(), 2000, round_robin, all_receivers, full_consensus)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
@@ -817,7 +832,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(1))]
         #[test]
-        fn arbitrary_messenger_binary(ref chain in chain(prop::bool::ANY.boxed(), 100, arbitrary_in_set, some_receivers, full_consensus)) {
+        fn arbitrary_messenger_binary(ref chain in chain(boolwrapper_gen(), 100, arbitrary_in_set, some_receivers, full_consensus)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
@@ -830,7 +845,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(1))]
         #[test]
-        fn arbitrary_messenger_integer(ref chain in chain(prop::num::u32::ANY.boxed(), 50, arbitrary_in_set, some_receivers, full_consensus)) {
+        fn arbitrary_messenger_integer(ref chain in chain(integerwrapper_gen(), 50, arbitrary_in_set, some_receivers, full_consensus)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
