@@ -41,9 +41,9 @@ impl std::fmt::Debug for Block {
     }
 }
 
-impl From<u32> for Block {
-    fn from(sender: u32) -> Self {
-        Block::from(ProtoBlock::new(None, 0))
+impl<S: Sender + Into<u32>> From<S> for Block {
+    fn from(sender: S) -> Self {
+        (Block::from(ProtoBlock::new(None, sender.into())))
     }
 }
 

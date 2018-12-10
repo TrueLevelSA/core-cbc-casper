@@ -27,13 +27,6 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
     type Sender: Sender;
     type Estimate: Estimate<M = Self>;
 
-    // impl From<u32> for Estimate {
-        fn from(sender: u32) -> Self {
-            // VoteCount::ZERO
-            Self::from(sender)
-        }
-    // }
-
     /// returns the validator who sent this message
     fn get_sender(&self) -> &Self::Sender;
 
@@ -609,14 +602,14 @@ mod tests {
     ) -> BoxedStrategy<HashMap<M::Sender, SenderState<M>>>
     where
         M: 'static + CasperMsg,
-        <M as CasperMsg>::Estimate: From<<M as CasperMsg>::Sender>
+        <<M as CasperMsg>::Estimate as Data>::Data: From<<M as CasperMsg>::Sender>
     {
         (sender_strategy, receiver_strategy, Just(state))
             .prop_map(|(sender, mut receivers, mut state)| {
                 if !receivers.contains(&sender) {
                     receivers.insert(sender.clone());
                 }
-                add_message(&mut state, sender, receivers, Some(sender.into())).clone()
+                add_message(&mut state, sender.clone(), receivers, Some(sender.into())).clone()
             })
             .boxed()
     }
@@ -708,7 +701,7 @@ mod tests {
         consensus_satisfied: H,
     ) -> BoxedStrategy<Vec<HashMap<u32, SenderState<Message<E, u32>>>>>
     where
-        E: Estimate<M = Message<E, u32>>,
+        E: Estimate<M = Message<E, u32>> + From<u32>,
         F: Fn(&mut Vec<u32>) -> BoxedStrategy<u32>,
         G: Fn(&Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
         H: Fn(&HashMap<u32, SenderState<Message<E, u32>>>) -> bool,
@@ -786,6 +779,7 @@ mod tests {
             })
             .boxed()
     }
+
 
     fn arbitrary_blockchain() -> BoxedStrategy<Block> {
         let genesis_block = Block::from(ProtoBlock::new(None, 0));

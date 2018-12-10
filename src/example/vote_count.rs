@@ -4,7 +4,7 @@ use std::fmt::{Debug, Formatter, Result};
 
 use proptest::prelude::*;
 
-use traits::{Zero, Estimate, Sender, Data};
+use traits::{Zero, Estimate, Sender};
 use message::{Message, CasperMsg};
 use justification::{Justification, LatestMsgsHonest};
 use senders_weight::{SendersWeight};
@@ -125,9 +125,9 @@ impl VoteCount {
     }
 }
 
-impl From<u32> for VoteCount {
-    fn from(sender: u32) -> Self {
-        VoteCount::ZERO
+impl<S: Sender> From<S> for VoteCount {
+    fn from(_sender: S) -> Self {
+        VoteCount::default()
     }
 }
 

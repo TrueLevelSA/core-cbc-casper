@@ -13,7 +13,7 @@ extern crate blake2;
 extern crate itertools;
 
 /// Describes an estimate, or a value of the consensus at a certain time
-pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize + From<<Self as Data>::Data> {
+pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {
     type M: CasperMsg<Estimate = Self>;
 
     /// Choses an estimate from a set of latest messages

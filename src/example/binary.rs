@@ -1,4 +1,4 @@
-use traits::{Estimate, Data, Zero};
+use traits::{Estimate, Data, Zero, Sender};
 use message::{CasperMsg, Message};
 use justification::{LatestMsgsHonest};
 use senders_weight::{SendersWeight};
@@ -15,9 +15,9 @@ impl BoolWrapper {
     }
 }
 
-impl From<u32> for BoolWrapper {
-    fn from(sender: u32) -> Self {
-        BoolWrapper::new(false)
+impl<S: Sender> From<S> for BoolWrapper {
+    fn from(_sender: S) -> Self {
+        BoolWrapper::new(bool::default())
     }
 }
 
