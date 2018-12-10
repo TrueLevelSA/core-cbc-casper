@@ -37,7 +37,7 @@ pub trait Data: From<<Self as Data>::Data> {
 }
 
 
-impl<T: From<T>> Data for T {
+impl<T: Into<Self>> Data for T {
     type Data = T;
 }
 

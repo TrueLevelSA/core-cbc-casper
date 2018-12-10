@@ -602,20 +602,21 @@ mod tests {
         ).boxed()
     }
 
-    fn message_event<M: 'static>(
+    fn message_event<M>(
         state: HashMap<M::Sender, SenderState<M>>,
         sender_strategy: BoxedStrategy<M::Sender>,
         receiver_strategy: BoxedStrategy<HashSet<M::Sender>>,
     ) -> BoxedStrategy<HashMap<M::Sender, SenderState<M>>>
     where
-        M: CasperMsg,
+        M: 'static + CasperMsg,
+        <M as CasperMsg>::Estimate: From<<M as CasperMsg>::Sender>
     {
         (sender_strategy, receiver_strategy, Just(state))
             .prop_map(|(sender, mut receivers, mut state)| {
                 if !receivers.contains(&sender) {
                     receivers.insert(sender.clone());
                 }
-                add_message(&mut state, sender, receivers).clone()
+                add_message(&mut state, sender, receivers, Some(sender.into())).clone()
             })
             .boxed()
     }
