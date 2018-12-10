@@ -96,7 +96,6 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
 
             let estimate = latest_msgs_honest.mk_estimate(
                 finalized_msg,
-                Some(sender.clone()),
                 &sender_state.get_senders_weights(),
                 external_data,
             );
@@ -540,7 +539,6 @@ mod tests {
         );
         let estimate = latest_honest_msgs.mk_estimate(
             None,
-            Some(sender.clone()),
             state[&sender].get_senders_weights(),
             data.map(|d| d.into()),
         );
@@ -610,14 +608,13 @@ mod tests {
     {
         let m: HashSet<_> = state
             .iter()
-            .map(|(sender, sender_state)| {
+            .map(|(_sender, sender_state)| {
                 let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
                     sender_state.get_latest_msgs(),
                     &HashSet::new(),
                 );
                 latest_honest_msgs.mk_estimate(
                     None,
-                    Some(sender.clone()),
                     sender_state.get_senders_weights(),
                     None,
                 )
