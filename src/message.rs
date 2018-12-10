@@ -776,7 +776,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(100))]
         #[test]
-        fn blockchain(ref chain in chain(arbitrary_blockchain(), 6, round_robin, all_receivers, safety_oracle)) {
+        fn blockchain(ref chain in chain(arbitrary_blockchain(), 6, round_robin, some_receivers, safety_oracle)) {
             // total messages until unilateral consensus
             println!("new chain");
             chain.iter().for_each(|state| {println!("{{lms: {:?},", state.iter().map(|(_, sender_state)|
