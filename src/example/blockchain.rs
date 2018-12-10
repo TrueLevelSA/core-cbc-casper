@@ -31,13 +31,11 @@ impl ProtoBlock {
 pub struct Block((Arc<ProtoBlock>, Hashed));
 
 impl std::fmt::Debug for Block {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{:?} -> {:?}",
-            self.id(),
-            self.get_prevblock().as_ref().map(|p| p.id()).unwrap_or(&Hashed::default())
-        )
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self.get_prevblock() {
+            None => write!(fmt, "{:?} -> {:?}", (self.get_sender(), self.id()), None::<Block>),
+            Some(block) => write!(fmt, "{:?} -> {:?}", (self.get_sender(), self.id()), block)
+        }
     }
 }
 
