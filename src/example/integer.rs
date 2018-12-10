@@ -16,12 +16,6 @@ impl IntegerWrapper {
     }
 }
 
-impl <S: Sender> From<S> for IntegerWrapper {
-    fn from(_sender: S) -> Self {
-        IntegerWrapper::new(u32::default())
-    }
-}
-
 pub type IntegerMsg = Message<IntegerWrapper /*Estimate*/, Validator /*Sender*/>;
 
 #[derive(Clone, Eq, Debug, Ord, PartialOrd, PartialEq, Hash)]

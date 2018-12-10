@@ -41,12 +41,6 @@ impl std::fmt::Debug for Block {
     }
 }
 
-impl<S: Sender + Into<u32>> From<S> for Block {
-    fn from(sender: S) -> Self {
-        (Block::from(ProtoBlock::new(None, sender.into())))
-    }
-}
-
 impl serde::Serialize for Block {
     fn serialize<T: serde::Serializer>(&self, rhs: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;

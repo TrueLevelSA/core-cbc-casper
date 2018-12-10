@@ -15,12 +15,6 @@ impl BoolWrapper {
     }
 }
 
-impl<S: Sender> From<S> for BoolWrapper {
-    fn from(_sender: S) -> Self {
-        BoolWrapper::new(bool::default())
-    }
-}
-
 pub type BinaryMsg = Message<BoolWrapper /*Estimate*/, Validator /*Sender*/>;
 
 impl Estimate for BoolWrapper {

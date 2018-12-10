@@ -125,12 +125,6 @@ impl VoteCount {
     }
 }
 
-impl<S: Sender> From<S> for VoteCount {
-    fn from(_sender: S) -> Self {
-        VoteCount::default()
-    }
-}
-
 type Voter = u32;
 
 impl Sender for Voter {}
