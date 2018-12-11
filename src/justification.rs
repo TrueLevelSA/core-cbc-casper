@@ -23,7 +23,7 @@ impl<M: CasperMsg> Justification<M> {
         Justification(Vec::new())
     }
 
-    /// creates a new Justification instance from a Vec of CasperMsg 
+    /// creates a new Justification instance from a Vec of CasperMsg
     /// and a SenderState
     pub fn from_msgs(
         msgs: Vec<M>,
@@ -86,7 +86,7 @@ impl<M: CasperMsg> Justification<M> {
 
     /// insert msgs to the Justification, accepting up to $thr$ faults by
     /// weight, returns success=true if at least one msg of the set gets
-    /// successfully included to the justification
+    /// successfully included in the justification
     pub fn faulty_inserts(
         &mut self,
         msgs: HashSet<&M>,
@@ -125,7 +125,7 @@ impl<M: CasperMsg> Justification<M> {
             sender_state.equivocators.contains(sender);
 
         match (is_equivocation, already_in_equivocators) {
-            // if it's already equivocating and listed as such, 
+            // if it's already equivocating and listed as such,
             // or not equivocating at all, an insertion can be
             // done without more checks
             (false, _) | (true, true) => {
@@ -135,7 +135,7 @@ impl<M: CasperMsg> Justification<M> {
                 }
                 (success, sender_state)
             },
-            // in the other case, we have to check that the threshold is not 
+            // in the other case, we have to check that the threshold is not
             // reached
             (true, false) => {
                 if sender_weight + sender_state.state_fault_weight
@@ -279,7 +279,7 @@ impl<M: CasperMsg> LatestMsgsHonest<M> {
         self.0.insert(msg)
     }
 
-    /// Filters the latest messages 
+    /// Filters the latest messages
     pub fn from_latest_msgs(
         latest_msgs: &LatestMsgs<M>,
         equivocators: &HashSet<M::Sender>,
@@ -319,8 +319,8 @@ impl<M: CasperMsg> LatestMsgsHonest<M> {
 }
 
 /// Mapping between senders and their latests messages
-/// Latest messages from a sender are all its messages that are not 
-/// in the dependency of an other of its messages
+/// Latest messages from a sender are all their messages that are not
+/// in the dependency of another of their messages
 #[derive(Eq, PartialEq, Clone, Default, Debug)]
 pub struct LatestMsgs<M: CasperMsg>(
     HashMap<<M as CasperMsg>::Sender, HashSet<M>>,
@@ -333,7 +333,7 @@ impl<M: CasperMsg> LatestMsgs<M> {
         LatestMsgs(HashMap::new())
     }
 
-    /// instert a new set of messages for a sender
+    /// insert a new set of messages for a sender
     pub fn insert(
         &mut self,
         k: M::Sender,
@@ -375,7 +375,7 @@ impl<M: CasperMsg> LatestMsgs<M> {
 
     /// update the data structure by adding a new message
     /// return true if new_message is a valid latest message,
-    /// aka the first message of a sender or a message that is not 
+    /// aka the first message of a sender or a message that is not
     /// in the justification of the existing latest messages
     pub fn update(&mut self, new_msg: &M) -> bool {
         let sender = new_msg.get_sender();
@@ -460,9 +460,9 @@ pub struct SenderState<M: CasperMsg> {
     state_fault_weight: WeightUnit,
     /// fault tolerance threshold
     thr: WeightUnit,
-    /// current validator set, mapped to their respective weights 
+    /// current validator set, mapped to their respective weights
     senders_weights: SendersWeight<M::Sender>,
-    /// this sender's last message 
+    /// this sender's last message
     /// TODO: better name?
     my_last_msg: Option<M>,
     latest_msgs: LatestMsgs<M>,
