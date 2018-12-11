@@ -4,7 +4,7 @@ use std::fmt::{Debug, Formatter, Result};
 
 use proptest::prelude::*;
 
-use traits::{Zero, Estimate, Sender, Data};
+use traits::{Zero, Estimate, Sender};
 use message::{Message, CasperMsg};
 use justification::{Justification, LatestMsgsHonest};
 use senders_weight::{SendersWeight};
@@ -141,7 +141,6 @@ impl Estimate for VoteCount {
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         _finalized_msg: Option<&Self::M>,
-        _sender: Option<Voter>,
         _weights: &SendersWeight<Voter>, // all voters have same weight
         _external_data: Option<Self>,
         // _external_data: Option<Self::Data>,

@@ -1,4 +1,4 @@
-use traits::{Estimate, Data, Zero};
+use traits::{Estimate, Data, Zero, Sender};
 use message::{CasperMsg, Message};
 use justification::{LatestMsgsHonest};
 use senders_weight::{SendersWeight};
@@ -7,19 +7,27 @@ use std::collections::HashSet;
 use std::iter::FromIterator;
 type Validator = u32;
 
-pub type IntegerMsg = Message<u32 /*Estimate*/, Validator /*Sender*/>;
+#[derive(Clone, Eq, Debug, Ord, PartialOrd, PartialEq, Hash, serde_derive::Serialize)]
+pub struct IntegerWrapper (u32);
+
+impl IntegerWrapper {
+    pub fn new(estimate: u32) -> Self {
+        IntegerWrapper(estimate)
+    }
+}
+
+pub type IntegerMsg = Message<IntegerWrapper /*Estimate*/, Validator /*Sender*/>;
 
 #[derive(Clone, Eq, Debug, Ord, PartialOrd, PartialEq, Hash)]
 pub struct Tx;
 
 /// the goal here is to find the weighted median of all the values
-impl Estimate for u32 {
+impl Estimate for IntegerWrapper {
     type M = IntegerMsg;
 
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         _finalized_msg: Option<&Self::M>,
-        _sender: Option<<<Self as Estimate>::M as CasperMsg>::Sender>,
         senders_weights: &SendersWeight<
             <<Self as Estimate>::M as CasperMsg>::Sender,
         >,
@@ -68,8 +76,8 @@ impl Estimate for u32 {
 
         // return said estimate
         match current_msg {
-            Err(_) => 0,
-            Ok(m) => *m.get_estimate()
+            Err(_) => IntegerWrapper(0),
+            Ok(m) => m.get_estimate().clone()
         }
     }
 }
@@ -105,22 +113,21 @@ mod tests{
         );
 
         assert_eq!(
-            u32::mk_estimate(
+            IntegerWrapper::mk_estimate(
                 &LatestMsgsHonest::from_latest_msgs(
                     &LatestMsgs::from(&Justification::new()),
                     sender_state.get_equivocators()
                 ),
                 None,
-                None,
                 &senders_weights,
                 None
             ),
-            0
+            IntegerWrapper(0)
         );
 
-        let m0 = IntegerMsg::new(senders[0], Justification::new(), 1, None);
-        let m1 = IntegerMsg::new(senders[1], Justification::new(), 2, None);
-        let m2 = IntegerMsg::new(senders[2], Justification::new(), 3, None);
+        let m0 = IntegerMsg::new(senders[0], Justification::new(), IntegerWrapper(1), None);
+        let m1 = IntegerMsg::new(senders[1], Justification::new(), IntegerWrapper(2), None);
+        let m2 = IntegerMsg::new(senders[2], Justification::new(), IntegerWrapper(3), None);
         let (m3, _) = IntegerMsg::from_msgs(
             senders[0],
             vec![&m0, &m1],
@@ -139,7 +146,7 @@ mod tests{
                 &senders_weights,
                 None
             ),
-            1
+            IntegerWrapper(1)
         );
 
         j0.faulty_insert(&m2, &sender_state);
@@ -151,7 +158,7 @@ mod tests{
                 &senders_weights,
                 None
             ),
-            2
+            IntegerWrapper(2)
         );
 
         j0.faulty_insert(&m3, &sender_state);
@@ -163,7 +170,7 @@ mod tests{
                 &senders_weights,
                 None
             ),
-            2
+            IntegerWrapper(2)
         );
     }
 
@@ -191,22 +198,21 @@ mod tests{
         );
 
         assert_eq!(
-            u32::mk_estimate(
+            IntegerWrapper::mk_estimate(
                 &LatestMsgsHonest::from_latest_msgs(
                     &LatestMsgs::from(&Justification::new()),
                     sender_state.get_equivocators()
                 ),
                 None,
-                None,
                 &senders_weights,
                 None
             ),
-            0
+            IntegerWrapper(0)
         );
 
-        let m0 = IntegerMsg::new(senders[0], Justification::new(), 1, None);
-        let m1 = IntegerMsg::new(senders[1], Justification::new(), 2, None);
-        let m2 = IntegerMsg::new(senders[2], Justification::new(), 3, None);
+        let m0 = IntegerMsg::new(senders[0], Justification::new(), IntegerWrapper(1), None);
+        let m1 = IntegerMsg::new(senders[1], Justification::new(), IntegerWrapper(2), None);
+        let m2 = IntegerMsg::new(senders[2], Justification::new(), IntegerWrapper(3), None);
         let (m3, _) = IntegerMsg::from_msgs(
             senders[0],
             vec![&m0, &m1],
@@ -225,7 +231,7 @@ mod tests{
                 &senders_weights,
                 None
             ),
-            1
+            IntegerWrapper(1)
         );
 
         j0.faulty_insert(&m2, &sender_state);
@@ -237,7 +243,7 @@ mod tests{
                 &senders_weights,
                 None
             ),
-            1
+            IntegerWrapper(1)
         );
 
         j0.faulty_insert(&m3, &sender_state);
@@ -249,7 +255,7 @@ mod tests{
                 &senders_weights,
                 None
             ),
-            1
+            IntegerWrapper(1)
         );
     }
 
@@ -277,23 +283,22 @@ mod tests{
         );
 
         assert_eq!(
-            u32::mk_estimate(
+            IntegerWrapper::mk_estimate(
                 &LatestMsgsHonest::from_latest_msgs(
                     &LatestMsgs::from(&Justification::new()),
                     sender_state.get_equivocators()
                 ),
                 None,
-                None,
                 &senders_weights,
                 None
             ),
-            0
+            IntegerWrapper(0)
         );
 
-        let m0 = IntegerMsg::new(senders[0], Justification::new(), 1, None);
-        let m1 = IntegerMsg::new(senders[1], Justification::new(), 2, None);
-        let m2 = IntegerMsg::new(senders[2], Justification::new(), 3, None);
-        let m3 = IntegerMsg::new(senders[3], Justification::new(), 4, None);
+        let m0 = IntegerMsg::new(senders[0], Justification::new(), IntegerWrapper(1), None);
+        let m1 = IntegerMsg::new(senders[1], Justification::new(), IntegerWrapper(2), None);
+        let m2 = IntegerMsg::new(senders[2], Justification::new(), IntegerWrapper(3), None);
+        let m3 = IntegerMsg::new(senders[3], Justification::new(), IntegerWrapper(4), None);
 
         let (m4, _) = IntegerMsg::from_msgs(
             senders[3],
@@ -313,7 +318,7 @@ mod tests{
                 &senders_weights,
                 None
             ),
-            1
+            IntegerWrapper(1)
         );
 
         j0.faulty_insert(&m2, &sender_state);
@@ -325,7 +330,7 @@ mod tests{
                 &senders_weights,
                 None
             ),
-            2
+            IntegerWrapper(2)
         );
 
         j0.faulty_insert(&m3, &sender_state);
@@ -337,7 +342,7 @@ mod tests{
                 &senders_weights,
                 None
             ),
-            4
+            IntegerWrapper(4)
         );
 
         j0.faulty_insert(&m4, &sender_state);
@@ -349,7 +354,7 @@ mod tests{
                 &senders_weights,
                 None
             ),
-            4
+            IntegerWrapper(4)
         );
 
     }

@@ -6,7 +6,7 @@ use justification::{Justification, LatestMsgsHonest, LatestMsgs};
 use message::{CasperMsg, Message};
 use senders_weight::SendersWeight;
 use std::sync::{Arc, RwLock};
-use traits::{Data, Estimate, Zero, Id};
+use traits::{Data, Estimate, Zero, Id, Sender};
 use hashed::Hashed;
 use weight_unit::WeightUnit;
 use serde_derive::Serialize;
@@ -419,7 +419,6 @@ impl Estimate for Block {
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         finalized_msg: Option<&Self::M>,
-        sender: Option<<<Self as Estimate>::M as CasperMsg>::Sender>,
         senders_weights: &SendersWeight<
             <<Self as Estimate>::M as CasperMsg>::Sender,
         >,
@@ -432,12 +431,7 @@ impl Estimate for Block {
             (0, _) => panic!(
                 "Needs at least one latest message to be able to pick one"
             ),
-            (_, None) => {
-                // no block data provided, thus create empty block building on prevblock from ghost
-                let prevblock =
-                    Block::ghost(latest_msgs, finalized_msg, senders_weights);
-                Block::new(prevblock, sender.unwrap_or(0))
-            },
+            (_, None) => panic!("incomplete_block is None"),
             (1, Some(incomplete_block)) => {
                 // only msg to built on top, no choice thus no ghost
                 let msg = latest_msgs.iter().next().cloned();

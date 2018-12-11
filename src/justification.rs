@@ -77,7 +77,6 @@ impl<M: CasperMsg> Justification<M> {
         M::Estimate::mk_estimate(
             &latest_msgs_honest,
             finalized_msg,
-            sender,
             senders_weights,
             data,
         )
@@ -312,11 +311,10 @@ impl<M: CasperMsg> LatestMsgsHonest<M> {
     pub fn mk_estimate(
         &self,
         finalized_msg: Option<&M>,
-        sender: Option<<M as CasperMsg>::Sender>,
         senders_weights: &SendersWeight<<M as CasperMsg>::Sender>,
         data: Option<<<M as CasperMsg>::Estimate as Data>::Data>,
     ) -> M::Estimate {
-        M::Estimate::mk_estimate(&self, finalized_msg, sender, senders_weights, data)
+        M::Estimate::mk_estimate(&self, finalized_msg, senders_weights, data)
     }
 }
 

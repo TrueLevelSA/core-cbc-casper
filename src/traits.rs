@@ -13,30 +13,30 @@ extern crate blake2;
 extern crate itertools;
 
 /// Describes an estimate, or a value of the consensus at a certain time
-pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + Data + serde::Serialize {
+pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {
     type M: CasperMsg<Estimate = Self>;
 
-    /// Choses an estimate from a set of latest messages 
-    /// The finalized_msg value can be used in order not to recursively 
+    /// Choses an estimate from a set of latest messages
+    /// The finalized_msg value can be used in order not to recursively
     /// go back to the genesis
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         finalized_msg: Option<&Self::M>,
-        sender: Option<<<Self as Estimate>::M as CasperMsg>::Sender>,
         senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
-        external_data: Option<<Self as Data>::Data>,
+        external_data: Option<<<Self::M as CasperMsg>::Estimate as Data>::Data>,
     ) -> Self;
 }
 
 /// Describes the accessory data needed for the mk_estimate
-pub trait Data {
+pub trait Data: From<<Self as Data>::Data> {
     type Data;
 
     // /// Checks whether this data is valid
     // fn is_valid(&Self::Data) -> bool;
 }
 
-impl<T> Data for T {
+
+impl<T: Into<Self>> Data for T {
     type Data = T;
 }
 

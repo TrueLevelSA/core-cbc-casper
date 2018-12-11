@@ -61,7 +61,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
         new_msgs: Vec<&Self>,
         finalized_msg: Option<&Self>,
         sender_state: &SenderState<Self>,
-        external_data: Option<<<Self as CasperMsg>::Estimate as Data>::Data>,
+        external_data: Option<<Self::Estimate as Data>::Data>,
     ) -> Result<(Self, SenderState<Self>), &'static str> {
         // // TODO eventually comment out these lines, and FIXME tests
         // // check whether two messages from same sender
@@ -96,7 +96,6 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
 
             let estimate = latest_msgs_honest.mk_estimate(
                 finalized_msg,
-                Some(sender.clone()),
                 &sender_state.get_senders_weights(),
                 external_data,
             );
@@ -486,6 +485,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use example::binary::BoolWrapper;
+    use example::integer::IntegerWrapper;
     use example::vote_count::{VoteCount};
     use senders_weight::{SendersWeight};
     use justification::{LatestMsgs};
@@ -494,10 +495,36 @@ mod tests {
     use std::{f64};
     use super::*;
 
+    // Implementations of From<Sender>
+    impl<S: Sender> From<S> for BoolWrapper {
+        fn from(_sender: S) -> Self {
+            BoolWrapper::new(bool::default())
+        }
+    }
+
+    impl<S: Sender> From<S> for VoteCount {
+        fn from(_sender: S) -> Self {
+            VoteCount::default()
+        }
+    }
+
+    impl <S: Sender> From<S> for IntegerWrapper {
+        fn from(_sender: S) -> Self {
+            IntegerWrapper::new(u32::default())
+        }
+    }
+
+    impl<S: Sender + Into<u32>> From<S> for Block {
+        fn from(sender: S) -> Self {
+            (Block::from(ProtoBlock::new(None, sender.into())))
+        }
+    }
+
     fn add_message<'z, M>(
         state: &'z mut HashMap<M::Sender, SenderState<M>>,
         sender: M::Sender,
         recipients: HashSet<M::Sender>,
+        data: Option<<M::Estimate as Data>::Data>,
     ) -> &'z HashMap<M::Sender, SenderState<M>>
     where
         M: CasperMsg,
@@ -512,9 +539,8 @@ mod tests {
         );
         let estimate = latest_honest_msgs.mk_estimate(
             None,
-            Some(sender.clone()),
             state[&sender].get_senders_weights(),
-            None,
+            data.map(|d| d.into()),
         );
         let m = M::new(sender.clone(), justification, estimate, None);
         let (_, sender_state) = Justification::from_msgs(
@@ -557,20 +583,21 @@ mod tests {
         ).boxed()
     }
 
-    fn message_event<M: 'static>(
+    fn message_event<M>(
         state: HashMap<M::Sender, SenderState<M>>,
         sender_strategy: BoxedStrategy<M::Sender>,
         receiver_strategy: BoxedStrategy<HashSet<M::Sender>>,
     ) -> BoxedStrategy<HashMap<M::Sender, SenderState<M>>>
     where
-        M: CasperMsg,
+        M: 'static + CasperMsg,
+        <<M as CasperMsg>::Estimate as Data>::Data: From<<M as CasperMsg>::Sender>
     {
         (sender_strategy, receiver_strategy, Just(state))
             .prop_map(|(sender, mut receivers, mut state)| {
                 if !receivers.contains(&sender) {
                     receivers.insert(sender.clone());
                 }
-                add_message(&mut state, sender, receivers).clone()
+                add_message(&mut state, sender.clone(), receivers, Some(sender.into())).clone()
             })
             .boxed()
     }
@@ -581,14 +608,13 @@ mod tests {
     {
         let m: HashSet<_> = state
             .iter()
-            .map(|(sender, sender_state)| {
+            .map(|(_sender, sender_state)| {
                 let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
                     sender_state.get_latest_msgs(),
                     &HashSet::new(),
                 );
                 latest_honest_msgs.mk_estimate(
                     None,
-                    Some(sender.clone()),
                     sender_state.get_senders_weights(),
                     None,
                 )
@@ -662,7 +688,7 @@ mod tests {
         consensus_satisfied: H,
     ) -> BoxedStrategy<Vec<HashMap<u32, SenderState<Message<E, u32>>>>>
     where
-        E: Estimate<M = Message<E, u32>>,
+        E: Estimate<M = Message<E, u32>> + From<u32>,
         F: Fn(&mut Vec<u32>) -> BoxedStrategy<u32>,
         G: Fn(&Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
         H: Fn(&HashMap<u32, SenderState<Message<E, u32>>>) -> bool,
@@ -741,6 +767,7 @@ mod tests {
             .boxed()
     }
 
+
     fn arbitrary_blockchain() -> BoxedStrategy<Block> {
         let genesis_block = Block::from(ProtoBlock::new(None, 0));
         Just(genesis_block).boxed()
@@ -771,10 +798,24 @@ mod tests {
         }
     }
 
+    prop_compose! {
+        fn boolwrapper_gen()
+            (boolean in prop::bool::ANY) -> BoolWrapper {
+                BoolWrapper::new(boolean)
+            }
+    }
+
+    prop_compose! {
+        fn integerwrapper_gen()
+            (int in prop::num::u32::ANY) -> IntegerWrapper {
+                IntegerWrapper::new(int)
+            }
+    }
+
     proptest! {
         #![proptest_config(Config::with_cases(30))]
         #[test]
-        fn round_robin_binary(ref chain in chain(prop::bool::ANY.boxed(), 15, round_robin, all_receivers, full_consensus)) {
+        fn round_robin_binary(ref chain in chain(boolwrapper_gen(), 15, round_robin, all_receivers, full_consensus)) {
             assert!(chain.last().unwrap_or(&HashMap::new()).keys().len() >=
                     chain.len(),
                     "round robin with n validators should converge in at most n messages")
@@ -784,7 +825,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(10))]
         #[test]
-        fn round_robin_integer(ref chain in chain(prop::num::u32::ANY.boxed(), 2000, round_robin, all_receivers, full_consensus)) {
+        fn round_robin_integer(ref chain in chain(integerwrapper_gen(), 2000, round_robin, all_receivers, full_consensus)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
@@ -813,7 +854,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(1))]
         #[test]
-        fn arbitrary_messenger_binary(ref chain in chain(prop::bool::ANY.boxed(), 100, arbitrary_in_set, some_receivers, full_consensus)) {
+        fn arbitrary_messenger_binary(ref chain in chain(boolwrapper_gen(), 100, arbitrary_in_set, some_receivers, full_consensus)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
@@ -826,7 +867,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config::with_cases(1))]
         #[test]
-        fn arbitrary_messenger_integer(ref chain in chain(prop::num::u32::ANY.boxed(), 50, arbitrary_in_set, some_receivers, full_consensus)) {
+        fn arbitrary_messenger_integer(ref chain in chain(integerwrapper_gen(), 50, arbitrary_in_set, some_receivers, full_consensus)) {
             // total messages until unilateral consensus
             println!("{} validators -> {:?} message(s)",
                      match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
