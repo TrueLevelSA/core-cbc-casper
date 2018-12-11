@@ -82,11 +82,13 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
             },
         );
 
+        let new_msgs_len = new_msgs.len();
+
         // tries to insert new messages in the justification
         let (success, sender_state) =
             justification.faulty_inserts(new_msgs, &sender_state);
 
-        if !success {
+        if !success && new_msgs_len > 0 {
             Err("None of the messages could be added to the state!")
         } else {
             let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(
@@ -529,29 +531,8 @@ mod tests {
     where
         M: CasperMsg,
     {
-        let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
-            &state[&sender].get_latest_msgs(),
-            &HashSet::new(),
-        );
-        let (justification, sender_state) = Justification::from_msgs(
-            latest_honest_msgs.iter().cloned().collect(),
-            &state[&sender],
-        );
-        let estimate = latest_honest_msgs.mk_estimate(
-            None,
-            state[&sender].get_senders_weights(),
-            data.map(|d| d.into()),
-        );
-        let m = M::new(sender.clone(), justification, estimate, None);
-        let (_, sender_state) = Justification::from_msgs(
-            LatestMsgsHonest::from_latest_msgs(
-                sender_state.get_latest_msgs(),
-                &HashSet::new(),
-            ).iter()
-                .cloned()
-                .collect(),
-            &sender_state,
-        );
+        let (m, sender_state) = M::from_msgs(sender.clone(), vec![], None, &state[&sender], data.clone().map(|d| d.into())).unwrap();
+
         state.insert(sender, sender_state);
         recipients.iter().for_each(|recipient| {
             let (_, recipient_state) =
