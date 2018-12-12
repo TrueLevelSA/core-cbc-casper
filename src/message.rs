@@ -1,18 +1,10 @@
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::sync::{Arc, RwLock};
-use std::iter;
-use std::iter::FromIterator;
 // use std::io::{Error};
 
 use rayon::prelude::*;
-use proptest::prelude::*;
-
-use proptest::test_runner::Config;
-use proptest::test_runner::TestRunner;
-use proptest::strategy::ValueTree;
-use rand::{thread_rng, Rng};
 
 use traits::{Estimate, Zero, Sender, Data, Id, };
 use justification::{Justification, SenderState, LatestMsgsHonest};
