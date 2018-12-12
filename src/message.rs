@@ -72,19 +72,10 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
         // dedup by putting msgs into a hashset
         // TODO DL: why don't we directly ask for a hashset instead of a Vec?
         let new_msgs: HashSet<_> = new_msgs.iter().cloned().collect();
-
-        let mut justification = Justification::new();
-        sender_state.get_my_last_msg().as_ref().map_or_else(
-            // || println!("No commitment to any previous state!"),
-            || (),
-            |my_last_msg| {
-                justification.insert(my_last_msg.clone());
-            },
-        );
-
         let new_msgs_len = new_msgs.len();
 
         // update latest_msgs in sender_state with new_msgs and reset justification (since new_msgs may not all reflect in updated latest_msgs)
+        let mut justification = Justification::new();
         let (success, sender_state) =
             justification.faulty_inserts(new_msgs, &sender_state);
         justification = Justification::new();
