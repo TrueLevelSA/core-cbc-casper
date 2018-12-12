@@ -1298,9 +1298,8 @@ necessarly seen sender1 seeing v0 and m0, thus not yet safe"
         ).unwrap();
 
         let safe_msgs = m2.get_msg_for_proposition(senders);
-        assert_eq!(
-            safe_msgs,
-            [m0.clone()].iter().cloned().collect(),
+        assert!(
+            safe_msgs.contains(&m0),
             "both sender0 and sender1 saw v0 and m0, and additionally both
 parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         );
@@ -1352,9 +1351,8 @@ necessarly seen sender1 seeing v0 and m0, just v1 is safe"
         ).unwrap();
 
         let safe_msgs = m2.get_msg_for_proposition(senders);
-        assert_eq!(
-            safe_msgs,
-            [m0.clone()].iter().cloned().collect(),
+        assert!(
+            safe_msgs.contains(&m0),
             "both sender0 and sender1 saw v0 and m0, and additionally both
 parties saw each other seing v0 and m0, safe"
         );
