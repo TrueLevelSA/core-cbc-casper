@@ -84,9 +84,10 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
 
         let new_msgs_len = new_msgs.len();
 
-        // tries to insert new messages in the justification
+        // update latest_msgs in sender_state with new_msgs and reset justification (since new_msgs may not all reflect in updated latest_msgs)
         let (success, sender_state) =
             justification.faulty_inserts(new_msgs, &sender_state);
+        justification = Justification::new();
 
         if !success && new_msgs_len > 0 {
             Err("None of the messages could be added to the state!")
@@ -95,6 +96,8 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
                 sender_state.get_latest_msgs(),
                 sender_state.get_equivocators(),
             );
+
+            latest_msgs_honest.iter().for_each(|m| {justification.faulty_insert(m, &sender_state);});
 
             let estimate = latest_msgs_honest.mk_estimate(
                 finalized_msg,
