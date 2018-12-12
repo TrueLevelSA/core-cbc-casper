@@ -3,12 +3,8 @@ extern crate rand;
 extern crate casper;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
-use std::hash::{Hash, Hasher};
-use std::fmt::{Debug, Formatter, Result as FmtResult};
-use std::sync::{Arc, RwLock};
 use std::iter;
 use std::iter::FromIterator;
-// use std::io::{Error};
 
 use proptest::prelude::*;
 
@@ -17,9 +13,8 @@ use proptest::test_runner::TestRunner;
 use proptest::strategy::ValueTree;
 use rand::{thread_rng, Rng};
 
-use casper::traits::{Estimate, Zero, Sender, Data, Id, };
+use casper::traits::{Estimate, Data};
 use casper::justification::{Justification, SenderState, LatestMsgsHonest};
-use casper::weight_unit::{WeightUnit};
 use casper::senders_weight::SendersWeight;
 use casper::message::*;
 
