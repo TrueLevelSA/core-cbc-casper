@@ -33,13 +33,18 @@ fn add_message<'z, M>(
 where
     M: CasperMsg,
 {
-    let (m, sender_state) = M::from_msgs(sender.clone(), vec![], None, &state[&sender], data.clone().map(|d| d.into())).unwrap();
+    let latest: HashSet<M> = state[&sender].get_latest_msgs().iter().fold(HashSet::new(), |acc, (_, lms)| acc.union(&lms).cloned().collect());
+    let latest_delta = match state[&sender].get_my_last_msg() {
+        Some(m) => latest.iter().filter(|lm| !m.get_justification().contains(lm)).cloned().collect(),
+        None => latest
+    };
+    let (m, sender_state) = M::from_msgs(sender.clone(), latest_delta.iter().collect(), None, &state[&sender], data.clone().map(|d| d.into())).unwrap();
 
-    state.insert(sender, sender_state);
+    state.insert(sender.clone(), sender_state);
     recipients.iter().for_each(|recipient| {
-        let (_, recipient_state) =
-            Justification::from_msgs(vec![m.clone()], &state[recipient]);
-        state.insert(recipient.clone(), recipient_state);
+        let mut rs = state[&recipient].clone();
+        rs.get_latest_msgs_as_mut().update(&m);
+        state.insert(recipient.clone(), rs);
     });
     state
 }
