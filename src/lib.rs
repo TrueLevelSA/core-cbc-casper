@@ -2,7 +2,9 @@
 
 extern crate rayon;
 extern crate digest;
+#[cfg(feature = "integration_test")]
 extern crate rand;
+#[cfg(feature = "integration_test")]
 #[macro_use] extern crate proptest;
 
 extern crate serde;

@@ -2,6 +2,7 @@ use std::collections::{HashSet};
 use std::ops::{Add};
 use std::fmt::{Debug, Formatter, Result};
 
+#[cfg(feature = "integration_test")]
 use proptest::prelude::*;
 
 use traits::{Zero, Estimate, Sender};
@@ -12,6 +13,13 @@ use senders_weight::{SendersWeight};
 pub struct VoteCount {
     yes: u32,
     no: u32,
+}
+
+#[cfg(feature = "integration_test")]
+impl<S: Sender> From<S> for VoteCount {
+    fn from(_sender: S) -> Self {
+        VoteCount::default()
+    }
 }
 
 impl Zero<VoteCount> for VoteCount {
@@ -35,6 +43,7 @@ impl Debug for VoteCount {
 }
 
 impl VoteCount {
+    #[cfg(feature = "integration_test")]
     pub fn arbitrary() -> BoxedStrategy<Self> {
         prop::sample::select(vec![
             VoteCount { yes: 1, no: 0 },

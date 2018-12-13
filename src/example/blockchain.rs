@@ -30,6 +30,13 @@ impl ProtoBlock {
 #[derive(Clone, Eq, Hash)]
 pub struct Block((Arc<ProtoBlock>, Hashed));
 
+#[cfg(feature = "integration_test")]
+impl<S: Sender + Into<u32>> From<S> for Block {
+    fn from(sender: S) -> Self {
+        (Block::from(ProtoBlock::new(None, sender.into())))
+    }
+}
+
 impl std::fmt::Debug for Block {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.get_prevblock() {
