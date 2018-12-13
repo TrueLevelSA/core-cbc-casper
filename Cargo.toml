@@ -6,16 +6,13 @@ authors = ["pZ4 <pz4@protonmail.ch>"]
 [dependencies]
 rayon = "*"
 digest = "0.7"
-proptest = {version = "0.6.0", optional = true}
-rand = "*"
+proptest = {version = "0.7.0", optional = true}
+rand = {version = "0.6.1", optional = true}
 serde = "1.0.79"
 serde_derive = "1.0.79"
 bincode = "1.0.1"
 blake2 = "0.7"
 itertools = "0.7.8"
 
-[dev-dependencies]
-quickcheck = "*"
-
 [features]
-integration_test = ["proptest"]
+integration_test = ["proptest", "rand"]
