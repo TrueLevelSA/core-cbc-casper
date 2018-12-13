@@ -1,13 +1,30 @@
 # Official framework image. Look for the different tagged releases at:
 # https://hub.docker.com/r/library/node/tags/
-image: rust:1.28.0
+image: rust:1.31.0
 
 before_script:
   - cargo version
+  - rustup component add clippy
+  - rustup component add rustfmt
 
 stages:
   - build
   - test
+  - example
+
+clippy:
+  stage: build
+  script:
+      # A collection of lints to catch common mistakes and improve your Rust code
+    - cargo clippy
+
+fmt:
+  stage: build
+  script:
+      # When running with --check, Rustfmt will exit with 0 if Rustfmt would
+      # not make any formatting changes to the input, and 1 if Rustfmt would
+      # make changes.
+    - cargo fmt --all -- --check
 
 build:
   stage: build
@@ -23,3 +40,8 @@ doc:
   stage: test
   script:
     - cargo doc
+
+serde:
+  stage: example
+  script:
+    - cargo run --example serde
