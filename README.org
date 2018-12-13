@@ -41,3 +41,18 @@ or ~cargo test $TEST -- --nocapture~, where TEST is the function name of a
 particular test.
 
 This library is experimental and might change dramatically.
+
+** ~cargo clippy~
+
+Install clippy with ~rustup~ in Rust stable
+
+    rustup component add clippy
+
+** ~cargo fmt~
+
+Install rustfmt in Rust stable
+
+    rustup component add rustfmt
+
+**** ~cargo fmt~ format with standard Rust guideline
+**** ~cargo fmt -- --check~ fail if rustfmt should made some formating
