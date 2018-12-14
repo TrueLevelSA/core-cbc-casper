@@ -1,15 +1,15 @@
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::convert::From;
-use std::iter::{Iterator};
+use std::iter::Iterator;
 
-use justification::{Justification, LatestMsgsHonest, LatestMsgs};
+use hashed::Hashed;
+use justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use message::{CasperMsg, Message};
 use senders_weight::SendersWeight;
-use std::sync::{Arc, RwLock};
-use traits::{Data, Estimate, Zero, Id};
-use hashed::Hashed;
-use weight_unit::WeightUnit;
 use serde_derive::Serialize;
+use std::sync::{Arc, RwLock};
+use traits::{Data, Estimate, Id, Zero};
+use weight_unit::WeightUnit;
 type Validator = u32;
 
 /// a genesis block should be a block with estimate Block with prevblock =
@@ -40,8 +40,13 @@ impl<S: ::traits::Sender + Into<u32>> From<S> for Block {
 impl std::fmt::Debug for Block {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.get_prevblock() {
-            None => write!(fmt, "{:?} -> {:?}", (self.get_sender(), self.id()), None::<Block>),
-            Some(block) => write!(fmt, "{:?} -> {:?}", (self.get_sender(), self.id()), block)
+            None => write!(
+                fmt,
+                "{:?} -> {:?}",
+                (self.get_sender(), self.id()),
+                None::<Block>
+            ),
+            Some(block) => write!(fmt, "{:?} -> {:?}", (self.get_sender(), self.id()), block),
         }
     }
 }
@@ -72,8 +77,7 @@ pub type BlockMsg = Message<Block /*Estimate*/, Validator /*Sender*/>;
 
 impl PartialEq for Block {
     fn eq(&self, rhs: &Self) -> bool {
-        Arc::ptr_eq(self.arc(), rhs.arc())
-            || self.id() == rhs.id()
+        Arc::ptr_eq(self.arc(), rhs.arc()) || self.id() == rhs.id()
     }
 }
 
@@ -91,17 +95,15 @@ impl<'z> From<&'z BlockMsg> for Block {
 }
 
 impl Block {
-    pub fn new(
-        prevblock: Option<Block>,
-        sender: Validator,
-    ) -> Self {
-        Block::from(ProtoBlock {
-            prevblock,
-            sender,
-        })
+    pub fn new(prevblock: Option<Block>, sender: Validator) -> Self {
+        Block::from(ProtoBlock { prevblock, sender })
     }
-    pub fn id(&self) -> &<Self as Id>::ID { &(self.0).1 }
-    fn arc(&self) -> &Arc<ProtoBlock> { &(self.0).0 }
+    pub fn id(&self) -> &<Self as Id>::ID {
+        &(self.0).1
+    }
+    fn arc(&self) -> &Arc<ProtoBlock> {
+        &(self.0).0
+    }
     pub fn get_sender(&self) -> Validator {
         self.arc().sender
     }
@@ -138,15 +140,12 @@ impl Block {
         safety_oracle_threshold: WeightUnit,
         weights: &SendersWeight<Validator>,
     ) -> HashSet<BTreeSet<<BlockMsg as CasperMsg>::Sender>> {
-
         fn latest_in_justification(
             j: &Justification<BlockMsg>,
             equivocators: &HashSet<<BlockMsg as CasperMsg>::Sender>,
         ) -> HashMap<<BlockMsg as CasperMsg>::Sender, BlockMsg> {
-            LatestMsgsHonest::from_latest_msgs(
-                &LatestMsgs::from(j),
-                equivocators,
-            ).iter()
+            LatestMsgsHonest::from_latest_msgs(&LatestMsgs::from(j), equivocators)
+                .iter()
                 .map(|m| (m.get_sender().clone(), m.clone()))
                 .collect()
         }
@@ -164,13 +163,9 @@ impl Block {
             .map(|m| {
                 (
                     m.get_sender().clone(),
-                    latest_in_justification(
-                        m.get_justification(),
-                        equivocators,
-                    ).into_iter()
-                        .filter(|(_sender, msg)| {
-                            block.is_member(&Block::from(msg))
-                        })
+                    latest_in_justification(m.get_justification(), equivocators)
+                        .into_iter()
+                        .filter(|(_sender, msg)| block.is_member(&Block::from(msg)))
                         .collect(),
                 )
             })
@@ -188,9 +183,12 @@ impl Block {
                         .keys()
                         .filter(|senderb| {
                             // println!("Some {:?}", senderb);
-                            if latest_agreeing_in_sender_view.contains_key(senderb)
-                                {latest_agreeing_in_sender_view[senderb].contains_key(&sender.clone())}
-                            else {false}
+                            if latest_agreeing_in_sender_view.contains_key(senderb) {
+                                latest_agreeing_in_sender_view[senderb]
+                                    .contains_key(&sender.clone())
+                            } else {
+                                false
+                            }
                         })
                         .collect(),
                 )
@@ -209,9 +207,8 @@ impl Block {
         ) {
             // println!("recursed");
             if p.is_empty() && x.is_empty() {
-                let rnew: BTreeSet<
-                    <BlockMsg as CasperMsg>::Sender,
-                > = r.into_iter().map(|x| x.clone()).collect();
+                let rnew: BTreeSet<<BlockMsg as CasperMsg>::Sender> =
+                    r.into_iter().map(|x| x.clone()).collect();
                 mx_clqs.insert(rnew);
             } else {
                 let piter = p.clone();
@@ -221,12 +218,10 @@ impl Block {
                     p.remove(i);
                     let mut rnew = r.clone();
                     rnew.insert(i);
-                    let pnew: HashSet<
-                        &<BlockMsg as CasperMsg>::Sender,
-                    > = p.intersection(&neighbours[i]).cloned().collect();
-                    let xnew: HashSet<
-                        &<BlockMsg as CasperMsg>::Sender,
-                    > = x.intersection(&neighbours[i]).cloned().collect();
+                    let pnew: HashSet<&<BlockMsg as CasperMsg>::Sender> =
+                        p.intersection(&neighbours[i]).cloned().collect();
+                    let xnew: HashSet<&<BlockMsg as CasperMsg>::Sender> =
+                        x.intersection(&neighbours[i]).cloned().collect();
                     x.insert(i);
                     bron_kerbosch(rnew, pnew, xnew, mx_clqs, neighbours.clone())
                 })
@@ -239,13 +234,7 @@ impl Block {
 
         let mut mx_clqs = HashSet::new();
 
-        bron_kerbosch(
-            HashSet::new(),
-            p,
-            HashSet::new(),
-            &mut mx_clqs,
-            neighbours,
-        );
+        bron_kerbosch(HashSet::new(), p, HashSet::new(), &mut mx_clqs, neighbours);
 
         mx_clqs
             .into_iter()
@@ -297,7 +286,6 @@ impl Block {
         latest_msgs: &LatestMsgsHonest<BlockMsg>,
         _finalized_msg: Option<&BlockMsg>,
     ) -> (HashMap<Block, HashSet<Block>>, HashSet<Block>) {
-
         // start at the tip of the blockchain
         let mut visited_parents: HashMap<Block, HashSet<Block>> = latest_msgs
             .iter()
@@ -341,11 +329,12 @@ impl Block {
     fn collect_validators(
         blocks: &HashSet<Block>,
         visited: &HashMap<Block, HashSet<Block>>,
-        acc: Arc<RwLock<HashSet<Validator>>>
+        acc: Arc<RwLock<HashSet<Validator>>>,
     ) -> Arc<RwLock<HashSet<Validator>>> {
         blocks.iter().fold(acc, |acc, block| {
             let _ = acc.write().map(|mut x| x.insert(block.get_sender()));
-            visited.get(&block)
+            visited
+                .get(&block)
                 .filter(|children| !children.is_empty())
                 .map(|children| Self::collect_validators(children, visited, acc.clone()))
                 .unwrap_or(acc)
@@ -360,40 +349,40 @@ impl Block {
     ) -> Option<(Option<Self>, WeightUnit, HashSet<Self>)> {
         let init = Some((None, WeightUnit::ZERO, HashSet::new()));
         let heaviest_child = blocks.iter().fold(init, |best, block| {
-            best.and_then(|best| {
-                visited.get(&block).map(|children| (best, children))
-            }).and_then(|((b_block, b_weight, b_children), children)| {
-                // add current block sender such that its weight counts too
-                let referred_senders: Arc<RwLock<HashSet<_>>> =
-                    Arc::new(RwLock::new(
-                        [block.get_sender()].iter().cloned().collect())
-                    );
-                let referred_senders =
-                    Self::collect_validators(children, visited, referred_senders);
-                let weight = referred_senders.read()
-                    .map(|s| weights.sum_weight_senders(&s));
+            best.and_then(|best| visited.get(&block).map(|children| (best, children)))
+                .and_then(|((b_block, b_weight, b_children), children)| {
+                    // add current block sender such that its weight counts too
+                    let referred_senders: Arc<RwLock<HashSet<_>>> =
+                        Arc::new(RwLock::new([block.get_sender()].iter().cloned().collect()));
+                    let referred_senders =
+                        Self::collect_validators(children, visited, referred_senders);
+                    let weight = referred_senders
+                        .read()
+                        .map(|s| weights.sum_weight_senders(&s));
 
-                if weight.is_err() {
-                    return None
-                }
-
-                let weight = weight.unwrap();
-
-                let res = Some((Some(block.clone()), weight, children.clone()));
-                let b_res = Some((b_block.clone(), b_weight, b_children));
-
-                if weight > b_weight { res }
-                else if weight < b_weight { b_res }
-                else {
-                    // break ties with blockhash
-                    let ord = b_block.as_ref().map(|b| b.id().cmp(block.id()));
-                    match ord {
-                        Some(std::cmp::Ordering::Greater) => res,
-                        Some(std::cmp::Ordering::Less) => b_res,
-                        _ => None,
+                    if weight.is_err() {
+                        return None;
                     }
-                }
-            })
+
+                    let weight = weight.unwrap();
+
+                    let res = Some((Some(block.clone()), weight, children.clone()));
+                    let b_res = Some((b_block.clone(), b_weight, b_children));
+
+                    if weight > b_weight {
+                        res
+                    } else if weight < b_weight {
+                        b_res
+                    } else {
+                        // break ties with blockhash
+                        let ord = b_block.as_ref().map(|b| b.id().cmp(block.id()));
+                        match ord {
+                            Some(std::cmp::Ordering::Greater) => res,
+                            Some(std::cmp::Ordering::Less) => b_res,
+                            _ => None,
+                        }
+                    }
+                })
         });
         heaviest_child.and_then(|(b_block, b_weight, b_children)| {
             if b_children.is_empty() {
@@ -411,8 +400,7 @@ impl Block {
         finalized_msg: Option<&BlockMsg>,
         senders_weights: &SendersWeight<<BlockMsg as CasperMsg>::Sender>,
     ) -> Option<Self> {
-        let (visited, genesis) =
-            Self::parse_blockchains(latest_msgs, finalized_msg);
+        let (visited, genesis) = Self::parse_blockchains(latest_msgs, finalized_msg);
         Block::pick_heaviest(&genesis, &visited, senders_weights)
             .and_then(|(opt_block, ..)| opt_block)
     }
@@ -424,18 +412,14 @@ impl Estimate for Block {
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         finalized_msg: Option<&Self::M>,
-        senders_weights: &SendersWeight<
-            <<Self as Estimate>::M as CasperMsg>::Sender,
-        >,
+        senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
         // in fact i could put the whole mempool inside of this incomplete_block
         // and search for a reasonable set of txs in this function that does not
         // conflict with the past blocks
         incomplete_block: Option<<Self as Data>::Data>,
     ) -> Self {
         match (latest_msgs.len(), incomplete_block) {
-            (0, _) => panic!(
-                "Needs at least one latest message to be able to pick one"
-            ),
+            (0, _) => panic!("Needs at least one latest message to be able to pick one"),
             (_, None) => panic!("incomplete_block is None"),
             (1, Some(incomplete_block)) => {
                 // only msg to built on top, no choice thus no ghost
@@ -443,8 +427,7 @@ impl Estimate for Block {
                 Self::from_prevblock_msg(msg, incomplete_block)
             }
             (_, Some(incomplete_block)) => {
-                let prevblock =
-                    Block::ghost(latest_msgs, finalized_msg, senders_weights);
+                let prevblock = Block::ghost(latest_msgs, finalized_msg, senders_weights);
                 let block = Block::from(ProtoBlock {
                     prevblock,
                     ..(*incomplete_block.arc().clone())
@@ -458,16 +441,15 @@ impl Estimate for Block {
 #[cfg(test)]
 mod tests {
     use std::iter;
-    use std::iter::{FromIterator};
+    use std::iter::FromIterator;
 
     use super::*;
-    use ::justification::{Justification, LatestMsgs, SenderState};
+    use justification::{Justification, LatestMsgs, SenderState};
 
     #[test]
     fn example_usage() {
         let (sender0, sender1, sender2, sender3, sender4) = (0, 1, 2, 3, 4); // miner identities
-        let (weight0, weight1, weight2, weight3, weight4) =
-            (1.0, 1.0, 2.0, 1.0, 1.1); // and their corresponding sender_state
+        let (weight0, weight1, weight2, weight3, weight4) = (1.0, 1.0, 2.0, 1.0, 1.1); // and their corresponding sender_state
         let senders_weights = SendersWeight::new(
             [
                 (sender0, weight0),
@@ -475,14 +457,15 @@ mod tests {
                 (sender2, weight2),
                 (sender3, weight3),
                 (sender4, weight4),
-            ].iter()
-                .cloned()
-                .collect(),
+            ]
+            .iter()
+            .cloned()
+            .collect(),
         );
         let sender_state = SenderState::new(
             senders_weights.clone(),
-            0.0, // state fault weight
-            None,  // latest messages
+            0.0,  // state fault weight
+            None, // latest messages
             LatestMsgs::new(),
             1.0,            // subjective fault weight threshold
             HashSet::new(), // equivocators
@@ -509,8 +492,7 @@ mod tests {
             sender: sender0,
         });
         let latest_msgs = Justification::new();
-        let genesis_block_msg =
-            BlockMsg::new(sender0, latest_msgs, genesis_block.clone(), None);
+        let genesis_block_msg = BlockMsg::new(sender0, latest_msgs, genesis_block.clone(), None);
         assert_eq!(
             &Block::from(&genesis_block_msg),
             &genesis_block,
@@ -524,7 +506,8 @@ mod tests {
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b1), // data
-        ).unwrap();
+        )
+        .unwrap();
 
         let proto_b2 = Block::new(None, sender2);
         let (m2, _) = BlockMsg::from_msgs(
@@ -533,7 +516,8 @@ mod tests {
             None,
             &sender_state,
             Some(proto_b2),
-        ).unwrap();
+        )
+        .unwrap();
 
         let proto_b3 = Block::new(None, sender3);
         let (m3, _) = BlockMsg::from_msgs(
@@ -542,7 +526,8 @@ mod tests {
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b3),
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(
             m3.get_estimate(),
@@ -557,7 +542,8 @@ mod tests {
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b4),
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(
             m4.get_estimate(),
@@ -574,7 +560,8 @@ mod tests {
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b5),
-        ).unwrap();
+        )
+        .unwrap();
         // println!("\nm5 {:?}", m5);
         // println!("\nm5_estimate {:?}", Block::from(&m5));
 
@@ -586,17 +573,13 @@ mod tests {
         );
 
         let block = Block::from(&m3);
-        assert_eq!(
-            block,
-            Block::new(Some(Block::from(&m2)), sender3),
-        );
+        assert_eq!(block, Block::new(Some(Block::from(&m2)), sender3),);
         // assert_eq!(block.get_prevblock(), Some(genesis_block),);
     }
 
     #[test]
     fn test2() {
-        let (senderg, sender0, sender1, sender2, sender3, sender4, sender5) =
-            (0, 1, 2, 3, 4, 5, 6); // miner identities
+        let (senderg, sender0, sender1, sender2, sender3, sender4, sender5) = (0, 1, 2, 3, 4, 5, 6); // miner identities
         let (weightg, weight0, weight1, weight2, weight3, weight4, weight5) =
             (1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.0); // and their corresponding sender_state
 
@@ -609,15 +592,16 @@ mod tests {
                 (sender3, weight3),
                 (sender4, weight4),
                 (sender5, weight5),
-            ].iter()
-                .cloned()
-                .collect(),
+            ]
+            .iter()
+            .cloned()
+            .collect(),
         );
 
         let sender_state = SenderState::new(
             senders_weights.clone(),
-            0.0, // state fault weight
-            None,  // latest messages
+            0.0,  // state fault weight
+            None, // latest messages
             LatestMsgs::new(),
             1.0,            // subjective fault weight threshold
             HashSet::new(), // equivocators
@@ -631,8 +615,7 @@ mod tests {
             sender: senderg,
         });
         let latest_msgs = Justification::new();
-        let genesis_block_msg =
-            BlockMsg::new(senderg, latest_msgs, genesis_block.clone(), None);
+        let genesis_block_msg = BlockMsg::new(senderg, latest_msgs, genesis_block.clone(), None);
         // assert_eq!(
         //     &Block::from(&genesis_block_msg),
         //     &genesis_block,
@@ -645,7 +628,8 @@ mod tests {
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b0), // data
-        ).unwrap();
+        )
+        .unwrap();
 
         let proto_b1 = Block::new(None, sender1);
         let (m1, sender_state) = BlockMsg::from_msgs(
@@ -654,7 +638,8 @@ mod tests {
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b1),
-        ).unwrap();
+        )
+        .unwrap();
 
         let proto_b2 = Block::new(None, sender2);
         let (m2, sender_state) = BlockMsg::from_msgs(
@@ -663,7 +648,8 @@ mod tests {
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b2),
-        ).unwrap();
+        )
+        .unwrap();
 
         // assert_eq!(
         //     m2.get_estimate(),
@@ -678,7 +664,8 @@ mod tests {
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b3),
-        ).unwrap();
+        )
+        .unwrap();
 
         // assert_eq!(
         //     m3.get_estimate(),
@@ -695,7 +682,8 @@ mod tests {
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b4),
-        ).unwrap();
+        )
+        .unwrap();
         // assert_eq!(
         //     m4.get_estimate(),
         //     &Block::new(Some(Block::from(&m2)), sender4),
@@ -710,7 +698,8 @@ mod tests {
             Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b5),
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(
             m5.get_estimate(),
@@ -723,8 +712,7 @@ mod tests {
     fn safety_oracles() {
         let nodes = 3;
         let senders: Vec<u32> = (0..nodes).collect();
-        let weights: Vec<f64> =
-            iter::repeat(1.0).take(nodes as usize).collect();
+        let weights: Vec<f64> = iter::repeat(1.0).take(nodes as usize).collect();
 
         let senders_weights = SendersWeight::new(
             senders
@@ -753,25 +741,25 @@ mod tests {
         let latest_msgs = Justification::new();
         let m0 = BlockMsg::new(senders[0], latest_msgs, proto_b0.clone(), None);
 
-        let proto_b1 =
-            Block::new(Some(proto_b0.clone()), senders[1]);
+        let proto_b1 = Block::new(Some(proto_b0.clone()), senders[1]);
         let (m1, sender_state) = BlockMsg::from_msgs(
             proto_b1.get_sender(),
             vec![&m0],
             None,
             &sender_state,
             Some(proto_b1.clone()),
-        ).unwrap();
+        )
+        .unwrap();
 
-        let proto_b2 =
-            Block::new(Some(proto_b1.clone()), senders[0]);
+        let proto_b2 = Block::new(Some(proto_b1.clone()), senders[0]);
         let (m2, sender_state) = BlockMsg::from_msgs(
             proto_b2.get_sender(),
             vec![&m1],
             None,
             &sender_state,
             Some(proto_b2.clone()),
-        ).unwrap();
+        )
+        .unwrap();
 
         // no clique yet, since senders[1] has not seen senders[0] seeing senders[1] having proto_b0 in the chain
         assert_eq!(
@@ -788,15 +776,15 @@ mod tests {
             HashSet::new()
         );
 
-        let proto_b3 =
-            Block::new(Some(proto_b2.clone()), senders[1]);
+        let proto_b3 = Block::new(Some(proto_b2.clone()), senders[1]);
         let (m3, sender_state) = BlockMsg::from_msgs(
             proto_b3.get_sender(),
             vec![&m2],
             None,
             &sender_state,
             Some(proto_b3.clone()),
-        ).unwrap();
+        )
+        .unwrap();
 
         // clique, since both senders have seen each other having proto_b0 in the chain
         assert_eq!(
@@ -810,30 +798,28 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            HashSet::from_iter(vec![BTreeSet::from_iter(vec![
-                senders[0], senders[1],
-            ])])
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1],])])
         );
 
-        let proto_b4 =
-            Block::new(Some(proto_b3.clone()), senders[2]);
+        let proto_b4 = Block::new(Some(proto_b3.clone()), senders[2]);
         let (m4, sender_state) = BlockMsg::from_msgs(
             proto_b4.get_sender(),
             vec![&m3],
             None,
             &sender_state,
             Some(proto_b4.clone()),
-        ).unwrap();
+        )
+        .unwrap();
 
-        let proto_b5 =
-            Block::new(Some(proto_b4.clone()), senders[1]);
+        let proto_b5 = Block::new(Some(proto_b4.clone()), senders[1]);
         let (m5, sender_state) = BlockMsg::from_msgs(
             proto_b5.get_sender(),
             vec![&m4],
             None,
             &sender_state,
             Some(proto_b5.clone()),
-        ).unwrap();
+        )
+        .unwrap();
 
         // no second clique yet, since senders[2] has not seen senders[1] seeing senders[2] having proto_b0.clone() in the chain
         assert_eq!(
@@ -847,20 +833,18 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            HashSet::from_iter(vec![BTreeSet::from_iter(vec![
-                senders[0], senders[1],
-            ])])
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1],])])
         );
 
-        let proto_b6 =
-            Block::new(Some(proto_b5.clone()), senders[2]);
+        let proto_b6 = Block::new(Some(proto_b5.clone()), senders[2]);
         let (m6, sender_state) = BlockMsg::from_msgs(
             proto_b6.get_sender(),
             vec![&m5],
             None,
             &sender_state,
             Some(proto_b5.clone()),
-        ).unwrap();
+        )
+        .unwrap();
 
         // have two cliques on proto_b0 now
         assert_eq!(
@@ -908,40 +892,38 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            HashSet::from_iter(vec![BTreeSet::from_iter(vec![
-                senders[1], senders[2],
-            ])])
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[1], senders[2],])])
         );
 
-        let proto_b7 =
-            Block::new(Some(proto_b6.clone()), senders[0]);
+        let proto_b7 = Block::new(Some(proto_b6.clone()), senders[0]);
         let (m7, sender_state) = BlockMsg::from_msgs(
             proto_b7.get_sender(),
             vec![&m6],
             None,
             &sender_state,
             Some(proto_b6.clone()),
-        ).unwrap();
+        )
+        .unwrap();
 
-        let proto_b8 =
-            Block::new(Some(proto_b7.clone()), senders[2]);
+        let proto_b8 = Block::new(Some(proto_b7.clone()), senders[2]);
         let (m8, sender_state) = BlockMsg::from_msgs(
             proto_b8.get_sender(),
             vec![&m7],
             None,
             &sender_state,
             Some(proto_b7.clone()),
-        ).unwrap();
+        )
+        .unwrap();
 
-        let proto_b9 =
-            Block::new(Some(proto_b8.clone()), senders[0]);
+        let proto_b9 = Block::new(Some(proto_b8.clone()), senders[0]);
         let (_, sender_state) = BlockMsg::from_msgs(
             proto_b9.get_sender(),
             vec![&m8],
             None,
             &sender_state,
             Some(proto_b8.clone()),
-        ).unwrap();
+        )
+        .unwrap();
 
         // now entire network is clique
         assert_eq!(

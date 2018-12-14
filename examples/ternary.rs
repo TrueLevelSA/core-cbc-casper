@@ -2,10 +2,10 @@ extern crate casper;
 
 use std::convert::From;
 
-use casper::message;
-use casper::traits::Estimate;
 use casper::justification::LatestMsgsHonest;
+use casper::message;
 use casper::senders_weight::SendersWeight;
+use casper::traits::Estimate;
 
 type Validator = u32;
 
@@ -51,21 +51,31 @@ impl Estimate for Value {
         _data: Option<Value>,
     ) -> Value {
         use message::CasperMsg;
-        latest_msgs.iter()
-            .map(|msg| (msg.get_estimate(), senders_weights.get_weight(msg.get_sender())))
-            .fold(((Value::Zero, 0f64), (Value::One, 0f64), (Value::Two, 0f64)), |acc, t| match t {
-                (Value::Zero, Ok(weight)) => (((acc.0).0, (acc.0).1 + weight), acc.1, acc.2),
-                (Value::One, Ok(weight)) => (acc.0, ((acc.1).0, (acc.1).1 + weight), acc.2),
-                (Value::Two, Ok(weight)) => (acc.0, acc.1, ((acc.2).0, (acc.2).1 + weight)),
-                _ => acc, // No weight for the given validator, do nothing
-            }).into()
+        latest_msgs
+            .iter()
+            .map(|msg| {
+                (
+                    msg.get_estimate(),
+                    senders_weights.get_weight(msg.get_sender()),
+                )
+            })
+            .fold(
+                ((Value::Zero, 0f64), (Value::One, 0f64), (Value::Two, 0f64)),
+                |acc, t| match t {
+                    (Value::Zero, Ok(weight)) => (((acc.0).0, (acc.0).1 + weight), acc.1, acc.2),
+                    (Value::One, Ok(weight)) => (acc.0, ((acc.1).0, (acc.1).1 + weight), acc.2),
+                    (Value::Two, Ok(weight)) => (acc.0, acc.1, ((acc.2).0, (acc.2).1 + weight)),
+                    _ => acc, // No weight for the given validator, do nothing
+                },
+            )
+            .into()
     }
 }
 
 fn main() {
-    use std::collections::HashSet;
+    use casper::justification::{Justification, LatestMsgs, SenderState};
     use casper::message::CasperMsg;
-    use casper::justification::{SenderState, Justification, LatestMsgs};
+    use std::collections::HashSet;
 
     let senders: Vec<u32> = (1..=4).collect();
     let weights = [0.6, 1.0, 2.0, 1.3];

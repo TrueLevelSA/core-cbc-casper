@@ -1,14 +1,14 @@
-use std::collections::{HashSet};
-use std::ops::{Add};
+use std::collections::HashSet;
 use std::fmt::{Debug, Formatter, Result};
+use std::ops::Add;
 
 #[cfg(feature = "integration_test")]
 use proptest::prelude::*;
 
-use traits::{Zero, Estimate, Sender};
-use message::{Message, CasperMsg};
 use justification::{Justification, LatestMsgsHonest};
-use senders_weight::{SendersWeight};
+use message::{CasperMsg, Message};
+use senders_weight::SendersWeight;
+use traits::{Estimate, Sender, Zero};
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]
 pub struct VoteCount {
     yes: u32,
@@ -48,7 +48,8 @@ impl VoteCount {
         prop::sample::select(vec![
             VoteCount { yes: 1, no: 0 },
             VoteCount { yes: 0, no: 1 },
-        ]).boxed()
+        ])
+        .boxed()
     }
     // makes sure nobody adds more than one vote to their unjustified VoteCount
     // object. if they did, their vote is invalid and will be ignored
@@ -83,7 +84,7 @@ impl VoteCount {
         Message::new(sender, justification, estimate, None)
     }
 
-    /// 
+    ///
     fn get_vote_msgs(
         latest_msgs: &LatestMsgsHonest<Message<Self, Voter>>,
     ) -> HashSet<Message<Self, Voter>> {
@@ -110,16 +111,16 @@ impl VoteCount {
                                 Some(_) => {
                                     println!("equiv: {:?}", equivocation);
                                     acc_prime.remove(&equivocation)
-                                },
+                                }
                                 // add the vote
                                 None => {
                                     // println!("no_equiv: {:?}", equivocation);
                                     acc_prime.insert((*m).clone())
-                                },
+                                }
                             };
                         }
                         acc_prime // returns it
-                    },
+                    }
                     _ => recursor(m.get_justification(), acc_prime),
                 }
             })
@@ -170,17 +171,16 @@ mod count_votes {
     use std::collections::HashSet;
 
     use super::*;
-    use message::{CasperMsg, Message};
     use justification::{Justification, LatestMsgs};
+    use message::{CasperMsg, Message};
 
     #[test]
     fn count_votes() {
-        use justification::{SenderState};
-        use senders_weight::{SendersWeight};
+        use justification::SenderState;
+        use senders_weight::SendersWeight;
 
-        let senders_weights = SendersWeight::new(
-            [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
-        );
+        let senders_weights =
+            SendersWeight::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
 
         let v0 = &VoteCount::create_vote_msg(0, false);
         let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
@@ -196,23 +196,18 @@ mod count_votes {
             HashSet::new(),
         );
 
-        let (success, _) =
-            j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights);
+        let (success, _) = j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights);
         assert!(success);
 
-        let (m0, _) =
-            &Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
+        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
         let mut j1 = Justification::new();
-        let (success, _) =
-            j1.faulty_inserts(vec![v1].iter().cloned().collect(), &weights);
+        let (success, _) = j1.faulty_inserts(vec![v1].iter().cloned().collect(), &weights);
         assert!(success);
 
-        let (success, _) =
-            j1.faulty_inserts(vec![m0].iter().cloned().collect(), &weights);
+        let (success, _) = j1.faulty_inserts(vec![m0].iter().cloned().collect(), &weights);
         assert!(success);
 
-        let (m1, _) =
-            &Message::from_msgs(1, vec![v1, m0], None, &weights, None).unwrap();
+        let (m1, _) = &Message::from_msgs(1, vec![v1, m0], None, &weights, None).unwrap();
         assert_eq!(
             Message::get_estimate(m1).clone(),
             VoteCount { yes: 1, no: 1 },
@@ -220,8 +215,7 @@ mod count_votes {
             Message::get_estimate(m1).clone(),
         );
 
-        let (success, _) = j1
-            .faulty_inserts(vec![v0_prime].iter().cloned().collect(), &weights);
+        let (success, _) = j1.faulty_inserts(vec![v0_prime].iter().cloned().collect(), &weights);
         assert!(success);
 
         let (m1_prime, _) = &Message::from_msgs(
@@ -230,7 +224,8 @@ mod count_votes {
             None,
             &weights,
             None,
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(
             Message::get_estimate(m1_prime).clone(),
             VoteCount { yes: 1, no: 0 },

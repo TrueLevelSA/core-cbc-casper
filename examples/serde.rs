@@ -1,14 +1,14 @@
 #[macro_use]
 extern crate serde_derive;
 
-extern crate serde;
 extern crate bincode;
 extern crate blake2;
-extern crate itertools;
 extern crate casper;
+extern crate itertools;
+extern crate serde;
 
-use casper::traits::{Id};
 use casper::hashed::Hashed;
+use casper::traits::Id;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 struct Example {
@@ -30,4 +30,3 @@ fn main() {
     println!("{:?}", de);
     assert_eq!(s, de.unwrap());
 }
-

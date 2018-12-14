@@ -1,4 +1,4 @@
-use traits::{Zero};
+use traits::Zero;
 
 pub type WeightUnit = f64;
 

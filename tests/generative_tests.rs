@@ -1,6 +1,7 @@
-#[macro_use] extern crate proptest;
-extern crate rand;
+#[macro_use]
+extern crate proptest;
 extern crate casper;
+extern crate rand;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::iter;
@@ -8,21 +9,21 @@ use std::iter::FromIterator;
 
 use proptest::prelude::*;
 
+use proptest::strategy::ValueTree;
 use proptest::test_runner::Config;
 use proptest::test_runner::TestRunner;
-use proptest::strategy::ValueTree;
-use rand::thread_rng;
 use rand::seq::SliceRandom;
+use rand::thread_rng;
 
-use casper::traits::{Estimate, Data};
-use casper::justification::{Justification, SenderState, LatestMsgsHonest, LatestMsgs};
-use casper::senders_weight::SendersWeight;
+use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest, SenderState};
 use casper::message::*;
+use casper::senders_weight::SendersWeight;
+use casper::traits::{Data, Estimate};
 
 use casper::example::binary::BoolWrapper;
-use casper::example::integer::IntegerWrapper;
-use casper::example::vote_count::{VoteCount};
 use casper::example::blockchain::{Block, BlockMsg, ProtoBlock};
+use casper::example::integer::IntegerWrapper;
+use casper::example::vote_count::VoteCount;
 
 fn add_message<'z, M>(
     state: &'z mut HashMap<M::Sender, SenderState<M>>,
@@ -33,12 +34,28 @@ fn add_message<'z, M>(
 where
     M: CasperMsg,
 {
-    let latest: HashSet<M> = state[&sender].get_latest_msgs().iter().fold(HashSet::new(), |acc, (_, lms)| acc.union(&lms).cloned().collect());
+    let latest: HashSet<M> = state[&sender]
+        .get_latest_msgs()
+        .iter()
+        .fold(HashSet::new(), |acc, (_, lms)| {
+            acc.union(&lms).cloned().collect()
+        });
     let latest_delta = match state[&sender].get_my_last_msg() {
-        Some(m) => latest.iter().filter(|lm| !m.get_justification().contains(lm)).cloned().collect(),
-        None => latest
+        Some(m) => latest
+            .iter()
+            .filter(|lm| !m.get_justification().contains(lm))
+            .cloned()
+            .collect(),
+        None => latest,
     };
-    let (m, sender_state) = M::from_msgs(sender.clone(), latest_delta.iter().collect(), None, &state[&sender], data.clone().map(|d| d.into())).unwrap();
+    let (m, sender_state) = M::from_msgs(
+        sender.clone(),
+        latest_delta.iter().collect(),
+        None,
+        &state[&sender],
+        data.clone().map(|d| d.into()),
+    )
+    .unwrap();
 
     state.insert(sender.clone(), sender_state);
     recipients.iter().for_each(|recipient| {
@@ -67,10 +84,7 @@ fn all_receivers(val: &Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
 }
 
 fn some_receivers(val: &Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
-    prop::collection::hash_set(
-        prop::sample::select(val.clone()),
-        0..(val.len() + 1),
-    ).boxed()
+    prop::collection::hash_set(prop::sample::select(val.clone()), 0..(val.len() + 1)).boxed()
 }
 
 fn message_event<M>(
@@ -80,7 +94,7 @@ fn message_event<M>(
 ) -> BoxedStrategy<HashMap<M::Sender, SenderState<M>>>
 where
     M: 'static + CasperMsg,
-<<M as CasperMsg>::Estimate as Data>::Data: From<<M as CasperMsg>::Sender>
+    <<M as CasperMsg>::Estimate as Data>::Data: From<<M as CasperMsg>::Sender>,
 {
     (sender_strategy, receiver_strategy, Just(state))
         .prop_map(|(sender, mut receivers, mut state)| {
@@ -99,15 +113,9 @@ where
     let m: HashSet<_> = state
         .iter()
         .map(|(_sender, sender_state)| {
-            let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
-                sender_state.get_latest_msgs(),
-                &HashSet::new(),
-            );
-            latest_honest_msgs.mk_estimate(
-                None,
-                sender_state.get_senders_weights(),
-                None,
-            )
+            let latest_honest_msgs =
+                LatestMsgsHonest::from_latest_msgs(sender_state.get_latest_msgs(), &HashSet::new());
+            latest_honest_msgs.mk_estimate(None, sender_state.get_senders_weights(), None)
         })
         .collect();
     println!("{:?}", m);
@@ -118,14 +126,10 @@ fn safety_oracle(state: &HashMap<u32, SenderState<BlockMsg>>) -> bool {
     let safety_oracle_detected: HashSet<bool> = state
         .iter()
         .map(|(_, sender_state)| {
-            let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
-                sender_state.get_latest_msgs(),
-                &HashSet::new(),
-            );
+            let latest_honest_msgs =
+                LatestMsgsHonest::from_latest_msgs(sender_state.get_latest_msgs(), &HashSet::new());
             let genesis_block = Block::from(ProtoBlock::new(None, 0));
-            let safety_threshold =
-                (sender_state.get_senders_weights().sum_all_weights())
-                / 2.0;
+            let safety_threshold = (sender_state.get_senders_weights().sum_all_weights()) / 2.0;
             Block::safety_oracles(
                 genesis_block,
                 &latest_honest_msgs,
@@ -138,17 +142,13 @@ fn safety_oracle(state: &HashMap<u32, SenderState<BlockMsg>>) -> bool {
     safety_oracle_detected.contains(&true)
 }
 
-fn clique_collection(
-    state: HashMap<u32, SenderState<BlockMsg>>,
-) -> Vec<Vec<Vec<u32>>> {
+fn clique_collection(state: HashMap<u32, SenderState<BlockMsg>>) -> Vec<Vec<Vec<u32>>> {
     state
         .iter()
         .map(|(_, sender_state)| {
             let genesis_block = Block::from(ProtoBlock::new(None, 0));
-            let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
-                sender_state.get_latest_msgs(),
-                &HashSet::new(),
-            );
+            let latest_honest_msgs =
+                LatestMsgsHonest::from_latest_msgs(sender_state.get_latest_msgs(), &HashSet::new());
             let safety_oracles = Block::safety_oracles(
                 genesis_block,
                 &latest_honest_msgs,
@@ -157,11 +157,9 @@ fn clique_collection(
                 0.0,
                 sender_state.get_senders_weights(),
             );
-            let safety_oracles_vec_of_btrees: Vec<
-                    BTreeSet<u32>,
-                > = Vec::from_iter(safety_oracles.iter().cloned());
-            let safety_oracles_vec_of_vecs: Vec<Vec<u32>> =
-                safety_oracles_vec_of_btrees
+            let safety_oracles_vec_of_btrees: Vec<BTreeSet<u32>> =
+                Vec::from_iter(safety_oracles.iter().cloned());
+            let safety_oracles_vec_of_vecs: Vec<Vec<u32>> = safety_oracles_vec_of_btrees
                 .iter()
                 .map(|btree| Vec::from_iter(btree.iter().cloned()))
                 .collect();
@@ -185,17 +183,13 @@ where
 {
     (prop::sample::select((1..validator_max_count).collect::<Vec<usize>>()))
         .prop_flat_map(move |validators| {
-            (prop::collection::vec(
-                consensus_value_strategy.clone(),
-                validators,
-            ))
+            (prop::collection::vec(consensus_value_strategy.clone(), validators))
         })
         .prop_map(move |votes| {
             let mut state = HashMap::new();
             let validators: Vec<u32> = (0..votes.len() as u32).collect();
 
-            let weights: Vec<f64> =
-                iter::repeat(1.0).take(votes.len() as usize).collect();
+            let weights: Vec<f64> = iter::repeat(1.0).take(votes.len() as usize).collect();
 
             let senders_weights = SendersWeight::new(
                 validators
@@ -230,14 +224,10 @@ where
             let mut runner = TestRunner::default();
             let mut senders = validators.clone();
             let chain = iter::repeat_with(|| {
-                let sender_strategy =
-                    message_producer_strategy(&mut senders);
+                let sender_strategy = message_producer_strategy(&mut senders);
                 let receiver_strategy = message_receiver_strategy(&senders);
-                state = message_event(
-                    state.clone(),
-                    sender_strategy,
-                    receiver_strategy,
-                ).new_value(&mut runner)
+                state = message_event(state.clone(), sender_strategy, receiver_strategy)
+                    .new_value(&mut runner)
                     .unwrap()
                     .current();
                 state.clone()
@@ -256,7 +246,6 @@ where
         })
         .boxed()
 }
-
 
 fn arbitrary_blockchain() -> BoxedStrategy<Block> {
     let genesis_block = Block::from(ProtoBlock::new(None, 0));
@@ -450,4 +439,3 @@ proptest! {
         assert_eq!(equivocations.len(), 0, "equivocation absorbed in threshold");
     }
 }
-

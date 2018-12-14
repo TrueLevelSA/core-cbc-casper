@@ -1,13 +1,13 @@
-use traits::{Estimate, Data, Zero};
+use justification::LatestMsgsHonest;
 use message::{CasperMsg, Message};
-use justification::{LatestMsgsHonest};
-use senders_weight::{SendersWeight};
-use weight_unit::{WeightUnit};
+use senders_weight::SendersWeight;
+use traits::{Data, Estimate, Zero};
+use weight_unit::WeightUnit;
 
 type Validator = u32;
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, serde_derive::Serialize)]
-pub struct BoolWrapper (bool);
+pub struct BoolWrapper(bool);
 
 impl BoolWrapper {
     pub fn new(estimate: bool) -> Self {
@@ -31,9 +31,7 @@ impl Estimate for BoolWrapper {
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         _finalized_msg: Option<&Self::M>,
-        senders_weights: &SendersWeight<
-            <<Self as Estimate>::M as CasperMsg>::Sender,
-        >,
+        senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
         _data: Option<<Self as Data>::Data>,
     ) -> Self {
         // loop over all the latest messages
@@ -61,9 +59,9 @@ impl Estimate for BoolWrapper {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use justification::{Justification, LatestMsgs, SenderState};
     use senders_weight::SendersWeight;
-    use justification::{SenderState, Justification, LatestMsgs};
-    use std::collections::{HashSet};
+    use std::collections::HashSet;
 
     #[test]
     fn equal_weight() {
@@ -90,13 +88,8 @@ mod tests {
         let m0 = BinaryMsg::new(senders[0], Justification::new(), BoolWrapper(false), None);
         let m1 = BinaryMsg::new(senders[1], Justification::new(), BoolWrapper(true), None);
         let m2 = BinaryMsg::new(senders[2], Justification::new(), BoolWrapper(false), None);
-        let (m3, _) = BinaryMsg::from_msgs(
-            senders[0],
-            vec![&m0, &m1],
-            None,
-            &sender_state,
-            None,
-        ).unwrap();
+        let (m3, _) =
+            BinaryMsg::from_msgs(senders[0], vec![&m0, &m1], None, &sender_state, None).unwrap();
 
         assert_eq!(
             BoolWrapper::mk_estimate(
@@ -110,8 +103,7 @@ mod tests {
             ),
             BoolWrapper(true)
         );
-        let (mut j0, _) =
-            Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
+        let (mut j0, _) = Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
         // s0 and s1 vote. since tie-breaker is `true`, get `true`
         assert_eq!(
             j0.mk_estimate(
@@ -194,13 +186,9 @@ mod tests {
         );
 
         // assume sender 0 has seen messages from sender 1 and sender 2 and reveals this in a published message
-        let (m5, _) = BinaryMsg::from_msgs(
-            senders[0],
-            vec![&m0, &m1, &m2],
-            None,
-            &sender_state,
-            None,
-        ).unwrap();
+        let (m5, _) =
+            BinaryMsg::from_msgs(senders[0], vec![&m0, &m1, &m2], None, &sender_state, None)
+                .unwrap();
 
         j0.faulty_insert(&m5, &sender_state);
         // sender 0 now "votes" in the other direction and sways the result: true

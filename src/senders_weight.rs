@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, LockResult};
+use std::sync::{Arc, LockResult, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
+use traits::{Sender, Zero};
 use weight_unit::WeightUnit;
-use traits::{Zero, Sender};
 
 // RwLock locks only before writing, while Mutex locks to both read and write
 
@@ -15,8 +15,7 @@ pub struct SendersWeight<S: Sender>(Arc<RwLock<HashMap<S, WeightUnit>>>);
 // }
 
 impl<S: Sender> SendersWeight<S> {
-
-    /// creates a new SendersWeight from a HashMap 
+    /// creates a new SendersWeight from a HashMap
     pub fn new(senders_weight: HashMap<S, WeightUnit>) -> Self {
         SendersWeight(Arc::new(RwLock::new(senders_weight)))
     }
@@ -30,12 +29,10 @@ impl<S: Sender> SendersWeight<S> {
     }
 
     /// same as RwLock write() function
-    /// basically locks the RwLock with write access 
+    /// basically locks the RwLock with write access
     /// TODO DL: why was this public? shouldn't it be that it's only accessed from
     /// insert and get_senders?
-    fn write(
-        &self,
-    ) -> LockResult<RwLockWriteGuard<HashMap<S, WeightUnit>>> {
+    fn write(&self) -> LockResult<RwLockWriteGuard<HashMap<S, WeightUnit>>> {
         self.0.write()
     }
 
@@ -52,25 +49,24 @@ impl<S: Sender> SendersWeight<S> {
 
     /// picks senders with positive weights
     pub fn get_senders(&self) -> Result<HashSet<S>, &'static str> {
-        self.read().map_err(|_| "Can't unwrap SendersWeight").map(
-            |senders_weight| {
+        self.read()
+            .map_err(|_| "Can't unwrap SendersWeight")
+            .map(|senders_weight| {
                 senders_weight
                     .iter()
                     .filter_map(|(sender, &weight)| {
                         if weight > WeightUnit::ZERO {
                             Some(sender.clone())
-                        }
-                        else {
+                        } else {
                             None
                         }
                     })
                     .collect()
-            },
-        )
+            })
     }
 
     /// Gets the weight of the sender
-    /// Returns an Error in case there is a reading error 
+    /// Returns an Error in case there is a reading error
     /// or the sender does not exist
     pub fn get_weight(&self, sender: &S) -> Result<WeightUnit, &'static str> {
         self.read()
@@ -81,7 +77,7 @@ impl<S: Sender> SendersWeight<S> {
             })
     }
 
-    /// returns the total weight of all the senders 
+    /// returns the total weight of all the senders
     pub fn sum_weight_senders(&self, senders: &HashSet<S>) -> WeightUnit {
         senders.iter().fold(WeightUnit::ZERO, |acc, sender| {
             acc + self.get_weight(sender).unwrap_or(::std::f64::NAN)
@@ -89,9 +85,12 @@ impl<S: Sender> SendersWeight<S> {
     }
 
     pub fn sum_all_weights(&self) -> WeightUnit {
-        self.get_senders().unwrap().iter().fold(WeightUnit::ZERO, |acc, sender| {
-            acc + self.get_weight(sender).unwrap_or(::std::f64::NAN)
-        })
+        self.get_senders()
+            .unwrap()
+            .iter()
+            .fold(WeightUnit::ZERO, |acc, sender| {
+                acc + self.get_weight(sender).unwrap_or(::std::f64::NAN)
+            })
     }
 }
 
@@ -101,27 +100,24 @@ mod tests {
 
     #[test]
     fn get_senders() {
-        let senders_weights = SendersWeight::new(
-            [(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
-        );
+        let senders_weights =
+            SendersWeight::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
         assert_eq!(
             SendersWeight::get_senders(&senders_weights).unwrap(),
             [0, 1, 2].iter().cloned().collect(),
             "should include senders with valid, positive weight"
         );
 
-        let senders_weights = SendersWeight::new(
-            [(0, 0.0), (1, 1.0), (2, 1.0)].iter().cloned().collect(),
-        );
+        let senders_weights =
+            SendersWeight::new([(0, 0.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
         assert_eq!(
             SendersWeight::get_senders(&senders_weights).unwrap(),
             [1, 2].iter().cloned().collect(),
             "should exclude senders with 0 weight"
         );
 
-        let senders_weights = SendersWeight::new(
-            [(0, 1.0), (1, -1.0), (2, 1.0)].iter().cloned().collect(),
-        );
+        let senders_weights =
+            SendersWeight::new([(0, 1.0), (1, -1.0), (2, 1.0)].iter().cloned().collect());
         assert_eq!(
             SendersWeight::get_senders(&senders_weights).unwrap(),
             [0, 2].iter().cloned().collect(),
