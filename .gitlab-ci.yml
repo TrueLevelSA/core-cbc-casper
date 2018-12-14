@@ -27,7 +27,7 @@ build:
 test:
   stage: test
   script:
-    - cargo test --feature "integration_test"
+    - cargo test --features "integration_test"
 
 doc:
   stage: test
