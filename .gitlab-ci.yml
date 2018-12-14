@@ -4,19 +4,12 @@ image: rust:1.31.0
 
 before_script:
   - cargo version
-  - rustup component add clippy
   - rustup component add rustfmt
 
 stages:
   - build
   - test
   - example
-
-clippy:
-  stage: build
-  script:
-      # A collection of lints to catch common mistakes and improve your Rust code
-    - cargo clippy
 
 fmt:
   stage: build
@@ -34,7 +27,7 @@ build:
 test:
   stage: test
   script:
-    - cargo test
+    - cargo test --feature "integration_test"
 
 doc:
   stage: test
