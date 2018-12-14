@@ -285,7 +285,11 @@ impl Block {
     pub fn parse_blockchains(
         latest_msgs: &LatestMsgsHonest<BlockMsg>,
         _finalized_msg: Option<&BlockMsg>,
-    ) -> (HashMap<Block, HashSet<Block>>, HashSet<Block>, HashSet<Block>) {
+    ) -> (
+        HashMap<Block, HashSet<Block>>,
+        HashSet<Block>,
+        HashSet<Block>,
+    ) {
         // start at the tip of the blockchain
         let mut visited_parents: HashMap<Block, HashSet<Block>> = latest_msgs
             .iter()
@@ -341,7 +345,9 @@ impl Block {
             visited
                 .get(&block)
                 .filter(|children| !children.is_empty())
-                .map(|children| Self::collect_validators(children, visited, acc.clone(), latest_blocks))
+                .map(|children| {
+                    Self::collect_validators(children, visited, acc.clone(), latest_blocks)
+                })
                 .unwrap_or(acc)
         })
     }
@@ -360,8 +366,12 @@ impl Block {
                     // add current block sender such that its weight counts too
                     let referred_senders: Arc<RwLock<HashSet<_>>> =
                         Arc::new(RwLock::new([block.get_sender()].iter().cloned().collect()));
-                    let referred_senders =
-                        Self::collect_validators(children, visited, referred_senders, latest_blocks);
+                    let referred_senders = Self::collect_validators(
+                        children,
+                        visited,
+                        referred_senders,
+                        latest_blocks,
+                    );
                     let weight = referred_senders
                         .read()
                         .map(|s| weights.sum_weight_senders(&s));
@@ -804,7 +814,7 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1],])])
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1]])])
         );
 
         let proto_b4 = Block::new(Some(proto_b3.clone()), senders[2]);
@@ -839,7 +849,7 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1],])])
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1]])])
         );
 
         let proto_b6 = Block::new(Some(proto_b5.clone()), senders[2]);
@@ -898,7 +908,7 @@ mod tests {
                 1.0,
                 &senders_weights
             ),
-            HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[1], senders[2],])])
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[1], senders[2]])])
         );
 
         let proto_b7 = Block::new(Some(proto_b6.clone()), senders[0]);
