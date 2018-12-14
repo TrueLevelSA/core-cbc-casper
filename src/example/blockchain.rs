@@ -332,24 +332,24 @@ impl Block {
     }
 
     fn collect_validators(
-        blocks: &HashSet<Block>,
+        block: &Block,
         visited: &HashMap<Block, HashSet<Block>>,
         acc: Arc<RwLock<HashSet<Validator>>>,
         latest_blocks: &HashSet<Block>,
     ) -> Arc<RwLock<HashSet<Validator>>> {
-        blocks.iter().fold(acc, |acc, block| {
-            if latest_blocks.contains(block) {
-                // collect this sender if this block is in his the latest message
-                let _ = acc.write().map(|mut x| x.insert(block.get_sender()));
-            }
-            visited
-                .get(&block)
-                .filter(|children| !children.is_empty())
-                .map(|children| {
-                    Self::collect_validators(children, visited, acc.clone(), latest_blocks)
+        if latest_blocks.contains(block) {
+            // collect this sender if this block is in his the latest message
+            let _ = acc.write().map(|mut x| x.insert(block.get_sender()));
+        }
+        visited
+            .get(&block)
+            .filter(|children| !children.is_empty())
+            .map(|children| {
+                children.iter().fold(acc.clone(), |acc, block| {
+                    Self::collect_validators(block, visited, acc.clone(), latest_blocks)
                 })
-                .unwrap_or(acc)
-        })
+            })
+            .unwrap_or(acc)
     }
 
     // find heaviest block
@@ -364,14 +364,9 @@ impl Block {
             best.and_then(|best| visited.get(&block).map(|children| (best, children)))
                 .and_then(|((b_block, b_weight, b_children), children)| {
                     // add current block sender such that its weight counts too
-                    let referred_senders: Arc<RwLock<HashSet<_>>> =
-                        Arc::new(RwLock::new([block.get_sender()].iter().cloned().collect()));
-                    let referred_senders = Self::collect_validators(
-                        children,
-                        visited,
-                        referred_senders,
-                        latest_blocks,
-                    );
+                    let referred_senders = Arc::new(RwLock::new(HashSet::new()));
+                    let referred_senders =
+                        Self::collect_validators(block, visited, referred_senders, latest_blocks);
                     let weight = referred_senders
                         .read()
                         .map(|s| weights.sum_weight_senders(&s));
