@@ -42,9 +42,11 @@ where
 
     state.insert(sender.clone(), sender_state);
     recipients.iter().for_each(|recipient| {
-        let mut rs = state[&recipient].clone();
-        rs.get_latest_msgs_as_mut().update(&m);
-        state.insert(recipient.clone(), rs);
+        state
+            .get_mut(&recipient)
+            .unwrap()
+            .get_latest_msgs_as_mut()
+            .update(&m);
     });
     state
 }
