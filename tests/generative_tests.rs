@@ -11,7 +11,8 @@ use proptest::prelude::*;
 use proptest::test_runner::Config;
 use proptest::test_runner::TestRunner;
 use proptest::strategy::ValueTree;
-use rand::{thread_rng, Rng};
+use rand::thread_rng;
+use rand::seq::SliceRandom;
 
 use casper::traits::{Estimate, Data};
 use casper::justification::{Justification, SenderState, LatestMsgsHonest};
@@ -375,7 +376,7 @@ prop_compose! {
          -> (Vec<Message<VoteCount, u32>>, HashSet<u32>, usize)
     {
         let mut validators: Vec<u32> = (0..senders as u32).collect();
-        thread_rng().shuffle(&mut validators);
+        validators.shuffle(&mut thread_rng());
         let equivocators: HashSet<u32> = HashSet::from_iter(validators[0..equivocations].iter().cloned());
 
         let mut messages = vec![];
