@@ -6,7 +6,7 @@ use justification::{Justification, LatestMsgsHonest, LatestMsgs};
 use message::{CasperMsg, Message};
 use senders_weight::SendersWeight;
 use std::sync::{Arc, RwLock};
-use traits::{Data, Estimate, Zero, Id, Sender};
+use traits::{Data, Estimate, Zero, Id};
 use hashed::Hashed;
 use weight_unit::WeightUnit;
 use serde_derive::Serialize;
@@ -31,7 +31,7 @@ impl ProtoBlock {
 pub struct Block((Arc<ProtoBlock>, Hashed));
 
 #[cfg(feature = "integration_test")]
-impl<S: Sender + Into<u32>> From<S> for Block {
+impl<S: ::traits::Sender + Into<u32>> From<S> for Block {
     fn from(sender: S) -> Self {
         (Block::from(ProtoBlock::new(None, sender.into())))
     }

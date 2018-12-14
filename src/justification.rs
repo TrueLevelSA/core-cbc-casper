@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashSet, HashMap, VecDeque};
+use std::collections::{HashSet, HashMap, VecDeque};
 use std::collections::hash_map::{Iter as HashIter, Keys, Values};
 use std::collections::hash_set::{Iter as HSetIter};
 use std::fmt::{Debug, Formatter};
@@ -67,7 +67,7 @@ impl<M: CasperMsg> Justification<M> {
         &self,
         finalized_msg: Option<&M>,
         equivocators: &HashSet<M::Sender>,
-        sender: Option<M::Sender>,
+        _sender: Option<M::Sender>,
         senders_weights: &SendersWeight<<M as CasperMsg>::Sender>,
         data: Option<<<M as CasperMsg>::Estimate as Data>::Data>,
     ) -> M::Estimate {

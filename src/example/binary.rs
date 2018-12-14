@@ -1,4 +1,4 @@
-use traits::{Estimate, Data, Zero, Sender};
+use traits::{Estimate, Data, Zero};
 use message::{CasperMsg, Message};
 use justification::{LatestMsgsHonest};
 use senders_weight::{SendersWeight};
@@ -16,7 +16,7 @@ impl BoolWrapper {
 }
 
 #[cfg(feature = "integration_test")]
-impl<S: Sender> From<S> for BoolWrapper {
+impl<S: ::traits::Sender> From<S> for BoolWrapper {
     fn from(_sender: S) -> Self {
         BoolWrapper::new(bool::default())
     }

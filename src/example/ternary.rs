@@ -1,7 +1,7 @@
 use std::convert::From;
 
 use message;
-use traits::{Data, Estimate};
+use traits::Estimate;
 use justification::LatestMsgsHonest;
 use senders_weight::SendersWeight;
 
@@ -9,19 +9,11 @@ type Validator = u32;
 
 pub type Message = message::Message<Value, Validator>;
 
-#[derive(Debug, Hash, Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, serde_derive::Serialize)]
 pub enum Value {
     Zero = 0,
     One = 1,
     Two = 2,
-}
-
-impl Data for Value {
-    type Data = Self;
-
-    fn is_valid(_data: &Value) -> bool {
-        true
-    }
 }
 
 impl From<((Value, f64), (Value, f64), (Value, f64))> for Value {
@@ -54,7 +46,7 @@ impl Estimate for Value {
         latest_msgs: &LatestMsgsHonest<Message>,
         _finalized_msg: Option<&Message>,
         senders_weights: &SendersWeight<Validator>,
-        _proto_block: Option<Value>,
+        _data: Option<Value>,
     ) -> Value {
         use message::CasperMsg;
         latest_msgs.iter()
@@ -99,10 +91,10 @@ fn casper_binary_consensus() {
     // 3: (0)  (0)       (0)
     // 4: (1)  (0)
 
-    let msg1 = Message::new(1, Justification::new(), Value::One);
-    let msg2 = Message::new(2, Justification::new(), Value::Two);
-    let msg3 = Message::new(3, Justification::new(), Value::Zero);
-    let msg4 = Message::new(4, Justification::new(), Value::One);
+    let msg1 = Message::new(1, Justification::new(), Value::One, None);
+    let msg2 = Message::new(2, Justification::new(), Value::Two, None);
+    let msg3 = Message::new(3, Justification::new(), Value::Zero, None);
+    let msg4 = Message::new(4, Justification::new(), Value::One, None);
     let (msg5, _) = Message::from_msgs(1, vec![&msg1, &msg2], None, &weights, None).unwrap();
     let (msg6, _) = Message::from_msgs(3, vec![&msg3, &msg4], None, &weights, None).unwrap();
     let (msg7, _) = Message::from_msgs(2, vec![&msg2, &msg5, &msg6], None, &weights, None).unwrap();

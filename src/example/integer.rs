@@ -1,4 +1,4 @@
-use traits::{Estimate, Data, Zero, Sender};
+use traits::{Estimate, Data, Zero};
 use message::{CasperMsg, Message};
 use justification::{LatestMsgsHonest};
 use senders_weight::{SendersWeight};
@@ -17,7 +17,7 @@ impl IntegerWrapper {
 }
 
 #[cfg(feature = "integration_test")]
-impl <S: Sender> From<S> for IntegerWrapper {
+impl <S: ::traits::Sender> From<S> for IntegerWrapper {
     fn from(_sender: S) -> Self {
         IntegerWrapper::new(u32::default())
     }
