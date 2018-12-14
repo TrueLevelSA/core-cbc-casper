@@ -1,10 +1,12 @@
-use justification::LatestMsgsHonest;
-use message::{CasperMsg, Message};
-use senders_weight::SendersWeight;
 use std::collections::HashSet;
 use std::iter::FromIterator;
-use traits::{Data, Estimate, Zero};
-use weight_unit::WeightUnit;
+
+use casper::justification::LatestMsgsHonest;
+use casper::message::{CasperMsg, Message};
+use casper::senders_weight::SendersWeight;
+use casper::traits::{Data, Estimate, Sender, Zero};
+use casper::weight_unit::WeightUnit;
+
 type Validator = u32;
 
 #[derive(Clone, Eq, Debug, Ord, PartialOrd, PartialEq, Hash, serde_derive::Serialize)]
@@ -16,8 +18,7 @@ impl IntegerWrapper {
     }
 }
 
-#[cfg(feature = "integration_test")]
-impl<S: ::traits::Sender> From<S> for IntegerWrapper {
+impl<S: Sender> From<S> for IntegerWrapper {
     fn from(_sender: S) -> Self {
         IntegerWrapper::new(u32::default())
     }
@@ -87,8 +88,8 @@ mod tests {
     use std::collections::HashSet;
 
     use super::*;
-    use justification::{Justification, LatestMsgs, SenderState};
-    use senders_weight::SendersWeight;
+    use casper::justification::{Justification, LatestMsgs, SenderState};
+    use casper::senders_weight::SendersWeight;
 
     #[test]
     fn equal_weight() {

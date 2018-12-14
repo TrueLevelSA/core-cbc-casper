@@ -1,8 +1,8 @@
-use justification::LatestMsgsHonest;
-use message::{CasperMsg, Message};
-use senders_weight::SendersWeight;
-use traits::{Data, Estimate, Zero};
-use weight_unit::WeightUnit;
+use casper::justification::LatestMsgsHonest;
+use casper::message::{CasperMsg, Message};
+use casper::senders_weight::SendersWeight;
+use casper::traits::{Data, Estimate, Sender, Zero};
+use casper::weight_unit::WeightUnit;
 
 type Validator = u32;
 
@@ -15,8 +15,7 @@ impl BoolWrapper {
     }
 }
 
-#[cfg(feature = "integration_test")]
-impl<S: ::traits::Sender> From<S> for BoolWrapper {
+impl<S: Sender> From<S> for BoolWrapper {
     fn from(_sender: S) -> Self {
         BoolWrapper::new(bool::default())
     }
@@ -59,8 +58,8 @@ impl Estimate for BoolWrapper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use justification::{Justification, LatestMsgs, SenderState};
-    use senders_weight::SendersWeight;
+    use casper::justification::{Justification, LatestMsgs, SenderState};
+    use casper::senders_weight::SendersWeight;
     use std::collections::HashSet;
 
     #[test]

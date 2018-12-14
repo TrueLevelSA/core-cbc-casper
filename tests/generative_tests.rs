@@ -3,6 +3,8 @@ extern crate proptest;
 extern crate casper;
 extern crate rand;
 
+mod common;
+
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::iter;
 use std::iter::FromIterator;
@@ -15,15 +17,15 @@ use proptest::test_runner::TestRunner;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
+use casper::blockchain::{Block, BlockMsg, ProtoBlock};
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest, SenderState};
 use casper::message::*;
 use casper::senders_weight::SendersWeight;
 use casper::traits::{Data, Estimate};
 
-use casper::example::binary::BoolWrapper;
-use casper::example::blockchain::{Block, BlockMsg, ProtoBlock};
-use casper::example::integer::IntegerWrapper;
-use casper::example::vote_count::VoteCount;
+use common::binary::BoolWrapper;
+use common::integer::IntegerWrapper;
+use common::vote_count::VoteCount;
 
 fn add_message<'z, M>(
     state: &'z mut HashMap<M::Sender, SenderState<M>>,

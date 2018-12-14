@@ -2,20 +2,19 @@ use std::collections::HashSet;
 use std::fmt::{Debug, Formatter, Result};
 use std::ops::Add;
 
-#[cfg(feature = "integration_test")]
 use proptest::prelude::*;
 
-use justification::{Justification, LatestMsgsHonest};
-use message::{CasperMsg, Message};
-use senders_weight::SendersWeight;
-use traits::{Estimate, Sender, Zero};
+use casper::justification::{Justification, LatestMsgsHonest};
+use casper::message::{CasperMsg, Message};
+use casper::senders_weight::SendersWeight;
+use casper::traits::{Estimate, Sender, Zero};
+
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]
 pub struct VoteCount {
     yes: u32,
     no: u32,
 }
 
-#[cfg(feature = "integration_test")]
 impl<S: Sender> From<S> for VoteCount {
     fn from(_sender: S) -> Self {
         VoteCount::default()
@@ -137,7 +136,7 @@ impl VoteCount {
 
 type Voter = u32;
 
-impl Sender for Voter {}
+//impl Sender for Voter {}
 
 impl Estimate for VoteCount {
     // the estimator just counts votes, which in this case are the unjustified
@@ -171,13 +170,13 @@ mod count_votes {
     use std::collections::HashSet;
 
     use super::*;
-    use justification::{Justification, LatestMsgs};
-    use message::{CasperMsg, Message};
+    use casper::justification::{Justification, LatestMsgs};
+    use casper::message::{CasperMsg, Message};
 
     #[test]
     fn count_votes() {
-        use justification::SenderState;
-        use senders_weight::SendersWeight;
+        use casper::justification::SenderState;
+        use casper::senders_weight::SendersWeight;
 
         let senders_weights =
             SendersWeight::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());

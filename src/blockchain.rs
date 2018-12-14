@@ -1,16 +1,19 @@
+use serde_derive::Serialize;
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::convert::From;
 use std::iter::Iterator;
+use std::sync::{Arc, RwLock};
 
 use hashed::Hashed;
 use justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use message::{CasperMsg, Message};
 use senders_weight::SendersWeight;
-use serde_derive::Serialize;
-use std::sync::{Arc, RwLock};
-use traits::{Data, Estimate, Id, Zero};
+use traits::{Data, Estimate, Id, Sender, Zero};
 use weight_unit::WeightUnit;
+
 type Validator = u32;
+
+impl Sender for Validator {}
 
 /// a genesis block should be a block with estimate Block with prevblock =
 /// None and data. data will be the unique identifier of this blockchain
