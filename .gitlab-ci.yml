@@ -8,8 +8,8 @@ before_script:
 
 stages:
   - build
-  - test
-  - example
+  - tests
+  - examples
 
 fmt:
   stage: build
@@ -24,22 +24,27 @@ build:
   script:
     - cargo build
 
-test:
-  stage: test
+unit-tests:
+  stage: tests
   script:
-    - cargo test --features "integration_test"
+    - cargo test --lib
 
-doc:
-  stage: test
+integration-tests:
+  stage: tests
+  script:
+    - cargo test --test generative_tests --features "integration_test"
+
+build-doc:
+  stage: tests
   script:
     - cargo doc
 
 serde:
-  stage: example
+  stage: examples
   script:
     - cargo run --example serde
 
 ternary:
-  stage: example
+  stage: examples
   script:
     - cargo run --example ternary
