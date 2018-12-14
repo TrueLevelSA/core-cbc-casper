@@ -297,6 +297,7 @@ impl Block {
             .collect();
 
         let mut queue: VecDeque<Block> = visited_parents.keys().cloned().collect();
+        let latest_blocks: HashSet<Block> = visited_parents.keys().cloned().collect();
         let mut genesis: HashSet<Block> = HashSet::new();
 
         // while there are still unvisited blocks
