@@ -1,9 +1,11 @@
+extern crate casper;
+
 use std::convert::From;
 
-use message;
-use traits::Estimate;
-use justification::LatestMsgsHonest;
-use senders_weight::SendersWeight;
+use casper::message;
+use casper::traits::Estimate;
+use casper::justification::LatestMsgsHonest;
+use casper::senders_weight::SendersWeight;
 
 type Validator = u32;
 
@@ -60,11 +62,10 @@ impl Estimate for Value {
     }
 }
 
-#[test]
-fn casper_binary_consensus() {
-    use message::CasperMsg;
+fn main() {
     use std::collections::HashSet;
-    use justification::{SenderState, Justification, LatestMsgs};
+    use casper::message::CasperMsg;
+    use casper::justification::{SenderState, Justification, LatestMsgs};
 
     let senders: Vec<u32> = (1..=4).collect();
     let weights = [0.6, 1.0, 2.0, 1.3];

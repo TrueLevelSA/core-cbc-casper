@@ -15,14 +15,13 @@ use rand::thread_rng;
 use rand::seq::SliceRandom;
 
 use casper::traits::{Estimate, Data};
-use casper::justification::{Justification, SenderState, LatestMsgsHonest};
+use casper::justification::{Justification, SenderState, LatestMsgsHonest, LatestMsgs};
 use casper::senders_weight::SendersWeight;
 use casper::message::*;
 
 use casper::example::binary::BoolWrapper;
 use casper::example::integer::IntegerWrapper;
 use casper::example::vote_count::{VoteCount};
-use casper::justification::{LatestMsgs};
 use casper::example::blockchain::{Block, BlockMsg, ProtoBlock};
 
 fn add_message<'z, M>(

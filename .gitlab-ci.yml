@@ -38,3 +38,8 @@ serde:
   stage: example
   script:
     - cargo run --example serde
+
+ternary:
+  stage: example
+  script:
+    - cargo run --example ternary
