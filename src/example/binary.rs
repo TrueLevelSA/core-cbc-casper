@@ -1,4 +1,4 @@
-use traits::{Estimate, Data, Zero};
+use traits::{Estimate, Data, Zero, Sender};
 use message::{CasperMsg, Message};
 use justification::{LatestMsgsHonest};
 use senders_weight::{SendersWeight};
@@ -6,16 +6,25 @@ use weight_unit::{WeightUnit};
 
 type Validator = u32;
 
-pub type BinaryMsg = Message<bool /*Estimate*/, Validator /*Sender*/>;
+#[derive(Clone, Eq, PartialEq, Debug, Hash, serde_derive::Serialize)]
+pub struct BoolWrapper (bool);
 
-impl Data for bool {
-    type Data = Self;
-    fn is_valid(_data: &Self::Data) -> bool {
-        true // FIXME
+impl BoolWrapper {
+    pub fn new(estimate: bool) -> Self {
+        BoolWrapper(estimate)
     }
 }
 
-impl Estimate for bool {
+#[cfg(feature = "integration_test")]
+impl<S: Sender> From<S> for BoolWrapper {
+    fn from(_sender: S) -> Self {
+        BoolWrapper::new(bool::default())
+    }
+}
+
+pub type BinaryMsg = Message<BoolWrapper /*Estimate*/, Validator /*Sender*/>;
+
+impl Estimate for BoolWrapper {
     type M = BinaryMsg;
 
     /// weighted count of the votes contained in the latest messages
@@ -37,7 +46,7 @@ impl Estimate for bool {
                     .unwrap_or(WeightUnit::ZERO);
 
                 // add the weight to the right accumulator
-                if *msg.get_estimate() {
+                if msg.get_estimate().0.clone() {
                     (true_w + sender_weight, false_w)
                 } else {
                     (true_w, false_w + sender_weight)
@@ -45,7 +54,7 @@ impl Estimate for bool {
             },
         );
 
-        true_w >= false_w
+        BoolWrapper(true_w >= false_w)
     }
 }
 
@@ -78,9 +87,9 @@ mod tests {
             HashSet::new(), // equivocators
         );
 
-        let m0 = BinaryMsg::new(senders[0], Justification::new(), false);
-        let m1 = BinaryMsg::new(senders[1], Justification::new(), true);
-        let m2 = BinaryMsg::new(senders[2], Justification::new(), false);
+        let m0 = BinaryMsg::new(senders[0], Justification::new(), BoolWrapper(false), None);
+        let m1 = BinaryMsg::new(senders[1], Justification::new(), BoolWrapper(true), None);
+        let m2 = BinaryMsg::new(senders[2], Justification::new(), BoolWrapper(false), None);
         let (m3, _) = BinaryMsg::from_msgs(
             senders[0],
             vec![&m0, &m1],
@@ -90,7 +99,7 @@ mod tests {
         ).unwrap();
 
         assert_eq!(
-            bool::mk_estimate(
+            BoolWrapper::mk_estimate(
                 &LatestMsgsHonest::from_latest_msgs(
                     &LatestMsgs::from(&Justification::new()),
                     sender_state.get_equivocators()
@@ -99,7 +108,7 @@ mod tests {
                 &senders_weights,
                 None
             ),
-            true
+            BoolWrapper(true)
         );
         let (mut j0, _) =
             Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
@@ -108,10 +117,11 @@ mod tests {
             j0.mk_estimate(
                 None,
                 sender_state.get_equivocators(),
+                None,
                 &senders_weights,
                 None
             ),
-            true
+            BoolWrapper(true)
         );
         j0.faulty_insert(&m2, &sender_state);
         // `false` now has weight 2.0, while true has weight `1.0`
@@ -119,20 +129,22 @@ mod tests {
             j0.mk_estimate(
                 None,
                 sender_state.get_equivocators(),
+                None,
                 &senders_weights,
                 None
             ),
-            false
+            BoolWrapper(false)
         );
         j0.faulty_insert(&m3, &sender_state);
         assert_eq!(
             j0.mk_estimate(
                 None,
                 sender_state.get_equivocators(),
+                None,
                 &senders_weights,
                 None
             ),
-            true
+            BoolWrapper(true)
         );
     }
 
@@ -158,11 +170,11 @@ mod tests {
             HashSet::new(), // equivocators
         );
 
-        let m0 = BinaryMsg::new(senders[0], Justification::new(), false);
-        let m1 = BinaryMsg::new(senders[1], Justification::new(), true);
-        let m2 = BinaryMsg::new(senders[2], Justification::new(), true);
-        let m3 = BinaryMsg::new(senders[3], Justification::new(), false);
-        let m4 = BinaryMsg::new(senders[4], Justification::new(), false);
+        let m0 = BinaryMsg::new(senders[0], Justification::new(), BoolWrapper(false), None);
+        let m1 = BinaryMsg::new(senders[1], Justification::new(), BoolWrapper(true), None);
+        let m2 = BinaryMsg::new(senders[2], Justification::new(), BoolWrapper(true), None);
+        let m3 = BinaryMsg::new(senders[3], Justification::new(), BoolWrapper(false), None);
+        let m4 = BinaryMsg::new(senders[4], Justification::new(), BoolWrapper(false), None);
 
         let (mut j0, _) = Justification::from_msgs(
             vec![m0.clone(), m1.clone(), m2.clone(), m3.clone(), m4.clone()],
@@ -174,10 +186,11 @@ mod tests {
             j0.mk_estimate(
                 None,
                 sender_state.get_equivocators(),
+                None,
                 &senders_weights,
                 None
             ),
-            false
+            BoolWrapper(false)
         );
 
         // assume sender 0 has seen messages from sender 1 and sender 2 and reveals this in a published message
@@ -195,10 +208,11 @@ mod tests {
             j0.mk_estimate(
                 None,
                 sender_state.get_equivocators(),
+                None,
                 &senders_weights,
                 None
             ),
-            true
+            BoolWrapper(true)
         );
     }
 }

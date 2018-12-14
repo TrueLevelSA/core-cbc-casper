@@ -2,14 +2,24 @@ use std::collections::{HashSet};
 use std::ops::{Add};
 use std::fmt::{Debug, Formatter, Result};
 
-use traits::{Zero, Estimate, Sender, Data};
+#[cfg(feature = "integration_test")]
+use proptest::prelude::*;
+
+use traits::{Zero, Estimate, Sender};
 use message::{Message, CasperMsg};
 use justification::{Justification, LatestMsgsHonest};
 use senders_weight::{SendersWeight};
-#[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default)]
+#[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]
 pub struct VoteCount {
     yes: u32,
     no: u32,
+}
+
+#[cfg(feature = "integration_test")]
+impl<S: Sender> From<S> for VoteCount {
+    fn from(_sender: S) -> Self {
+        VoteCount::default()
+    }
 }
 
 impl Zero<VoteCount> for VoteCount {
@@ -33,6 +43,13 @@ impl Debug for VoteCount {
 }
 
 impl VoteCount {
+    #[cfg(feature = "integration_test")]
+    pub fn arbitrary() -> BoxedStrategy<Self> {
+        prop::sample::select(vec![
+            VoteCount { yes: 1, no: 0 },
+            VoteCount { yes: 0, no: 1 },
+        ]).boxed()
+    }
     // makes sure nobody adds more than one vote to their unjustified VoteCount
     // object. if they did, their vote is invalid and will be ignored
     fn is_valid_vote(vote: &Self) -> bool {
@@ -63,7 +80,7 @@ impl VoteCount {
             false => VoteCount { yes: 0, no: 1 },
         };
 
-        Message::new(sender, justification, estimate)
+        Message::new(sender, justification, estimate, None)
     }
 
     /// 
@@ -84,6 +101,7 @@ impl VoteCount {
                                 m.get_sender().clone(),
                                 m.get_justification().clone(),
                                 VoteCount::toggle_vote(&estimate),
+                                None,
                             );
                             // search for the equivocation of the current latest_msgs
                             match acc_prime.get(&equivocation) {
@@ -95,7 +113,7 @@ impl VoteCount {
                                 },
                                 // add the vote
                                 None => {
-                                    println!("no_equiv: {:?}", equivocation);
+                                    // println!("no_equiv: {:?}", equivocation);
                                     acc_prime.insert((*m).clone())
                                 },
                             };
@@ -119,13 +137,6 @@ impl VoteCount {
 type Voter = u32;
 
 impl Sender for Voter {}
-
-impl Data for VoteCount {
-    type Data = VoteCount;
-    fn is_valid(_data: &Self::Data) -> bool {
-        unimplemented!()
-    }
-}
 
 impl Estimate for VoteCount {
     // the estimator just counts votes, which in this case are the unjustified
