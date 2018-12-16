@@ -263,12 +263,13 @@ proptest! {
         // total messages until unilateral consensus
         let mut output_file = OpenOptions::new().create(true).append(true).open("blockchain_test.log").unwrap();
 
-        writeln!(output_file, "new chain");
-        chain.iter().for_each(|state| {writeln!(output_file, "{{lms: {:?},", state.iter().map(|(_, sender_state)|
-                                                                                 sender_state.get_latest_msgs()).collect::<Vec<_>>());
-                                       writeln!(output_file, "sendercount: {:?},", state.keys().len());
-                                       writeln!(output_file, "clqs: ");
-                                       writeln!(output_file, "{:?}}},", clique_collection(state.clone()));
+        writeln!(output_file, "new chain")?;
+        chain.iter().for_each(|state| {
+            writeln!(output_file, "{{lms: {:?},", state.iter().map(|(_, sender_state)|
+                                                                   sender_state.get_latest_msgs()).collect::<Vec<_>>()).unwrap();
+            writeln!(output_file, "sendercount: {:?},", state.keys().len()).unwrap();
+            writeln!(output_file, "clqs: ").unwrap();
+            writeln!(output_file, "{:?}}},", clique_collection(state.clone())).unwrap();
         });
     }
 }
