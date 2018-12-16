@@ -363,7 +363,7 @@ impl Block {
         let latest_block = latest_blocks.iter().find(|b| b.get_sender() == sender);
         let is_member = match latest_block {
             Some(latest) => block.is_member(latest),
-            None => false
+            None => false,
         };
         if is_member {
             // collect this sender if this block is his latest message
