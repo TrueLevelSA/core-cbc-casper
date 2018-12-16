@@ -33,10 +33,11 @@ pub struct Block((Arc<ProtoBlock>, Hashed));
 #[cfg(feature = "integration_test")]
 impl<S: ::traits::Sender + Into<u32>> From<S> for Block {
     fn from(sender: S) -> Self {
-        (Block::from(ProtoBlock::new(None, sender.into())))
+        Block::from(ProtoBlock::new(None, sender.into()))
     }
 }
 
+#[cfg(feature = "integration_test")]
 impl std::fmt::Debug for Block {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.get_prevblock() {
@@ -48,6 +49,21 @@ impl std::fmt::Debug for Block {
             ),
             Some(block) => write!(fmt, "{:?} -> {:?}", (self.get_sender(), self.id()), block),
         }
+    }
+}
+
+#[cfg(not(feature = "integration_test"))]
+impl std::fmt::Debug for Block {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{:?} -> {:?}",
+            self.id(),
+            self.get_prevblock()
+                .as_ref()
+                .map(|p| p.id())
+                .unwrap_or(&Hashed::default())
+        )
     }
 }
 
@@ -245,26 +261,6 @@ impl Block {
             })
             .collect()
     }
-    // pub fn safety_oracle(
-    //     latest_msgs_honest: &LatestMsgsHonest<BlockMsg>,
-    //     validator: &<BlockMsg as CasperMsg>::Sender,
-    //     equivocators: &HashSet<<BlockMsg as CasperMsg>::Sender>,
-    //     all_honest_senders: &HashSet<<BlockMsg as CasperMsg>::Sender>,
-    // ) -> bool {
-    //     let (val_msgs, rest): (HashSet<_>, HashSet<_>) = latest_msgs_honest
-    //         .iter()
-    //         .partition(|&msg| msg.get_sender() == validator);
-    //     let val_latests_msg: &BlockMsg = *val_msgs.iter().next().unwrap();
-    //     let msg_for_prop = val_latests_msg
-    //         .get_msg_for_proposition(all_honest_senders)
-    //         .iter()
-    //         .next()
-    //         .cloned()
-    //         .unwrap();
-    //     let prop = Block::from(&msg_for_prop);
-    //     rest.iter()
-    //         .all(|&msg| prop.is_member(&Block::from(msg)))
-    // }
 
     // //TODO: this should possibly go to Estimate trait (not sure)
     // pub fn set_as_final(&mut self) -> () {
@@ -303,12 +299,18 @@ impl Block {
         let mut queue: VecDeque<Block> = visited_parents.keys().cloned().collect();
         let latest_blocks: HashSet<Block> = visited_parents.keys().cloned().collect();
         let mut genesis: HashSet<Block> = HashSet::new();
-
+        let mut referred_latest_blocks: HashSet<Block> = HashSet::new();
         // while there are still unvisited blocks
         while let Some(child) = queue.pop_front() {
-            match child.get_prevblock() {
+            match (
+                child.get_prevblock(),
+                referred_latest_blocks == latest_blocks,
+            ) {
                 // if the prevblock is set, update the visited_parents map
-                Some(parent) => {
+                (Some(parent), false) => {
+                    if latest_blocks.contains(&child) && !referred_latest_blocks.contains(&child) {
+                        referred_latest_blocks.insert(child.clone());
+                    }
                     if visited_parents.contains_key(&parent) {
                         // visited parent before, fork found, add new child and don't add parent to queue (since it is already in the queue)
                         visited_parents.get_mut(&parent).map(|parents_children| {
@@ -323,36 +325,39 @@ impl Block {
                     }
                 }
                 // if not, update the genesis set, as a None prevblock indicates the genesis
-                None => {
+                _ => {
                     genesis.insert(child);
                 }
             };
         }
         (visited_parents, genesis, latest_blocks)
     }
-
+    /// used to collect the validators that produced blocks for each side of a fork
     fn collect_validators(
         block: &Block,
         visited: &HashMap<Block, HashSet<Block>>,
         acc: Arc<RwLock<HashSet<Validator>>>,
         latest_blocks: &HashSet<Block>,
     ) -> Arc<RwLock<HashSet<Validator>>> {
-        if latest_blocks.contains(block) {
-            // collect this sender if this block is in his the latest message
-            let _ = acc.write().map(|mut x| x.insert(block.get_sender()));
+        let sender = block.get_sender();
+        let latest_block = latest_blocks.iter().find(|b| b.get_sender() == sender);
+        let is_member = match latest_block {
+            Some(latest) => block.is_member(latest),
+            None => false,
+        };
+        if is_member {
+            // collect this sender if this block is his latest message
+            let _ = acc.write().map(|mut x| x.insert(sender));
         }
-        visited
-            .get(&block)
-            .filter(|children| !children.is_empty())
-            .map(|children| {
-                children.iter().fold(acc.clone(), |acc, block| {
-                    Self::collect_validators(block, visited, acc.clone(), latest_blocks)
-                })
-            })
-            .unwrap_or(acc)
+        match visited.get(&block).filter(|children| !children.is_empty()) {
+            None => acc,
+            Some(children) => children.iter().fold(acc.clone(), |acc, block| {
+                Self::collect_validators(block, visited, acc.clone(), latest_blocks)
+            }),
+        }
     }
 
-    // find heaviest block
+    /// find heaviest block
     fn pick_heaviest(
         blocks: &HashSet<Block>,
         visited: &HashMap<Block, HashSet<Block>>,
@@ -363,7 +368,6 @@ impl Block {
         let heaviest_child = blocks.iter().fold(init, |best, block| {
             best.and_then(|best| visited.get(&block).map(|children| (best, children)))
                 .and_then(|((b_block, b_weight, b_children), children)| {
-                    // add current block sender such that its weight counts too
                     let referred_senders = Arc::new(RwLock::new(HashSet::new()));
                     let referred_senders =
                         Self::collect_validators(block, visited, referred_senders, latest_blocks);
@@ -374,8 +378,7 @@ impl Block {
                     if weight.is_err() {
                         return None;
                     }
-
-                    let weight = weight.unwrap();
+                    let weight = weight.expect("Weight can't be an error, checked above!");
 
                     let res = Some((Some(block.clone()), weight, children.clone()));
                     let b_res = Some((b_block.clone(), b_weight, b_children));
