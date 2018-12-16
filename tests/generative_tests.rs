@@ -26,6 +26,9 @@ use casper::example::blockchain::{Block, BlockMsg, ProtoBlock};
 use casper::example::integer::IntegerWrapper;
 use casper::example::vote_count::VoteCount;
 
+use std::fs::OpenOptions;
+use std::io::Write;
+
 fn add_message<'z, M>(
     state: &'z mut HashMap<M::Sender, SenderState<M>>,
     sender: M::Sender,
@@ -258,12 +261,14 @@ proptest! {
     #[test]
     fn blockchain(ref chain in chain(arbitrary_blockchain(), 6, round_robin, some_receivers, safety_oracle)) {
         // total messages until unilateral consensus
-        println!("new chain");
-        chain.iter().for_each(|state| {println!("{{lms: {:?},", state.iter().map(|(_, sender_state)|
+        let mut output_file = OpenOptions::new().create(true).append(true).open("blockchain_test.log").unwrap();
+
+        writeln!(output_file, "new chain");
+        chain.iter().for_each(|state| {writeln!(output_file, "{{lms: {:?},", state.iter().map(|(_, sender_state)|
                                                                                  sender_state.get_latest_msgs()).collect::<Vec<_>>());
-                                       println!("sendercount: {:?},", state.keys().len());
-                                       print!("clqs: ");
-                                       println!("{:?}}},", clique_collection(state.clone()));
+                                       writeln!(output_file, "sendercount: {:?},", state.keys().len());
+                                       writeln!(output_file, "clqs: ");
+                                       writeln!(output_file, "{:?}}},", clique_collection(state.clone()));
         });
     }
 }
