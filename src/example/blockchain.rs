@@ -33,7 +33,7 @@ pub struct Block((Arc<ProtoBlock>, Hashed));
 #[cfg(feature = "integration_test")]
 impl<S: ::traits::Sender + Into<u32>> From<S> for Block {
     fn from(sender: S) -> Self {
-        (Block::from(ProtoBlock::new(None, sender.into())))
+        Block::from(ProtoBlock::new(None, sender.into()))
     }
 }
 
