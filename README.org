@@ -36,9 +36,12 @@ implementation to generate the protocols.
 We also present an example blockchain implementation.
 
 In order to get started using the library, the best way is to study the examples
-folder. It is also instructive to run the tests with ~cargo test -- --nocapture~
-or ~cargo test $TEST -- --nocapture~, where TEST is the function name of a
-particular test.
+folder. It is also instructive to run the tests.
+To run the unit tests, run ~cargo test -- --nocapture~, or ~cargo test $TEST --
+--nocapture~, where ~TEST~ is the function name of a particular unit test.
+If the integration tests are to be run as well, issue ~cargo test --features
+integration_test -- --nocapture~, or ~cargo test --features integration_test $TEST --
+--nocapture~, where ~TEST~ is the function name of a particular integration test.
 
 This library is experimental and might change dramatically.
 
