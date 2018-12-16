@@ -359,9 +359,15 @@ impl Block {
         acc: Arc<RwLock<HashSet<Validator>>>,
         latest_blocks: &HashSet<Block>,
     ) -> Arc<RwLock<HashSet<Validator>>> {
-        if latest_blocks.contains(block) {
+        let sender = block.get_sender();
+        let latest_block = latest_blocks.iter().find(|b| b.get_sender() == sender);
+        let is_member = match latest_block {
+            Some(latest) => block.is_member(latest),
+            None => false
+        };
+        if is_member {
             // collect this sender if this block is his latest message
-            let _ = acc.write().map(|mut x| x.insert(block.get_sender()));
+            let _ = acc.write().map(|mut x| x.insert(sender));
         }
         match visited.get(&block).filter(|children| !children.is_empty()) {
             None => acc,
