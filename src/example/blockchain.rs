@@ -261,26 +261,6 @@ impl Block {
             })
             .collect()
     }
-    // pub fn safety_oracle(
-    //     latest_msgs_honest: &LatestMsgsHonest<BlockMsg>,
-    //     validator: &<BlockMsg as CasperMsg>::Sender,
-    //     equivocators: &HashSet<<BlockMsg as CasperMsg>::Sender>,
-    //     all_honest_senders: &HashSet<<BlockMsg as CasperMsg>::Sender>,
-    // ) -> bool {
-    //     let (val_msgs, rest): (HashSet<_>, HashSet<_>) = latest_msgs_honest
-    //         .iter()
-    //         .partition(|&msg| msg.get_sender() == validator);
-    //     let val_latests_msg: &BlockMsg = *val_msgs.iter().next().unwrap();
-    //     let msg_for_prop = val_latests_msg
-    //         .get_msg_for_proposition(all_honest_senders)
-    //         .iter()
-    //         .next()
-    //         .cloned()
-    //         .unwrap();
-    //     let prop = Block::from(&msg_for_prop);
-    //     rest.iter()
-    //         .all(|&msg| prop.is_member(&Block::from(msg)))
-    // }
 
     // //TODO: this should possibly go to Estimate trait (not sure)
     // pub fn set_as_final(&mut self) -> () {
