@@ -347,19 +347,22 @@ impl Block {
         }
         match visited.get(&block).filter(|children| !children.is_empty()) {
             None => acc,
-            Some(children) => children.iter().fold(acc, |mut acc, b| {
-                let mut res = Self::collect_validators(
-                    b,
+            // compute the senders endorsing the child block
+            Some(children) => children.iter().fold(acc, |mut acc, child| {
+                let mut endorsers = Self::collect_validators(
+                    child,
                     visited,
                     HashSet::new(),
                     latest_blocks,
                     b_in_lms_senders.clone(),
                 );
+                // memoize child's endorsers
                 b_in_lms_senders
                     .write()
                     .ok()
-                    .map(|mut lms| lms.insert(b.clone(), res.clone()));
-                let acc = Iterator::chain(acc.drain(), res.drain()).collect();
+                    .map(|mut lms| lms.insert(child.clone(), endorsers.clone()));
+                // take the union of accumulator and endorsers
+                let acc = Iterator::chain(acc.drain(), endorsers.drain()).collect();
                 acc
             }),
         }
