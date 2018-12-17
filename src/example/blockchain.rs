@@ -416,7 +416,8 @@ impl Block {
                         match ord {
                             Some(std::cmp::Ordering::Greater) => res,
                             Some(std::cmp::Ordering::Less) => b_res,
-                            _ => None,
+                            Some(std::cmp::Ordering::Equal) => b_res,
+                            None => None,
                         }
                     }
                 })
