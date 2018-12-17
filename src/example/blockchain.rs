@@ -360,39 +360,51 @@ impl Block {
         latest_blocks: &HashSet<Block>,
     ) -> Option<(Option<Self>, WeightUnit, HashSet<Self>)> {
         let init = Some((None, WeightUnit::ZERO, HashSet::new()));
-        let heaviest_child = blocks.iter().fold(init, |best, block| {
-            best.and_then(|best| visited.get(&block).map(|children| (best, children)))
-                .and_then(|((b_block, b_weight, b_children), children)| {
-                    let referred_senders = Arc::new(RwLock::new(HashSet::new()));
-                    let referred_senders =
-                        Self::collect_validators(block, visited, referred_senders, latest_blocks);
-                    let weight = referred_senders
-                        .read()
-                        .map(|s| weights.sum_weight_senders(&s));
+        let heaviest_child = match blocks.len() {
+            l if l == 1 => blocks.iter().next().cloned().and_then(|block| {
+                visited
+                    .get(&block)
+                    .map(|children| (Some(block), WeightUnit::ZERO, children.clone()))
+            }),
+            l if l > 1 => blocks.iter().fold(init, |best, block| {
+                best.and_then(|best| visited.get(&block).map(|children| (best, children)))
+                    .and_then(|((b_block, b_weight, b_children), children)| {
+                        let referred_senders = Arc::new(RwLock::new(HashSet::new()));
+                        let referred_senders = Self::collect_validators(
+                            block,
+                            visited,
+                            referred_senders,
+                            latest_blocks,
+                        );
+                        let weight = referred_senders
+                            .read()
+                            .map(|s| weights.sum_weight_senders(&s));
 
-                    if weight.is_err() {
-                        return None;
-                    }
-                    let weight = weight.expect("Weight can't be an error, checked above!");
-
-                    let res = Some((Some(block.clone()), weight, children.clone()));
-                    let b_res = Some((b_block.clone(), b_weight, b_children));
-
-                    if weight > b_weight {
-                        res
-                    } else if weight < b_weight {
-                        b_res
-                    } else {
-                        // break ties with blockhash
-                        let ord = b_block.as_ref().map(|b| b.id().cmp(block.id()));
-                        match ord {
-                            Some(std::cmp::Ordering::Greater) => res,
-                            Some(std::cmp::Ordering::Less) => b_res,
-                            _ => None,
+                        if weight.is_err() {
+                            return None;
                         }
-                    }
-                })
-        });
+                        let weight = weight.expect("Weight can't be an error, checked above!");
+
+                        let res = Some((Some(block.clone()), weight, children.clone()));
+                        let b_res = Some((b_block.clone(), b_weight, b_children));
+
+                        if weight > b_weight {
+                            res
+                        } else if weight < b_weight {
+                            b_res
+                        } else {
+                            // break ties with blockhash
+                            let ord = b_block.as_ref().map(|b| b.id().cmp(block.id()));
+                            match ord {
+                                Some(std::cmp::Ordering::Greater) => res,
+                                Some(std::cmp::Ordering::Less) => b_res,
+                                _ => None,
+                            }
+                        }
+                    })
+            }),
+            _ => init,
+        };
         heaviest_child.and_then(|(b_block, b_weight, b_children)| {
             if b_children.is_empty() {
                 // base case
