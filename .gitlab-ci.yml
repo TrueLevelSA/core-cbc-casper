@@ -10,14 +10,7 @@ stages:
   - build
   - tests
   - examples
-
-fmt:
-  stage: build
-  script:
-      # When running with --check, Rustfmt will exit with 0 if Rustfmt would
-      # not make any formatting changes to the input, and 1 if Rustfmt would
-      # make changes.
-    - cargo fmt --all -- --check
+  - format
 
 build:
   stage: build
@@ -48,3 +41,11 @@ ternary:
   stage: examples
   script:
     - cargo run --example ternary
+
+fmt:
+  stage: format
+  script:
+      # When running with --check, Rustfmt will exit with 0 if Rustfmt would
+      # not make any formatting changes to the input, and 1 if Rustfmt would
+      # make changes.
+    - cargo fmt --all -- --check
