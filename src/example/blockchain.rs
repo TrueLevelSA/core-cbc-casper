@@ -725,7 +725,7 @@ mod tests {
         assert_eq!(
             m5.get_estimate(),
             &Block::new(Some(Block::from(&m4)), sender5),
-            "should build on top of "
+            "should build on top of b4"
         );
     }
 
