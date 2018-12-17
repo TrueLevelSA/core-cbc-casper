@@ -336,18 +336,31 @@ impl Block {
     fn collect_validators(
         block: &Block,
         visited: &HashMap<Block, HashSet<Block>>,
-        acc: Arc<RwLock<HashSet<Validator>>>,
+        mut acc: HashSet<Validator>,
         latest_blocks: &HashSet<Block>,
-    ) -> Arc<RwLock<HashSet<Validator>>> {
+        b_in_lms_senders: Arc<RwLock<HashMap<Block, HashSet<Validator>>>>,
+    ) -> HashSet<Validator> {
         let sender = block.get_sender();
         if latest_blocks.contains(block) {
             // collect this sender if this block is his latest message
-            let _ = acc.write().map(|mut x| x.insert(sender));
+            let _ = acc.insert(sender);
         }
         match visited.get(&block).filter(|children| !children.is_empty()) {
             None => acc,
-            Some(children) => children.iter().fold(acc.clone(), |acc, block| {
-                Self::collect_validators(block, visited, acc.clone(), latest_blocks)
+            Some(children) => children.iter().fold(acc, |mut acc, b| {
+                let mut res = Self::collect_validators(
+                    b,
+                    visited,
+                    HashSet::new(),
+                    latest_blocks,
+                    b_in_lms_senders.clone(),
+                );
+                b_in_lms_senders
+                    .write()
+                    .ok()
+                    .map(|mut lms| lms.insert(b.clone(), res.clone()));
+                let acc = Iterator::chain(acc.drain(), res.drain()).collect();
+                acc
             }),
         }
     }
@@ -358,6 +371,7 @@ impl Block {
         visited: &HashMap<Block, HashSet<Block>>,
         weights: &SendersWeight<Validator>,
         latest_blocks: &HashSet<Block>,
+        b_in_lms_senders: Arc<RwLock<HashMap<Block, HashSet<Validator>>>>,
     ) -> Option<(Option<Self>, WeightUnit, HashSet<Self>)> {
         let init = Some((None, WeightUnit::ZERO, HashSet::new()));
         let heaviest_child = match blocks.len() {
@@ -369,21 +383,25 @@ impl Block {
             l if l > 1 => blocks.iter().fold(init, |best, block| {
                 best.and_then(|best| visited.get(&block).map(|children| (best, children)))
                     .and_then(|((b_block, b_weight, b_children), children)| {
-                        let referred_senders = Arc::new(RwLock::new(HashSet::new()));
-                        let referred_senders = Self::collect_validators(
-                            block,
-                            visited,
-                            referred_senders,
-                            latest_blocks,
-                        );
-                        let weight = referred_senders
+                        let referred_senders = match b_in_lms_senders
                             .read()
-                            .map(|s| weights.sum_weight_senders(&s));
+                            .ok()
+                            .and_then(|lms| lms.get(block).cloned())
+                        {
+                            Some(rs) => rs,
+                            None => {
+                                let referred_senders = HashSet::new();
+                                Self::collect_validators(
+                                    block,
+                                    visited,
+                                    referred_senders,
+                                    latest_blocks,
+                                    b_in_lms_senders.clone(),
+                                )
+                            }
+                        };
 
-                        if weight.is_err() {
-                            return None;
-                        }
-                        let weight = weight.expect("Weight can't be an error, checked above!");
+                        let weight = weights.sum_weight_senders(&referred_senders);
 
                         let res = Some((Some(block.clone()), weight, children.clone()));
                         let b_res = Some((b_block.clone(), b_weight, b_children));
@@ -411,7 +429,13 @@ impl Block {
                 Some((b_block, b_weight, b_children))
             } else {
                 // recurse
-                Self::pick_heaviest(&b_children, visited, &weights, latest_blocks)
+                Self::pick_heaviest(
+                    &b_children,
+                    visited,
+                    &weights,
+                    latest_blocks,
+                    b_in_lms_senders.clone(),
+                )
             }
         })
     }
@@ -422,8 +446,15 @@ impl Block {
         senders_weights: &SendersWeight<<BlockMsg as CasperMsg>::Sender>,
     ) -> Option<Self> {
         let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_msgs, finalized_msg);
-        Block::pick_heaviest(&genesis, &visited, senders_weights, &latest_blocks)
-            .and_then(|(opt_block, ..)| opt_block)
+        let b_in_lms_senders = Arc::new(RwLock::new(HashMap::<Block, HashSet<Validator>>::new()));
+        Block::pick_heaviest(
+            &genesis,
+            &visited,
+            senders_weights,
+            &latest_blocks,
+            b_in_lms_senders,
+        )
+        .and_then(|(opt_block, ..)| opt_block)
     }
 }
 
