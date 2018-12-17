@@ -308,7 +308,7 @@ impl Block {
             ) {
                 // if the prevblock is set, update the visited_parents map
                 (Some(parent), false) => {
-                    if latest_blocks.contains(&child) && !referred_latest_blocks.contains(&child) {
+                    if latest_blocks.contains(&child) {
                         referred_latest_blocks.insert(child.clone());
                     }
                     if visited_parents.contains_key(&parent) {
