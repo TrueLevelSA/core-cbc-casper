@@ -304,11 +304,11 @@ impl Block {
         while let Some(child) = queue.pop_front() {
             match (
                 child.get_prevblock(),
-                referred_latest_blocks == latest_blocks,
+                referred_latest_blocks == latest_blocks && queue.len() == 0,
             ) {
                 // if the prevblock is set, update the visited_parents map
                 (Some(parent), false) => {
-                    if latest_blocks.contains(&child) && !referred_latest_blocks.contains(&child) {
+                    if latest_blocks.contains(&child) {
                         referred_latest_blocks.insert(child.clone());
                     }
                     if visited_parents.contains_key(&parent) {
@@ -336,23 +336,34 @@ impl Block {
     fn collect_validators(
         block: &Block,
         visited: &HashMap<Block, HashSet<Block>>,
-        acc: Arc<RwLock<HashSet<Validator>>>,
+        mut acc: HashSet<Validator>,
         latest_blocks: &HashSet<Block>,
-    ) -> Arc<RwLock<HashSet<Validator>>> {
+        b_in_lms_senders: Arc<RwLock<HashMap<Block, HashSet<Validator>>>>,
+    ) -> HashSet<Validator> {
         let sender = block.get_sender();
-        let latest_block = latest_blocks.iter().find(|b| b.get_sender() == sender);
-        let is_member = match latest_block {
-            Some(latest) => block.is_member(latest),
-            None => false,
-        };
-        if is_member {
+        if latest_blocks.contains(block) {
             // collect this sender if this block is his latest message
-            let _ = acc.write().map(|mut x| x.insert(sender));
+            let _ = acc.insert(sender);
         }
         match visited.get(&block).filter(|children| !children.is_empty()) {
             None => acc,
-            Some(children) => children.iter().fold(acc.clone(), |acc, block| {
-                Self::collect_validators(block, visited, acc.clone(), latest_blocks)
+            // compute the senders endorsing the child block
+            Some(children) => children.iter().fold(acc, |mut acc, child| {
+                let mut endorsers = Self::collect_validators(
+                    child,
+                    visited,
+                    HashSet::new(),
+                    latest_blocks,
+                    b_in_lms_senders.clone(),
+                );
+                // memoize child's endorsers
+                b_in_lms_senders
+                    .write()
+                    .ok()
+                    .map(|mut lms| lms.insert(child.clone(), endorsers.clone()));
+                // take the union of accumulator and endorsers
+                let acc = Iterator::chain(acc.drain(), endorsers.drain()).collect();
+                acc
             }),
         }
     }
@@ -363,26 +374,38 @@ impl Block {
         visited: &HashMap<Block, HashSet<Block>>,
         weights: &SendersWeight<Validator>,
         latest_blocks: &HashSet<Block>,
+        b_in_lms_senders: Arc<RwLock<HashMap<Block, HashSet<Validator>>>>,
     ) -> Option<(Option<Self>, WeightUnit, HashSet<Self>)> {
         let init = Some((None, WeightUnit::ZERO, HashSet::new()));
-        let heaviest_child = blocks.iter().fold(init, |best, block| {
-            best.and_then(|best| visited.get(&block).map(|children| (best, children)))
-                .and_then(|((b_block, b_weight, b_children), children)| {
-                    let referred_senders = Arc::new(RwLock::new(HashSet::new()));
-                    let referred_senders =
-                        Self::collect_validators(block, visited, referred_senders, latest_blocks);
-                    let weight = referred_senders
+        let heaviest_child = match blocks.len() {
+            // only one choice, no need to compute anything
+            l if l == 1 => blocks.iter().next().cloned().and_then(|block| {
+                visited
+                    .get(&block)
+                    .map(|children| (Some(block), WeightUnit::ZERO, children.clone()))
+            }),
+            // fork, need to find best block
+            l if l > 1 => blocks.iter().fold(init, |best, block| {
+                let best_children =
+                    best.and_then(|best| visited.get(&block).map(|children| (best, children)));
+                best_children.and_then(|((b_block, b_weight, b_children), children)| {
+                    let referred_senders = match b_in_lms_senders
                         .read()
-                        .map(|s| weights.sum_weight_senders(&s));
-
-                    if weight.is_err() {
-                        return None;
-                    }
-                    let weight = weight.expect("Weight can't be an error, checked above!");
-
+                        .ok()
+                        .and_then(|lms| lms.get(block).cloned())
+                    {
+                        Some(rs) => rs,
+                        None => Self::collect_validators(
+                            block,
+                            visited,
+                            HashSet::new(),
+                            latest_blocks,
+                            b_in_lms_senders.clone(),
+                        ),
+                    };
+                    let weight = weights.sum_weight_senders(&referred_senders);
                     let res = Some((Some(block.clone()), weight, children.clone()));
                     let b_res = Some((b_block.clone(), b_weight, b_children));
-
                     if weight > b_weight {
                         res
                     } else if weight < b_weight {
@@ -393,18 +416,27 @@ impl Block {
                         match ord {
                             Some(std::cmp::Ordering::Greater) => res,
                             Some(std::cmp::Ordering::Less) => b_res,
-                            _ => None,
+                            Some(std::cmp::Ordering::Equal) => b_res,
+                            None => None,
                         }
                     }
                 })
-        });
+            }),
+            _ => init,
+        };
         heaviest_child.and_then(|(b_block, b_weight, b_children)| {
             if b_children.is_empty() {
                 // base case
                 Some((b_block, b_weight, b_children))
             } else {
                 // recurse
-                Self::pick_heaviest(&b_children, visited, &weights, latest_blocks)
+                Self::pick_heaviest(
+                    &b_children,
+                    visited,
+                    &weights,
+                    latest_blocks,
+                    b_in_lms_senders.clone(),
+                )
             }
         })
     }
@@ -415,8 +447,15 @@ impl Block {
         senders_weights: &SendersWeight<<BlockMsg as CasperMsg>::Sender>,
     ) -> Option<Self> {
         let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_msgs, finalized_msg);
-        Block::pick_heaviest(&genesis, &visited, senders_weights, &latest_blocks)
-            .and_then(|(opt_block, ..)| opt_block)
+        let b_in_lms_senders = Arc::new(RwLock::new(HashMap::<Block, HashSet<Validator>>::new()));
+        Block::pick_heaviest(
+            &genesis,
+            &visited,
+            senders_weights,
+            &latest_blocks,
+            b_in_lms_senders,
+        )
+        .and_then(|(opt_block, ..)| opt_block)
     }
 }
 
@@ -432,15 +471,9 @@ impl Estimate for Block {
         // conflict with the past blocks
         incomplete_block: Option<<Self as Data>::Data>,
     ) -> Self {
-        match (latest_msgs.len(), incomplete_block) {
-            (0, _) => panic!("Needs at least one latest message to be able to pick one"),
-            (_, None) => panic!("incomplete_block is None"),
-            (1, Some(incomplete_block)) => {
-                // only msg to built on top, no choice thus no ghost
-                let msg = latest_msgs.iter().next().cloned();
-                Self::from_prevblock_msg(msg, incomplete_block)
-            }
-            (_, Some(incomplete_block)) => {
+        match incomplete_block {
+            None => panic!("incomplete_block is None"),
+            Some(incomplete_block) => {
                 let prevblock = Block::ghost(latest_msgs, finalized_msg, senders_weights);
                 let block = Block::from(ProtoBlock {
                     prevblock,
@@ -718,7 +751,7 @@ mod tests {
         assert_eq!(
             m5.get_estimate(),
             &Block::new(Some(Block::from(&m4)), sender5),
-            "should build on top of "
+            "should build on top of b4"
         );
     }
 
