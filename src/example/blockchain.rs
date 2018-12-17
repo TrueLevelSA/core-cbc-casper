@@ -470,15 +470,9 @@ impl Estimate for Block {
         // conflict with the past blocks
         incomplete_block: Option<<Self as Data>::Data>,
     ) -> Self {
-        match (latest_msgs.len(), incomplete_block) {
-            (0, _) => panic!("Needs at least one latest message to be able to pick one"),
-            (_, None) => panic!("incomplete_block is None"),
-            (1, Some(incomplete_block)) => {
-                // only msg to built on top, no choice thus no ghost
-                let msg = latest_msgs.iter().next().cloned();
-                Self::from_prevblock_msg(msg, incomplete_block)
-            }
-            (_, Some(incomplete_block)) => {
+        match incomplete_block {
+            None => panic!("incomplete_block is None"),
+            Some(incomplete_block) => {
                 let prevblock = Block::ghost(latest_msgs, finalized_msg, senders_weights);
                 let block = Block::from(ProtoBlock {
                     prevblock,
