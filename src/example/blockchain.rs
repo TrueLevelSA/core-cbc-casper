@@ -304,7 +304,7 @@ impl Block {
         while let Some(child) = queue.pop_front() {
             match (
                 child.get_prevblock(),
-                referred_latest_blocks == latest_blocks,
+                referred_latest_blocks == latest_blocks && queue.len() == 0,
             ) {
                 // if the prevblock is set, update the visited_parents map
                 (Some(parent), false) => {
