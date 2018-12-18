@@ -467,16 +467,16 @@ impl Estimate for Block {
         // and search for a reasonable set of txs in this function that does not
         // conflict with the past blocks
         incomplete_block: Option<<Self as Data>::Data>,
-    ) -> Self {
+    ) -> Result<Self, &'static str> {
         match incomplete_block {
-            None => panic!("incomplete_block is None"),
+            None => Err("incomplete_block is None"),
             Some(incomplete_block) => {
                 let prevblock = Block::ghost(latest_msgs, senders_weights);
                 let block = Block::from(ProtoBlock {
                     prevblock,
                     ..(*incomplete_block.arc().clone())
                 });
-                block
+                Ok(block)
             }
         }
     }

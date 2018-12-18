@@ -48,9 +48,9 @@ impl Estimate for Value {
         latest_msgs: &LatestMsgsHonest<Message>,
         senders_weights: &SendersWeight<Validator>,
         _data: Option<Value>,
-    ) -> Value {
+    ) -> Result<Self, &'static str> {
         use message::CasperMsg;
-        latest_msgs
+        let res: Self = latest_msgs
             .iter()
             .map(|msg| {
                 (
@@ -67,7 +67,8 @@ impl Estimate for Value {
                     _ => acc, // No weight for the given validator, do nothing
                 },
             )
-            .into()
+            .into();
+        Ok(res)
     }
 }
 

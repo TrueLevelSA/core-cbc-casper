@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::fmt::{Debug, Formatter, Result};
+use std::fmt::{Debug, Formatter};
 use std::ops::Add;
 
 #[cfg(feature = "integration_test")]
@@ -37,7 +37,7 @@ impl Add for VoteCount {
 }
 
 impl Debug for VoteCount {
-    fn fmt(&self, f: &mut Formatter) -> Result {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "y{:?}/n{:?}", self.yes, self.no)
     }
 }
@@ -153,14 +153,15 @@ impl Estimate for VoteCount {
         _weights: &SendersWeight<Voter>, // all voters have same weight
         _external_data: Option<Self>,
         // _external_data: Option<Self::Data>,
-    ) -> Self {
+    ) -> Result<Self, &'static str> {
         // the estimates are actually the original votes of each of the voters /
         // validators
 
         let votes = Self::get_vote_msgs(latest_msgs);
-        votes
+        let votes = votes
             .iter()
-            .fold(Self::ZERO, |acc, vote| acc + vote.get_estimate().clone())
+            .fold(Self::ZERO, |acc, vote| acc + vote.get_estimate().clone());
+        Ok(votes)
     }
 }
 

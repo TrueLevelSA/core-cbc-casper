@@ -64,7 +64,7 @@ impl<M: CasperMsg> Justification<M> {
         equivocators: &HashSet<M::Sender>,
         senders_weights: &SendersWeight<<M as CasperMsg>::Sender>,
         data: Option<<<M as CasperMsg>::Estimate as Data>::Data>,
-    ) -> M::Estimate {
+    ) -> Result<M::Estimate, &'static str> {
         let latest_msgs = LatestMsgs::from(self);
         let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(&latest_msgs, equivocators);
         M::Estimate::mk_estimate(&latest_msgs_honest, senders_weights, data)
@@ -291,7 +291,7 @@ impl<M: CasperMsg> LatestMsgsHonest<M> {
         &self,
         senders_weights: &SendersWeight<<M as CasperMsg>::Sender>,
         data: Option<<<M as CasperMsg>::Estimate as Data>::Data>,
-    ) -> M::Estimate {
+    ) -> Result<M::Estimate, &'static str> {
         M::Estimate::mk_estimate(&self, senders_weights, data)
     }
 }
