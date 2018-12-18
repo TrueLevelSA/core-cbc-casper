@@ -51,7 +51,6 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
     fn from_msgs(
         sender: Self::Sender,
         mut new_msgs: Vec<&Self>,
-        finalized_msg: Option<&Self>,
         sender_state: &SenderState<Self>,
         external_data: Option<<Self::Estimate as Data>::Data>,
     ) -> Result<(Self, SenderState<Self>), &'static str> {
@@ -78,11 +77,8 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
                 sender_state.get_equivocators(),
             );
 
-            let estimate = latest_msgs_honest.mk_estimate(
-                finalized_msg,
-                &sender_state.get_senders_weights(),
-                external_data,
-            );
+            let estimate =
+                latest_msgs_honest.mk_estimate(&sender_state.get_senders_weights(), external_data);
 
             let message = Self::new(sender, justification, estimate, None);
             Ok((message, sender_state))
@@ -518,7 +514,7 @@ mod tests {
         assert!(success);
 
         let external_data: Option<VoteCount> = None;
-        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &sender_state, external_data).unwrap();
+        let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state, external_data).unwrap();
         // let m0 = &Message::new(0, justification, estimate);
 
         let mut j1 = Justification::new();
@@ -529,11 +525,11 @@ mod tests {
         let (success, _) = j1.faulty_inserts(vec![m0].iter().cloned().collect(), &sender_state);
         assert!(success);
 
-        let (msg1, _) = Message::from_msgs(0, vec![v0], None, &sender_state, None).unwrap();
-        let (msg2, _) = Message::from_msgs(0, vec![v0], None, &sender_state, None).unwrap();
+        let (msg1, _) = Message::from_msgs(0, vec![v0], &sender_state, None).unwrap();
+        let (msg2, _) = Message::from_msgs(0, vec![v0], &sender_state, None).unwrap();
         assert!(msg1 == msg2, "messages should be equal");
 
-        let (msg3, _) = Message::from_msgs(0, vec![v0, m0], None, &sender_state, None).unwrap();
+        let (msg3, _) = Message::from_msgs(0, vec![v0, m0], &sender_state, None).unwrap();
         assert!(msg1 != msg3, "msg1 should be different than msg3");
     }
 
@@ -558,7 +554,7 @@ mod tests {
         let (success, _) = j0.faulty_inserts(vec![v0].iter().cloned().collect(), &sender_state);
         assert!(success);
 
-        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &sender_state, None).unwrap();
+        let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state, None).unwrap();
 
         assert!(
             !v0.depends(v0_prime),
@@ -575,7 +571,7 @@ mod tests {
         let (success, _) = j0.faulty_inserts([v0].iter().cloned().collect(), &sender_state);
         assert!(success);
 
-        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &sender_state, None).unwrap();
+        let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state, None).unwrap();
 
         let mut j1 = Justification::new();
         let (success, _) = j1.faulty_inserts([v0].iter().cloned().collect(), &sender_state);
@@ -584,7 +580,7 @@ mod tests {
         let (success, _) = j1.faulty_inserts([m0].iter().cloned().collect(), &sender_state);
         assert!(success);
 
-        let (m1, _) = &Message::from_msgs(0, vec![v0, m0], None, &sender_state, None).unwrap();
+        let (m1, _) = &Message::from_msgs(0, vec![v0, m0], &sender_state, None).unwrap();
 
         assert!(m1.depends(m0), "m1 DOES depent on m0");
         assert!(!m0.depends(m1), "but m0 does NOT depend on m1");
@@ -612,9 +608,9 @@ mod tests {
         let (success, _) = j0.faulty_inserts(vec![v0].iter().cloned().collect(), &sender_state);
         assert!(success);
 
-        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &sender_state, None).unwrap();
+        let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state, None).unwrap();
 
-        let (m1, _) = &Message::from_msgs(1, vec![v0], None, &sender_state, None).unwrap();
+        let (m1, _) = &Message::from_msgs(1, vec![v0], &sender_state, None).unwrap();
         assert!(!v0.equivocates(v0), "should be all good");
         assert!(!v1.equivocates(m0), "should be all good");
         assert!(!m0.equivocates(v1), "should be all good");
@@ -654,25 +650,15 @@ mod tests {
         let safe_msgs = v0.get_safe_msgs_by_weight(senders_weights, thr);
         assert_eq!(safe_msgs.len(), 0, "only 0.5 of weight saw v0");
 
-        let (m0, _) = &Message::from_msgs(
-            sender0,
-            vec![&v0],
-            None,
-            &sender_state,
-            None as Option<VoteCount>,
-        )
-        .unwrap();
+        let (m0, _) =
+            &Message::from_msgs(sender0, vec![&v0], &sender_state, None as Option<VoteCount>)
+                .unwrap();
         let safe_msgs = m0.get_safe_msgs_by_weight(senders_weights, thr);
         assert_eq!(safe_msgs.len(), 0, "only 0.5 of weight saw v0 and m0");
 
-        let (m1, _) = &Message::from_msgs(
-            sender1,
-            vec![&m0],
-            None,
-            &sender_state,
-            None as Option<VoteCount>,
-        )
-        .unwrap();
+        let (m1, _) =
+            &Message::from_msgs(sender1, vec![&m0], &sender_state, None as Option<VoteCount>)
+                .unwrap();
         let safe_msgs = m1.get_safe_msgs_by_weight(senders_weights, thr);
         assert_eq!(
             safe_msgs.len(),
@@ -680,14 +666,9 @@ mod tests {
             "both sender0 (0.5) and sender1 (0.5) saw v0 and m0, but sender0 hasn't necessarly seen sender1 seeing v0 and m0, thus not yet safe"
         );
 
-        let (m2, _) = &Message::from_msgs(
-            sender0,
-            vec![&m1],
-            None,
-            &sender_state,
-            None as Option<VoteCount>,
-        )
-        .unwrap();
+        let (m2, _) =
+            &Message::from_msgs(sender0, vec![&m1], &sender_state, None as Option<VoteCount>)
+                .unwrap();
         let safe_msgs = m2.get_safe_msgs_by_weight(senders_weights, thr);
         assert_eq!(
             safe_msgs.get(m0).unwrap_or(&f64::NAN),
@@ -779,26 +760,16 @@ mod tests {
         let safe_msgs = v0.get_msg_for_proposition(senders);
         assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0");
 
-        let (m0, sender_state0) = &Message::from_msgs(
-            sender0,
-            vec![v0],
-            None,
-            &sender_state,
-            None as Option<VoteCount>,
-        )
-        .unwrap();
+        let (m0, sender_state0) =
+            &Message::from_msgs(sender0, vec![v0], &sender_state, None as Option<VoteCount>)
+                .unwrap();
 
         let safe_msgs = m0.get_msg_for_proposition(senders);
         assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0 and m0");
 
-        let (m1, _) = &Message::from_msgs(
-            sender1,
-            vec![m0],
-            None,
-            &sender_state,
-            None as Option<VoteCount>,
-        )
-        .unwrap();
+        let (m1, _) =
+            &Message::from_msgs(sender1, vec![m0], &sender_state, None as Option<VoteCount>)
+                .unwrap();
 
         let safe_msgs = m1.get_msg_for_proposition(senders);
         assert_eq!(
@@ -807,14 +778,9 @@ mod tests {
             "both sender0 and sender1 saw v0 and m0, but sender0 hasn't necessarly seen sender1 seeing v0 and m0, thus not yet safe"
         );
 
-        let (m2, _) = &Message::from_msgs(
-            sender0,
-            vec![m1],
-            None,
-            &sender_state0,
-            None as Option<VoteCount>,
-        )
-        .unwrap();
+        let (m2, _) =
+            &Message::from_msgs(sender0, vec![m1], &sender_state0, None as Option<VoteCount>)
+                .unwrap();
 
         let safe_msgs = m2.get_msg_for_proposition(senders);
         assert_eq!(
@@ -831,7 +797,6 @@ mod tests {
         let (ref mut m0, sender_state0) = &mut Message::from_msgs(
             sender0,
             vec![v0, v1],
-            None,
             &sender_state,
             None as Option<VoteCount>,
         )
@@ -846,14 +811,9 @@ mod tests {
         //     "sender0 saw v0, v1 and m0, and sender1 saw only v1"
         // );
 
-        let (m1, _) = &Message::from_msgs(
-            sender1,
-            vec![m0],
-            None,
-            &sender_state,
-            None as Option<VoteCount>,
-        )
-        .unwrap();
+        let (m1, _) =
+            &Message::from_msgs(sender1, vec![m0], &sender_state, None as Option<VoteCount>)
+                .unwrap();
         let safe_msgs = m1.get_msg_for_proposition(senders);
 
         assert_eq!(
@@ -862,14 +822,9 @@ mod tests {
             "both sender0 and sender1 saw v0, v1 and m0, but sender0 hasn't necessarly seen sender1 seeing v0 and m0, just v1 is safe"
         );
 
-        let (m2, _sender_state) = &Message::from_msgs(
-            sender0,
-            vec![m1],
-            None,
-            &sender_state0,
-            None as Option<VoteCount>,
-        )
-        .unwrap();
+        let (m2, _sender_state) =
+            &Message::from_msgs(sender0, vec![m1], &sender_state0, None as Option<VoteCount>)
+                .unwrap();
 
         let safe_msgs = m2.get_msg_for_proposition(senders);
         assert_eq!(

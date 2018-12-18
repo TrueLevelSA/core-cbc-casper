@@ -55,7 +55,6 @@ where
     let (m, sender_state) = M::from_msgs(
         sender.clone(),
         latest_delta.iter().collect(),
-        None,
         &state[&sender],
         data.clone().map(|d| d.into()),
     )
@@ -119,7 +118,7 @@ where
         .map(|(_sender, sender_state)| {
             let latest_honest_msgs =
                 LatestMsgsHonest::from_latest_msgs(sender_state.get_latest_msgs(), &HashSet::new());
-            latest_honest_msgs.mk_estimate(None, sender_state.get_senders_weights(), None)
+            latest_honest_msgs.mk_estimate(sender_state.get_senders_weights(), None)
         })
         .collect();
     println!("{:?}", m);
@@ -418,7 +417,7 @@ proptest! {
         let single_equivocation: Vec<_> = messages[..nodes+1].iter().map(|message| message).collect();
         let equivocator = messages[nodes].get_sender();
         let (m0, _) =
-            &Message::from_msgs(0, single_equivocation.clone(), None, &sender_state, None)
+            &Message::from_msgs(0, single_equivocation.clone(), &sender_state, None)
             .unwrap();
         let equivocations: Vec<_> = single_equivocation.iter().filter(|message| message.equivocates(&m0)).collect();
         assert!(if *equivocator == 0 {equivocations.len() == 1} else {equivocations.len() == 0}, "should detect sender 0 equivocating if sender 0 equivocates");
@@ -426,7 +425,7 @@ proptest! {
         // assert_eq!(equivocations.len(), 1, "should detect sender 0 equivocating if sender 0 equivocates");
 
         let (m0, _) =
-            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), None, &sender_state, None)
+            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &sender_state, None)
             .unwrap();
         let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
         assert_eq!(equivocations.len(), 1, "should detect sender 0 equivocating if sender 0 equivocates");
@@ -440,7 +439,7 @@ proptest! {
             HashSet::new(),
         );
         let (m0, _) =
-            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), None, &sender_state, None)
+            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &sender_state, None)
             .unwrap();
         let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
         assert_eq!(equivocations.len(), 0, "equivocation absorbed in threshold");

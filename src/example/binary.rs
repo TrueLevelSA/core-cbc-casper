@@ -30,7 +30,6 @@ impl Estimate for BoolWrapper {
     /// weighted count of the votes contained in the latest messages
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        _finalized_msg: Option<&Self::M>,
         senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
         _data: Option<<Self as Data>::Data>,
     ) -> Self {
@@ -89,7 +88,7 @@ mod tests {
         let m1 = BinaryMsg::new(senders[1], Justification::new(), BoolWrapper(true), None);
         let m2 = BinaryMsg::new(senders[2], Justification::new(), BoolWrapper(false), None);
         let (m3, _) =
-            BinaryMsg::from_msgs(senders[0], vec![&m0, &m1], None, &sender_state, None).unwrap();
+            BinaryMsg::from_msgs(senders[0], vec![&m0, &m1], &sender_state, None).unwrap();
 
         assert_eq!(
             BoolWrapper::mk_estimate(
@@ -97,7 +96,6 @@ mod tests {
                     &LatestMsgs::from(&Justification::new()),
                     sender_state.get_equivocators()
                 ),
-                None,
                 &senders_weights,
                 None
             ),
@@ -187,8 +185,7 @@ mod tests {
 
         // assume sender 0 has seen messages from sender 1 and sender 2 and reveals this in a published message
         let (m5, _) =
-            BinaryMsg::from_msgs(senders[0], vec![&m0, &m1, &m2], None, &sender_state, None)
-                .unwrap();
+            BinaryMsg::from_msgs(senders[0], vec![&m0, &m1, &m2], &sender_state, None).unwrap();
 
         j0.faulty_insert(&m5, &sender_state);
         // sender 0 now "votes" in the other direction and sways the result: true
