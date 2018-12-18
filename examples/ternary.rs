@@ -52,12 +52,7 @@ impl Estimate for Value {
         use message::CasperMsg;
         let res: Self = latest_msgs
             .iter()
-            .map(|msg| {
-                (
-                    msg.estimate(),
-                    senders_weights.weight(msg.sender()),
-                )
-            })
+            .map(|msg| (msg.estimate(), senders_weights.weight(msg.sender())))
             .fold(
                 ((Value::Zero, 0f64), (Value::One, 0f64), (Value::Two, 0f64)),
                 |acc, t| match t {
