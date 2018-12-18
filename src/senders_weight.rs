@@ -68,7 +68,7 @@ impl<S: Sender> SendersWeight<S> {
     /// Gets the weight of the sender
     /// Returns an Error in case there is a reading error
     /// or the sender does not exist
-    pub fn get_weight(&self, sender: &S) -> Result<WeightUnit, &'static str> {
+    pub fn weight(&self, sender: &S) -> Result<WeightUnit, &'static str> {
         self.read()
             .map_err(|_| "Can't unwrap SendersWeight")
             .and_then(|weights| match weights.get(sender) {
@@ -80,7 +80,7 @@ impl<S: Sender> SendersWeight<S> {
     /// returns the total weight of all the senders
     pub fn sum_weight_senders(&self, senders: &HashSet<S>) -> WeightUnit {
         senders.iter().fold(WeightUnit::ZERO, |acc, sender| {
-            acc + self.get_weight(sender).unwrap_or(::std::f64::NAN)
+            acc + self.weight(sender).unwrap_or(::std::f64::NAN)
         })
     }
 
@@ -89,7 +89,7 @@ impl<S: Sender> SendersWeight<S> {
             .unwrap()
             .iter()
             .fold(WeightUnit::ZERO, |acc, sender| {
-                acc + self.get_weight(sender).unwrap_or(::std::f64::NAN)
+                acc + self.weight(sender).unwrap_or(::std::f64::NAN)
             })
     }
 }

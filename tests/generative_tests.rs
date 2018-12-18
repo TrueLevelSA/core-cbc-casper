@@ -41,12 +41,12 @@ where
     M: CasperMsg,
 {
     let latest: HashSet<M> = state[&sender]
-        .get_latest_msgs()
+        .latests_msgs()
         .iter()
         .fold(HashSet::new(), |acc, (_, lms)| {
             acc.union(&lms).cloned().collect()
         });
-    let latest_delta = match state[&sender].get_my_last_msg() {
+    let latest_delta = match state[&sender].my_last_msg() {
         Some(m) => latest
             .iter()
             .filter(|lm| !m.justification().contains(lm))
@@ -67,7 +67,7 @@ where
         state
             .get_mut(&recipient)
             .unwrap()
-            .get_latest_msgs_as_mut()
+            .latests_msgs_as_mut()
             .update(&m);
     });
     state
@@ -119,7 +119,7 @@ where
         .iter()
         .map(|(_sender, sender_state)| {
             let latest_honest_msgs =
-                LatestMsgsHonest::from_latest_msgs(sender_state.get_latest_msgs(), &HashSet::new());
+                LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
             latest_honest_msgs.mk_estimate(sender_state.senders_weights(), None)
         })
         .collect();
@@ -132,7 +132,7 @@ fn safety_oracle(state: &HashMap<u32, SenderState<BlockMsg>>) -> bool {
         .iter()
         .map(|(_, sender_state)| {
             let latest_honest_msgs =
-                LatestMsgsHonest::from_latest_msgs(sender_state.get_latest_msgs(), &HashSet::new());
+                LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
             let genesis_block = Block::from(ProtoBlock::new(None, 0));
             let safety_threshold = (sender_state.senders_weights().sum_all_weights()) / 2.0;
             Block::safety_oracles(
@@ -153,7 +153,7 @@ fn clique_collection(state: HashMap<u32, SenderState<BlockMsg>>) -> Vec<Vec<Vec<
         .map(|(_, sender_state)| {
             let genesis_block = Block::from(ProtoBlock::new(None, 0));
             let latest_honest_msgs =
-                LatestMsgsHonest::from_latest_msgs(sender_state.get_latest_msgs(), &HashSet::new());
+                LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
             let safety_oracles = Block::safety_oracles(
                 genesis_block,
                 &latest_honest_msgs,
@@ -276,7 +276,7 @@ proptest! {
         writeln!(output_file, "new chain")?;
         chain.iter().for_each(|state| {
             writeln!(output_file, "{{lms: {:?},", state.iter().map(|(_, sender_state)|
-                                                                   sender_state.get_latest_msgs()).collect::<Vec<_>>()).unwrap();
+                                                                   sender_state.latests_msgs()).collect::<Vec<_>>()).unwrap();
             writeln!(output_file, "sendercount: {:?},", state.keys().len()).unwrap();
             writeln!(output_file, "clqs: ").unwrap();
             writeln!(output_file, "{:?}}},", clique_collection(state.clone())).unwrap();

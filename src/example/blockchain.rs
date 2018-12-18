@@ -40,7 +40,7 @@ impl<S: ::traits::Sender + Into<u32>> From<S> for Block {
 #[cfg(feature = "integration_test")]
 impl std::fmt::Debug for Block {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self.get_prevblock() {
+        match self.prevblock() {
             None => write!(
                 fmt,
                 "{:?} -> {:?}",
@@ -59,7 +59,7 @@ impl std::fmt::Debug for Block {
             f,
             "{:?} -> {:?}",
             self.id(),
-            self.get_prevblock()
+            self.prevblock()
                 .as_ref()
                 .map(|p| p.id())
                 .unwrap_or(&Hashed::default())
@@ -72,7 +72,7 @@ impl serde::Serialize for Block {
         use serde::ser::SerializeStruct;
         let mut msg = rhs.serialize_struct("Block", 2)?;
         msg.serialize_field("sender", &self.sender())?;
-        msg.serialize_field("prevblock", &self.get_prevblock())?;
+        msg.serialize_field("prevblock", &self.prevblock())?;
         msg.end()
     }
 }
@@ -143,7 +143,7 @@ impl Block {
     pub fn is_member(&self, rhs: &Self) -> bool {
         self == rhs
             || rhs
-                .get_prevblock()
+                .prevblock()
                 .as_ref()
                 .map(|prevblock| self.is_member(prevblock))
                 .unwrap_or(false)
@@ -256,7 +256,7 @@ impl Block {
             .into_iter()
             .filter(|x| {
                 x.iter().fold(WeightUnit::ZERO, |acc, sender| {
-                    acc + weights.get_weight(sender).unwrap_or(::std::f64::NAN)
+                    acc + weights.weight(sender).unwrap_or(::std::f64::NAN)
                 }) > safety_oracle_threshold
             })
             .collect()
@@ -269,7 +269,7 @@ impl Block {
     //     *self.0 = Arc::new(proto_block);
     // }
 
-    pub fn get_prevblock(&self) -> Option<Self> {
+    pub fn prevblock(&self) -> Option<Self> {
         self.arc().prevblock.as_ref().cloned()
     }
 
@@ -302,7 +302,7 @@ impl Block {
         // while there are still unvisited blocks
         while let Some(child) = queue.pop_front() {
             match (
-                child.get_prevblock(),
+                child.prevblock(),
                 referred_latest_blocks == latest_blocks && queue.len() == 0,
             ) {
                 // if the prevblock is set, update the visited_parents map
@@ -613,7 +613,7 @@ mod tests {
 
         let block = Block::from(&m3);
         assert_eq!(block, Block::new(Some(Block::from(&m2)), sender3),);
-        // assert_eq!(block.get_prevblock(), Some(genesis_block),);
+        // assert_eq!(block.prevblock(), Some(genesis_block),);
     }
 
     #[test]
@@ -797,10 +797,10 @@ mod tests {
             Block::safety_oracles(
                 proto_b0.clone(),
                 &LatestMsgsHonest::from_latest_msgs(
-                    sender_state.get_latest_msgs(),
-                    sender_state.get_equivocators()
+                    sender_state.latests_msgs(),
+                    sender_state.equivocators()
                 ),
-                sender_state.get_equivocators(),
+                sender_state.equivocators(),
                 2.0,
                 &senders_weights
             ),
@@ -821,10 +821,10 @@ mod tests {
             Block::safety_oracles(
                 proto_b0.clone(),
                 &LatestMsgsHonest::from_latest_msgs(
-                    sender_state.get_latest_msgs(),
-                    sender_state.get_equivocators()
+                    sender_state.latests_msgs(),
+                    sender_state.equivocators()
                 ),
-                sender_state.get_equivocators(),
+                sender_state.equivocators(),
                 1.0,
                 &senders_weights
             ),
@@ -854,10 +854,10 @@ mod tests {
             Block::safety_oracles(
                 proto_b0.clone(),
                 &LatestMsgsHonest::from_latest_msgs(
-                    sender_state.get_latest_msgs(),
-                    sender_state.get_equivocators()
+                    sender_state.latests_msgs(),
+                    sender_state.equivocators()
                 ),
-                sender_state.get_equivocators(),
+                sender_state.equivocators(),
                 1.0,
                 &senders_weights
             ),
@@ -878,10 +878,10 @@ mod tests {
             Block::safety_oracles(
                 proto_b0.clone(),
                 &LatestMsgsHonest::from_latest_msgs(
-                    sender_state.get_latest_msgs(),
-                    sender_state.get_equivocators()
+                    sender_state.latests_msgs(),
+                    sender_state.equivocators()
                 ),
-                sender_state.get_equivocators(),
+                sender_state.equivocators(),
                 1.0,
                 &senders_weights
             ),
@@ -895,10 +895,10 @@ mod tests {
             Block::safety_oracles(
                 proto_b1.clone(),
                 &LatestMsgsHonest::from_latest_msgs(
-                    sender_state.get_latest_msgs(),
-                    sender_state.get_equivocators()
+                    sender_state.latests_msgs(),
+                    sender_state.equivocators()
                 ),
-                sender_state.get_equivocators(),
+                sender_state.equivocators(),
                 1.0,
                 &senders_weights
             ),
@@ -912,10 +912,10 @@ mod tests {
             Block::safety_oracles(
                 proto_b2.clone(),
                 &LatestMsgsHonest::from_latest_msgs(
-                    sender_state.get_latest_msgs(),
-                    sender_state.get_equivocators()
+                    sender_state.latests_msgs(),
+                    sender_state.equivocators()
                 ),
-                sender_state.get_equivocators(),
+                sender_state.equivocators(),
                 1.0,
                 &senders_weights
             ),
@@ -954,10 +954,10 @@ mod tests {
             Block::safety_oracles(
                 proto_b0.clone(),
                 &LatestMsgsHonest::from_latest_msgs(
-                    sender_state.get_latest_msgs(),
-                    sender_state.get_equivocators()
+                    sender_state.latests_msgs(),
+                    sender_state.equivocators()
                 ),
-                sender_state.get_equivocators(),
+                sender_state.equivocators(),
                 1.0,
                 &senders_weights
             ),
@@ -969,10 +969,10 @@ mod tests {
             Block::safety_oracles(
                 proto_b2.clone(),
                 &LatestMsgsHonest::from_latest_msgs(
-                    sender_state.get_latest_msgs(),
-                    sender_state.get_equivocators()
+                    sender_state.latests_msgs(),
+                    sender_state.equivocators()
                 ),
-                sender_state.get_equivocators(),
+                sender_state.equivocators(),
                 1.0,
                 &senders_weights
             ),

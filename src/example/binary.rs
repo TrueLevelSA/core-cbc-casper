@@ -39,7 +39,7 @@ impl Estimate for BoolWrapper {
             |(true_w, false_w), msg| {
                 // get the weight for the sender
                 let sender_weight = senders_weights
-                    .get_weight(msg.sender())
+                    .weight(msg.sender())
                     .unwrap_or(WeightUnit::ZERO);
 
                 // add the weight to the right accumulator
@@ -94,7 +94,7 @@ mod tests {
             BoolWrapper::mk_estimate(
                 &LatestMsgsHonest::from_latest_msgs(
                     &LatestMsgs::from(&Justification::new()),
-                    sender_state.get_equivocators()
+                    sender_state.equivocators()
                 ),
                 &senders_weights,
                 None
@@ -105,20 +105,20 @@ mod tests {
         let (mut j0, _) = Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
         // s0 and s1 vote. since tie-breaker is `true`, get `true`
         assert_eq!(
-            j0.mk_estimate(sender_state.get_equivocators(), &senders_weights, None)
+            j0.mk_estimate(sender_state.equivocators(), &senders_weights, None)
                 .unwrap(),
             BoolWrapper(true)
         );
         j0.faulty_insert(&m2, &sender_state);
         // `false` now has weight 2.0, while true has weight `1.0`
         assert_eq!(
-            j0.mk_estimate(sender_state.get_equivocators(), &senders_weights, None)
+            j0.mk_estimate(sender_state.equivocators(), &senders_weights, None)
                 .unwrap(),
             BoolWrapper(false)
         );
         j0.faulty_insert(&m3, &sender_state);
         assert_eq!(
-            j0.mk_estimate(sender_state.get_equivocators(), &senders_weights, None)
+            j0.mk_estimate(sender_state.equivocators(), &senders_weights, None)
                 .unwrap(),
             BoolWrapper(true)
         );
@@ -159,7 +159,7 @@ mod tests {
 
         // honest result of vote: false
         assert_eq!(
-            j0.mk_estimate(sender_state.get_equivocators(), &senders_weights, None)
+            j0.mk_estimate(sender_state.equivocators(), &senders_weights, None)
                 .unwrap(),
             BoolWrapper(false)
         );
@@ -171,7 +171,7 @@ mod tests {
         j0.faulty_insert(&m5, &sender_state);
         // sender 0 now "votes" in the other direction and sways the result: true
         assert_eq!(
-            j0.mk_estimate(sender_state.get_equivocators(), &senders_weights, None)
+            j0.mk_estimate(sender_state.equivocators(), &senders_weights, None)
                 .unwrap(),
             BoolWrapper(true)
         );

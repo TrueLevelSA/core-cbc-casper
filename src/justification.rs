@@ -105,7 +105,7 @@ impl<M: CasperMsg> Justification<M> {
         let sender = msg.sender();
         let sender_weight = sender_state
             .senders_weights
-            .get_weight(sender)
+            .weight(sender)
             .unwrap_or(::std::f64::INFINITY);
 
         let already_in_equivocators = sender_state.equivocators.contains(sender);
@@ -159,83 +159,6 @@ impl<M: CasperMsg> Justification<M> {
         sender_state.latest_msgs.update(msg);
         let success = self.insert(msg.clone());
         (success, sender_state)
-    }
-
-    pub fn get_subtree_weights(
-        &self,
-        finalized_msg: Option<&M>, // stops sum at finalized_msg
-        senders_weights: &SendersWeight<M::Sender>,
-    ) -> Result<HashMap<M, WeightUnit>, &'static str> {
-        fn recursor<M>(
-            m: &M,
-            finalized_msg: Option<&M>, // if None, runs all the way to genesis msgs
-            senders_weights: &SendersWeight<M::Sender>,
-            all_senders: &HashSet<M::Sender>,
-            mut senders_referred: HashSet<M::Sender>,
-            initial_weight: WeightUnit,
-        ) -> WeightUnit
-        where
-            M: CasperMsg,
-        {
-            m.justification()
-                .iter()
-                .fold(initial_weight, |weight_referred, m_prime| {
-                    // base case
-                    if finalized_msg
-                        .map(|f_msg| {
-                            f_msg == m_prime || !m_prime.depends(f_msg) // TODO: check if needed
-                        })
-                        .unwrap_or(false)
-                    {
-                        weight_referred
-                    } else {
-                        let sender_current = m_prime.sender();
-                        // it fails to insert sender_current, if sender_current is
-                        // already in set
-                        let weight_referred = if senders_referred.insert(sender_current.clone()) {
-                            weight_referred
-                                + senders_weights
-                                    .get_weight(&sender_current)
-                                    .unwrap_or(WeightUnit::ZERO)
-                        } else {
-                            weight_referred
-                        };
-
-                        recursor(
-                            m_prime,
-                            finalized_msg,
-                            senders_weights,
-                            all_senders,
-                            senders_referred.clone(),
-                            weight_referred,
-                        )
-                    }
-                })
-        };
-        // initial state, trigger recursion
-        senders_weights.senders().map(|all_senders| {
-            self.iter()
-                .map(|m| {
-                    let sender_current = m.sender();
-                    let senders_referred: HashSet<_> =
-                        [sender_current.clone()].iter().cloned().collect();
-                    let initial_weight = senders_weights
-                        .get_weight(&sender_current)
-                        .unwrap_or(WeightUnit::ZERO);
-                    (
-                        m.clone(),
-                        recursor(
-                            m,
-                            finalized_msg,
-                            senders_weights,
-                            &all_senders,
-                            senders_referred.clone(),
-                            initial_weight,
-                        ),
-                    )
-                })
-                .collect()
-        })
     }
 }
 
@@ -456,7 +379,7 @@ impl<M: CasperMsg> SenderState<M> {
         }
     }
 
-    pub fn get_equivocators(&self) -> &HashSet<M::Sender> {
+    pub fn equivocators(&self) -> &HashSet<M::Sender> {
         &self.equivocators
     }
 
@@ -464,20 +387,20 @@ impl<M: CasperMsg> SenderState<M> {
         &self.senders_weights
     }
 
-    pub fn get_my_last_msg(&self) -> &Option<M> {
+    pub fn my_last_msg(&self) -> &Option<M> {
         &self.my_last_msg
     }
 
-    pub fn get_latest_msgs(&self) -> &LatestMsgs<M> {
+    pub fn latests_msgs(&self) -> &LatestMsgs<M> {
         &self.latest_msgs
     }
 
-    pub fn get_latest_msgs_as_mut(&mut self) -> &mut LatestMsgs<M> {
+    pub fn latests_msgs_as_mut(&mut self) -> &mut LatestMsgs<M> {
         &mut self.latest_msgs
     }
 
     /// get msgs and fault weight overhead and equivocators overhead sorted
-    /// by fault weight overhead
+    /// by fault weight overhead against the current sender_state
     fn sort_by_faultweight<'z>(&self, msgs: HashSet<&'z M>) -> Vec<&'z M> {
         let mut msgs_sorted_by_faultw: Vec<_> = msgs
             .iter()
@@ -486,7 +409,7 @@ impl<M: CasperMsg> SenderState<M> {
                 let sender = msg.sender();
                 if !self.equivocators.contains(sender) && self.latest_msgs.equivocate(msg) {
                     self.senders_weights
-                        .get_weight(sender)
+                        .weight(sender)
                         .map(|w| (msg, w))
                         .ok()
                 } else {
@@ -495,8 +418,8 @@ impl<M: CasperMsg> SenderState<M> {
             })
             .collect();
 
-        let _ = msgs_sorted_by_faultw.sort_unstable_by(|(_, w0), (_, w1)| {
-            w0.partial_cmp(w1).unwrap_or(::std::cmp::Ordering::Greater) // tie breaker
+        let _ = msgs_sorted_by_faultw.sort_unstable_by(|(m0, w0), (m1, w1)| {
+            w0.partial_cmp(w1).unwrap_or(m0.id().cmp(m1.id())) // tie breaker
         });
 
         // return a Vec<CasperMsg>
@@ -514,82 +437,6 @@ mod tests {
 
     use example::vote_count::VoteCount;
     use message::Message;
-
-    #[test]
-    fn children_weight() {
-        use example::blockchain::{Block, BlockMsg};
-
-        let (sender0, sender1, sender2, sender3) = (0, 1, 2, 3); // miner identities
-        let (weight0, weight1, weight2, weight3) = (2., 4., 8., 16.); // and their corresponding weights
-        let senders_weights = SendersWeight::new(
-            [
-                (sender0, weight0),
-                (sender1, weight1),
-                (sender2, weight2),
-                (sender3, weight3),
-            ]
-            .iter()
-            .cloned()
-            .collect(),
-        );
-        let genesis_block = Block::new(None, sender0); // estimate of the first casper message
-        let justification = Justification::new();
-        let genesis_msg = BlockMsg::new(sender0, justification, genesis_block.clone(), None);
-        assert_eq!(
-            genesis_msg.estimate(),
-            &genesis_block,
-            "genesis block with None as prev_block"
-        );
-        // genesis_msg(s=0, w=2) <- m1(s=1, w=4) <- m2(s=2, w=8) <- m3(s=3, w=16)
-        // weights:       2               6               14               30
-        let mut justification = Justification::new();
-        assert!(justification.insert(genesis_msg.clone()));
-
-        let subtree_weights = justification
-            .get_subtree_weights(None, &senders_weights)
-            .unwrap();
-        let (_msg, weight) = subtree_weights.iter().next().unwrap();
-        assert_eq!(weight, &2.0);
-
-        let proto_b1 = Block::new(None, sender1);
-        let b1 = Block::from_prevblock_msg(Some(genesis_msg), proto_b1);
-        let m1 = BlockMsg::new(sender1, justification, b1, None);
-
-        let mut justification = Justification::new();
-        assert!(justification.insert(m1.clone()));
-
-        let subtree_weights = justification
-            .get_subtree_weights(None, &senders_weights)
-            .unwrap();
-        let (_msg, weight) = subtree_weights.iter().next().unwrap();
-        assert_eq!(weight, &6.0);
-
-        let proto_b2 = Block::new(None, sender2);
-        let b2 = Block::from_prevblock_msg(Some(m1), proto_b2);
-        let m2 = BlockMsg::new(sender2, justification, b2, None);
-
-        let mut justification = Justification::new();
-        assert!(justification.insert(m2.clone()));
-
-        let subtree_weights = justification
-            .get_subtree_weights(None, &senders_weights)
-            .unwrap();
-        let (_msg, weight) = subtree_weights.iter().next().unwrap();
-        assert_eq!(weight, &14.0);
-
-        let proto_b3 = Block::new(None, sender3);
-        let b3 = Block::from_prevblock_msg(Some(m2), proto_b3);
-        let m3 = BlockMsg::new(sender3, justification, b3, None);
-
-        let mut justification = Justification::new();
-        assert!(justification.insert(m3.clone()));
-
-        let subtree_weights = justification
-            .get_subtree_weights(None, &senders_weights)
-            .unwrap();
-        let (_msg, weight) = subtree_weights.iter().next().unwrap();
-        assert_eq!(weight, &30.0);
-    }
 
     #[test]
     fn faulty_inserts_sorted() {
