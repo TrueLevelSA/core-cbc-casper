@@ -261,7 +261,7 @@ proptest! {
     #[test]
     fn blockchain(ref chain in chain(arbitrary_blockchain(), 6, round_robin, some_receivers, safety_oracle)) {
         // total messages until unilateral consensus
-        let mut output_file = OpenOptions::new().create(true).append(true).open("blockchain_test.log").unwrap();
+        let mut output_file = OpenOptions::new().create(true).truncate(true).append(true).open("blockchain_test.log").unwrap();
 
         writeln!(output_file, "new chain")?;
         chain.iter().for_each(|state| {
