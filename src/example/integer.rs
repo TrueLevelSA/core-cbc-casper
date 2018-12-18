@@ -116,9 +116,8 @@ mod tests {
                 ),
                 &senders_weights,
                 None
-            )
-            .unwrap(),
-            IntegerWrapper(0)
+            ),
+            Err("no msg")
         );
 
         let m0 = IntegerMsg::new(senders[0], Justification::new(), IntegerWrapper(1), None);
@@ -180,9 +179,8 @@ mod tests {
                 ),
                 &senders_weights,
                 None
-            )
-            .unwrap(),
-            IntegerWrapper(0)
+            ),
+            Err("no msg")
         );
 
         let m0 = IntegerMsg::new(senders[0], Justification::new(), IntegerWrapper(1), None);
@@ -244,9 +242,8 @@ mod tests {
                 ),
                 &senders_weights,
                 None
-            )
-            .unwrap(),
-            IntegerWrapper(0)
+            ),
+            Err("no msg")
         );
 
         let m0 = IntegerMsg::new(senders[0], Justification::new(), IntegerWrapper(1), None);
