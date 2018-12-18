@@ -34,7 +34,6 @@ impl Estimate for IntegerWrapper {
 
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        _finalized_msg: Option<&Self::M>,
         senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
         // in fact i could put the whole mempool inside of this proto_block and
         // search for a reasonable set of txs in this function that does not
@@ -118,7 +117,6 @@ mod tests {
                     &LatestMsgs::from(&Justification::new()),
                     sender_state.get_equivocators()
                 ),
-                None,
                 &senders_weights,
                 None
             ),
@@ -129,7 +127,7 @@ mod tests {
         let m1 = IntegerMsg::new(senders[1], Justification::new(), IntegerWrapper(2), None);
         let m2 = IntegerMsg::new(senders[2], Justification::new(), IntegerWrapper(3), None);
         let (m3, _) =
-            IntegerMsg::from_msgs(senders[0], vec![&m0, &m1], None, &sender_state, None).unwrap();
+            IntegerMsg::from_msgs(senders[0], vec![&m0, &m1], &sender_state, None).unwrap();
 
         let (mut j0, _) = Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
         assert_eq!(
@@ -197,7 +195,6 @@ mod tests {
                     &LatestMsgs::from(&Justification::new()),
                     sender_state.get_equivocators()
                 ),
-                None,
                 &senders_weights,
                 None
             ),
@@ -208,7 +205,7 @@ mod tests {
         let m1 = IntegerMsg::new(senders[1], Justification::new(), IntegerWrapper(2), None);
         let m2 = IntegerMsg::new(senders[2], Justification::new(), IntegerWrapper(3), None);
         let (m3, _) =
-            IntegerMsg::from_msgs(senders[0], vec![&m0, &m1], None, &sender_state, None).unwrap();
+            IntegerMsg::from_msgs(senders[0], vec![&m0, &m1], &sender_state, None).unwrap();
 
         let (mut j0, _) = Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
         assert_eq!(
@@ -276,7 +273,6 @@ mod tests {
                     &LatestMsgs::from(&Justification::new()),
                     sender_state.get_equivocators()
                 ),
-                None,
                 &senders_weights,
                 None
             ),
@@ -288,14 +284,9 @@ mod tests {
         let m2 = IntegerMsg::new(senders[2], Justification::new(), IntegerWrapper(3), None);
         let m3 = IntegerMsg::new(senders[3], Justification::new(), IntegerWrapper(4), None);
 
-        let (m4, _) = IntegerMsg::from_msgs(
-            senders[3],
-            vec![&m0, &m1, &m2, &m3],
-            None,
-            &sender_state,
-            None,
-        )
-        .unwrap();
+        let (m4, _) =
+            IntegerMsg::from_msgs(senders[3], vec![&m0, &m1, &m2, &m3], &sender_state, None)
+                .unwrap();
 
         let (mut j0, _) = Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
         assert_eq!(

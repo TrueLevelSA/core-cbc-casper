@@ -280,7 +280,6 @@ impl Block {
     /// as their prevblock (aka genesis blocks or finalized blocks)
     pub fn parse_blockchains(
         latest_msgs: &LatestMsgsHonest<BlockMsg>,
-        _finalized_msg: Option<&BlockMsg>,
     ) -> (
         HashMap<Block, HashSet<Block>>,
         HashSet<Block>,
@@ -443,10 +442,9 @@ impl Block {
 
     pub fn ghost(
         latest_msgs: &LatestMsgsHonest<BlockMsg>,
-        finalized_msg: Option<&BlockMsg>,
         senders_weights: &SendersWeight<<BlockMsg as CasperMsg>::Sender>,
     ) -> Option<Self> {
-        let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_msgs, finalized_msg);
+        let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_msgs);
         let b_in_lms_senders = Arc::new(RwLock::new(HashMap::<Block, HashSet<Validator>>::new()));
         Block::pick_heaviest(
             &genesis,
@@ -464,7 +462,6 @@ impl Estimate for Block {
 
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        finalized_msg: Option<&Self::M>,
         senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
         // in fact i could put the whole mempool inside of this incomplete_block
         // and search for a reasonable set of txs in this function that does not
@@ -474,7 +471,7 @@ impl Estimate for Block {
         match incomplete_block {
             None => panic!("incomplete_block is None"),
             Some(incomplete_block) => {
-                let prevblock = Block::ghost(latest_msgs, finalized_msg, senders_weights);
+                let prevblock = Block::ghost(latest_msgs, senders_weights);
                 let block = Block::from(ProtoBlock {
                     prevblock,
                     ..(*incomplete_block.arc().clone())
@@ -550,7 +547,6 @@ mod tests {
         let (m1, _) = BlockMsg::from_msgs(
             proto_b1.get_sender(),
             vec![&genesis_block_msg],
-            Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b1), // data
         )
@@ -560,7 +556,6 @@ mod tests {
         let (m2, _) = BlockMsg::from_msgs(
             proto_b2.get_sender(),
             vec![&genesis_block_msg],
-            None,
             &sender_state,
             Some(proto_b2),
         )
@@ -570,7 +565,6 @@ mod tests {
         let (m3, _) = BlockMsg::from_msgs(
             proto_b3.get_sender(),
             vec![&m1, &m2],
-            Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b3),
         )
@@ -586,7 +580,6 @@ mod tests {
         let (m4, _) = BlockMsg::from_msgs(
             proto_b4.get_sender(),
             vec![&m1],
-            Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b4),
         )
@@ -604,7 +597,6 @@ mod tests {
         let (m5, _) = BlockMsg::from_msgs(
             proto_b5.get_sender(),
             vec![&m3, &m2],
-            Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b5),
         )
@@ -672,7 +664,6 @@ mod tests {
         let (m0, sender_state) = BlockMsg::from_msgs(
             proto_b0.get_sender(),
             vec![&genesis_block_msg],
-            Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b0), // data
         )
@@ -682,7 +673,6 @@ mod tests {
         let (m1, sender_state) = BlockMsg::from_msgs(
             proto_b1.get_sender(),
             vec![&m0],
-            Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b1),
         )
@@ -692,7 +682,6 @@ mod tests {
         let (m2, sender_state) = BlockMsg::from_msgs(
             proto_b2.get_sender(),
             vec![&genesis_block_msg],
-            Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b2),
         )
@@ -708,7 +697,6 @@ mod tests {
         let (m3, sender_state) = BlockMsg::from_msgs(
             proto_b3.get_sender(),
             vec![&m2],
-            Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b3),
         )
@@ -726,7 +714,6 @@ mod tests {
         let (m4, sender_state) = BlockMsg::from_msgs(
             proto_b4.get_sender(),
             vec![&m2],
-            Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b4),
         )
@@ -742,7 +729,6 @@ mod tests {
         let (m5, _) = BlockMsg::from_msgs(
             proto_b5.get_sender(),
             vec![&m0, &m1, &m2, &m3, &m4],
-            Some(&genesis_block_msg), // finalized_msg, could be genesis_block_msg
             &sender_state,
             Some(proto_b5),
         )
@@ -792,7 +778,6 @@ mod tests {
         let (m1, sender_state) = BlockMsg::from_msgs(
             proto_b1.get_sender(),
             vec![&m0],
-            None,
             &sender_state,
             Some(proto_b1.clone()),
         )
@@ -802,7 +787,6 @@ mod tests {
         let (m2, sender_state) = BlockMsg::from_msgs(
             proto_b2.get_sender(),
             vec![&m1],
-            None,
             &sender_state,
             Some(proto_b2.clone()),
         )
@@ -827,7 +811,6 @@ mod tests {
         let (m3, sender_state) = BlockMsg::from_msgs(
             proto_b3.get_sender(),
             vec![&m2],
-            None,
             &sender_state,
             Some(proto_b3.clone()),
         )
@@ -852,7 +835,6 @@ mod tests {
         let (m4, sender_state) = BlockMsg::from_msgs(
             proto_b4.get_sender(),
             vec![&m3],
-            None,
             &sender_state,
             Some(proto_b4.clone()),
         )
@@ -862,7 +844,6 @@ mod tests {
         let (m5, sender_state) = BlockMsg::from_msgs(
             proto_b5.get_sender(),
             vec![&m4],
-            None,
             &sender_state,
             Some(proto_b5.clone()),
         )
@@ -887,7 +868,6 @@ mod tests {
         let (m6, sender_state) = BlockMsg::from_msgs(
             proto_b6.get_sender(),
             vec![&m5],
-            None,
             &sender_state,
             Some(proto_b5.clone()),
         )
@@ -946,7 +926,6 @@ mod tests {
         let (m7, sender_state) = BlockMsg::from_msgs(
             proto_b7.get_sender(),
             vec![&m6],
-            None,
             &sender_state,
             Some(proto_b6.clone()),
         )
@@ -956,7 +935,6 @@ mod tests {
         let (m8, sender_state) = BlockMsg::from_msgs(
             proto_b8.get_sender(),
             vec![&m7],
-            None,
             &sender_state,
             Some(proto_b7.clone()),
         )
@@ -966,7 +944,6 @@ mod tests {
         let (_, sender_state) = BlockMsg::from_msgs(
             proto_b9.get_sender(),
             vec![&m8],
-            None,
             &sender_state,
             Some(proto_b8.clone()),
         )

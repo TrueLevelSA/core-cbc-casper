@@ -150,7 +150,6 @@ impl Estimate for VoteCount {
 
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        _finalized_msg: Option<&Self::M>,
         _weights: &SendersWeight<Voter>, // all voters have same weight
         _external_data: Option<Self>,
         // _external_data: Option<Self::Data>,

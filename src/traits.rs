@@ -21,7 +21,6 @@ pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {
     /// go back to the genesis
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        finalized_msg: Option<&Self::M>,
         senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
         external_data: Option<<<Self::M as CasperMsg>::Estimate as Data>::Data>,
     ) -> Self;
