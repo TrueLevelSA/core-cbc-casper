@@ -55,7 +55,7 @@ impl Estimate for Value {
             .map(|msg| {
                 (
                     msg.get_estimate(),
-                    senders_weights.get_weight(msg.get_sender()),
+                    senders_weights.get_weight(msg.sender()),
                 )
             })
             .fold(

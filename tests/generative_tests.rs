@@ -120,7 +120,7 @@ where
         .map(|(_sender, sender_state)| {
             let latest_honest_msgs =
                 LatestMsgsHonest::from_latest_msgs(sender_state.get_latest_msgs(), &HashSet::new());
-            latest_honest_msgs.mk_estimate(sender_state.get_senders_weights(), None)
+            latest_honest_msgs.mk_estimate(sender_state.senders_weights(), None)
         })
         .collect();
     println!("{:?}", m);
@@ -134,13 +134,13 @@ fn safety_oracle(state: &HashMap<u32, SenderState<BlockMsg>>) -> bool {
             let latest_honest_msgs =
                 LatestMsgsHonest::from_latest_msgs(sender_state.get_latest_msgs(), &HashSet::new());
             let genesis_block = Block::from(ProtoBlock::new(None, 0));
-            let safety_threshold = (sender_state.get_senders_weights().sum_all_weights()) / 2.0;
+            let safety_threshold = (sender_state.senders_weights().sum_all_weights()) / 2.0;
             Block::safety_oracles(
                 genesis_block,
                 &latest_honest_msgs,
                 &HashSet::new(),
                 safety_threshold,
-                sender_state.get_senders_weights(),
+                sender_state.senders_weights(),
             ) != HashSet::new()
         })
         .collect();
@@ -160,7 +160,7 @@ fn clique_collection(state: HashMap<u32, SenderState<BlockMsg>>) -> Vec<Vec<Vec<
                 &HashSet::new(),
                 // cliques, not safety oracles, because our threshold is 0
                 0.0,
-                sender_state.get_senders_weights(),
+                sender_state.senders_weights(),
             );
             let safety_oracles_vec_of_btrees: Vec<BTreeSet<u32>> =
                 Vec::from_iter(safety_oracles.iter().cloned());
@@ -421,7 +421,7 @@ proptest! {
 
         // here, only take one equivocation
         let single_equivocation: Vec<_> = messages[..nodes+1].iter().map(|message| message).collect();
-        let equivocator = messages[nodes].get_sender();
+        let equivocator = messages[nodes].sender();
         let (m0, _) =
             &Message::from_msgs(0, single_equivocation.clone(), &sender_state, None)
             .unwrap();

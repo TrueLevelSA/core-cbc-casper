@@ -49,7 +49,7 @@ impl<M: CasperMsg> Justification<M> {
 
     pub fn insert(&mut self, msg: M) -> bool {
         if self.contains(&msg)
-        // || self.iter().any(|m| m.get_sender() == msg.get_sender())
+        // || self.iter().any(|m| m.sender() == msg.sender())
         {
             false
         } else {
@@ -102,7 +102,7 @@ impl<M: CasperMsg> Justification<M> {
         let mut sender_state = sender_state.clone();
         let is_equivocation = sender_state.latest_msgs.equivocate(msg);
 
-        let sender = msg.get_sender();
+        let sender = msg.sender();
         let sender_weight = sender_state
             .senders_weights
             .get_weight(sender)
@@ -150,7 +150,7 @@ impl<M: CasperMsg> Justification<M> {
     ) -> (bool, SenderState<M>) {
         let is_equivocation = sender_state.latest_msgs.equivocate(msg);
         if is_equivocation {
-            let sender = msg.get_sender();
+            let sender = msg.sender();
             sender_state.equivocators.insert(sender.clone());
             sender_state
                 .senders_weights
@@ -189,7 +189,7 @@ impl<M: CasperMsg> Justification<M> {
                     {
                         weight_referred
                     } else {
-                        let sender_current = m_prime.get_sender();
+                        let sender_current = m_prime.sender();
                         // it fails to insert sender_current, if sender_current is
                         // already in set
                         let weight_referred = if senders_referred.insert(sender_current.clone()) {
@@ -213,10 +213,10 @@ impl<M: CasperMsg> Justification<M> {
                 })
         };
         // initial state, trigger recursion
-        senders_weights.get_senders().map(|all_senders| {
+        senders_weights.senders().map(|all_senders| {
             self.iter()
                 .map(|m| {
-                    let sender_current = m.get_sender();
+                    let sender_current = m.sender();
                     let senders_referred: HashSet<_> =
                         [sender_current.clone()].iter().cloned().collect();
                     let initial_weight = senders_weights
@@ -349,7 +349,7 @@ impl<M: CasperMsg> LatestMsgs<M> {
     /// aka the first message of a sender or a message that is not
     /// in the justification of the existing latest messages
     pub fn update(&mut self, new_msg: &M) -> bool {
-        let sender = new_msg.get_sender();
+        let sender = new_msg.sender();
         if let Some(latest_msgs_from_sender) = self.get(sender).cloned() {
             latest_msgs_from_sender
                 .iter()
@@ -384,7 +384,7 @@ impl<M: CasperMsg> LatestMsgs<M> {
 
     /// checks whether msg_new equivocates with latest msgs
     fn equivocate(&self, msg_new: &M) -> bool {
-        self.get(msg_new.get_sender())
+        self.get(msg_new.sender())
             .map(|latest_msgs| latest_msgs.iter().any(|m| m.equivocates(&msg_new)))
             .unwrap_or(false)
     }
@@ -460,7 +460,7 @@ impl<M: CasperMsg> SenderState<M> {
         &self.equivocators
     }
 
-    pub fn get_senders_weights(&self) -> &SendersWeight<M::Sender> {
+    pub fn senders_weights(&self) -> &SendersWeight<M::Sender> {
         &self.senders_weights
     }
 
@@ -483,7 +483,7 @@ impl<M: CasperMsg> SenderState<M> {
             .iter()
             .filter_map(|&msg| {
                 // equivocations in relation to state
-                let sender = msg.get_sender();
+                let sender = msg.sender();
                 if !self.equivocators.contains(sender) && self.latest_msgs.equivocate(msg) {
                     self.senders_weights
                         .get_weight(sender)

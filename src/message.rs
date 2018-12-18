@@ -20,7 +20,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
     type Estimate: Estimate<M = Self>;
 
     /// returns the validator who sent this message
-    fn get_sender(&self) -> &Self::Sender;
+    fn sender(&self) -> &Self::Sender;
 
     /// returns the estimate of this message
     fn get_estimate(&self) -> &Self::Estimate;
@@ -57,7 +57,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
         // // TODO eventually comment out these lines, and FIXME tests
         // // check whether two messages from same sender
         // let mut senders = HashSet::new();
-        // let dup_senders = new_msgs.iter().any(|msg| !senders.insert(msg.get_sender()));
+        // let dup_senders = new_msgs.iter().any(|msg| !senders.insert(msg.sender()));
         // assert!(!dup_senders, "A sender can only have one, and only one, latest message");
 
         // dedup by putting msgs into a hashset
@@ -78,7 +78,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
             );
 
             let estimate =
-                latest_msgs_honest.mk_estimate(&sender_state.get_senders_weights(), external_data);
+                latest_msgs_honest.mk_estimate(&sender_state.senders_weights(), external_data);
             estimate.map(|e| (Self::new(sender, justification, e, None), sender_state))
         }
     }
@@ -91,7 +91,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
     ) -> (bool, HashSet<<Self as CasperMsg>::Sender>) {
         let is_equivocation = self.equivocates(rhs);
         let init = if is_equivocation {
-            equivocators.insert(self.get_sender().clone());
+            equivocators.insert(self.sender().clone());
             (true, equivocators)
         } else {
             (false, equivocators)
@@ -113,7 +113,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
     /// Math definition of the equivocation
     fn equivocates(&self, rhs: &Self) -> bool {
         self != rhs
-            && self.get_sender() == rhs.get_sender()
+            && self.sender() == rhs.sender()
             && !rhs.depends(self)
             && !self.depends(rhs)
     }
@@ -185,12 +185,12 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
                 .iter()
                 .fold(safe_msgs, |mut safe_msgs_prime, msg_prime| {
                     // base case
-                    if &senders_referred == all_senders && original_sender == msg_prime.get_sender()
+                    if &senders_referred == all_senders && original_sender == msg_prime.sender()
                     {
                         let _ = safe_msgs_prime.insert(msg_prime.clone());
                         safe_msgs_prime
                     } else {
-                        let _ = senders_referred.insert(msg_prime.get_sender().clone());
+                        let _ = senders_referred.insert(msg_prime.sender().clone());
 
                         recursor(
                             msg_prime,
@@ -204,7 +204,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
         };
 
         // initial state, trigger recursion
-        let original_sender = self.get_sender();
+        let original_sender = self.sender();
         let senders_refered = [original_sender.clone()].iter().cloned().collect();
         let safe_msgs = HashSet::new();
         recursor(
@@ -243,7 +243,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
                         let _ = safe_msg_weight_prime.insert(m.clone(), weight_referred);
                         safe_msg_weight_prime
                     } else {
-                        let sender_current = m_prime.get_sender();
+                        let sender_current = m_prime.sender();
                         let weight_referred = if senders_referred.insert(sender_current.clone()) {
                             weight_referred
                                 + senders_weights
@@ -378,7 +378,7 @@ where
         use serde::ser::SerializeStruct;
         let mut msg = serializer.serialize_struct("Message", 3)?;
         let j: Vec<_> = self.get_justification().iter().map(Self::id).collect();
-        msg.serialize_field("sender", self.get_sender())?;
+        msg.serialize_field("sender", self.sender())?;
         msg.serialize_field("estimate", self.get_estimate())?;
         msg.serialize_field("justification", &j)?;
         msg.end()
@@ -393,7 +393,7 @@ where
     type Estimate = E;
     type Sender = S;
 
-    fn get_sender(&self) -> &Self::Sender {
+    fn sender(&self) -> &Self::Sender {
         &self.0.sender
     }
 
@@ -462,7 +462,7 @@ where
             f,
             "M{:?}({:?})",
             // "M{:?}({:?}) -> {:?}",
-            self.get_sender(),
+            self.sender(),
             self.get_estimate().clone(),
             // self.get_justification()
         )
@@ -673,7 +673,7 @@ mod tests {
             &1.0,
             "both sender0 and sender1 saw v0 and m0, and additionally both parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
         );
-        // let senders = &Sender::get_senders(&relative_senders_weights);
+        // let senders = &Sender::senders(&relative_senders_weights);
     }
 
     // #[test]
@@ -691,7 +691,7 @@ mod tests {
     //         0.0,
     //         HashSet::new(),
     //     );
-    //     let senders = &senders_weights.get_senders().unwrap();
+    //     let senders = &senders_weights.senders().unwrap();
 
     //     // sender0        v0---m0        m2---
     //     // sender1               \--m1--/
@@ -750,7 +750,7 @@ mod tests {
             0.0,
             HashSet::new(),
         );
-        let senders = &senders_weights.get_senders().unwrap();
+        let senders = &senders_weights.senders().unwrap();
 
         // sender0        v0---m0        m2---
         // sender1               \--m1--/

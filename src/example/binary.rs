@@ -39,7 +39,7 @@ impl Estimate for BoolWrapper {
             |(true_w, false_w), msg| {
                 // get the weight for the sender
                 let sender_weight = senders_weights
-                    .get_weight(msg.get_sender())
+                    .get_weight(msg.sender())
                     .unwrap_or(WeightUnit::ZERO);
 
                 // add the weight to the right accumulator

@@ -99,7 +99,7 @@ impl VoteCount {
                         let estimate = m.get_estimate().clone();
                         if VoteCount::is_valid_vote(&estimate) {
                             let equivocation = Message::new(
-                                m.get_sender().clone(),
+                                m.sender().clone(),
                                 m.get_justification().clone(),
                                 VoteCount::toggle_vote(&estimate),
                                 None,

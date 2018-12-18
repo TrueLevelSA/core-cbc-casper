@@ -55,7 +55,7 @@ impl Estimate for IntegerWrapper {
             .iter()
             .fold(WeightUnit::ZERO, |acc, x| {
                 acc + senders_weights
-                    .get_weight(x.get_sender())
+                    .get_weight(x.sender())
                     .unwrap_or(WeightUnit::ZERO)
             });
 
@@ -69,7 +69,7 @@ impl Estimate for IntegerWrapper {
         while running_weight / total_weight < 0.5 {
             current_msg = msg_iter.next().ok_or("no next msg");
             running_weight += current_msg
-                .and_then(|m| senders_weights.get_weight(m.get_sender()))
+                .and_then(|m| senders_weights.get_weight(m.sender()))
                 .unwrap_or(WeightUnit::ZERO)
         }
 

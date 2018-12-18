@@ -23,7 +23,7 @@ impl<S: Sender> SendersWeight<S> {
     /// same as RwLock read() function
     /// basically locks the Rwlock with read access
     /// TODO DL: why was this public? shouldn't it be that it's only accessed from
-    /// insert and get_senders?
+    /// insert and senders?
     fn read(&self) -> LockResult<RwLockReadGuard<HashMap<S, WeightUnit>>> {
         self.0.read()
     }
@@ -31,7 +31,7 @@ impl<S: Sender> SendersWeight<S> {
     /// same as RwLock write() function
     /// basically locks the RwLock with write access
     /// TODO DL: why was this public? shouldn't it be that it's only accessed from
-    /// insert and get_senders?
+    /// insert and senders?
     fn write(&self) -> LockResult<RwLockWriteGuard<HashMap<S, WeightUnit>>> {
         self.0.write()
     }
@@ -48,7 +48,7 @@ impl<S: Sender> SendersWeight<S> {
     }
 
     /// picks senders with positive weights
-    pub fn get_senders(&self) -> Result<HashSet<S>, &'static str> {
+    pub fn senders(&self) -> Result<HashSet<S>, &'static str> {
         self.read()
             .map_err(|_| "Can't unwrap SendersWeight")
             .map(|senders_weight| {
@@ -85,7 +85,7 @@ impl<S: Sender> SendersWeight<S> {
     }
 
     pub fn sum_all_weights(&self) -> WeightUnit {
-        self.get_senders()
+        self.senders()
             .unwrap()
             .iter()
             .fold(WeightUnit::ZERO, |acc, sender| {
@@ -99,11 +99,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn get_senders() {
+    fn senders() {
         let senders_weights =
             SendersWeight::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
         assert_eq!(
-            SendersWeight::get_senders(&senders_weights).unwrap(),
+            SendersWeight::senders(&senders_weights).unwrap(),
             [0, 1, 2].iter().cloned().collect(),
             "should include senders with valid, positive weight"
         );
@@ -111,7 +111,7 @@ mod tests {
         let senders_weights =
             SendersWeight::new([(0, 0.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
         assert_eq!(
-            SendersWeight::get_senders(&senders_weights).unwrap(),
+            SendersWeight::senders(&senders_weights).unwrap(),
             [1, 2].iter().cloned().collect(),
             "should exclude senders with 0 weight"
         );
@@ -119,7 +119,7 @@ mod tests {
         let senders_weights =
             SendersWeight::new([(0, 1.0), (1, -1.0), (2, 1.0)].iter().cloned().collect());
         assert_eq!(
-            SendersWeight::get_senders(&senders_weights).unwrap(),
+            SendersWeight::senders(&senders_weights).unwrap(),
             [0, 2].iter().cloned().collect(),
             "should exclude senders with negative weight"
         );
@@ -131,7 +131,7 @@ mod tests {
                 .collect(),
         );
         assert_eq!(
-            SendersWeight::get_senders(&senders_weights).unwrap(),
+            SendersWeight::senders(&senders_weights).unwrap(),
             [1, 2].iter().cloned().collect(),
             "should exclude senders with NAN weight"
         );
@@ -143,7 +143,7 @@ mod tests {
                 .collect(),
         );
         assert_eq!(
-            SendersWeight::get_senders(&senders_weights).unwrap(),
+            SendersWeight::senders(&senders_weights).unwrap(),
             [0, 1, 2].iter().cloned().collect(),
             "should include senders with INFINITY weight"
         );
