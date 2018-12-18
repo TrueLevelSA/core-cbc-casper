@@ -132,9 +132,7 @@ mod tests {
         let (mut j0, _) = Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
         assert_eq!(
             j0.mk_estimate(
-                None,
                 sender_state.get_equivocators(),
-                None,
                 &senders_weights,
                 None
             ),
@@ -144,9 +142,7 @@ mod tests {
         j0.faulty_insert(&m2, &sender_state);
         assert_eq!(
             j0.mk_estimate(
-                None,
                 sender_state.get_equivocators(),
-                None,
                 &senders_weights,
                 None
             ),
@@ -156,9 +152,7 @@ mod tests {
         j0.faulty_insert(&m3, &sender_state);
         assert_eq!(
             j0.mk_estimate(
-                None,
                 sender_state.get_equivocators(),
-                None,
                 &senders_weights,
                 None
             ),
@@ -210,9 +204,7 @@ mod tests {
         let (mut j0, _) = Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
         assert_eq!(
             j0.mk_estimate(
-                None,
                 sender_state.get_equivocators(),
-                None,
                 &senders_weights,
                 None
             ),
@@ -222,9 +214,7 @@ mod tests {
         j0.faulty_insert(&m2, &sender_state);
         assert_eq!(
             j0.mk_estimate(
-                None,
                 sender_state.get_equivocators(),
-                None,
                 &senders_weights,
                 None
             ),
@@ -234,9 +224,7 @@ mod tests {
         j0.faulty_insert(&m3, &sender_state);
         assert_eq!(
             j0.mk_estimate(
-                None,
                 sender_state.get_equivocators(),
-                None,
                 &senders_weights,
                 None
             ),
@@ -291,9 +279,7 @@ mod tests {
         let (mut j0, _) = Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
         assert_eq!(
             j0.mk_estimate(
-                None,
                 sender_state.get_equivocators(),
-                None,
                 &senders_weights,
                 None
             ),
@@ -303,9 +289,7 @@ mod tests {
         j0.faulty_insert(&m2, &sender_state);
         assert_eq!(
             j0.mk_estimate(
-                None,
                 sender_state.get_equivocators(),
-                None,
                 &senders_weights,
                 None
             ),
@@ -315,9 +299,7 @@ mod tests {
         j0.faulty_insert(&m3, &sender_state);
         assert_eq!(
             j0.mk_estimate(
-                None,
                 sender_state.get_equivocators(),
-                None,
                 &senders_weights,
                 None
             ),
@@ -327,9 +309,7 @@ mod tests {
         j0.faulty_insert(&m4, &sender_state);
         assert_eq!(
             j0.mk_estimate(
-                None,
                 sender_state.get_equivocators(),
-                None,
                 &senders_weights,
                 None
             ),

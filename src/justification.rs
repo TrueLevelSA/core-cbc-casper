@@ -61,9 +61,7 @@ impl<M: CasperMsg> Justification<M> {
     /// reexport from Estimate impl
     pub fn mk_estimate(
         &self,
-        finalized_msg: Option<&M>,
         equivocators: &HashSet<M::Sender>,
-        _sender: Option<M::Sender>,
         senders_weights: &SendersWeight<<M as CasperMsg>::Sender>,
         data: Option<<<M as CasperMsg>::Estimate as Data>::Data>,
     ) -> M::Estimate {
