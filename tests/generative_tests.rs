@@ -63,6 +63,12 @@ where
     .unwrap();
 
     state.insert(sender.clone(), sender_state);
+    state
+        .get_mut(&sender)
+        .unwrap()
+        .get_latest_msgs_as_mut()
+        .update(&m);
+
     recipients.iter().for_each(|recipient| {
         state
             .get_mut(&recipient)
@@ -103,9 +109,7 @@ where
 {
     (sender_strategy, receiver_strategy, Just(state))
         .prop_map(|(sender, mut receivers, mut state)| {
-            if !receivers.contains(&sender) {
-                receivers.insert(sender.clone());
-            }
+            receivers.remove(&sender);
             add_message(&mut state, sender.clone(), receivers, Some(sender.into())).clone()
         })
         .boxed()
