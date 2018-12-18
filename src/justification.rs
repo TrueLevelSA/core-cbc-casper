@@ -591,44 +591,48 @@ mod tests {
         assert_eq!(weight, &30.0);
     }
 
-    // #[test]
-    // fn faulty_inserts_sorted() {
-    //     let senders_weights = SendersWeight::new(
-    //         [(0, 1.0), (1, 2.0), (2, 3.0)].iter().cloned().collect(),
-    //     );
+    #[test]
+    fn faulty_inserts_sorted() {
+        let senders_weights = SendersWeight::new(
+            [(0, 1.0), (1, 2.0), (2, 3.0)].iter().cloned().collect(),
+        );
 
-    //     let v0 = &VoteCount::create_vote_msg(0, false);
-    //     let v0_prime = &VoteCount::create_vote_msg(0, true);
-    //     let v1 = &VoteCount::create_vote_msg(1, true);
-    //     let v1_prime = &VoteCount::create_vote_msg(1, false);
-    //     let v2 = &VoteCount::create_vote_msg(2, true);
-    //     let v2_prime = &VoteCount::create_vote_msg(2, false);
-    //     let sender_state = SenderState {
-    //         senders_weights: senders_weights.clone(),
-    //         state_fault_weight: (0.0),
-    //         my_last_msg: None,
-    //         thr: 3.0,
-    //         equivocators: HashSet::new(),
-    //         latest_msgs: LatestMsgs::new(),
-    //     };
-    //     let mut j = Justification::new();
-    //     let sorted_msgs = j.sort_by_faultweight(
-    //         &sender_state,
-    //         vec![v2, v2_prime, v1, v1_prime, v0, v0_prime]
-    //             .iter()
-    //             .cloned()
-    //             .collect(),
-    //     );
-    //     let (_, sender_state) = sorted_msgs.iter().fold(
-    //         (false, sender_state),
-    //         |(success, sender_state), m| {
-    //             let (s, w) = j.faulty_insert(m, &sender_state);
-    //             (s || success, w)
-    //         },
-    //     );
-    //     assert_eq!(j.len(), 5);
-    //     assert_eq!(sender_state.state_fault_weight, 3.0);
-    // }
+        let v0 = &VoteCount::create_vote_msg(0, false);
+        let v0_prime = &VoteCount::create_vote_msg(0, true);
+        let v1 = &VoteCount::create_vote_msg(1, true);
+        let v1_prime = &VoteCount::create_vote_msg(1, false);
+        let v2 = &VoteCount::create_vote_msg(2, true);
+        let v2_prime = &VoteCount::create_vote_msg(2, false);
+        let mut sender_state = SenderState {
+            senders_weights: senders_weights.clone(),
+            state_fault_weight: 0.0,
+            my_last_msg: None,
+            thr: 3.0,
+            equivocators: HashSet::new(),
+            latest_msgs: LatestMsgs::new(),
+        };
+        let mut j = Justification::new();
+        let _ = sender_state.latest_msgs.update(v0);
+        let _ = sender_state.latest_msgs.update(v1);
+        let _ = sender_state.latest_msgs.update(v2);
+        let sorted_msgs = sender_state.sort_by_faultweight(
+            vec![v2_prime, v1_prime, v0_prime]
+                .iter()
+                .cloned()
+                .collect(),
+        );
+        let (_, sender_state) = sorted_msgs.iter().fold(
+            (false, sender_state),
+            |(success, sender_state), &m| {
+                let (s, w) = j.faulty_insert(m, &sender_state);
+                (s || success, w)
+            },
+        );
+        assert!(j.contains(v0_prime));
+        assert!(j.contains(v1_prime));
+        assert!(!j.contains(v2_prime));
+        assert_eq!(sender_state.state_fault_weight, 3.0);
+    }
     #[test]
     fn faulty_inserts() {
         let senders_weights =
