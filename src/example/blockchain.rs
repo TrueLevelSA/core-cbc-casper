@@ -106,7 +106,7 @@ impl From<ProtoBlock> for Block {
 
 impl<'z> From<&'z BlockMsg> for Block {
     fn from(msg: &BlockMsg) -> Self {
-        msg.get_estimate().clone()
+        msg.estimate().clone()
     }
 }
 
@@ -179,7 +179,7 @@ impl Block {
             .map(|m| {
                 (
                     m.sender().clone(),
-                    latest_in_justification(m.get_justification(), equivocators)
+                    latest_in_justification(m.justification(), equivocators)
                         .into_iter()
                         .filter(|(_sender, msg)| block.is_member(&Block::from(msg)))
                         .collect(),
@@ -571,7 +571,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            m3.get_estimate(),
+            m3.estimate(),
             &Block::new(Some(Block::from(&m2)), sender3),
             "should build on top of m2 as sender2 has more weight"
         );
@@ -586,7 +586,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            m4.get_estimate(),
+            m4.estimate(),
             &Block::new(Some(Block::from(&m1)), sender4),
             "should build on top of m1 as as thats the only msg it saw"
         );
@@ -606,7 +606,7 @@ mod tests {
 
         // println!();
         assert_eq!(
-            m5.get_estimate(),
+            m5.estimate(),
             &Block::new(Some(Block::from(&m3)), sender0),
             "should build on top of "
         );
@@ -688,7 +688,7 @@ mod tests {
         .unwrap();
 
         // assert_eq!(
-        //     m2.get_estimate(),
+        //     m2.estimate(),
         //     &Block::new(Some(Block::from(&m1)), sender2),
         //     "should build on top of m1 as sender1 has more weight"
         // );
@@ -703,7 +703,7 @@ mod tests {
         .unwrap();
 
         // assert_eq!(
-        //     m3.get_estimate(),
+        //     m3.estimate(),
         //     &Block::new(Some(Block::from(&m0)), sender3),
         //     "should build on top of m0 as as thats the only msg it saw"
         // );
@@ -719,7 +719,7 @@ mod tests {
         )
         .unwrap();
         // assert_eq!(
-        //     m4.get_estimate(),
+        //     m4.estimate(),
         //     &Block::new(Some(Block::from(&m2)), sender4),
         //     "should build on top of "
         // );
@@ -735,7 +735,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            m5.get_estimate(),
+            m5.estimate(),
             &Block::new(Some(Block::from(&m4)), sender5),
             "should build on top of b4"
         );

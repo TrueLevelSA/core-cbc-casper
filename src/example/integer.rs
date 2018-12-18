@@ -47,7 +47,7 @@ impl Estimate for IntegerWrapper {
                 latest
             },
         ));
-        msgs_sorted_by_estimate.sort_unstable_by(|a, b| a.get_estimate().cmp(&b.get_estimate()));
+        msgs_sorted_by_estimate.sort_unstable_by(|a, b| a.estimate().cmp(&b.estimate()));
 
         // get the total weight of the senders of the messages
         // in the set
@@ -74,7 +74,7 @@ impl Estimate for IntegerWrapper {
         }
 
         // return said estimate
-        current_msg.map(|m| m.get_estimate().clone())
+        current_msg.map(|m| m.estimate().clone())
     }
 }
 

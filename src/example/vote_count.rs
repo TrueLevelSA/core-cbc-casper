@@ -93,14 +93,14 @@ impl VoteCount {
             acc: HashSet<Message<VoteCount, Voter>>,
         ) -> HashSet<Message<VoteCount, Voter>> {
             latest_msgs.iter().fold(acc, |mut acc_prime, m| {
-                match m.get_justification().len() {
+                match m.justification().len() {
                     0 => {
                         // vote found, vote is a message with 0 justification
-                        let estimate = m.get_estimate().clone();
+                        let estimate = m.estimate().clone();
                         if VoteCount::is_valid_vote(&estimate) {
                             let equivocation = Message::new(
                                 m.sender().clone(),
-                                m.get_justification().clone(),
+                                m.justification().clone(),
                                 VoteCount::toggle_vote(&estimate),
                                 None,
                             );
@@ -121,7 +121,7 @@ impl VoteCount {
                         }
                         acc_prime // returns it
                     }
-                    _ => recursor(m.get_justification(), acc_prime),
+                    _ => recursor(m.justification(), acc_prime),
                 }
             })
         }
@@ -160,7 +160,7 @@ impl Estimate for VoteCount {
         let votes = Self::get_vote_msgs(latest_msgs);
         let votes = votes
             .iter()
-            .fold(Self::ZERO, |acc, vote| acc + vote.get_estimate().clone());
+            .fold(Self::ZERO, |acc, vote| acc + vote.estimate().clone());
         Ok(votes)
     }
 }
@@ -209,10 +209,10 @@ mod count_votes {
 
         let (m1, _) = &Message::from_msgs(1, vec![v1, m0], None, &weights, None).unwrap();
         assert_eq!(
-            Message::get_estimate(m1).clone(),
+            Message::estimate(m1).clone(),
             VoteCount { yes: 1, no: 1 },
             "should have 1 yes, and 1 no vote, found {:?}",
-            Message::get_estimate(m1).clone(),
+            Message::estimate(m1).clone(),
         );
 
         let (success, _) = j1.faulty_inserts(vec![v0_prime].iter().cloned().collect(), &weights);
@@ -227,9 +227,9 @@ mod count_votes {
         )
         .unwrap();
         assert_eq!(
-            Message::get_estimate(m1_prime).clone(),
+            Message::estimate(m1_prime).clone(),
             VoteCount { yes: 1, no: 0 },
             "should have 1 yes, and 0 no vote, found {:?}, the equivocation vote should cancels out the normal vote",
-            Message::get_estimate(&m1_prime).clone())
+            Message::estimate(&m1_prime).clone())
     }
 }

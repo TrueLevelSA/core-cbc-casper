@@ -43,7 +43,7 @@ impl Estimate for BoolWrapper {
                     .unwrap_or(WeightUnit::ZERO);
 
                 // add the weight to the right accumulator
-                if msg.get_estimate().0.clone() {
+                if msg.estimate().0.clone() {
                     (true_w + sender_weight, false_w)
                 } else {
                     (true_w, false_w + sender_weight)

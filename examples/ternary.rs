@@ -54,7 +54,7 @@ impl Estimate for Value {
             .iter()
             .map(|msg| {
                 (
-                    msg.get_estimate(),
+                    msg.estimate(),
                     senders_weights.get_weight(msg.sender()),
                 )
             })
@@ -112,9 +112,9 @@ fn main() {
     let (msg8, _) = Message::from_msgs(3, vec![&msg7, &msg6], &weights, None).unwrap();
     let (msg9, _) = Message::from_msgs(4, vec![&msg4, &msg6], &weights, None).unwrap();
 
-    assert_eq!(msg5.get_estimate(), &Value::Two);
-    assert_eq!(msg6.get_estimate(), &Value::Zero);
-    assert_eq!(msg7.get_estimate(), &Value::Zero);
-    assert_eq!(msg8.get_estimate(), &Value::Zero);
-    assert_eq!(msg9.get_estimate(), &Value::Zero);
+    assert_eq!(msg5.estimate(), &Value::Two);
+    assert_eq!(msg6.estimate(), &Value::Zero);
+    assert_eq!(msg7.estimate(), &Value::Zero);
+    assert_eq!(msg8.estimate(), &Value::Zero);
+    assert_eq!(msg9.estimate(), &Value::Zero);
 }

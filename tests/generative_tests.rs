@@ -49,7 +49,7 @@ where
     let latest_delta = match state[&sender].get_my_last_msg() {
         Some(m) => latest
             .iter()
-            .filter(|lm| !m.get_justification().contains(lm))
+            .filter(|lm| !m.justification().contains(lm))
             .cloned()
             .collect(),
         None => latest,
@@ -240,7 +240,12 @@ where
             let mut have_consensus = false;
 
             let start = Instant::now();
-            let mut timestamp_file = OpenOptions::new().create(true).truncate(true).write(true).open("timestamp.log").unwrap();
+            let mut timestamp_file = OpenOptions::new()
+                .create(true)
+                .truncate(true)
+                .write(true)
+                .open("timestamp.log")
+                .unwrap();
             Vec::from_iter(chain.take_while(|state| {
                 writeln!(timestamp_file, "{:?}", start.elapsed());
                 if have_consensus {

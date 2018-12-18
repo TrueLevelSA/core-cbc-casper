@@ -23,10 +23,10 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
     fn sender(&self) -> &Self::Sender;
 
     /// returns the estimate of this message
-    fn get_estimate(&self) -> &Self::Estimate;
+    fn estimate(&self) -> &Self::Estimate;
 
     /// returns the justification of this message
-    fn get_justification<'z>(&'z self) -> &'z Justification<Self>;
+    fn justification<'z>(&'z self) -> &'z Justification<Self>;
 
     fn id(&self) -> &Self::ID;
 
@@ -96,7 +96,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
         } else {
             (false, equivocators)
         };
-        self.get_justification().iter().fold(
+        self.justification().iter().fold(
             init,
             |(acc_has_equivocations, acc_equivocators), self_prime| {
                 // note the rotation between rhs and self, done because
@@ -135,7 +135,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
         // computation on the other threads will be canceled.
         // TODO DL: bad idea to spawn threads recursively and without upper bound
         fn recurse<M: CasperMsg>(lhs: &M, rhs: &M, visited: Arc<RwLock<HashSet<M>>>) -> bool {
-            let justification = lhs.get_justification();
+            let justification = lhs.justification();
 
             // Math definition of dependency
             justification.contains(rhs)
@@ -181,7 +181,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
         where
             M: CasperMsg,
         {
-            m.get_justification()
+            m.justification()
                 .iter()
                 .fold(safe_msgs, |mut safe_msgs_prime, msg_prime| {
                     // base case
@@ -235,7 +235,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
         where
             M: CasperMsg,
         {
-            m.get_justification().iter().fold(
+            m.justification().iter().fold(
                 safe_msg_weight,
                 |mut safe_msg_weight_prime, m_prime| {
                     // base case
@@ -377,9 +377,9 @@ where
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
         let mut msg = serializer.serialize_struct("Message", 3)?;
-        let j: Vec<_> = self.get_justification().iter().map(Self::id).collect();
+        let j: Vec<_> = self.justification().iter().map(Self::id).collect();
         msg.serialize_field("sender", self.sender())?;
-        msg.serialize_field("estimate", self.get_estimate())?;
+        msg.serialize_field("estimate", self.estimate())?;
         msg.serialize_field("justification", &j)?;
         msg.end()
     }
@@ -397,11 +397,11 @@ where
         &self.0.sender
     }
 
-    fn get_estimate(&self) -> &Self::Estimate {
+    fn estimate(&self) -> &Self::Estimate {
         &self.0.estimate
     }
 
-    fn get_justification<'z>(&'z self) -> &'z Justification<Self> {
+    fn justification<'z>(&'z self) -> &'z Justification<Self> {
         &self.0.justification
     }
 
@@ -463,8 +463,8 @@ where
             "M{:?}({:?})",
             // "M{:?}({:?}) -> {:?}",
             self.sender(),
-            self.get_estimate().clone(),
-            // self.get_justification()
+            self.estimate().clone(),
+            // self.justification()
         )
     }
 }

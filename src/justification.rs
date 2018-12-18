@@ -177,7 +177,7 @@ impl<M: CasperMsg> Justification<M> {
         where
             M: CasperMsg,
         {
-            m.get_justification()
+            m.justification()
                 .iter()
                 .fold(initial_weight, |weight_referred, m_prime| {
                     // base case
@@ -397,7 +397,7 @@ impl<'z, M: CasperMsg> From<&'z Justification<M>> for LatestMsgs<M> {
         let mut queue: VecDeque<M> = j.iter().cloned().collect();
         while let Some(msg) = queue.pop_front() {
             if latest_msgs.update(&msg) {
-                msg.get_justification()
+                msg.justification()
                     .iter()
                     .for_each(|m| queue.push_back(m.clone()));
             }
@@ -414,7 +414,7 @@ impl<'z, M: CasperMsg> From<&'z Justification<M>> for LatestMsgs<M> {
 //             // TODO: this should be breadth first like ghost in blockchain
 //             j.iter().fold(latest_msgs, |mut acc, m| {
 //                 acc.update(m);
-//                 recur_func(m.get_justification(), acc)
+//                 recur_func(m.justification(), acc)
 //             })
 //         }
 //         recur_func(j, LatestMsgs::new())
@@ -536,7 +536,7 @@ mod tests {
         let justification = Justification::new();
         let genesis_msg = BlockMsg::new(sender0, justification, genesis_block.clone(), None);
         assert_eq!(
-            genesis_msg.get_estimate(),
+            genesis_msg.estimate(),
             &genesis_block,
             "genesis block with None as prev_block"
         );
