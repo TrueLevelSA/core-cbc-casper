@@ -50,7 +50,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
     /// finalized_msg allows to shortcut the recursive checks
     fn from_msgs(
         sender: Self::Sender,
-        new_msgs: Vec<&Self>,
+        mut new_msgs: Vec<&Self>,
         finalized_msg: Option<&Self>,
         sender_state: &SenderState<Self>,
         external_data: Option<<Self::Estimate as Data>::Data>,
@@ -63,7 +63,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
 
         // dedup by putting msgs into a hashset
         // TODO DL: why don't we directly ask for a hashset instead of a Vec?
-        let new_msgs: HashSet<_> = new_msgs.iter().cloned().collect();
+        let new_msgs: HashSet<_> = new_msgs.drain(..).collect();
         let new_msgs_len = new_msgs.len();
 
         // update latest_msgs in sender_state with new_msgs
