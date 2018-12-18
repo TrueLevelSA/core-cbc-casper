@@ -39,7 +39,7 @@ impl Estimate for IntegerWrapper {
         // search for a reasonable set of txs in this function that does not
         // conflict with the past blocks
         _proto_block: Option<<Self as Data>::Data>,
-    ) -> Self {
+    ) -> Result<Self, &'static str> {
         let mut msgs_sorted_by_estimate = Vec::from_iter(latest_msgs.iter().fold(
             HashSet::new(),
             |mut latest, latest_from_validator| {
@@ -74,10 +74,7 @@ impl Estimate for IntegerWrapper {
         }
 
         // return said estimate
-        match current_msg {
-            Err(_) => IntegerWrapper(0),
-            Ok(m) => m.get_estimate().clone(),
-        }
+        current_msg.map(|m| m.get_estimate().clone())
     }
 }
 
@@ -119,7 +116,8 @@ mod tests {
                 ),
                 &senders_weights,
                 None
-            ),
+            )
+            .unwrap(),
             IntegerWrapper(0)
         );
 
@@ -131,31 +129,22 @@ mod tests {
 
         let (mut j0, _) = Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
         assert_eq!(
-            j0.mk_estimate(
-                sender_state.get_equivocators(),
-                &senders_weights,
-                None
-            ),
+            j0.mk_estimate(sender_state.get_equivocators(), &senders_weights, None)
+                .unwrap(),
             IntegerWrapper(1)
         );
 
         j0.faulty_insert(&m2, &sender_state);
         assert_eq!(
-            j0.mk_estimate(
-                sender_state.get_equivocators(),
-                &senders_weights,
-                None
-            ),
+            j0.mk_estimate(sender_state.get_equivocators(), &senders_weights, None)
+                .unwrap(),
             IntegerWrapper(2)
         );
 
         j0.faulty_insert(&m3, &sender_state);
         assert_eq!(
-            j0.mk_estimate(
-                sender_state.get_equivocators(),
-                &senders_weights,
-                None
-            ),
+            j0.mk_estimate(sender_state.get_equivocators(), &senders_weights, None)
+                .unwrap(),
             IntegerWrapper(2)
         );
     }
@@ -191,7 +180,8 @@ mod tests {
                 ),
                 &senders_weights,
                 None
-            ),
+            )
+            .unwrap(),
             IntegerWrapper(0)
         );
 
@@ -203,31 +193,22 @@ mod tests {
 
         let (mut j0, _) = Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
         assert_eq!(
-            j0.mk_estimate(
-                sender_state.get_equivocators(),
-                &senders_weights,
-                None
-            ),
+            j0.mk_estimate(sender_state.get_equivocators(), &senders_weights, None)
+                .unwrap(),
             IntegerWrapper(1)
         );
 
         j0.faulty_insert(&m2, &sender_state);
         assert_eq!(
-            j0.mk_estimate(
-                sender_state.get_equivocators(),
-                &senders_weights,
-                None
-            ),
+            j0.mk_estimate(sender_state.get_equivocators(), &senders_weights, None)
+                .unwrap(),
             IntegerWrapper(1)
         );
 
         j0.faulty_insert(&m3, &sender_state);
         assert_eq!(
-            j0.mk_estimate(
-                sender_state.get_equivocators(),
-                &senders_weights,
-                None
-            ),
+            j0.mk_estimate(sender_state.get_equivocators(), &senders_weights, None)
+                .unwrap(),
             IntegerWrapper(1)
         );
     }
@@ -263,7 +244,8 @@ mod tests {
                 ),
                 &senders_weights,
                 None
-            ),
+            )
+            .unwrap(),
             IntegerWrapper(0)
         );
 
@@ -278,41 +260,29 @@ mod tests {
 
         let (mut j0, _) = Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
         assert_eq!(
-            j0.mk_estimate(
-                sender_state.get_equivocators(),
-                &senders_weights,
-                None
-            ),
+            j0.mk_estimate(sender_state.get_equivocators(), &senders_weights, None)
+                .unwrap(),
             IntegerWrapper(1)
         );
 
         j0.faulty_insert(&m2, &sender_state);
         assert_eq!(
-            j0.mk_estimate(
-                sender_state.get_equivocators(),
-                &senders_weights,
-                None
-            ),
+            j0.mk_estimate(sender_state.get_equivocators(), &senders_weights, None)
+                .unwrap(),
             IntegerWrapper(2)
         );
 
         j0.faulty_insert(&m3, &sender_state);
         assert_eq!(
-            j0.mk_estimate(
-                sender_state.get_equivocators(),
-                &senders_weights,
-                None
-            ),
+            j0.mk_estimate(sender_state.get_equivocators(), &senders_weights, None)
+                .unwrap(),
             IntegerWrapper(4)
         );
 
         j0.faulty_insert(&m4, &sender_state);
         assert_eq!(
-            j0.mk_estimate(
-                sender_state.get_equivocators(),
-                &senders_weights,
-                None
-            ),
+            j0.mk_estimate(sender_state.get_equivocators(), &senders_weights, None)
+                .unwrap(),
             IntegerWrapper(4)
         );
     }
