@@ -29,6 +29,8 @@ use casper::example::vote_count::VoteCount;
 use std::fs::OpenOptions;
 use std::io::Write;
 
+use std::time::Instant;
+
 fn add_message<'z, M>(
     state: &'z mut HashMap<M::Sender, SenderState<M>>,
     sender: M::Sender,
@@ -237,7 +239,11 @@ where
                 state.clone()
             });
             let mut have_consensus = false;
+
+            let start = Instant::now();
+            let mut timestamp_file = OpenOptions::new().create(true).truncate(true).write(true).open("timestamp.log").unwrap();
             Vec::from_iter(chain.take_while(|state| {
+                writeln!(timestamp_file, "{:?}", start.elapsed());
                 if have_consensus {
                     false
                 } else {
