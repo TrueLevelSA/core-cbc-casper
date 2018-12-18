@@ -66,15 +66,15 @@ where
     state
         .get_mut(&sender)
         .unwrap()
-        .get_latest_msgs_as_mut()
+        .latests_msgs_as_mut()
         .update(&m);
 
     recipients.iter().for_each(|recipient| {
-        state
-            .get_mut(&recipient)
-            .unwrap()
-            .latests_msgs_as_mut()
-            .update(&m);
+        let state_to_update = state.get_mut(&recipient).unwrap().latests_msgs_as_mut();
+        state_to_update.update(&m);
+        m.justification().iter().for_each(|m| {
+            state_to_update.update(m);
+        });
     });
     state
 }
