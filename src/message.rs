@@ -112,10 +112,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
 
     /// Math definition of the equivocation
     fn equivocates(&self, rhs: &Self) -> bool {
-        self != rhs
-            && self.sender() == rhs.sender()
-            && !rhs.depends(self)
-            && !self.depends(rhs)
+        self != rhs && self.sender() == rhs.sender() && !rhs.depends(self) && !self.depends(rhs)
     }
 
     /// checks whether self depends on rhs
@@ -185,8 +182,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
                 .iter()
                 .fold(safe_msgs, |mut safe_msgs_prime, msg_prime| {
                     // base case
-                    if &senders_referred == all_senders && original_sender == msg_prime.sender()
-                    {
+                    if &senders_referred == all_senders && original_sender == msg_prime.sender() {
                         let _ = safe_msgs_prime.insert(msg_prime.clone());
                         safe_msgs_prime
                     } else {
@@ -235,9 +231,9 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
         where
             M: CasperMsg,
         {
-            m.justification().iter().fold(
-                safe_msg_weight,
-                |mut safe_msg_weight_prime, m_prime| {
+            m.justification()
+                .iter()
+                .fold(safe_msg_weight, |mut safe_msg_weight_prime, m_prime| {
                     // base case
                     if &weight_referred > thr {
                         let _ = safe_msg_weight_prime.insert(m.clone(), weight_referred);
@@ -262,8 +258,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
                             safe_msg_weight_prime,
                         )
                     }
-                },
-            )
+                })
         };
 
         // initial state, trigger recursion
