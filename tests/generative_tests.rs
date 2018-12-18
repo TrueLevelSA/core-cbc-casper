@@ -241,7 +241,12 @@ where
             let mut have_consensus = false;
 
             let start = Instant::now();
-            let mut timestamp_file = OpenOptions::new().create(true).truncate(true).write(true).open("timestamp.log").unwrap();
+            let mut timestamp_file = OpenOptions::new()
+                .create(true)
+                .truncate(true)
+                .write(true)
+                .open("timestamp.log")
+                .unwrap();
             Vec::from_iter(chain.take_while(|state| {
                 writeln!(timestamp_file, "{:?}", start.elapsed());
                 if have_consensus {
