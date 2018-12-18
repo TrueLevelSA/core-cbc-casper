@@ -70,6 +70,26 @@ where
         .update(&m);
 
     recipients.iter().for_each(|recipient| {
+        let sender_state_reconstructed = SenderState::new(
+            state[&recipient].senders_weights().clone(),
+            0.0,
+            Some(m.clone()),
+            LatestMsgs::from(m.justification()),
+            0.0,
+            HashSet::new(),
+        );
+        assert_eq!(
+            m.estimate(),
+            M::from_msgs(
+                sender.clone(),
+                m.justification().iter().collect(),
+                &sender_state_reconstructed,
+                data.clone().map(|d| d.into()),
+            )
+            .unwrap()
+            .0
+            .estimate()
+        );
         let state_to_update = state.get_mut(&recipient).unwrap().latests_msgs_as_mut();
         state_to_update.update(&m);
         m.justification().iter().for_each(|m| {
