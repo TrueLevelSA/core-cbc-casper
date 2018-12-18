@@ -136,13 +136,14 @@ impl VoteCount {
 }
 
 type Voter = u32;
+pub type VoteMsg = Message<VoteCount, Voter>;
 
 impl Sender for Voter {}
 
 impl Estimate for VoteCount {
     // the estimator just counts votes, which in this case are the unjustified
     // msgs
-    type M = Message<Self, Voter>;
+    type M = VoteMsg;
 
     // Data could be anything, as it will not be used, will just pass None to
     // mk_estimate, as it takes an Option
