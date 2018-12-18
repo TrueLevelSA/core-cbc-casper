@@ -408,10 +408,7 @@ impl<M: CasperMsg> SenderState<M> {
                 // equivocations in relation to state
                 let sender = msg.sender();
                 if !self.equivocators.contains(sender) && self.latest_msgs.equivocate(msg) {
-                    self.senders_weights
-                        .weight(sender)
-                        .map(|w| (msg, w))
-                        .ok()
+                    self.senders_weights.weight(sender).map(|w| (msg, w)).ok()
                 } else {
                     Some((msg, WeightUnit::ZERO))
                 }
@@ -440,9 +437,8 @@ mod tests {
 
     #[test]
     fn faulty_inserts_sorted() {
-        let senders_weights = SendersWeight::new(
-            [(0, 1.0), (1, 2.0), (2, 3.0)].iter().cloned().collect(),
-        );
+        let senders_weights =
+            SendersWeight::new([(0, 1.0), (1, 2.0), (2, 3.0)].iter().cloned().collect());
 
         let v0 = &VoteCount::create_vote_msg(0, false);
         let v0_prime = &VoteCount::create_vote_msg(0, true);
@@ -462,19 +458,15 @@ mod tests {
         let _ = sender_state.latest_msgs.update(v0);
         let _ = sender_state.latest_msgs.update(v1);
         let _ = sender_state.latest_msgs.update(v2);
-        let sorted_msgs = sender_state.sort_by_faultweight(
-            vec![v2_prime, v1_prime, v0_prime]
+        let sorted_msgs = sender_state
+            .sort_by_faultweight(vec![v2_prime, v1_prime, v0_prime].iter().cloned().collect());
+        let (_, sender_state) =
+            sorted_msgs
                 .iter()
-                .cloned()
-                .collect(),
-        );
-        let (_, sender_state) = sorted_msgs.iter().fold(
-            (false, sender_state),
-            |(success, sender_state), &m| {
-                let (s, w) = j.faulty_insert(m, &sender_state);
-                (s || success, w)
-            },
-        );
+                .fold((false, sender_state), |(success, sender_state), &m| {
+                    let (s, w) = j.faulty_insert(m, &sender_state);
+                    (s || success, w)
+                });
         assert!(j.contains(v0_prime));
         assert!(j.contains(v1_prime));
         assert!(!j.contains(v2_prime));

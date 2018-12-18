@@ -1,8 +1,8 @@
-use std::collections::{HashSet};
-use std::fmt::{Debug};
+use rayon::prelude::*;
+use std::collections::HashSet;
+use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, RwLock};
-use rayon::prelude::*;
 
 use hashed::Hashed;
 use justification::{Justification, LatestMsgsHonest, SenderState};
@@ -349,10 +349,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use example::vote_count::{VoteCount};
+    use super::*;
+    use example::vote_count::VoteCount;
     use justification::LatestMsgs;
     use senders_weight::SendersWeight;
-    use super::*;
 
     #[test]
     fn debug() {

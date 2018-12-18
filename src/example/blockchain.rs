@@ -577,13 +577,9 @@ mod tests {
         );
 
         let proto_b4 = Block::new(None, sender4);
-        let (m4, _) = BlockMsg::from_msgs(
-            proto_b4.sender(),
-            vec![&m1],
-            &sender_state,
-            Some(proto_b4),
-        )
-        .unwrap();
+        let (m4, _) =
+            BlockMsg::from_msgs(proto_b4.sender(), vec![&m1], &sender_state, Some(proto_b4))
+                .unwrap();
 
         assert_eq!(
             m4.estimate(),
@@ -670,13 +666,9 @@ mod tests {
         .unwrap();
 
         let proto_b1 = Block::new(None, sender1);
-        let (m1, sender_state) = BlockMsg::from_msgs(
-            proto_b1.sender(),
-            vec![&m0],
-            &sender_state,
-            Some(proto_b1),
-        )
-        .unwrap();
+        let (m1, sender_state) =
+            BlockMsg::from_msgs(proto_b1.sender(), vec![&m0], &sender_state, Some(proto_b1))
+                .unwrap();
 
         let proto_b2 = Block::new(None, sender2);
         let (m2, sender_state) = BlockMsg::from_msgs(
@@ -694,13 +686,9 @@ mod tests {
         // );
 
         let proto_b3 = Block::new(None, sender3);
-        let (m3, sender_state) = BlockMsg::from_msgs(
-            proto_b3.sender(),
-            vec![&m2],
-            &sender_state,
-            Some(proto_b3),
-        )
-        .unwrap();
+        let (m3, sender_state) =
+            BlockMsg::from_msgs(proto_b3.sender(), vec![&m2], &sender_state, Some(proto_b3))
+                .unwrap();
 
         // assert_eq!(
         //     m3.estimate(),
@@ -711,13 +699,9 @@ mod tests {
         let proto_b4 = Block::new(None, sender4);
         // println!("\n3 {:?}", m2);
         // println!("\n4 {:?}", m3);
-        let (m4, sender_state) = BlockMsg::from_msgs(
-            proto_b4.sender(),
-            vec![&m2],
-            &sender_state,
-            Some(proto_b4),
-        )
-        .unwrap();
+        let (m4, sender_state) =
+            BlockMsg::from_msgs(proto_b4.sender(), vec![&m2], &sender_state, Some(proto_b4))
+                .unwrap();
         // assert_eq!(
         //     m4.estimate(),
         //     &Block::new(Some(Block::from(&m2)), sender4),
