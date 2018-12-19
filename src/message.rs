@@ -57,7 +57,6 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
         // assert!(!dup_senders, "A sender can only have one, and only one, latest message");
 
         // dedup by putting msgs into a hashset
-        // TODO DL: why don't we directly ask for a hashset instead of a Vec?
         let new_msgs: HashSet<_> = new_msgs.drain(..).collect();
         let new_msgs_len = new_msgs.len();
 
@@ -126,7 +125,6 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
         // thus, highly parallelizable. when it shortcuts, because in one thread
         // a dependency was found, the function returns true and all the
         // computation on the other threads will be canceled.
-        // TODO DL: bad idea to spawn threads recursively and without upper bound
         fn recurse<M: CasperMsg>(lhs: &M, rhs: &M, visited: Arc<RwLock<HashSet<M>>>) -> bool {
             let justification = lhs.justification();
 

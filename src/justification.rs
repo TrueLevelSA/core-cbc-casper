@@ -334,7 +334,6 @@ impl<'z, M: CasperMsg> From<&'z Justification<M>> for LatestMsgs<M> {
 //             j: &Justification<M>,
 //             latest_msgs: LatestMsgs<M>,
 //         ) -> LatestMsgs<M> {
-//             // TODO: this should be breadth first like ghost in blockchain
 //             j.iter().fold(latest_msgs, |mut acc, m| {
 //                 acc.update(m);
 //                 recur_func(m.justification(), acc)
@@ -357,7 +356,7 @@ pub struct SenderState<M: CasperMsg> {
     /// TODO: better name?
     my_last_msg: Option<M>,
     latest_msgs: LatestMsgs<M>,
-    equivocators: HashSet<M::Sender>, // FIXME: put it here as its needed on the same context as
+    equivocators: HashSet<M::Sender>,
 }
 
 impl<M: CasperMsg> SenderState<M> {

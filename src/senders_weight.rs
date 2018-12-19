@@ -9,11 +9,6 @@ use weight_unit::WeightUnit;
 #[derive(Clone, Default, Debug)]
 pub struct SendersWeight<S: Sender>(Arc<RwLock<HashMap<S, WeightUnit>>>);
 
-////TODO
-// impl<S: Sender> From<HashMap<S, WeightUnit>> for SendersWeight<S>{
-//     fn from()
-// }
-
 impl<S: Sender> SendersWeight<S> {
     /// creates a new SendersWeight from a HashMap
     pub fn new(senders_weight: HashMap<S, WeightUnit>) -> Self {
@@ -22,7 +17,6 @@ impl<S: Sender> SendersWeight<S> {
 
     /// same as RwLock read() function
     /// basically locks the Rwlock with read access
-    /// TODO DL: why was this public? shouldn't it be that it's only accessed from
     /// insert and senders?
     fn read(&self) -> LockResult<RwLockReadGuard<HashMap<S, WeightUnit>>> {
         self.0.read()
@@ -30,8 +24,6 @@ impl<S: Sender> SendersWeight<S> {
 
     /// same as RwLock write() function
     /// basically locks the RwLock with write access
-    /// TODO DL: why was this public? shouldn't it be that it's only accessed from
-    /// insert and senders?
     fn write(&self) -> LockResult<RwLockWriteGuard<HashMap<S, WeightUnit>>> {
         self.0.write()
     }
