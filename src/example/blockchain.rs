@@ -7,6 +7,7 @@ use justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use message::{CasperMsg, Message};
 use senders_weight::SendersWeight;
 use serde_derive::Serialize;
+use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 use traits::{Data, Estimate, Id, Zero};
 use weight_unit::WeightUnit;
@@ -262,7 +263,6 @@ impl Block {
             .collect()
     }
 
-    // //TODO: this should possibly go to Estimate trait (not sure)
     // pub fn set_as_final(&mut self) -> () {
     //     let mut proto_block = (**self.0).clone();
     //     proto_block.prevblock = None;
@@ -298,17 +298,14 @@ impl Block {
         let mut queue: VecDeque<Block> = visited_parents.keys().cloned().collect();
         let latest_blocks: HashSet<Block> = visited_parents.keys().cloned().collect();
         let mut genesis: HashSet<Block> = HashSet::new();
-        let mut referred_latest_blocks: HashSet<Block> = HashSet::new();
+        let mut was_empty = false;
         // while there are still unvisited blocks
         while let Some(child) = queue.pop_front() {
-            match (
-                child.prevblock(),
-                referred_latest_blocks == latest_blocks && queue.len() == 0,
-            ) {
+            match (child.prevblock(), was_empty) {
                 // if the prevblock is set, update the visited_parents map
                 (Some(parent), false) => {
-                    if latest_blocks.contains(&child) {
-                        referred_latest_blocks.insert(child.clone());
+                    if queue.is_empty() {
+                        was_empty = true
                     }
                     if visited_parents.contains_key(&parent) {
                         // visited parent before, fork found, add new child and don't add parent to queue (since it is already in the queue)
@@ -337,7 +334,7 @@ impl Block {
         visited: &HashMap<Block, HashSet<Block>>,
         mut acc: HashSet<Validator>,
         latest_blocks: &HashSet<Block>,
-        b_in_lms_senders: Arc<RwLock<HashMap<Block, HashSet<Validator>>>>,
+        b_in_lms_senders: Rc<RwLock<HashMap<Block, HashSet<Validator>>>>,
     ) -> HashSet<Validator> {
         let sender = block.sender();
         if latest_blocks.contains(block) {
@@ -373,7 +370,7 @@ impl Block {
         visited: &HashMap<Block, HashSet<Block>>,
         weights: &SendersWeight<Validator>,
         latest_blocks: &HashSet<Block>,
-        b_in_lms_senders: Arc<RwLock<HashMap<Block, HashSet<Validator>>>>,
+        b_in_lms_senders: Rc<RwLock<HashMap<Block, HashSet<Validator>>>>,
     ) -> Option<(Option<Self>, WeightUnit, HashSet<Self>)> {
         let init = Some((None, WeightUnit::ZERO, HashSet::new()));
         let heaviest_child = match blocks.len() {
@@ -445,7 +442,7 @@ impl Block {
         senders_weights: &SendersWeight<<BlockMsg as CasperMsg>::Sender>,
     ) -> Option<Self> {
         let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_msgs);
-        let b_in_lms_senders = Arc::new(RwLock::new(HashMap::<Block, HashSet<Validator>>::new()));
+        let b_in_lms_senders = Rc::new(RwLock::new(HashMap::<Block, HashSet<Validator>>::new()));
         Block::pick_heaviest(
             &genesis,
             &visited,

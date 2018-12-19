@@ -239,15 +239,17 @@ where
             });
             let mut have_consensus = false;
 
-            let start = Instant::now();
+            let mut start = Instant::now();
             let mut timestamp_file = OpenOptions::new()
                 .create(true)
                 .truncate(true)
                 .write(true)
                 .open("timestamp.log")
                 .unwrap();
+            writeln!(timestamp_file, "start");
             Vec::from_iter(chain.take_while(|state| {
-                writeln!(timestamp_file, "{:?}", start.elapsed());
+                writeln!(timestamp_file, "{:?}", start.elapsed().subsec_micros());
+                start = Instant::now();
                 if have_consensus {
                     false
                 } else {
@@ -267,9 +269,9 @@ fn arbitrary_blockchain() -> BoxedStrategy<Block> {
 }
 
 proptest! {
-    #![proptest_config(Config::with_cases(100))]
+    #![proptest_config(Config::with_cases(1))]
     #[test]
-    fn blockchain(ref chain in chain(arbitrary_blockchain(), 6, round_robin, some_receivers, safety_oracle)) {
+    fn blockchain(ref chain in chain(arbitrary_blockchain(), 2, round_robin, all_receivers, |_| false)) {
         // total messages until unilateral consensus
         let mut output_file = OpenOptions::new().create(true).truncate(true).write(true).open("blockchain_test.log").unwrap();
 
