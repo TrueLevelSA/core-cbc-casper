@@ -332,36 +332,34 @@ impl Block {
     fn collect_validators(
         block: &Block,
         visited: &HashMap<Block, HashSet<Block>>,
-        mut acc: HashSet<Validator>,
+        // mut acc: HashSet<Validator>,
         latest_blocks: &HashSet<Block>,
         b_in_lms_senders: Rc<RwLock<HashMap<Block, HashSet<Validator>>>>,
     ) -> HashSet<Validator> {
-        let sender = block.sender();
+        let mut senders = HashSet::new();
+        // collect this sender if this block is his latest message
         if latest_blocks.contains(block) {
-            // collect this sender if this block is his latest message
-            let _ = acc.insert(sender);
+            let _ = senders.insert(block.sender());
         }
-        match visited.get(&block).filter(|children| !children.is_empty()) {
-            None => acc,
-            // compute the senders endorsing the child block
-            Some(children) => children.iter().fold(acc, |mut acc, child| {
-                let mut endorsers = Self::collect_validators(
-                    child,
-                    visited,
-                    HashSet::new(),
-                    latest_blocks,
-                    b_in_lms_senders.clone(),
-                );
-                // memoize child's endorsers
-                b_in_lms_senders
-                    .write()
-                    .ok()
-                    .map(|mut lms| lms.insert(child.clone(), endorsers.clone()));
-                // take the union of accumulator and endorsers
-                let acc = Iterator::chain(acc.drain(), endorsers.drain()).collect();
-                acc
-            }),
-        }
+        let res = visited
+            .get(block)
+            .map(|children| {
+                children.iter().fold(senders.clone(), |acc, child| {
+                    let res = Self::collect_validators(
+                        child,
+                        visited,
+                        latest_blocks,
+                        b_in_lms_senders.clone(),
+                    );
+                    res.union(&acc).cloned().collect()
+                })
+            })
+            .unwrap_or_else(|| senders);
+        b_in_lms_senders
+            .write()
+            .ok()
+            .map(|mut lms| lms.insert(block.clone(), res.clone()));
+        res
     }
 
     /// find heaviest block
@@ -390,11 +388,10 @@ impl Block {
                         .ok()
                         .and_then(|lms| lms.get(block).cloned())
                     {
-                        Some(rs) => rs,
+                        Some(rs) => { println!("rs: {:?}", rs); rs },
                         None => Self::collect_validators(
                             block,
                             visited,
-                            HashSet::new(),
                             latest_blocks,
                             b_in_lms_senders.clone(),
                         ),
