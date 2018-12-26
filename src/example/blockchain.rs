@@ -88,10 +88,6 @@ impl Id for Block {
 
 pub type BlockMsg = Message<Block /*Estimate*/, Validator /*Sender*/>;
 
-//// this type can be used to create a look up for what msgs are referred by
-//// what validators
-// type ReferredValidators = HashMap<Block, HashSet<Validator>>;
-
 impl PartialEq for Block {
     fn eq(&self, rhs: &Self) -> bool {
         Arc::ptr_eq(self.arc(), rhs.arc()) || self.id() == rhs.id()
