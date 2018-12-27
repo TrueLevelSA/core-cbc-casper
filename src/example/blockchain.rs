@@ -437,7 +437,7 @@ impl Block {
     pub fn ghost(
         latest_msgs: &LatestMsgsHonest<BlockMsg>,
         senders_weights: &SendersWeight<<BlockMsg as CasperMsg>::Sender>,
-    ) -> Option<Self> {
+    ) -> Result<Self, &'static str> {
         let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_msgs);
         let b_in_lms_senders = Rc::new(RwLock::new(HashMap::<Block, HashSet<Validator>>::new()));
         Block::pick_heaviest(
@@ -447,7 +447,9 @@ impl Block {
             &latest_blocks,
             b_in_lms_senders,
         )
-        .and_then(|(opt_block, ..)| opt_block)
+            .and_then(|(opt_block, ..)| opt_block)
+            .ok_or_else(|| "Failed to get prevblock using ghost.")
+
     }
 }
 
@@ -462,17 +464,15 @@ impl Estimate for Block {
         // conflict with the past blocks
         incomplete_block: Option<<Self as Data>::Data>,
     ) -> Result<Self, &'static str> {
-        match incomplete_block {
-            None => Err("incomplete_block is None"),
-            Some(incomplete_block) => {
-                let prevblock = Block::ghost(latest_msgs, senders_weights);
-                let block = Block::from(ProtoBlock {
-                    prevblock,
-                    ..(*incomplete_block.arc().clone())
-                });
-                Ok(block)
-            }
-        }
+        incomplete_block
+            .ok_or_else(|| "incomplete_block is None")
+            .map(|incomplete_block| {
+                let prevblock = Block::ghost(latest_msgs, senders_weights).ok();
+                Block::from(ProtoBlock {
+                        prevblock,
+                        ..(*incomplete_block.arc().clone())
+                    })
+            })
     }
 }
 
