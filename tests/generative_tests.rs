@@ -248,7 +248,7 @@ where
                 .open("timestamp.log")
                 .unwrap();
             Vec::from_iter(chain.take_while(|state| {
-                writeln!(timestamp_file, "{:?}", start.elapsed()).unwrap();
+                writeln!(timestamp_file, "{:?}", start.elapsed().as_nanos()).unwrap();
                 if have_consensus {
                     false
                 } else {
