@@ -245,7 +245,7 @@ where
                 .create(true)
                 .truncate(true)
                 .write(true)
-                .open("timestamp.log")
+                .open("timestamps_nanoseconds.log")
                 .unwrap();
             Vec::from_iter(chain.take_while(|state| {
                 writeln!(timestamp_file, "{:?}", start.elapsed().as_nanos()).unwrap();
