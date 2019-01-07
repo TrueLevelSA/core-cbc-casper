@@ -291,15 +291,13 @@ impl Block {
             })
             .collect();
 
-        let mut queue: Vec<Block> = visited_parents.keys().cloned().collect();
-        queue.sort_by(|a, b| a.id().cmp(b.id()));
-        let mut queue: VecDeque<Block> = queue.iter().cloned().collect();
+        let mut queue: VecDeque<Block> = visited_parents.keys().cloned().collect();
         let latest_blocks: HashSet<Block> = visited_parents.keys().cloned().collect();
         let mut genesis: HashSet<Block> = HashSet::new();
         let mut was_empty = false;
         // while there are still unvisited blocks
         while let Some(child) = queue.pop_front() {
-            match (child.prevblock(), was_empty) {
+            match (child.prevblock(), was_empty && genesis.is_empty()) {
                 // if the prevblock is set, update the visited_parents map
                 (Some(parent), false) => {
                     if queue.is_empty() {
