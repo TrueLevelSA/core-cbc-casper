@@ -86,9 +86,11 @@ where
                 &sender_state_reconstructed,
                 data.clone().map(|d| d.into()),
             )
-            .unwrap()
-            .0
-            .estimate()
+                .unwrap()
+                .0
+                .estimate(),
+            "Recipient must be able to reproduce the estimate from its justification and the justification only.\nSender: {:?}\nRecipient: {:?}\nNumber of Nodes: {:?}\n",
+            sender, recipient, state.len(),
         );
         let state_to_update = state.get_mut(&recipient).unwrap().latests_msgs_as_mut();
         state_to_update.update(&m);
@@ -293,9 +295,9 @@ fn arbitrary_blockchain() -> BoxedStrategy<Block> {
 }
 
 proptest! {
-    #![proptest_config(Config::with_cases(1))]
+    #![proptest_config(Config::with_cases(100))]
     #[test]
-    fn blockchain(ref chain in chain(arbitrary_blockchain(), 2, round_robin, all_receivers, |_| false)) {
+    fn blockchain(ref chain in chain(arbitrary_blockchain(), 6, arbitrary_in_set, some_receivers, safety_oracle)) {
         // total messages until unilateral consensus
         let mut output_file = OpenOptions::new().create(true).truncate(true).write(true).open("blockchain_test.log").unwrap();
 

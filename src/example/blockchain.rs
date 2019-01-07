@@ -291,7 +291,9 @@ impl Block {
             })
             .collect();
 
-        let mut queue: VecDeque<Block> = visited_parents.keys().cloned().collect();
+        let mut queue: Vec<Block> = visited_parents.keys().cloned().collect();
+        queue.sort_by(|a, b| a.id().cmp(b.id()));
+        let mut queue: VecDeque<Block> = queue.iter().cloned().collect();
         let latest_blocks: HashSet<Block> = visited_parents.keys().cloned().collect();
         let mut genesis: HashSet<Block> = HashSet::new();
         let mut was_empty = false;
