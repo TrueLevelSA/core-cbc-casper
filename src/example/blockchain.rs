@@ -384,7 +384,7 @@ impl Block {
                         .ok()
                         .and_then(|lms| lms.get(block).cloned())
                     {
-                        Some(rs) => rs ,
+                        Some(rs) => rs,
                         None => Self::collect_validators(
                             block,
                             visited,
@@ -443,9 +443,8 @@ impl Block {
             &latest_blocks,
             b_in_lms_senders,
         )
-            .and_then(|(opt_block, ..)| opt_block)
-            .ok_or_else(|| "Failed to get prevblock using ghost.")
-
+        .and_then(|(opt_block, ..)| opt_block)
+        .ok_or_else(|| "Failed to get prevblock using ghost.")
     }
 }
 
@@ -457,15 +456,12 @@ impl Estimate for Block {
         senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
         incomplete_block: Option<<Self as Data>::Data>,
     ) -> Result<Self, &'static str> {
-        incomplete_block
-            .ok_or_else(|| "incomplete_block is None")
-            .map(|incomplete_block| {
-                let prevblock = Block::ghost(latest_msgs, senders_weights).ok();
-                Block::from(ProtoBlock {
-                        prevblock,
-                        ..(*incomplete_block.arc().clone())
-                    })
-            })
+        let incomplete_block = incomplete_block.ok_or_else(|| "incomplete_block is None")?;
+        let prevblock = Block::ghost(latest_msgs, senders_weights)?;
+        Ok(Block::from(ProtoBlock {
+            prevblock: Some(prevblock),
+            ..(*incomplete_block.arc().clone())
+        }))
     }
 }
 
