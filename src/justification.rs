@@ -1,5 +1,3 @@
-use std::collections::hash_map::{Iter as HashIter, Keys, Values};
-use std::collections::hash_set::Iter as HSetIter;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Debug, Formatter};
 
@@ -202,7 +200,7 @@ impl<M: CasperMsg> LatestMsgsHonest<M> {
             })
     }
 
-    pub fn iter(&self) -> HSetIter<M> {
+    pub fn iter(&self) -> std::collections::hash_set::Iter<M> {
         self.0.iter()
     }
 
@@ -251,7 +249,7 @@ impl<M: CasperMsg> LatestMsgs<M> {
         self.0.get_mut(k)
     }
 
-    pub fn iter(&self) -> HashIter<M::Sender, HashSet<M>> {
+    pub fn iter(&self) -> std::collections::hash_map::Iter<M::Sender, HashSet<M>> {
         self.0.iter()
     }
 
@@ -259,11 +257,11 @@ impl<M: CasperMsg> LatestMsgs<M> {
         self.0.len()
     }
 
-    pub fn keys(&self) -> Keys<M::Sender, HashSet<M>> {
+    pub fn keys(&self) -> std::collections::hash_map::Keys<M::Sender, HashSet<M>> {
         self.0.keys()
     }
 
-    pub fn values(&self) -> Values<'_, M::Sender, HashSet<M>> {
+    pub fn values(&self) -> std::collections::hash_map::Values<'_, M::Sender, HashSet<M>> {
         self.0.values()
     }
 
