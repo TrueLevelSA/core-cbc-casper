@@ -384,7 +384,7 @@ impl Block {
                         .ok()
                         .and_then(|lms| lms.get(block).cloned())
                     {
-                        Some(rs) => { println!("rs: {:?}", rs); rs },
+                        Some(rs) => rs ,
                         None => Self::collect_validators(
                             block,
                             visited,
@@ -411,7 +411,7 @@ impl Block {
                     }
                 })
             }),
-            _ => init,
+            _ => None,
         };
         heaviest_child.and_then(|(b_block, b_weight, b_children)| {
             if b_children.is_empty() {
@@ -455,9 +455,6 @@ impl Estimate for Block {
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
-        // in fact i could put the whole mempool inside of this incomplete_block
-        // and search for a reasonable set of txs in this function that does not
-        // conflict with the past blocks
         incomplete_block: Option<<Self as Data>::Data>,
     ) -> Result<Self, &'static str> {
         incomplete_block
