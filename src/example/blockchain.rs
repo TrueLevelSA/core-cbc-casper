@@ -305,9 +305,7 @@ impl Block {
                     }
                     if visited_parents.contains_key(&parent) {
                         // visited parent before, fork found, add new child and don't add parent to queue (since it is already in the queue)
-                        visited_parents.get_mut(&parent).map(|parents_children| {
-                            parents_children.insert(child);
-                        });
+                        visited_parents.get_mut(&parent).unwrap().insert(child);
                     } else {
                         // didn't visit parent before, add it with known child, and push to queue
                         let mut parents_children = HashSet::new();
