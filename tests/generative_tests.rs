@@ -46,18 +46,18 @@ where
         .fold(HashSet::new(), |acc, (_, lms)| {
             acc.union(&lms).cloned().collect()
         });
-    let latest_delta = match state[&sender]
-        .latests_msgs()
-        .get(&sender)
-        .unwrap()
-        .iter()
-        .next()
-    {
-        Some(m) => latest
-            .iter()
-            .filter(|lm| !m.justification().contains(lm))
-            .cloned()
-            .collect(),
+    let latest_delta = match state[&sender].latests_msgs().get(&sender) {
+        Some(msgs) => match msgs.len() {
+            1 => {
+                let m = msgs.iter().next().unwrap();
+                latest
+                    .iter()
+                    .filter(|lm| !m.justification().contains(lm))
+                    .cloned()
+                    .collect()
+            }
+            _ => unimplemented!(),
+        },
         None => latest,
     };
     let (m, sender_state) = M::from_msgs(
