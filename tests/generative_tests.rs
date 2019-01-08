@@ -46,7 +46,13 @@ where
         .fold(HashSet::new(), |acc, (_, lms)| {
             acc.union(&lms).cloned().collect()
         });
-    let latest_delta = match state[&sender].my_last_msg() {
+    let latest_delta = match state[&sender]
+        .latests_msgs()
+        .get(&sender)
+        .unwrap()
+        .iter()
+        .next()
+    {
         Some(m) => latest
             .iter()
             .filter(|lm| !m.justification().contains(lm))
