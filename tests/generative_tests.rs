@@ -300,17 +300,42 @@ fn arbitrary_blockchain() -> BoxedStrategy<Block> {
     Just(genesis_block).boxed()
 }
 
-proptest! {
-    #![proptest_config(Config::with_cases(100))]
-    #[test]
-    fn blockchain(ref chain in chain(arbitrary_blockchain(), 6, arbitrary_in_set, some_receivers, safety_oracle)) {
-        // total messages until unilateral consensus
-        let mut output_file = OpenOptions::new().create(true).truncate(true).write(true).open("blockchain_test.log").unwrap();
+#[test]
+fn blockchain() {
+    // total messages until unilateral consensus
+    let mut output_file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open("blockchain_test.log")
+        .unwrap();
 
-        writeln!(output_file, "new chain")?;
-        chain.iter().for_each(|state| {
-            writeln!(output_file, "{{lms: {:?},", state.iter().map(|(_, sender_state)|
-                                                                   sender_state.latests_msgs()).collect::<Vec<_>>()).unwrap();
+    let mut runner = TestRunner::default();
+
+    for _ in 0..100 {
+        writeln!(output_file, "new chain");
+
+        chain(
+            arbitrary_blockchain(),
+            6,
+            arbitrary_in_set,
+            some_receivers,
+            safety_oracle,
+        )
+        .new_value(&mut runner)
+        .unwrap()
+        .current()
+        .iter()
+        .for_each(|state| {
+            writeln!(
+                output_file,
+                "{{lms: {:?},",
+                state
+                    .iter()
+                    .map(|(_, sender_state)| sender_state.latests_msgs())
+                    .collect::<Vec<_>>()
+            )
+            .unwrap();
             writeln!(output_file, "sendercount: {:?},", state.keys().len()).unwrap();
             writeln!(output_file, "clqs: ").unwrap();
             writeln!(output_file, "{:?}}},", clique_collection(state.clone())).unwrap();
