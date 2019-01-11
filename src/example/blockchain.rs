@@ -9,7 +9,7 @@ use senders_weight::SendersWeight;
 use serde_derive::Serialize;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
-use traits::{Data, Estimate, Id, Zero, Sender};
+use traits::{Data, Estimate, Id, Sender, Zero};
 use weight_unit::WeightUnit;
 
 /// a genesis block should be a block with estimate Block with prevblock =
@@ -77,7 +77,7 @@ impl<S: Sender> serde::Serialize for Block<S> {
     }
 }
 
-impl <S: Sender> Id for ProtoBlock<S> {
+impl<S: Sender> Id for ProtoBlock<S> {
     type ID = Hashed;
 }
 
@@ -167,26 +167,21 @@ impl<S: Sender> Block<S> {
             .filter(|&msg| block.is_member(&Block::from(msg)))
             .collect();
 
-        let latest_agreeing_in_sender_view: HashMap<
-                S,
-            HashMap<S, BlockMsg<S>>,
-        > = latest_containing_block
-            .iter()
-            .map(|m| {
-                (
-                    m.sender().clone(),
-                    latest_in_justification(m.justification(), equivocators)
-                        .into_iter()
-                        .filter(|(_sender, msg)| block.is_member(&Block::from(msg)))
-                        .collect(),
-                )
-            })
-            .collect();
+        let latest_agreeing_in_sender_view: HashMap<S, HashMap<S, BlockMsg<S>>> =
+            latest_containing_block
+                .iter()
+                .map(|m| {
+                    (
+                        m.sender().clone(),
+                        latest_in_justification(m.justification(), equivocators)
+                            .into_iter()
+                            .filter(|(_sender, msg)| block.is_member(&Block::from(msg)))
+                            .collect(),
+                    )
+                })
+                .collect();
 
-        let neighbours: HashMap<
-            &S,
-            HashSet<&S>,
-        > = latest_agreeing_in_sender_view
+        let neighbours: HashMap<&S, HashSet<&S>> = latest_agreeing_in_sender_view
             .iter()
             .map(|(sender, seen_agreeing)| {
                 (
@@ -212,15 +207,11 @@ impl<S: Sender> Block<S> {
             p: HashSet<&S>,
             x: HashSet<&S>,
             mx_clqs: &mut HashSet<BTreeSet<S>>,
-            neighbours: HashMap<
-                &S,
-                HashSet<&S>,
-            >,
+            neighbours: HashMap<&S, HashSet<&S>>,
         ) {
             // println!("recursed");
             if p.is_empty() && x.is_empty() {
-                let rnew: BTreeSet<S> =
-                    r.into_iter().map(|x| x.clone()).collect();
+                let rnew: BTreeSet<S> = r.into_iter().map(|x| x.clone()).collect();
                 mx_clqs.insert(rnew);
             } else {
                 let piter = p.clone();
@@ -230,10 +221,8 @@ impl<S: Sender> Block<S> {
                     p.remove(i);
                     let mut rnew = r.clone();
                     rnew.insert(i);
-                    let pnew: HashSet<&S> =
-                        p.intersection(&neighbours[i]).cloned().collect();
-                    let xnew: HashSet<&S> =
-                        x.intersection(&neighbours[i]).cloned().collect();
+                    let pnew: HashSet<&S> = p.intersection(&neighbours[i]).cloned().collect();
+                    let xnew: HashSet<&S> = x.intersection(&neighbours[i]).cloned().collect();
                     x.insert(i);
                     bron_kerbosch(rnew, pnew, xnew, mx_clqs, neighbours.clone())
                 })
