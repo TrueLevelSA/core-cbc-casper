@@ -31,11 +31,11 @@ use std::io::Write;
 
 use std::time::Instant;
 
-fn add_message<'z, M>(
-    state: &'z mut HashMap<M::Sender, SenderState<M>>,
+fn add_message<M>(
+    state: &mut HashMap<M::Sender, SenderState<M>>,
     sender: M::Sender,
     recipients: HashSet<M::Sender>,
-) -> &'z HashMap<M::Sender, SenderState<M>>
+) -> Result<(), &'static str>
 where
     M: CasperMsg,
 {
@@ -101,7 +101,7 @@ where
             state_to_update.update(m);
         });
     });
-    state
+    Ok(())
 }
 
 fn round_robin(val: &mut Vec<u32>) -> BoxedStrategy<u32> {
@@ -134,7 +134,8 @@ where
     (sender_strategy, receiver_strategy, Just(state))
         .prop_map(|(sender, mut receivers, mut state)| {
             receivers.remove(&sender);
-            add_message(&mut state, sender.clone(), receivers).clone()
+            add_message(&mut state, sender.clone(), receivers);
+            state
         })
         .boxed()
 }
