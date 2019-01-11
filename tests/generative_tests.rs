@@ -195,7 +195,35 @@ fn run_until_height(state: &HashMap<u32, SenderState<BlockMsg>>, value: &u32) ->
     v.contains(&true)
 }
 
+fn get_blocks_at_next_height_from_parsed(blocks_to_children:HashMap<Block, HashSet<Block>>, genesis_blocks: HashSet<Block>) -> HashSet<Block> {
+    let mut set: HashSet<Block> = HashSet::new();
+    blocks_to_children.iter()
+        .filter(|(block, children)|{
+            genesis_blocks.contains(block)
+        })
+        .flat_map(|(_, children)|{
+            children
+        })
+        .for_each(|block| {
+            set.insert(block.clone());
+        });
+    set
+}
+
+fn get_blocks_at_height(state: SenderState<BlockMsg>, height:u32) -> Vec<Block> {
+    let blocks:Vec<Block> = vec![];
+    let genesis_block = Block::from(ProtoBlock::new(None, 0));
+    let latest_msgs = state.latests_msgs();
+    let latest_messages_honest = LatestMsgsHonest::from_latest_msgs(latest_msgs, &HashSet::new());
+
+
+    let (blocks_to_children, genesis_blocks, _latest_messages) = Block::parse_blockchains(&latest_messages_honest);
+
+    blocks
+}
+
 fn safety_oracle(state: &HashMap<u32, SenderState<BlockMsg>>, value: &u32) -> bool {
+
     let safety_oracle_detected: HashSet<bool> = state
         .iter()
         .map(|(_, sender_state)| {
@@ -366,7 +394,7 @@ fn blockchain() {
             round_robin,
             all_receivers,
             run_until_height,
-            20, //unused
+            20,
         )
         .new_value(&mut runner)
         .unwrap()
