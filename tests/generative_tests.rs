@@ -195,29 +195,32 @@ fn run_until_height(state: &HashMap<u32, SenderState<BlockMsg>>, value: &u32) ->
     v.contains(&true)
 }
 
-fn get_blocks_at_next_height_from_parsed(blocks_to_children:HashMap<Block, HashSet<Block>>, genesis_blocks: HashSet<Block>) -> HashSet<Block> {
+fn get_blocks_at_next_height_from_parsed(blocks_to_children: &HashMap<Block, HashSet<Block>>, genesis_blocks: HashSet<Block>) -> HashSet<Block> {
     let mut set: HashSet<Block> = HashSet::new();
-    blocks_to_children.iter()
-        .filter(|(block, children)|{
-            genesis_blocks.contains(block)
-        })
-        .flat_map(|(_, children)|{
-            children
-        })
-        .for_each(|block| {
-            set.insert(block.clone());
-        });
+    
+    genesis_blocks.iter().for_each(|block|{
+        match blocks_to_children.get(block) {
+            Some(blocks) => for block in blocks {
+                set.insert(block.clone());
+            },
+            None => {},
+        }
+    });
+
     set
 }
 
-fn get_blocks_at_height(state: SenderState<BlockMsg>, height:u32) -> Vec<Block> {
-    let blocks:Vec<Block> = vec![];
+fn get_blocks_at_height(state: SenderState<BlockMsg>, height:u32) -> HashSet<Block> {
     let genesis_block = Block::from(ProtoBlock::new(None, 0));
     let latest_msgs = state.latests_msgs();
     let latest_messages_honest = LatestMsgsHonest::from_latest_msgs(latest_msgs, &HashSet::new());
 
-
     let (blocks_to_children, genesis_blocks, _latest_messages) = Block::parse_blockchains(&latest_messages_honest);
+
+    let mut blocks: HashSet<Block> = genesis_blocks; 
+    for i in 0..height {
+        blocks = get_blocks_at_next_height_from_parsed(&blocks_to_children, blocks);        
+    }
 
     blocks
 }
