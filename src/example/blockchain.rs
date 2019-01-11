@@ -9,44 +9,43 @@ use senders_weight::SendersWeight;
 use serde_derive::Serialize;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
-use traits::{Data, Estimate, Id, Zero};
+use traits::{Data, Estimate, Id, Zero, Sender};
 use weight_unit::WeightUnit;
-type Validator = u32;
 
 /// a genesis block should be a block with estimate Block with prevblock =
 /// None and data. data will be the unique identifier of this blockchain
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize)]
-pub struct ProtoBlock {
-    prevblock: Option<Block>,
-    sender: Validator,
+pub struct ProtoBlock<S: Sender> {
+    prevblock: Option<Block<S>>,
+    sender: S,
 }
 
-impl ProtoBlock {
-    pub fn new(prevblock: Option<Block>, sender: Validator) -> ProtoBlock {
+impl<S: Sender> ProtoBlock<S> {
+    pub fn new(prevblock: Option<Block<S>>, sender: S) -> ProtoBlock<S> {
         ProtoBlock { prevblock, sender }
     }
 }
 
 /// Boxing of a block, will be implemented as a CasperMsg
 #[derive(Clone, Eq, Hash)]
-pub struct Block((Arc<ProtoBlock>, Hashed));
+pub struct Block<S: Sender>((Arc<ProtoBlock<S>>, Hashed));
 
 #[cfg(feature = "integration_test")]
-impl<S: ::traits::Sender + Into<u32>> From<S> for Block {
+impl<S: Sender + Into<S>> From<S> for Block<S> {
     fn from(sender: S) -> Self {
         Block::from(ProtoBlock::new(None, sender.into()))
     }
 }
 
 #[cfg(feature = "integration_test")]
-impl std::fmt::Debug for Block {
+impl<S: Sender> std::fmt::Debug for Block<S> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.prevblock() {
             None => write!(
                 fmt,
                 "{:?} -> {:?}",
                 (self.sender(), self.id()),
-                None::<Block>
+                None::<Block<S>>
             ),
             Some(block) => write!(fmt, "{:?} -> {:?}", (self.sender(), self.id()), block),
         }
@@ -54,7 +53,7 @@ impl std::fmt::Debug for Block {
 }
 
 #[cfg(not(feature = "integration_test"))]
-impl std::fmt::Debug for Block {
+impl<S: Sender> std::fmt::Debug for Block<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -68,7 +67,7 @@ impl std::fmt::Debug for Block {
     }
 }
 
-impl serde::Serialize for Block {
+impl<S: Sender> serde::Serialize for Block<S> {
     fn serialize<T: serde::Serializer>(&self, rhs: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
         let mut msg = rhs.serialize_struct("Block", 2)?;
@@ -78,60 +77,60 @@ impl serde::Serialize for Block {
     }
 }
 
-impl Id for ProtoBlock {
+impl <S: Sender> Id for ProtoBlock<S> {
     type ID = Hashed;
 }
 
-impl Id for Block {
+impl<S: Sender> Id for Block<S> {
     type ID = Hashed;
 }
 
-pub type BlockMsg = Message<Block /*Estimate*/, Validator /*Sender*/>;
+pub type BlockMsg<S> = Message<Block<S> /*Estimate*/, S /*Sender*/>;
 
-impl PartialEq for Block {
+impl<S: Sender> PartialEq for Block<S> {
     fn eq(&self, rhs: &Self) -> bool {
         Arc::ptr_eq(self.arc(), rhs.arc()) || self.id() == rhs.id()
     }
 }
 
-impl From<ProtoBlock> for Block {
-    fn from(protoblock: ProtoBlock) -> Self {
+impl<S: Sender> From<ProtoBlock<S>> for Block<S> {
+    fn from(protoblock: ProtoBlock<S>) -> Self {
         let id = protoblock.getid();
         Block((Arc::new(protoblock), id))
     }
 }
 
-impl<'z> From<&'z BlockMsg> for Block {
-    fn from(msg: &BlockMsg) -> Self {
+impl<'z, S: Sender> From<&'z BlockMsg<S>> for Block<S> {
+    fn from(msg: &BlockMsg<S>) -> Self {
         msg.estimate().clone()
     }
 }
 
-impl Block {
-    pub fn new(prevblock: Option<Block>, sender: Validator) -> Self {
+impl<S: Sender> Block<S> {
+    pub fn new(prevblock: Option<Block<S>>, sender: S) -> Self {
         Block::from(ProtoBlock { prevblock, sender })
     }
     pub fn id(&self) -> &<Self as Id>::ID {
         &(self.0).1
     }
-    fn arc(&self) -> &Arc<ProtoBlock> {
+    fn arc(&self) -> &Arc<ProtoBlock<S>> {
         &(self.0).0
     }
-    pub fn sender(&self) -> Validator {
-        self.arc().sender
+    pub fn sender(&self) -> S {
+        self.arc().sender.clone()
     }
 
     /// Create a new block from a prevblock message and an incomplete block
     pub fn from_prevblock_msg(
-        prevblock_msg: Option<BlockMsg>,
+        prevblock_msg: Option<BlockMsg<S>>,
         // a incomplete_block is a block with a None prevblock (ie, Estimate) AND is
         // not a genesis_block
-        incomplete_block: Block,
+        incomplete_block: Block<S>,
     ) -> Self {
         let prevblock = prevblock_msg.map(|m| Block::from(&m));
         let block = Block::from(ProtoBlock {
             prevblock,
-            ..(*incomplete_block.arc().clone())
+            ..((**incomplete_block.arc()).clone())
         });
         block
     }
@@ -147,30 +146,30 @@ impl Block {
     }
 
     pub fn safety_oracles(
-        block: Block,
-        latest_msgs_honest: &LatestMsgsHonest<BlockMsg>,
-        equivocators: &HashSet<<BlockMsg as CasperMsg>::Sender>,
+        block: Block<S>,
+        latest_msgs_honest: &LatestMsgsHonest<BlockMsg<S>>,
+        equivocators: &HashSet<<BlockMsg<S> as CasperMsg>::Sender>,
         safety_oracle_threshold: WeightUnit,
-        weights: &SendersWeight<Validator>,
-    ) -> HashSet<BTreeSet<<BlockMsg as CasperMsg>::Sender>> {
-        fn latest_in_justification(
-            j: &Justification<BlockMsg>,
-            equivocators: &HashSet<<BlockMsg as CasperMsg>::Sender>,
-        ) -> HashMap<<BlockMsg as CasperMsg>::Sender, BlockMsg> {
+        weights: &SendersWeight<S>,
+    ) -> HashSet<BTreeSet<<BlockMsg<S> as CasperMsg>::Sender>> {
+        fn latest_in_justification<S: Sender>(
+            j: &Justification<BlockMsg<S>>,
+            equivocators: &HashSet<<BlockMsg<S> as CasperMsg>::Sender>,
+        ) -> HashMap<<BlockMsg<S> as CasperMsg>::Sender, BlockMsg<S>> {
             LatestMsgsHonest::from_latest_msgs(&LatestMsgs::from(j), equivocators)
                 .iter()
                 .map(|m| (m.sender().clone(), m.clone()))
                 .collect()
         }
 
-        let latest_containing_block: HashSet<&BlockMsg> = latest_msgs_honest
+        let latest_containing_block: HashSet<&BlockMsg<S>> = latest_msgs_honest
             .iter()
             .filter(|&msg| block.is_member(&Block::from(msg)))
             .collect();
 
         let latest_agreeing_in_sender_view: HashMap<
-            <BlockMsg as CasperMsg>::Sender,
-            HashMap<<BlockMsg as CasperMsg>::Sender, BlockMsg>,
+                S,
+            HashMap<S, BlockMsg<S>>,
         > = latest_containing_block
             .iter()
             .map(|m| {
@@ -185,8 +184,8 @@ impl Block {
             .collect();
 
         let neighbours: HashMap<
-            &<BlockMsg as CasperMsg>::Sender,
-            HashSet<&<BlockMsg as CasperMsg>::Sender>,
+            &S,
+            HashSet<&S>,
         > = latest_agreeing_in_sender_view
             .iter()
             .map(|(sender, seen_agreeing)| {
@@ -208,19 +207,19 @@ impl Block {
             })
             .collect();
         // println!("neighbours: {:?}", neighbours);
-        fn bron_kerbosch(
-            r: HashSet<&<BlockMsg as CasperMsg>::Sender>,
-            p: HashSet<&<BlockMsg as CasperMsg>::Sender>,
-            x: HashSet<&<BlockMsg as CasperMsg>::Sender>,
-            mx_clqs: &mut HashSet<BTreeSet<<BlockMsg as CasperMsg>::Sender>>,
+        fn bron_kerbosch<S: Sender>(
+            r: HashSet<&S>,
+            p: HashSet<&S>,
+            x: HashSet<&S>,
+            mx_clqs: &mut HashSet<BTreeSet<S>>,
             neighbours: HashMap<
-                &<BlockMsg as CasperMsg>::Sender,
-                HashSet<&<BlockMsg as CasperMsg>::Sender>,
+                &S,
+                HashSet<&S>,
             >,
         ) {
             // println!("recursed");
             if p.is_empty() && x.is_empty() {
-                let rnew: BTreeSet<<BlockMsg as CasperMsg>::Sender> =
+                let rnew: BTreeSet<S> =
                     r.into_iter().map(|x| x.clone()).collect();
                 mx_clqs.insert(rnew);
             } else {
@@ -231,9 +230,9 @@ impl Block {
                     p.remove(i);
                     let mut rnew = r.clone();
                     rnew.insert(i);
-                    let pnew: HashSet<&<BlockMsg as CasperMsg>::Sender> =
+                    let pnew: HashSet<&S> =
                         p.intersection(&neighbours[i]).cloned().collect();
-                    let xnew: HashSet<&<BlockMsg as CasperMsg>::Sender> =
+                    let xnew: HashSet<&S> =
                         x.intersection(&neighbours[i]).cloned().collect();
                     x.insert(i);
                     bron_kerbosch(rnew, pnew, xnew, mx_clqs, neighbours.clone())
@@ -275,14 +274,14 @@ impl Block {
     /// the set contains all the blocks that have a None
     /// as their prevblock (aka genesis blocks or finalized blocks)
     pub fn parse_blockchains(
-        latest_msgs: &LatestMsgsHonest<BlockMsg>,
+        latest_msgs: &LatestMsgsHonest<BlockMsg<S>>,
     ) -> (
-        HashMap<Block, HashSet<Block>>,
-        HashSet<Block>,
-        HashSet<Block>,
+        HashMap<Block<S>, HashSet<Block<S>>>,
+        HashSet<Block<S>>,
+        HashSet<Block<S>>,
     ) {
         // start at the tip of the blockchain
-        let mut visited_parents: HashMap<Block, HashSet<Block>> = latest_msgs
+        let mut visited_parents: HashMap<Block<S>, HashSet<Block<S>>> = latest_msgs
             .iter()
             .map(|msg| {
                 let parent = Block::from(msg);
@@ -291,9 +290,9 @@ impl Block {
             })
             .collect();
 
-        let mut queue: VecDeque<Block> = visited_parents.keys().cloned().collect();
-        let latest_blocks: HashSet<Block> = visited_parents.keys().cloned().collect();
-        let mut genesis: HashSet<Block> = HashSet::new();
+        let mut queue: VecDeque<Block<S>> = visited_parents.keys().cloned().collect();
+        let latest_blocks: HashSet<Block<S>> = visited_parents.keys().cloned().collect();
+        let mut genesis: HashSet<Block<S>> = HashSet::new();
         let mut was_empty = false;
         // while there are still unvisited blocks
         while let Some(child) = queue.pop_front() {
@@ -326,12 +325,12 @@ impl Block {
     }
     /// used to collect the validators that produced blocks for each side of a fork
     fn collect_validators(
-        block: &Block,
-        visited: &HashMap<Block, HashSet<Block>>,
-        // mut acc: HashSet<Validator>,
-        latest_blocks: &HashSet<Block>,
-        b_in_lms_senders: Rc<RwLock<HashMap<Block, HashSet<Validator>>>>,
-    ) -> HashSet<Validator> {
+        block: &Block<S>,
+        visited: &HashMap<Block<S>, HashSet<Block<S>>>,
+        // mut acc: HashSet<S>,
+        latest_blocks: &HashSet<Block<S>>,
+        b_in_lms_senders: Rc<RwLock<HashMap<Block<S>, HashSet<S>>>>,
+    ) -> HashSet<S> {
         let mut senders = HashSet::new();
         // collect this sender if this block is his latest message
         if latest_blocks.contains(block) {
@@ -360,11 +359,11 @@ impl Block {
 
     /// find heaviest block
     fn pick_heaviest(
-        blocks: &HashSet<Block>,
-        visited: &HashMap<Block, HashSet<Block>>,
-        weights: &SendersWeight<Validator>,
-        latest_blocks: &HashSet<Block>,
-        b_in_lms_senders: Rc<RwLock<HashMap<Block, HashSet<Validator>>>>,
+        blocks: &HashSet<Block<S>>,
+        visited: &HashMap<Block<S>, HashSet<Block<S>>>,
+        weights: &SendersWeight<S>,
+        latest_blocks: &HashSet<Block<S>>,
+        b_in_lms_senders: Rc<RwLock<HashMap<Block<S>, HashSet<S>>>>,
     ) -> Option<(Option<Self>, WeightUnit, HashSet<Self>)> {
         let init = Some((None, WeightUnit::ZERO, HashSet::new()));
         let heaviest_child = match blocks.len() {
@@ -431,11 +430,11 @@ impl Block {
     }
 
     pub fn ghost(
-        latest_msgs: &LatestMsgsHonest<BlockMsg>,
-        senders_weights: &SendersWeight<<BlockMsg as CasperMsg>::Sender>,
+        latest_msgs: &LatestMsgsHonest<BlockMsg<S>>,
+        senders_weights: &SendersWeight<<BlockMsg<S> as CasperMsg>::Sender>,
     ) -> Result<Self, &'static str> {
         let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_msgs);
-        let b_in_lms_senders = Rc::new(RwLock::new(HashMap::<Block, HashSet<Validator>>::new()));
+        let b_in_lms_senders = Rc::new(RwLock::new(HashMap::<Block<S>, HashSet<S>>::new()));
         Block::pick_heaviest(
             &genesis,
             &visited,
@@ -448,8 +447,8 @@ impl Block {
     }
 }
 
-impl Estimate for Block {
-    type M = BlockMsg;
+impl<S: Sender> Estimate for Block<S> {
+    type M = BlockMsg<S>;
 
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
@@ -460,7 +459,7 @@ impl Estimate for Block {
         let prevblock = Block::ghost(latest_msgs, senders_weights)?;
         Ok(Block::from(ProtoBlock {
             prevblock: Some(prevblock),
-            ..(*incomplete_block.arc().clone())
+            ..((**incomplete_block.arc()).clone())
         }))
     }
 }

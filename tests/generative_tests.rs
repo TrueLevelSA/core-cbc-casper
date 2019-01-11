@@ -159,7 +159,7 @@ where
     m.len() == 1
 }
 
-fn safety_oracle(state: &HashMap<u32, SenderState<BlockMsg>>) -> bool {
+fn safety_oracle(state: &HashMap<u32, SenderState<BlockMsg<u32>>>) -> bool {
     let safety_oracle_detected: HashSet<bool> = state
         .iter()
         .map(|(_, sender_state)| {
@@ -179,7 +179,7 @@ fn safety_oracle(state: &HashMap<u32, SenderState<BlockMsg>>) -> bool {
     safety_oracle_detected.contains(&true)
 }
 
-fn clique_collection(state: HashMap<u32, SenderState<BlockMsg>>) -> Vec<Vec<Vec<u32>>> {
+fn clique_collection(state: HashMap<u32, SenderState<BlockMsg<u32>>>) -> Vec<Vec<Vec<u32>>> {
     state
         .iter()
         .map(|(_, sender_state)| {
@@ -295,7 +295,7 @@ where
         .boxed()
 }
 
-fn arbitrary_blockchain() -> BoxedStrategy<Block> {
+fn arbitrary_blockchain() -> BoxedStrategy<Block<u32>> {
     let genesis_block = Block::from(ProtoBlock::new(None, 0));
     Just(genesis_block).boxed()
 }
