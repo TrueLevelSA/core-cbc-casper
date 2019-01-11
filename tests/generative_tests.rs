@@ -159,6 +159,46 @@ where
     m.len() == 1
 }
 
+fn heights_from_state(state: &HashMap<u32, SenderState<BlockMsg>>) -> Vec<u32> {
+    state
+        .iter()
+        .map(|(_, sender_state)| (sender_state.latests_msgs(), sender_state.senders_weights()))
+        .map(|(latest_msgs, senders_weights)| {
+            let latest_messages_honest =
+                LatestMsgsHonest::from_latest_msgs(latest_msgs, &HashSet::new());
+            Block::ghost(&latest_messages_honest, senders_weights)
+        })
+        .map(|block| {
+            fn reduce(b: &Block, i: u32) -> u32 {
+                match b.prevblock() {
+                    Some(_msg) => reduce(&_msg, i + 1),
+                    None => i,
+                }
+            }
+            let height_this_message = match block {
+                Ok(b) => reduce(&b, 1),
+                _ => 0,
+            };
+            height_this_message
+        })
+        .collect()
+    //    v.iter().fold(0, |x, y|{
+    //        if x > *y {
+    //            x
+    //        } else {
+    //            *y
+    //        }
+    //    })
+}
+
+fn run_100_height(state: &HashMap<u32, SenderState<BlockMsg>>) -> bool {
+    let v: Vec<bool> = heights_from_state(state)
+        .iter()
+        .map(|v| v >= &100)
+        .collect();
+    v.contains(&true)
+}
+
 fn safety_oracle(state: &HashMap<u32, SenderState<BlockMsg>>) -> bool {
     let safety_oracle_detected: HashSet<bool> = state
         .iter()
@@ -310,23 +350,32 @@ fn blockchain() {
         .open("blockchain_test.log")
         .unwrap();
 
+    let mut stats_file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open("stats_blockchain_test.csv")
+        .unwrap();
+    writeln!(stats_file, "latency;nb_nodes;overhead").unwrap();
+
     let mut runner = TestRunner::default();
 
     for _ in 0..100 {
         writeln!(output_file, "new chain");
 
-        chain(
+        let states = chain(
             arbitrary_blockchain(),
             6,
-            arbitrary_in_set,
-            some_receivers,
+            round_robin,
+            all_receivers,
             safety_oracle,
+            //            run_100_height,
         )
         .new_value(&mut runner)
         .unwrap()
-        .current()
-        .iter()
-        .for_each(|state| {
+        .current();
+
+        states.iter().for_each(|state| {
             writeln!(
                 output_file,
                 "{{lms: {:?},",
@@ -339,7 +388,18 @@ fn blockchain() {
             writeln!(output_file, "sendercount: {:?},", state.keys().len()).unwrap();
             writeln!(output_file, "clqs: ").unwrap();
             writeln!(output_file, "{:?}}},", clique_collection(state.clone())).unwrap();
+
         });
+
+        let final_state = states.last().unwrap();
+
+        let latency = heights_from_state(final_state)
+            .iter()
+            // max because u32::max does not match the signature=
+            .fold(0, |x, y| if x > *y { x } else { *y });
+        let nb_nodes = final_state.keys().len();
+        let overhead = 0;
+        writeln!(stats_file, "{};{};{}", latency, nb_nodes, overhead).unwrap();
     }
 }
 
