@@ -29,6 +29,8 @@ use casper::example::vote_count::VoteCount;
 use std::fs::OpenOptions;
 use std::io::Write;
 
+use std::time::Instant;
+
 fn add_message<'z, M>(
     state: &'z mut HashMap<M::Sender, SenderState<M>>,
     sender: M::Sender,
@@ -39,35 +41,68 @@ where
     M: CasperMsg,
 {
     let latest: HashSet<M> = state[&sender]
-        .get_latest_msgs()
+        .latests_msgs()
         .iter()
         .fold(HashSet::new(), |acc, (_, lms)| {
             acc.union(&lms).cloned().collect()
         });
-    let latest_delta = match state[&sender].get_my_last_msg() {
-        Some(m) => latest
-            .iter()
-            .filter(|lm| !m.get_justification().contains(lm))
-            .cloned()
-            .collect(),
+    let latest_delta = match state[&sender].latests_msgs().get(&sender) {
+        Some(msgs) => match msgs.len() {
+            1 => {
+                let m = msgs.iter().next().unwrap();
+                latest
+                    .iter()
+                    .filter(|lm| !m.justification().contains(lm))
+                    .cloned()
+                    .collect()
+            }
+            _ => unimplemented!(),
+        },
         None => latest,
     };
     let (m, sender_state) = M::from_msgs(
         sender.clone(),
         latest_delta.iter().collect(),
-        None,
         &state[&sender],
         data.clone().map(|d| d.into()),
     )
     .unwrap();
 
     state.insert(sender.clone(), sender_state);
+    state
+        .get_mut(&sender)
+        .unwrap()
+        .latests_msgs_as_mut()
+        .update(&m);
+
     recipients.iter().for_each(|recipient| {
-        state
-            .get_mut(&recipient)
-            .unwrap()
-            .get_latest_msgs_as_mut()
-            .update(&m);
+        let sender_state_reconstructed = SenderState::new(
+            state[&recipient].senders_weights().clone(),
+            0.0,
+            Some(m.clone()),
+            LatestMsgs::from(m.justification()),
+            0.0,
+            HashSet::new(),
+        );
+        assert_eq!(
+            m.estimate(),
+            M::from_msgs(
+                sender.clone(),
+                m.justification().iter().collect(),
+                &sender_state_reconstructed,
+                data.clone().map(|d| d.into()),
+            )
+                .unwrap()
+                .0
+                .estimate(),
+            "Recipient must be able to reproduce the estimate from its justification and the justification only.\nSender: {:?}\nRecipient: {:?}\nNumber of Nodes: {:?}\n",
+            sender, recipient, state.len(),
+        );
+        let state_to_update = state.get_mut(&recipient).unwrap().latests_msgs_as_mut();
+        state_to_update.update(&m);
+        m.justification().iter().for_each(|m| {
+            state_to_update.update(m);
+        });
     });
     state
 }
@@ -102,9 +137,7 @@ where
 {
     (sender_strategy, receiver_strategy, Just(state))
         .prop_map(|(sender, mut receivers, mut state)| {
-            if !receivers.contains(&sender) {
-                receivers.insert(sender.clone());
-            }
+            receivers.remove(&sender);
             add_message(&mut state, sender.clone(), receivers, Some(sender.into())).clone()
         })
         .boxed()
@@ -118,8 +151,8 @@ where
         .iter()
         .map(|(_sender, sender_state)| {
             let latest_honest_msgs =
-                LatestMsgsHonest::from_latest_msgs(sender_state.get_latest_msgs(), &HashSet::new());
-            latest_honest_msgs.mk_estimate(None, sender_state.get_senders_weights(), None)
+                LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
+            latest_honest_msgs.mk_estimate(sender_state.senders_weights(), None)
         })
         .collect();
     println!("{:?}", m);
@@ -131,15 +164,15 @@ fn safety_oracle(state: &HashMap<u32, SenderState<BlockMsg>>) -> bool {
         .iter()
         .map(|(_, sender_state)| {
             let latest_honest_msgs =
-                LatestMsgsHonest::from_latest_msgs(sender_state.get_latest_msgs(), &HashSet::new());
+                LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
             let genesis_block = Block::from(ProtoBlock::new(None, 0));
-            let safety_threshold = (sender_state.get_senders_weights().sum_all_weights()) / 2.0;
+            let safety_threshold = (sender_state.senders_weights().sum_all_weights()) / 2.0;
             Block::safety_oracles(
                 genesis_block,
                 &latest_honest_msgs,
                 &HashSet::new(),
                 safety_threshold,
-                sender_state.get_senders_weights(),
+                sender_state.senders_weights(),
             ) != HashSet::new()
         })
         .collect();
@@ -152,14 +185,14 @@ fn clique_collection(state: HashMap<u32, SenderState<BlockMsg>>) -> Vec<Vec<Vec<
         .map(|(_, sender_state)| {
             let genesis_block = Block::from(ProtoBlock::new(None, 0));
             let latest_honest_msgs =
-                LatestMsgsHonest::from_latest_msgs(sender_state.get_latest_msgs(), &HashSet::new());
+                LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
             let safety_oracles = Block::safety_oracles(
                 genesis_block,
                 &latest_honest_msgs,
                 &HashSet::new(),
                 // cliques, not safety oracles, because our threshold is 0
                 0.0,
-                sender_state.get_senders_weights(),
+                sender_state.senders_weights(),
             );
             let safety_oracles_vec_of_btrees: Vec<BTreeSet<u32>> =
                 Vec::from_iter(safety_oracles.iter().cloned());
@@ -237,7 +270,18 @@ where
                 state.clone()
             });
             let mut have_consensus = false;
+
+            let mut start = Instant::now();
+            let mut timestamp_file = OpenOptions::new()
+                .create(true)
+                .truncate(true)
+                .write(true)
+                .open("timestamp.log")
+                .unwrap();
+            writeln!(timestamp_file, "start");
             Vec::from_iter(chain.take_while(|state| {
+                writeln!(timestamp_file, "{:?}", start.elapsed().subsec_micros());
+                start = Instant::now();
                 if have_consensus {
                     false
                 } else {
@@ -256,17 +300,42 @@ fn arbitrary_blockchain() -> BoxedStrategy<Block> {
     Just(genesis_block).boxed()
 }
 
-proptest! {
-    #![proptest_config(Config::with_cases(100))]
-    #[test]
-    fn blockchain(ref chain in chain(arbitrary_blockchain(), 6, round_robin, some_receivers, safety_oracle)) {
-        // total messages until unilateral consensus
-        let mut output_file = OpenOptions::new().create(true).append(true).open("blockchain_test.log").unwrap();
+#[test]
+fn blockchain() {
+    // total messages until unilateral consensus
+    let mut output_file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open("blockchain_test.log")
+        .unwrap();
 
-        writeln!(output_file, "new chain")?;
-        chain.iter().for_each(|state| {
-            writeln!(output_file, "{{lms: {:?},", state.iter().map(|(_, sender_state)|
-                                                                   sender_state.get_latest_msgs()).collect::<Vec<_>>()).unwrap();
+    let mut runner = TestRunner::default();
+
+    for _ in 0..100 {
+        writeln!(output_file, "new chain");
+
+        chain(
+            arbitrary_blockchain(),
+            6,
+            arbitrary_in_set,
+            some_receivers,
+            safety_oracle,
+        )
+        .new_value(&mut runner)
+        .unwrap()
+        .current()
+        .iter()
+        .for_each(|state| {
+            writeln!(
+                output_file,
+                "{{lms: {:?},",
+                state
+                    .iter()
+                    .map(|(_, sender_state)| sender_state.latests_msgs())
+                    .collect::<Vec<_>>()
+            )
+            .unwrap();
             writeln!(output_file, "sendercount: {:?},", state.keys().len()).unwrap();
             writeln!(output_file, "clqs: ").unwrap();
             writeln!(output_file, "{:?}}},", clique_collection(state.clone())).unwrap();
@@ -416,9 +485,9 @@ proptest! {
 
         // here, only take one equivocation
         let single_equivocation: Vec<_> = messages[..nodes+1].iter().map(|message| message).collect();
-        let equivocator = messages[nodes].get_sender();
+        let equivocator = messages[nodes].sender();
         let (m0, _) =
-            &Message::from_msgs(0, single_equivocation.clone(), None, &sender_state, None)
+            &Message::from_msgs(0, single_equivocation.clone(), &sender_state, None)
             .unwrap();
         let equivocations: Vec<_> = single_equivocation.iter().filter(|message| message.equivocates(&m0)).collect();
         assert!(if *equivocator == 0 {equivocations.len() == 1} else {equivocations.len() == 0}, "should detect sender 0 equivocating if sender 0 equivocates");
@@ -426,7 +495,7 @@ proptest! {
         // assert_eq!(equivocations.len(), 1, "should detect sender 0 equivocating if sender 0 equivocates");
 
         let (m0, _) =
-            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), None, &sender_state, None)
+            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &sender_state, None)
             .unwrap();
         let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
         assert_eq!(equivocations.len(), 1, "should detect sender 0 equivocating if sender 0 equivocates");
@@ -440,7 +509,7 @@ proptest! {
             HashSet::new(),
         );
         let (m0, _) =
-            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), None, &sender_state, None)
+            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &sender_state, None)
             .unwrap();
         let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
         assert_eq!(equivocations.len(), 0, "equivocation absorbed in threshold");

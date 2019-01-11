@@ -1,16 +1,12 @@
-use std::collections::{HashMap, HashSet};
-use std::fmt::{Debug, Formatter, Result as FmtResult};
+use rayon::prelude::*;
+use std::collections::HashSet;
+use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, RwLock};
-// use std::io::{Error};
-
-use rayon::prelude::*;
 
 use hashed::Hashed;
 use justification::{Justification, LatestMsgsHonest, SenderState};
-use senders_weight::SendersWeight;
-use traits::{Data, Estimate, Id, Sender, Zero};
-use weight_unit::WeightUnit;
+use traits::{Data, Estimate, Id, Sender};
 
 /// A Casper Message, that can will be sent over the network
 /// and used as a justification for a more recent message
@@ -20,13 +16,13 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
     type Estimate: Estimate<M = Self>;
 
     /// returns the validator who sent this message
-    fn get_sender(&self) -> &Self::Sender;
+    fn sender(&self) -> &Self::Sender;
 
     /// returns the estimate of this message
-    fn get_estimate(&self) -> &Self::Estimate;
+    fn estimate(&self) -> &Self::Estimate;
 
     /// returns the justification of this message
-    fn get_justification<'z>(&'z self) -> &'z Justification<Self>;
+    fn justification<'z>(&'z self) -> &'z Justification<Self>;
 
     fn id(&self) -> &Self::ID;
 
@@ -50,20 +46,18 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
     /// finalized_msg allows to shortcut the recursive checks
     fn from_msgs(
         sender: Self::Sender,
-        new_msgs: Vec<&Self>,
-        finalized_msg: Option<&Self>,
+        mut new_msgs: Vec<&Self>,
         sender_state: &SenderState<Self>,
         external_data: Option<<Self::Estimate as Data>::Data>,
     ) -> Result<(Self, SenderState<Self>), &'static str> {
         // // TODO eventually comment out these lines, and FIXME tests
         // // check whether two messages from same sender
         // let mut senders = HashSet::new();
-        // let dup_senders = new_msgs.iter().any(|msg| !senders.insert(msg.get_sender()));
+        // let dup_senders = new_msgs.iter().any(|msg| !senders.insert(msg.sender()));
         // assert!(!dup_senders, "A sender can only have one, and only one, latest message");
 
         // dedup by putting msgs into a hashset
-        // TODO DL: why don't we directly ask for a hashset instead of a Vec?
-        let new_msgs: HashSet<_> = new_msgs.iter().cloned().collect();
+        let new_msgs: HashSet<_> = new_msgs.drain(..).collect();
         let new_msgs_len = new_msgs.len();
 
         // update latest_msgs in sender_state with new_msgs
@@ -74,18 +68,13 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
             Err("None of the messages could be added to the state!")
         } else {
             let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(
-                sender_state.get_latest_msgs(),
-                sender_state.get_equivocators(),
+                sender_state.latests_msgs(),
+                sender_state.equivocators(),
             );
 
-            let estimate = latest_msgs_honest.mk_estimate(
-                finalized_msg,
-                &sender_state.get_senders_weights(),
-                external_data,
-            );
-
-            let message = Self::new(sender, justification, estimate, None);
-            Ok((message, sender_state))
+            let estimate =
+                latest_msgs_honest.mk_estimate(&sender_state.senders_weights(), external_data);
+            estimate.map(|e| (Self::new(sender, justification, e, None), sender_state))
         }
     }
 
@@ -97,12 +86,12 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
     ) -> (bool, HashSet<<Self as CasperMsg>::Sender>) {
         let is_equivocation = self.equivocates(rhs);
         let init = if is_equivocation {
-            equivocators.insert(self.get_sender().clone());
+            equivocators.insert(self.sender().clone());
             (true, equivocators)
         } else {
             (false, equivocators)
         };
-        self.get_justification().iter().fold(
+        self.justification().iter().fold(
             init,
             |(acc_has_equivocations, acc_equivocators), self_prime| {
                 // note the rotation between rhs and self, done because
@@ -118,10 +107,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
 
     /// Math definition of the equivocation
     fn equivocates(&self, rhs: &Self) -> bool {
-        self != rhs
-            && self.get_sender() == rhs.get_sender()
-            && !rhs.depends(self)
-            && !self.depends(rhs)
+        self != rhs && self.sender() == rhs.sender() && !rhs.depends(self) && !self.depends(rhs)
     }
 
     /// checks whether self depends on rhs
@@ -139,9 +125,8 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
         // thus, highly parallelizable. when it shortcuts, because in one thread
         // a dependency was found, the function returns true and all the
         // computation on the other threads will be canceled.
-        // TODO DL: bad idea to spawn threads recursively and without upper bound
         fn recurse<M: CasperMsg>(lhs: &M, rhs: &M, visited: Arc<RwLock<HashSet<M>>>) -> bool {
-            let justification = lhs.get_justification();
+            let justification = lhs.justification();
 
             // Math definition of dependency
             justification.contains(rhs)
@@ -170,121 +155,6 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
     /// checks whether ther is a circular dependency between self and rhs
     fn is_circular(&self, rhs: &Self) -> bool {
         rhs.depends(self) && self.depends(rhs)
-    }
-
-    /// returns the dag tip-most safe messages. a safe message is defined as one
-    /// that was seen by all senders (with non-zero weight in senders_weights)
-    /// and all senders saw each other seeing each other messages.
-    fn get_msg_for_proposition(&self, all_senders: &HashSet<Self::Sender>) -> HashSet<Self> {
-        /// recursively looks for all tips of the dag
-        fn recursor<M>(
-            m: &M,
-            all_senders: &HashSet<M::Sender>,
-            mut senders_referred: HashSet<M::Sender>,
-            safe_msgs: HashSet<M>,
-            original_sender: &M::Sender,
-        ) -> HashSet<M>
-        where
-            M: CasperMsg,
-        {
-            m.get_justification()
-                .iter()
-                .fold(safe_msgs, |mut safe_msgs_prime, msg_prime| {
-                    // base case
-                    if &senders_referred == all_senders && original_sender == msg_prime.get_sender()
-                    {
-                        let _ = safe_msgs_prime.insert(msg_prime.clone());
-                        safe_msgs_prime
-                    } else {
-                        let _ = senders_referred.insert(msg_prime.get_sender().clone());
-
-                        recursor(
-                            msg_prime,
-                            all_senders,
-                            senders_referred.clone(),
-                            safe_msgs_prime,
-                            original_sender,
-                        )
-                    }
-                })
-        };
-
-        // initial state, trigger recursion
-        let original_sender = self.get_sender();
-        let senders_refered = [original_sender.clone()].iter().cloned().collect();
-        let safe_msgs = HashSet::new();
-        recursor(
-            self,
-            all_senders,
-            senders_refered,
-            safe_msgs,
-            &original_sender,
-        )
-    }
-
-    /// returns the dag tip-most safe messages. a safe message is defined as one
-    /// that was seen by more than a given thr of total weight units. TODO: not
-    /// sure about this implementation, i assume its not working correctly.
-    fn get_safe_msgs_by_weight(
-        &self,
-        senders_weights: &SendersWeight<Self::Sender>,
-        thr: &WeightUnit,
-    ) -> HashMap<Self, WeightUnit> {
-        fn recursor<M>(
-            m: &M,
-            senders_weights: &SendersWeight<M::Sender>,
-            mut senders_referred: HashSet<M::Sender>,
-            weight_referred: WeightUnit,
-            thr: &WeightUnit,
-            safe_msg_weight: HashMap<M, WeightUnit>,
-        ) -> HashMap<M, WeightUnit>
-        where
-            M: CasperMsg,
-        {
-            m.get_justification().iter().fold(
-                safe_msg_weight,
-                |mut safe_msg_weight_prime, m_prime| {
-                    // base case
-                    if &weight_referred > thr {
-                        let _ = safe_msg_weight_prime.insert(m.clone(), weight_referred);
-                        safe_msg_weight_prime
-                    } else {
-                        let sender_current = m_prime.get_sender();
-                        let weight_referred = if senders_referred.insert(sender_current.clone()) {
-                            weight_referred
-                                + senders_weights
-                                    .get_weight(&sender_current)
-                                    .unwrap_or(WeightUnit::ZERO)
-                        } else {
-                            weight_referred
-                        };
-
-                        recursor(
-                            m_prime,
-                            senders_weights,
-                            senders_referred.clone(),
-                            weight_referred,
-                            thr,
-                            safe_msg_weight_prime,
-                        )
-                    }
-                },
-            )
-        };
-
-        // initial state, trigger recursion
-        let senders_referred = [].iter().cloned().collect();
-        let weight_referred = WeightUnit::ZERO;
-        let safe_msg_weight = HashMap::new();
-
-        recursor(
-            self,
-            senders_weights,
-            senders_referred,
-            weight_referred,
-            thr,
-            safe_msg_weight,
-        )
     }
 }
 
@@ -383,9 +253,9 @@ where
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
         let mut msg = serializer.serialize_struct("Message", 3)?;
-        let j: Vec<_> = self.get_justification().iter().map(Self::id).collect();
-        msg.serialize_field("sender", self.get_sender())?;
-        msg.serialize_field("estimate", self.get_estimate())?;
+        let j: Vec<_> = self.justification().iter().map(Self::id).collect();
+        msg.serialize_field("sender", self.sender())?;
+        msg.serialize_field("estimate", self.estimate())?;
         msg.serialize_field("justification", &j)?;
         msg.end()
     }
@@ -399,15 +269,15 @@ where
     type Estimate = E;
     type Sender = S;
 
-    fn get_sender(&self) -> &Self::Sender {
+    fn sender(&self) -> &Self::Sender {
         &self.0.sender
     }
 
-    fn get_estimate(&self) -> &Self::Estimate {
+    fn estimate(&self) -> &Self::Estimate {
         &self.0.estimate
     }
 
-    fn get_justification<'z>(&'z self) -> &'z Justification<Self> {
+    fn justification<'z>(&'z self) -> &'z Justification<Self> {
         &self.0.justification
     }
 
@@ -463,25 +333,24 @@ where
     S: Sender,
 {
     // Note: format used for rendering illustrative gifs from generative tests; modify with care
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
             "M{:?}({:?})",
             // "M{:?}({:?}) -> {:?}",
-            self.get_sender(),
-            self.get_estimate().clone(),
-            // self.get_justification()
+            self.sender(),
+            self.estimate().clone(),
+            // self.justification()
         )
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use example::vote_count::VoteCount;
     use justification::LatestMsgs;
-
-    use super::*;
-    use std::f64;
+    use senders_weight::SendersWeight;
 
     #[test]
     fn debug() {
@@ -518,7 +387,7 @@ mod tests {
         assert!(success);
 
         let external_data: Option<VoteCount> = None;
-        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &sender_state, external_data).unwrap();
+        let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state, external_data).unwrap();
         // let m0 = &Message::new(0, justification, estimate);
 
         let mut j1 = Justification::new();
@@ -529,11 +398,11 @@ mod tests {
         let (success, _) = j1.faulty_inserts(vec![m0].iter().cloned().collect(), &sender_state);
         assert!(success);
 
-        let (msg1, _) = Message::from_msgs(0, vec![v0], None, &sender_state, None).unwrap();
-        let (msg2, _) = Message::from_msgs(0, vec![v0], None, &sender_state, None).unwrap();
+        let (msg1, _) = Message::from_msgs(0, vec![v0], &sender_state, None).unwrap();
+        let (msg2, _) = Message::from_msgs(0, vec![v0], &sender_state, None).unwrap();
         assert!(msg1 == msg2, "messages should be equal");
 
-        let (msg3, _) = Message::from_msgs(0, vec![v0, m0], None, &sender_state, None).unwrap();
+        let (msg3, _) = Message::from_msgs(0, vec![v0, m0], &sender_state, None).unwrap();
         assert!(msg1 != msg3, "msg1 should be different than msg3");
     }
 
@@ -558,7 +427,7 @@ mod tests {
         let (success, _) = j0.faulty_inserts(vec![v0].iter().cloned().collect(), &sender_state);
         assert!(success);
 
-        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &sender_state, None).unwrap();
+        let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state, None).unwrap();
 
         assert!(
             !v0.depends(v0_prime),
@@ -575,7 +444,7 @@ mod tests {
         let (success, _) = j0.faulty_inserts([v0].iter().cloned().collect(), &sender_state);
         assert!(success);
 
-        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &sender_state, None).unwrap();
+        let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state, None).unwrap();
 
         let mut j1 = Justification::new();
         let (success, _) = j1.faulty_inserts([v0].iter().cloned().collect(), &sender_state);
@@ -584,7 +453,7 @@ mod tests {
         let (success, _) = j1.faulty_inserts([m0].iter().cloned().collect(), &sender_state);
         assert!(success);
 
-        let (m1, _) = &Message::from_msgs(0, vec![v0, m0], None, &sender_state, None).unwrap();
+        let (m1, _) = &Message::from_msgs(0, vec![v0, m0], &sender_state, None).unwrap();
 
         assert!(m1.depends(m0), "m1 DOES depent on m0");
         assert!(!m0.depends(m1), "but m0 does NOT depend on m1");
@@ -612,9 +481,9 @@ mod tests {
         let (success, _) = j0.faulty_inserts(vec![v0].iter().cloned().collect(), &sender_state);
         assert!(success);
 
-        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &sender_state, None).unwrap();
+        let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state, None).unwrap();
 
-        let (m1, _) = &Message::from_msgs(1, vec![v0], None, &sender_state, None).unwrap();
+        let (m1, _) = &Message::from_msgs(1, vec![v0], &sender_state, None).unwrap();
         assert!(!v0.equivocates(v0), "should be all good");
         assert!(!v1.equivocates(m0), "should be all good");
         assert!(!m0.equivocates(v1), "should be all good");
@@ -628,73 +497,6 @@ mod tests {
             m1.equivocates_indirect(v0_prime, HashSet::new()).0,
             "should be an indirect equivocation, equivocates to m0 through v0"
         );
-    }
-
-    #[test]
-    fn msg_safe_by_weight() {
-        let sender0 = 0;
-        let sender1 = 1;
-
-        let senders_weights =
-            &SendersWeight::new([(sender0, 0.5), (sender1, 0.5)].iter().cloned().collect());
-
-        let sender_state = SenderState::new(
-            senders_weights.clone(),
-            0.0,
-            None,
-            LatestMsgs::new(),
-            0.0,
-            HashSet::new(),
-        );
-
-        let thr = &0.5;
-        // sender0        v0---m0        m2---
-        // sender1               \--m1--/
-        let v0 = &VoteCount::create_vote_msg(sender0, false);
-        let safe_msgs = v0.get_safe_msgs_by_weight(senders_weights, thr);
-        assert_eq!(safe_msgs.len(), 0, "only 0.5 of weight saw v0");
-
-        let (m0, _) = &Message::from_msgs(
-            sender0,
-            vec![&v0],
-            None,
-            &sender_state,
-            None as Option<VoteCount>,
-        )
-        .unwrap();
-        let safe_msgs = m0.get_safe_msgs_by_weight(senders_weights, thr);
-        assert_eq!(safe_msgs.len(), 0, "only 0.5 of weight saw v0 and m0");
-
-        let (m1, _) = &Message::from_msgs(
-            sender1,
-            vec![&m0],
-            None,
-            &sender_state,
-            None as Option<VoteCount>,
-        )
-        .unwrap();
-        let safe_msgs = m1.get_safe_msgs_by_weight(senders_weights, thr);
-        assert_eq!(
-            safe_msgs.len(),
-            0,
-            "both sender0 (0.5) and sender1 (0.5) saw v0 and m0, but sender0 hasn't necessarly seen sender1 seeing v0 and m0, thus not yet safe"
-        );
-
-        let (m2, _) = &Message::from_msgs(
-            sender0,
-            vec![&m1],
-            None,
-            &sender_state,
-            None as Option<VoteCount>,
-        )
-        .unwrap();
-        let safe_msgs = m2.get_safe_msgs_by_weight(senders_weights, thr);
-        assert_eq!(
-            safe_msgs.get(m0).unwrap_or(&f64::NAN),
-            &1.0,
-            "both sender0 and sender1 saw v0 and m0, and additionally both parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
-        );
-        // let senders = &Sender::get_senders(&relative_senders_weights);
     }
 
     // #[test]
@@ -712,7 +514,7 @@ mod tests {
     //         0.0,
     //         HashSet::new(),
     //     );
-    //     let senders = &senders_weights.get_senders().unwrap();
+    //     let senders = &senders_weights.senders().unwrap();
 
     //     // sender0        v0---m0        m2---
     //     // sender1               \--m1--/
@@ -753,131 +555,4 @@ mod tests {
     //     println!("message after\n {:?}", m0);
     //     println!("------------");
     // }
-
-    #[test]
-    fn msg_safe_by_sender() {
-        // setup
-        let sender0 = 0;
-        let sender1 = 1;
-
-        let senders_weights =
-            SendersWeight::new([(sender0, 1.0), (sender1, 1.0)].iter().cloned().collect());
-
-        let sender_state = SenderState::new(
-            senders_weights.clone(),
-            0.0,
-            None,
-            LatestMsgs::new(),
-            0.0,
-            HashSet::new(),
-        );
-        let senders = &senders_weights.get_senders().unwrap();
-
-        // sender0        v0---m0        m2---
-        // sender1               \--m1--/
-        let v0 = &VoteCount::create_vote_msg(sender0, false);
-        let safe_msgs = v0.get_msg_for_proposition(senders);
-        assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0");
-
-        let (m0, sender_state0) = &Message::from_msgs(
-            sender0,
-            vec![v0],
-            None,
-            &sender_state,
-            None as Option<VoteCount>,
-        )
-        .unwrap();
-
-        let safe_msgs = m0.get_msg_for_proposition(senders);
-        assert_eq!(safe_msgs.len(), 0, "only sender0 saw v0 and m0");
-
-        let (m1, _) = &Message::from_msgs(
-            sender1,
-            vec![m0],
-            None,
-            &sender_state,
-            None as Option<VoteCount>,
-        )
-        .unwrap();
-
-        let safe_msgs = m1.get_msg_for_proposition(senders);
-        assert_eq!(
-            safe_msgs.len(),
-            0,
-            "both sender0 and sender1 saw v0 and m0, but sender0 hasn't necessarly seen sender1 seeing v0 and m0, thus not yet safe"
-        );
-
-        let (m2, _) = &Message::from_msgs(
-            sender0,
-            vec![m1],
-            None,
-            &sender_state0,
-            None as Option<VoteCount>,
-        )
-        .unwrap();
-
-        let safe_msgs = m2.get_msg_for_proposition(senders);
-        assert_eq!(
-            safe_msgs,
-            [m0.clone()].iter().cloned().collect(),
-            "both sender0 and sender1 saw v0 and m0, and additionally both parties saw each other seing v0 and m0, m0 (and all its dependencies) are final"
-        );
-
-        // sender0        v0---m0        m2---
-        // sender1        v1--/   \--m1--/
-        let v0 = &VoteCount::create_vote_msg(sender0, false);
-        let v1 = &VoteCount::create_vote_msg(sender1, false);
-
-        let (ref mut m0, sender_state0) = &mut Message::from_msgs(
-            sender0,
-            vec![v0, v1],
-            None,
-            &sender_state,
-            None as Option<VoteCount>,
-        )
-        .unwrap();
-
-        let safe_msgs = m0.get_msg_for_proposition(senders);
-        println!("safe_msgs: {:?}", safe_msgs);
-        // TODO: turned off because it was eventually failing after changing from BTreeSet to Vec. Function is not used anywhere
-        // assert_eq!(
-        //     safe_msgs.len(),
-        //     0,
-        //     "sender0 saw v0, v1 and m0, and sender1 saw only v1"
-        // );
-
-        let (m1, _) = &Message::from_msgs(
-            sender1,
-            vec![m0],
-            None,
-            &sender_state,
-            None as Option<VoteCount>,
-        )
-        .unwrap();
-        let safe_msgs = m1.get_msg_for_proposition(senders);
-
-        assert_eq!(
-            safe_msgs,
-            [v1.clone()].iter().cloned().collect(),
-            "both sender0 and sender1 saw v0, v1 and m0, but sender0 hasn't necessarly seen sender1 seeing v0 and m0, just v1 is safe"
-        );
-
-        let (m2, _sender_state) = &Message::from_msgs(
-            sender0,
-            vec![m1],
-            None,
-            &sender_state0,
-            None as Option<VoteCount>,
-        )
-        .unwrap();
-
-        let safe_msgs = m2.get_msg_for_proposition(senders);
-        assert_eq!(
-            safe_msgs,
-            [m0.clone()].iter().cloned().collect(),
-            "both sender0 and sender1 saw v0 and m0, and additionally both parties saw each other seing v0 and m0, safe"
-        );
-
-        // m0.set_as_final()
-    }
 }

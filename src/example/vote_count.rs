@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::fmt::{Debug, Formatter, Result};
+use std::fmt::{Debug, Formatter};
 use std::ops::Add;
 
 #[cfg(feature = "integration_test")]
@@ -37,7 +37,7 @@ impl Add for VoteCount {
 }
 
 impl Debug for VoteCount {
-    fn fmt(&self, f: &mut Formatter) -> Result {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "y{:?}/n{:?}", self.yes, self.no)
     }
 }
@@ -93,14 +93,14 @@ impl VoteCount {
             acc: HashSet<Message<VoteCount, Voter>>,
         ) -> HashSet<Message<VoteCount, Voter>> {
             latest_msgs.iter().fold(acc, |mut acc_prime, m| {
-                match m.get_justification().len() {
+                match m.justification().len() {
                     0 => {
                         // vote found, vote is a message with 0 justification
-                        let estimate = m.get_estimate().clone();
+                        let estimate = m.estimate().clone();
                         if VoteCount::is_valid_vote(&estimate) {
                             let equivocation = Message::new(
-                                m.get_sender().clone(),
-                                m.get_justification().clone(),
+                                m.sender().clone(),
+                                m.justification().clone(),
                                 VoteCount::toggle_vote(&estimate),
                                 None,
                             );
@@ -121,7 +121,7 @@ impl VoteCount {
                         }
                         acc_prime // returns it
                     }
-                    _ => recursor(m.get_justification(), acc_prime),
+                    _ => recursor(m.justification(), acc_prime),
                 }
             })
         }
@@ -136,13 +136,14 @@ impl VoteCount {
 }
 
 type Voter = u32;
+pub type VoteMsg = Message<VoteCount, Voter>;
 
 impl Sender for Voter {}
 
 impl Estimate for VoteCount {
     // the estimator just counts votes, which in this case are the unjustified
     // msgs
-    type M = Message<Self, Voter>;
+    type M = VoteMsg;
 
     // Data could be anything, as it will not be used, will just pass None to
     // mk_estimate, as it takes an Option
@@ -150,18 +151,18 @@ impl Estimate for VoteCount {
 
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        _finalized_msg: Option<&Self::M>,
         _weights: &SendersWeight<Voter>, // all voters have same weight
         _external_data: Option<Self>,
         // _external_data: Option<Self::Data>,
-    ) -> Self {
+    ) -> Result<Self, &'static str> {
         // the estimates are actually the original votes of each of the voters /
         // validators
 
         let votes = Self::get_vote_msgs(latest_msgs);
-        votes
+        let votes = votes
             .iter()
-            .fold(Self::ZERO, |acc, vote| acc + vote.get_estimate().clone())
+            .fold(Self::ZERO, |acc, vote| acc + vote.estimate().clone());
+        Ok(votes)
     }
 }
 
@@ -209,10 +210,10 @@ mod count_votes {
 
         let (m1, _) = &Message::from_msgs(1, vec![v1, m0], None, &weights, None).unwrap();
         assert_eq!(
-            Message::get_estimate(m1).clone(),
+            Message::estimate(m1).clone(),
             VoteCount { yes: 1, no: 1 },
             "should have 1 yes, and 1 no vote, found {:?}",
-            Message::get_estimate(m1).clone(),
+            Message::estimate(m1).clone(),
         );
 
         let (success, _) = j1.faulty_inserts(vec![v0_prime].iter().cloned().collect(), &weights);
@@ -227,9 +228,9 @@ mod count_votes {
         )
         .unwrap();
         assert_eq!(
-            Message::get_estimate(m1_prime).clone(),
+            Message::estimate(m1_prime).clone(),
             VoteCount { yes: 1, no: 0 },
             "should have 1 yes, and 0 no vote, found {:?}, the equivocation vote should cancels out the normal vote",
-            Message::get_estimate(&m1_prime).clone())
+            Message::estimate(&m1_prime).clone())
     }
 }

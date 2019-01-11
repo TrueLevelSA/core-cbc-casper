@@ -46,19 +46,13 @@ impl Estimate for Value {
 
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Message>,
-        _finalized_msg: Option<&Message>,
         senders_weights: &SendersWeight<Validator>,
         _data: Option<Value>,
-    ) -> Value {
+    ) -> Result<Self, &'static str> {
         use message::CasperMsg;
-        latest_msgs
+        let res: Self = latest_msgs
             .iter()
-            .map(|msg| {
-                (
-                    msg.get_estimate(),
-                    senders_weights.get_weight(msg.get_sender()),
-                )
-            })
+            .map(|msg| (msg.estimate(), senders_weights.weight(msg.sender())))
             .fold(
                 ((Value::Zero, 0f64), (Value::One, 0f64), (Value::Two, 0f64)),
                 |acc, t| match t {
@@ -68,7 +62,8 @@ impl Estimate for Value {
                     _ => acc, // No weight for the given validator, do nothing
                 },
             )
-            .into()
+            .into();
+        Ok(res)
     }
 }
 
@@ -106,15 +101,15 @@ fn main() {
     let msg2 = Message::new(2, Justification::new(), Value::Two, None);
     let msg3 = Message::new(3, Justification::new(), Value::Zero, None);
     let msg4 = Message::new(4, Justification::new(), Value::One, None);
-    let (msg5, _) = Message::from_msgs(1, vec![&msg1, &msg2], None, &weights, None).unwrap();
-    let (msg6, _) = Message::from_msgs(3, vec![&msg3, &msg4], None, &weights, None).unwrap();
-    let (msg7, _) = Message::from_msgs(2, vec![&msg2, &msg5, &msg6], None, &weights, None).unwrap();
-    let (msg8, _) = Message::from_msgs(3, vec![&msg7, &msg6], None, &weights, None).unwrap();
-    let (msg9, _) = Message::from_msgs(4, vec![&msg4, &msg6], None, &weights, None).unwrap();
+    let (msg5, _) = Message::from_msgs(1, vec![&msg1, &msg2], &weights, None).unwrap();
+    let (msg6, _) = Message::from_msgs(3, vec![&msg3, &msg4], &weights, None).unwrap();
+    let (msg7, _) = Message::from_msgs(2, vec![&msg2, &msg5, &msg6], &weights, None).unwrap();
+    let (msg8, _) = Message::from_msgs(3, vec![&msg7, &msg6], &weights, None).unwrap();
+    let (msg9, _) = Message::from_msgs(4, vec![&msg4, &msg6], &weights, None).unwrap();
 
-    assert_eq!(msg5.get_estimate(), &Value::Two);
-    assert_eq!(msg6.get_estimate(), &Value::Zero);
-    assert_eq!(msg7.get_estimate(), &Value::Zero);
-    assert_eq!(msg8.get_estimate(), &Value::Zero);
-    assert_eq!(msg9.get_estimate(), &Value::Zero);
+    assert_eq!(msg5.estimate(), &Value::Two);
+    assert_eq!(msg6.estimate(), &Value::Zero);
+    assert_eq!(msg7.estimate(), &Value::Zero);
+    assert_eq!(msg8.estimate(), &Value::Zero);
+    assert_eq!(msg9.estimate(), &Value::Zero);
 }
