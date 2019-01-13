@@ -26,7 +26,6 @@ use casper::example::blockchain::{Block, BlockMsg, ProtoBlock};
 use casper::example::integer::IntegerWrapper;
 use casper::example::vote_count::VoteCount;
 
-use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::Write;
 
@@ -211,16 +210,25 @@ fn get_blocks_at_next_height_from_parsed(
 ) -> HashSet<Block> {
     let mut set: HashSet<Block> = HashSet::new();
 
+   // blocks_to_children
+   //     .iter()
+   //     .for_each(|(block, children)| {
+   //         println!("block {:?} is mapped to {:?}", block, children);
+   //         
+   //     });
     genesis_blocks
         .iter()
-        .for_each(|block| match blocks_to_children.get(block) {
+        .for_each(|block|{
+            //println!("trying to find childrne of {:?}", block);
+            match blocks_to_children.get(block) {
             Some(blocks) => {
-                for block in blocks {
-                    set.insert(block.clone());
+                for _block in blocks {
+              //      println!("child found{:?}", _block);
+                    set.insert(_block.clone());
                 }
             }
             None => {}
-        });
+        }});
 
     set
 }
@@ -246,34 +254,156 @@ fn get_blocks_at_height(state: &SenderState<BlockMsg>, height: &u32) -> HashSet<
     }));
 
     for i in 0..*height {
-        println!("yolo");
+        println!("getting children of height {} {:?}", i, blocks);
         blocks = get_blocks_at_next_height_from_parsed(&blocks_to_children, blocks);
+        println!("children are: {:?}", blocks);
     }
 
     blocks
 }
 
+
+fn get_total_number_messages(sender_state: &SenderState<BlockMsg>) -> usize {
+    let latest_msgs = sender_state.latests_msgs();
+    let latest_messages_honest = LatestMsgsHonest::from_latest_msgs(latest_msgs, &HashSet::new());
+
+    let (blocks_to_children, genesis_blocks, _latest_messages) =
+        Block::parse_blockchains(&latest_messages_honest);
+    //    latest_msgs.iter()
+    //        .for_each(|(_, msg)| {
+    //            fn reducer(msg
+    //        });
+
+    blocks_to_children.len()
+}
+
+fn get_height_selected_chain(sender_state: &SenderState<BlockMsg>) -> u32 {
+    let latest_msgs = sender_state.latests_msgs();
+    let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(latest_msgs, &HashSet::new());
+    let selected_block = Block::ghost(&latest_msgs_honest, sender_state.senders_weights());
+    fn reduce(b: &Block, i: u32) -> u32 {
+        match b.prevblock() {
+            Some(_msg) => reduce(&_msg, i + 1),
+            None => i,
+        }
+    }
+    let height_this_message = match selected_block {
+        Ok(b) => reduce(&b, 1),
+        _ => 0,
+    };
+    height_this_message
+}
+
+fn get_children_of_blocks(sender_state: &SenderState<BlockMsg>, genesis_blocks: HashSet<Block>) -> HashSet<Block>{
+    let mut children = HashSet::new();
+    let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
+    fn reduce(b: &Block, genesis_blocks: &HashSet<Block>, children: &mut HashSet<Block>) -> () {
+                match b.prevblock() {
+                    Some(_msg) => {
+                        if (genesis_blocks.contains(&_msg)){
+                            children.insert(b.clone());
+                            ()
+                        } else {
+                            reduce(&_msg, genesis_blocks, children)
+                        }
+                    }
+                    _ => ()
+                }
+            }
+
+    latest_msgs_honest
+        .iter()
+        .for_each(|latest_msg|{
+            let parent = Block::from(latest_msg);
+            
+           reduce(&parent, &genesis_blocks, &mut children); 
+        });
+
+    children
+}
+
 fn get_data_from_state(
     sender_state: &SenderState<BlockMsg>,
     max_height_of_oracle: &u32,
-) -> (bool, ChainData) {
+    data: &mut ChainData,
+) -> (bool) {
+    let total_number_messages = get_total_number_messages(sender_state);
+
+    let height_selected_chain = get_height_selected_chain(sender_state);
+
     let latest_honest_msgs =
         LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
-    let genesis_block = Block::from(ProtoBlock::new(None, 0));
-    let safety_threshold = (sender_state.senders_weights().sum_all_weights()) / 2.0;
-    let set_of_stuff = Block::safety_oracles(
-        genesis_block,
-        &latest_honest_msgs,
-        &HashSet::new(),
-        safety_threshold,
-        sender_state.senders_weights(),
-    ); //returns set of btreeset? basically the cliques; if the set is not empty, there is at least one clique
-    let is_consensus_satisfied = set_of_stuff != HashSet::new();
 
-    (is_consensus_satisfied, ChainData::new(0, 0, 0, 0, 0, 0))
+    let mut consensus_height: i64 = -1;
+
+    let safety_threshold = (sender_state.senders_weights().sum_all_weights()) / 2.0;
+
+    let mut genesis_blocks = HashSet::new();
+    genesis_blocks.insert(Block::from(ProtoBlock::new(None, 0)));
+
+    for height in 0..max_height_of_oracle + 1 {
+        //println!("checking height {}", height);
+        //let genesis_blocks = get_blocks_at_height(sender_state, &(height as u32));
+        //if genesis_blocks.len() < 1 {
+        //    break;
+        //}
+        println!("genesis {:?}", genesis_blocks);
+
+        let truc: Vec<bool> = genesis_blocks
+            .iter()
+            .cloned()
+            .map(|genesis_block| {
+
+                let set_of_stuff = Block::safety_oracles(
+                    genesis_block,
+                    &latest_honest_msgs,
+                    &HashSet::new(),
+                    safety_threshold,
+                    sender_state.senders_weights(),
+                );
+                //returns set of btreeset? basically the cliques; if the set is not empty, there is at least one clique
+                println!("set:{:?}", set_of_stuff);
+                set_of_stuff != HashSet::new()
+            })
+            .collect();
+        let is_local_consensus_satisfied = truc.contains(&true);
+
+        consensus_height = if is_local_consensus_satisfied {
+            println!("local consensus found at height {}", height);
+            height as i64
+        } else {
+            //consensus_height;
+            println!("no local consensus found at height {}", height);
+            break;
+        };
+        
+        genesis_blocks = get_children_of_blocks(sender_state, genesis_blocks);
+        println!("new genesis: {:?}", genesis_blocks);
+        // cant have a consensus over children if there is none
+        if(genesis_blocks.len() == 0){
+            break;
+        }
+    }
+    println!("broke");
+
+    let is_consensus_satisfied = consensus_height >= *max_height_of_oracle as i64;
+    println!("is_consensus_satisfied {}", is_consensus_satisfied);
+    //let data = ChainData::new(
+    //    0,
+    //    0,
+    //    0,
+    //    consensus_height,
+    //    height_selected_chain,
+    //    total_number_messages,
+    //);
+    data.consensus_height = consensus_height;
+    data.longest_chain = height_selected_chain;
+    data.nb_messages = total_number_messages;
+    println!("data: {}", data);
+    (is_consensus_satisfied)
 }
 
-fn safety_oracle(
+fn safety_oracle_2(
     state: &HashMap<u32, SenderState<BlockMsg>>,
     height_of_oracle: &u32,
     vec_data: &mut Vec<ChainData>,
@@ -282,10 +412,36 @@ fn safety_oracle(
     let safety_oracle_detected: HashSet<bool> = state
         .iter()
         .map(|(_, sender_state)| {
-            let (is_consensus_satisfied, mut data) =
-                get_data_from_state(sender_state, height_of_oracle);
-            data.chain_id = chain_id;
-
+            let latest_honest_msgs =
+                LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
+            let genesis_block = Block::from(ProtoBlock::new(None, 0));
+            let safety_threshold = (sender_state.senders_weights().sum_all_weights()) / 2.0;
+            Block::safety_oracles(
+                genesis_block,
+                &latest_honest_msgs,
+                &HashSet::new(),
+                safety_threshold,
+                sender_state.senders_weights(),
+            ) != HashSet::new()
+        })
+        .collect();
+    safety_oracle_detected.contains(&true)
+}
+fn safety_oracle(
+    state: &HashMap<u32, SenderState<BlockMsg>>,
+    height_of_oracle: &u32,
+    vec_data: &mut Vec<ChainData>,
+    chain_id: u32,
+) -> bool {
+    let safety_oracle_detected: HashSet<bool> = state
+        .iter()
+        .map(|(sender_id, sender_state)| {
+            let mut data = ChainData::new(chain_id, state.len() as u32, *sender_id, 0,0,0);
+            let (is_consensus_satisfied) =
+                get_data_from_state(sender_state, height_of_oracle, &mut data);
+            //data.chain_id = chain_id;
+            //data.node_id = *sender_id;
+            //data.nb_nodes = state.len() as u32;
             vec_data.push(data);
             is_consensus_satisfied
         })
@@ -323,9 +479,9 @@ struct ChainData {
     pub chain_id: u32,
     pub nb_nodes: u32,
     pub node_id: u32,
-    pub consensus_height: u32,
+    pub consensus_height: i64,
     pub longest_chain: u32,
-    pub nb_messages: u32,
+    pub nb_messages: usize,
 }
 
 impl fmt::Display for ChainData {
@@ -348,9 +504,9 @@ impl ChainData {
         chain_id: u32,
         nb_nodes: u32,
         node_id: u32,
-        consensus_height: u32,
+        consensus_height: i64,
         longest_chain: u32,
-        nb_messages: u32,
+        nb_messages: usize,
     ) -> ChainData {
         ChainData {
             chain_id,
@@ -494,14 +650,6 @@ fn blockchain() {
         .open("blockchain_test.log")
         .unwrap();
 
-    let mut stats_file = OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open("stats_blockchain_test.csv")
-        .unwrap();
-    writeln!(stats_file, "latency;nb_nodes;overhead").unwrap();
-
     let mut runner = TestRunner::default();
 
     for chain_id in 0..100 {
@@ -537,14 +685,6 @@ fn blockchain() {
         });
 
         let final_state = states.last().unwrap();
-
-        let latency = heights_from_state(final_state)
-            .iter()
-            // max because u32::max does not match the signature
-            .fold(0, |x, y| if x > *y { x } else { *y });
-        let nb_nodes = final_state.keys().len();
-        let overhead = 0;
-        writeln!(stats_file, "{};{};{}", latency, nb_nodes, overhead).unwrap();
     }
 }
 
