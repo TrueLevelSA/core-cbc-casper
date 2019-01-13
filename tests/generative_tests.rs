@@ -210,25 +210,24 @@ fn get_blocks_at_next_height_from_parsed(
 ) -> HashSet<Block> {
     let mut set: HashSet<Block> = HashSet::new();
 
-   // blocks_to_children
-   //     .iter()
-   //     .for_each(|(block, children)| {
-   //         println!("block {:?} is mapped to {:?}", block, children);
-   //         
-   //     });
-    genesis_blocks
-        .iter()
-        .for_each(|block|{
-            //println!("trying to find childrne of {:?}", block);
-            match blocks_to_children.get(block) {
+    // blocks_to_children
+    //     .iter()
+    //     .for_each(|(block, children)| {
+    //         println!("block {:?} is mapped to {:?}", block, children);
+    //
+    //     });
+    genesis_blocks.iter().for_each(|block| {
+        //println!("trying to find childrne of {:?}", block);
+        match blocks_to_children.get(block) {
             Some(blocks) => {
                 for _block in blocks {
-              //      println!("child found{:?}", _block);
+                    //      println!("child found{:?}", _block);
                     set.insert(_block.clone());
                 }
             }
             None => {}
-        }});
+        }
+    });
 
     set
 }
@@ -262,19 +261,24 @@ fn get_blocks_at_height(state: &SenderState<BlockMsg>, height: &u32) -> HashSet<
     blocks
 }
 
-
 fn get_total_number_messages(sender_state: &SenderState<BlockMsg>) -> usize {
     let latest_msgs = sender_state.latests_msgs();
     let latest_messages_honest = LatestMsgsHonest::from_latest_msgs(latest_msgs, &HashSet::new());
 
-    let (blocks_to_children, genesis_blocks, _latest_messages) =
-        Block::parse_blockchains(&latest_messages_honest);
-    //    latest_msgs.iter()
-    //        .for_each(|(_, msg)| {
-    //            fn reducer(msg
-    //        });
+    fn reduce(b: &Block, blocks: &mut HashSet<Block>) -> () {
+        blocks.insert(b.clone());
+        match b.prevblock() {
+            Some(_b) => reduce(&_b, blocks),
+            _ => {}
+        };
+    }
 
-    blocks_to_children.len()
+    let mut blocks = HashSet::new();
+    latest_messages_honest.iter().for_each(|block| {
+        reduce(&Block::from(block), &mut blocks);
+    });
+
+    blocks.len()
 }
 
 fn get_height_selected_chain(sender_state: &SenderState<BlockMsg>) -> u32 {
@@ -294,30 +298,32 @@ fn get_height_selected_chain(sender_state: &SenderState<BlockMsg>) -> u32 {
     height_this_message
 }
 
-fn get_children_of_blocks(sender_state: &SenderState<BlockMsg>, genesis_blocks: HashSet<Block>) -> HashSet<Block>{
+fn get_children_of_blocks(
+    sender_state: &SenderState<BlockMsg>,
+    genesis_blocks: HashSet<Block>,
+) -> HashSet<Block> {
     let mut children = HashSet::new();
-    let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
+    let latest_msgs_honest =
+        LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
     fn reduce(b: &Block, genesis_blocks: &HashSet<Block>, children: &mut HashSet<Block>) -> () {
-                match b.prevblock() {
-                    Some(_msg) => {
-                        if (genesis_blocks.contains(&_msg)){
-                            children.insert(b.clone());
-                            ()
-                        } else {
-                            reduce(&_msg, genesis_blocks, children)
-                        }
-                    }
-                    _ => ()
+        match b.prevblock() {
+            Some(_msg) => {
+                if (genesis_blocks.contains(&_msg)) {
+                    children.insert(b.clone());
+                    ()
+                } else {
+                    reduce(&_msg, genesis_blocks, children)
                 }
             }
+            _ => (),
+        }
+    }
 
-    latest_msgs_honest
-        .iter()
-        .for_each(|latest_msg|{
-            let parent = Block::from(latest_msg);
-            
-           reduce(&parent, &genesis_blocks, &mut children); 
-        });
+    latest_msgs_honest.iter().for_each(|latest_msg| {
+        let parent = Block::from(latest_msg);
+
+        reduce(&parent, &genesis_blocks, &mut children);
+    });
 
     children
 }
@@ -353,7 +359,6 @@ fn get_data_from_state(
             .iter()
             .cloned()
             .map(|genesis_block| {
-
                 let set_of_stuff = Block::safety_oracles(
                     genesis_block,
                     &latest_honest_msgs,
@@ -376,11 +381,11 @@ fn get_data_from_state(
             println!("no local consensus found at height {}", height);
             break;
         };
-        
+
         genesis_blocks = get_children_of_blocks(sender_state, genesis_blocks);
         println!("new genesis: {:?}", genesis_blocks);
         // cant have a consensus over children if there is none
-        if(genesis_blocks.len() == 0){
+        if (genesis_blocks.len() == 0) {
             break;
         }
     }
@@ -436,7 +441,7 @@ fn safety_oracle(
     let safety_oracle_detected: HashSet<bool> = state
         .iter()
         .map(|(sender_id, sender_state)| {
-            let mut data = ChainData::new(chain_id, state.len() as u32, *sender_id, 0,0,0);
+            let mut data = ChainData::new(chain_id, state.len() as u32, *sender_id, 0, 0, 0);
             let (is_consensus_satisfied) =
                 get_data_from_state(sender_state, height_of_oracle, &mut data);
             //data.chain_id = chain_id;
