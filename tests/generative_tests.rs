@@ -221,7 +221,7 @@ where
         })
         .prop_map(move |votes| {
             let mut state = HashMap::new();
-            let validators: Vec<u32> = (0..votes.len() as u32).collect();
+            let mut validators: Vec<u32> = (0..votes.len() as u32).collect();
 
             let weights: Vec<f64> = iter::repeat(1.0).take(votes.len() as usize).collect();
 
@@ -256,10 +256,9 @@ where
             });
 
             let mut runner = TestRunner::default();
-            let mut senders = validators.clone();
             let chain = iter::repeat_with(|| {
-                let sender_strategy = message_producer_strategy(&mut senders);
-                let receiver_strategy = message_receiver_strategy(&senders);
+                let sender_strategy = message_producer_strategy(&mut validators);
+                let receiver_strategy = message_receiver_strategy(&validators);
                 state = message_event(state.clone(), sender_strategy, receiver_strategy)
                     .new_value(&mut runner)
                     .unwrap()
