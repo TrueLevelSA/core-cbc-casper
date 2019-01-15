@@ -287,9 +287,9 @@ where
                 .write(true)
                 .open("timestamp.log")
                 .unwrap();
-            writeln!(timestamp_file, "start");
+            writeln!(timestamp_file, "start").unwrap();
             Vec::from_iter(chain.take_while(|state| {
-                writeln!(timestamp_file, "{:?}", start.elapsed().subsec_micros());
+                writeln!(timestamp_file, "{:?}", start.elapsed().subsec_micros()).unwrap();
                 start = Instant::now();
                 match (state, no_err) {
                     (Ok(st), true) => {
