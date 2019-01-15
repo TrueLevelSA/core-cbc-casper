@@ -73,7 +73,7 @@ where
         .latests_msgs_as_mut()
         .update(&m);
 
-    recipients.iter().for_each(|recipient| {
+    let result: Result<(),&'static str> = recipients.into_iter().map(|recipient| {
         let sender_state_reconstructed = SenderState::new(
             state[&recipient].senders_weights().clone(),
             0.0,
@@ -82,26 +82,28 @@ where
             0.0,
             HashSet::new(),
         );
-        assert_eq!(
-            m.estimate(),
-            M::from_msgs(
+        if m.estimate()
+            != M::from_msgs(
                 sender.clone(),
                 m.justification().iter().collect(),
                 &sender_state_reconstructed,
             )
-                .unwrap()
-                .0
-                .estimate(),
-            "Recipient must be able to reproduce the estimate from its justification and the justification only.\nSender: {:?}\nRecipient: {:?}\nNumber of Nodes: {:?}\n",
-            sender, recipient, state.len(),
-        );
+            .unwrap()
+            .0
+            .estimate()
+        {
+            return Err("Recipient must be able to reproduce the estimate from its justification and the justification only.");
+        }
+
         let state_to_update = state.get_mut(&recipient).unwrap().latests_msgs_as_mut();
         state_to_update.update(&m);
         m.justification().iter().for_each(|m| {
             state_to_update.update(m);
         });
-    });
-    Ok(())
+
+        Ok(())
+    }).collect();
+    result
 }
 
 fn round_robin(val: &mut Vec<u32>) -> BoxedStrategy<u32> {
