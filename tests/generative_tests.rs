@@ -145,7 +145,7 @@ where
         .boxed()
 }
 
-fn full_consensus<M>(state: &HashMap<M::Sender, SenderState<M>>, value: &u32) -> bool
+fn full_consensus<M>(state: &HashMap<M::Sender, SenderState<M>>, _value: &u32) -> bool
 where
     M: CasperMsg,
 {
@@ -193,7 +193,7 @@ fn run_until_height(
     state: &HashMap<u32, SenderState<BlockMsg>>,
     height: &u32,
     vec_data: &mut Vec<ChainData>,
-    chain_id: u32,
+    _chain_id: u32,
 ) -> bool {
     let v: Vec<bool> = heights_from_state(state)
         .iter()
@@ -252,10 +252,8 @@ fn get_blocks_at_height(state: &SenderState<BlockMsg>, height: &u32) -> HashSet<
         reducer(b)
     }));
 
-    for i in 0..*height {
-        println!("getting children of height {} {:?}", i, blocks);
+    for _ in 0..*height {
         blocks = get_blocks_at_next_height_from_parsed(&blocks_to_children, blocks);
-        println!("children are: {:?}", blocks);
     }
 
     blocks
@@ -308,7 +306,7 @@ fn get_children_of_blocks(
     fn reduce(b: &Block, genesis_blocks: &HashSet<Block>, children: &mut HashSet<Block>) -> () {
         match b.prevblock() {
             Some(_msg) => {
-                if (genesis_blocks.contains(&_msg)) {
+                if genesis_blocks.contains(&_msg) {
                     children.insert(b.clone());
                     ()
                 } else {
@@ -333,7 +331,7 @@ fn get_data_from_state(
     max_height_of_oracle: &u32,
     data: &mut ChainData,
 ) -> (bool) {
-    let total_number_messages = get_total_number_messages(sender_state);
+    //let total_number_messages = get_total_number_messages(sender_state);
 
     let height_selected_chain = get_height_selected_chain(sender_state);
 
@@ -353,7 +351,6 @@ fn get_data_from_state(
         //if genesis_blocks.len() < 1 {
         //    break;
         //}
-        println!("genesis {:?}", genesis_blocks);
 
         let truc: Vec<bool> = genesis_blocks
             .iter()
@@ -367,32 +364,25 @@ fn get_data_from_state(
                     sender_state.senders_weights(),
                 );
                 //returns set of btreeset? basically the cliques; if the set is not empty, there is at least one clique
-                println!("set:{:?}", set_of_stuff);
                 set_of_stuff != HashSet::new()
             })
             .collect();
         let is_local_consensus_satisfied = truc.contains(&true);
 
         consensus_height = if is_local_consensus_satisfied {
-            println!("local consensus found at height {}", height);
             height as i64
         } else {
-            //consensus_height;
-            println!("no local consensus found at height {}", height);
             break;
         };
 
         genesis_blocks = get_children_of_blocks(sender_state, genesis_blocks);
-        println!("new genesis: {:?}", genesis_blocks);
         // cant have a consensus over children if there is none
-        if (genesis_blocks.len() == 0) {
+        if genesis_blocks.len() == 0 {
             break;
         }
     }
-    println!("broke");
 
     let is_consensus_satisfied = consensus_height >= *max_height_of_oracle as i64;
-    println!("is_consensus_satisfied {}", is_consensus_satisfied);
     //let data = ChainData::new(
     //    0,
     //    0,
@@ -403,16 +393,14 @@ fn get_data_from_state(
     //);
     data.consensus_height = consensus_height;
     data.longest_chain = height_selected_chain;
-    data.nb_messages = total_number_messages;
-    println!("data: {}", data);
     (is_consensus_satisfied)
 }
 
-fn safety_oracle_2(
+fn safety_oracle(
     state: &HashMap<u32, SenderState<BlockMsg>>,
-    height_of_oracle: &u32,
-    vec_data: &mut Vec<ChainData>,
-    chain_id: u32,
+    _height_of_oracle: &u32,
+    _vec_data: &mut Vec<ChainData>,
+    _chain_id: u32,
 ) -> bool {
     let safety_oracle_detected: HashSet<bool> = state
         .iter()
@@ -432,21 +420,35 @@ fn safety_oracle_2(
         .collect();
     safety_oracle_detected.contains(&true)
 }
-fn safety_oracle(
+
+fn safety_oracle_at_height(
     state: &HashMap<u32, SenderState<BlockMsg>>,
     height_of_oracle: &u32,
     vec_data: &mut Vec<ChainData>,
     chain_id: u32,
+    set_msgs: &mut HashSet<Block>,
 ) -> bool {
+    state.iter().for_each(|(_, sender_state)| {
+        for (_, msgs) in sender_state.latests_msgs().iter() {
+            for msg in msgs.iter() {
+                set_msgs.insert(Block::from(msg));
+            }
+        }
+        //            match sender_state.my_last_msg() {
+        //                Some(latest_msg) => {
+        //                    println!("new message: {:?}", Block::from(latest_msg));
+        //                    set_msgs.insert(Block::from(latest_msg));
+        //                },
+        //                _ => {},
+        //            };
+    });
     let safety_oracle_detected: HashSet<bool> = state
         .iter()
         .map(|(sender_id, sender_state)| {
             let mut data = ChainData::new(chain_id, state.len() as u32, *sender_id, 0, 0, 0);
-            let (is_consensus_satisfied) =
+            let is_consensus_satisfied =
                 get_data_from_state(sender_state, height_of_oracle, &mut data);
-            //data.chain_id = chain_id;
-            //data.node_id = *sender_id;
-            //data.nb_nodes = state.len() as u32;
+            data.nb_messages = set_msgs.len();
             vec_data.push(data);
             is_consensus_satisfied
         })
@@ -537,7 +539,13 @@ where
     E: Estimate<M = Message<E, u32>> + From<u32>,
     F: Fn(&mut Vec<u32>) -> BoxedStrategy<u32>,
     G: Fn(&Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
-    H: Fn(&HashMap<u32, SenderState<Message<E, u32>>>, &u32, &mut Vec<ChainData>, u32) -> bool,
+    H: Fn(
+        &HashMap<u32, SenderState<Message<E, u32>>>,
+        &u32,
+        &mut Vec<ChainData>,
+        u32,
+        &mut HashSet<Block>,
+    ) -> bool,
 {
     (prop::sample::select((1..validator_max_count).collect::<Vec<usize>>()))
         .prop_flat_map(move |validators| {
@@ -600,8 +608,6 @@ where
                 .open("timestamp.log")
                 .unwrap();
 
-            //TODO: instead of multiple writes, add everything to a vector and write the vector at
-            //the end
             let mut stats_file = OpenOptions::new()
                 .create(true)
                 .truncate(true)
@@ -610,10 +616,11 @@ where
                 .unwrap();
 
             let mut vec_data: Vec<ChainData> = vec![];
+            let mut set_msgs: HashSet<Block> = HashSet::new();
 
-            writeln!(timestamp_file, "start");
+            writeln!(timestamp_file, "start").unwrap();
             let v = Vec::from_iter(chain.take_while(|state| {
-                writeln!(timestamp_file, "{:?}", start.elapsed().subsec_micros());
+                writeln!(timestamp_file, "{:?}", start.elapsed().subsec_micros()).unwrap();
                 start = Instant::now();
                 if have_consensus {
                     false
@@ -623,6 +630,7 @@ where
                         &consensus_satisfied_value,
                         &mut vec_data,
                         chain_id,
+                        &mut set_msgs,
                     );
                     if is_consensus_satisfied {
                         have_consensus = true
@@ -658,17 +666,16 @@ fn blockchain() {
     let mut runner = TestRunner::default();
 
     for chain_id in 0..100 {
-        writeln!(output_file, "new chain");
+        writeln!(output_file, "new chain").unwrap();
 
-        let mut vec_stuff: Vec<u32> = vec![];
         let states = chain(
             arbitrary_blockchain(),
-            6,
-            round_robin,
-            all_receivers,
-            safety_oracle,
-            2,
-            chain_id,
+            20,
+            round_robin, //arbitrary_in_set,//round_robin,
+            some_receivers,
+            safety_oracle_at_height,
+            5,
+            chain_id + 1, // +1 to match numbering in visualization
         )
         .new_value(&mut runner)
         .unwrap()
@@ -688,8 +695,6 @@ fn blockchain() {
             writeln!(output_file, "clqs: ").unwrap();
             writeln!(output_file, "{:?}}},", clique_collection(state.clone())).unwrap();
         });
-
-        let final_state = states.last().unwrap();
     }
 }
 
