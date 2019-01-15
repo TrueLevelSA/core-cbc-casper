@@ -328,7 +328,10 @@ fn blockchain() {
         .open("blockchain_test.log")
         .unwrap();
 
-    let mut runner = TestRunner::default();
+    let mut config = Config::default();
+    config.source_file = Some("tests/generative_tests.rs");
+
+    let mut runner = TestRunner::new(config);
 
     for _ in 0..100 {
         writeln!(output_file, "new chain");
