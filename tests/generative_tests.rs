@@ -129,15 +129,18 @@ fn message_event<M>(
     state: HashMap<M::Sender, SenderState<M>>,
     sender_strategy: BoxedStrategy<M::Sender>,
     receiver_strategy: BoxedStrategy<HashSet<M::Sender>>,
-) -> BoxedStrategy<HashMap<M::Sender, SenderState<M>>>
+) -> BoxedStrategy<Result<HashMap<M::Sender, SenderState<M>>, &'static str>>
 where
     M: 'static + CasperMsg,
 {
     (sender_strategy, receiver_strategy, Just(state))
         .prop_map(|(sender, mut receivers, mut state)| {
             receivers.remove(&sender);
-            add_message(&mut state, sender.clone(), receivers);
-            state
+            let result = add_message(&mut state, sender.clone(), receivers);
+            match result {
+                Ok(()) => Ok(state),
+                Err(e) => Err(e),
+            }
         })
         .boxed()
 }
@@ -210,7 +213,7 @@ fn chain<E: 'static, F: 'static, G: 'static, H: 'static>(
     message_producer_strategy: F,
     message_receiver_strategy: G,
     consensus_satisfied: H,
-) -> BoxedStrategy<Vec<HashMap<u32, SenderState<Message<E, u32>>>>>
+) -> BoxedStrategy<Vec<Result<HashMap<u32, SenderState<Message<E, u32>>>, &'static str>>>
 where
     E: Estimate<M = Message<E, u32>>,
     F: Fn(&mut Vec<u32>) -> BoxedStrategy<u32>,
@@ -257,17 +260,25 @@ where
                 );
             });
 
+            let mut state = Ok(state);
             let mut runner = TestRunner::default();
             let chain = iter::repeat_with(|| {
                 let sender_strategy = message_producer_strategy(&mut validators);
                 let receiver_strategy = message_receiver_strategy(&validators);
-                state = message_event(state.clone(), sender_strategy, receiver_strategy)
-                    .new_value(&mut runner)
-                    .unwrap()
-                    .current();
-                state.clone()
+                match state.clone() {
+                    Ok(st) => {
+                        state = message_event(st, sender_strategy, receiver_strategy)
+                            .new_value(&mut runner)
+                            .unwrap()
+                            .current();
+                        state.clone()
+                    }
+                    Err(e) => Err(e),
+                }
             });
+            // both variable exist to retain the last unlazified result in the chain
             let mut have_consensus = false;
+            let mut no_err = true;
 
             let mut start = Instant::now();
             let mut timestamp_file = OpenOptions::new()
@@ -280,13 +291,22 @@ where
             Vec::from_iter(chain.take_while(|state| {
                 writeln!(timestamp_file, "{:?}", start.elapsed().subsec_micros());
                 start = Instant::now();
-                if have_consensus {
-                    false
-                } else {
-                    if consensus_satisfied(state) {
-                        have_consensus = true
+                match (state, no_err) {
+                    (Ok(st), true) => {
+                        if have_consensus {
+                            false
+                        } else {
+                            if consensus_satisfied(st) {
+                                have_consensus = true
+                            }
+                            true
+                        }
                     }
-                    true
+                    (Err(_), true) => {
+                        no_err = false;
+                        true
+                    }
+                    (_, false) => false,
                 }
             }))
         })
@@ -313,31 +333,42 @@ fn blockchain() {
     for _ in 0..100 {
         writeln!(output_file, "new chain");
 
-        chain(
-            arbitrary_blockchain(),
-            6,
-            arbitrary_in_set,
-            some_receivers,
-            safety_oracle,
-        )
-        .new_value(&mut runner)
-        .unwrap()
-        .current()
-        .iter()
-        .for_each(|state| {
-            writeln!(
-                output_file,
-                "{{lms: {:?},",
-                state
-                    .iter()
-                    .map(|(_, sender_state)| sender_state.latests_msgs())
-                    .collect::<Vec<_>>()
+        runner
+            .run(
+                &chain(
+                    arbitrary_blockchain(),
+                    36,
+                    arbitrary_in_set,
+                    some_receivers,
+                    safety_oracle,
+                ),
+                |chain| {
+                    chain.iter().for_each(|state| {
+                        println!("attempting unwrap");
+                        let state = state.as_ref().unwrap();
+                        let mut output_file = OpenOptions::new()
+                            .create(false)
+                            .truncate(false)
+                            .write(true)
+                            .open("blockchain_test.log")
+                            .unwrap();
+                        writeln!(
+                            output_file,
+                            "{{lms: {:?},",
+                            state
+                                .iter()
+                                .map(|(_, sender_state)| sender_state.latests_msgs())
+                                .collect::<Vec<_>>()
+                        )
+                        .unwrap();
+                        writeln!(output_file, "sendercount: {:?},", state.keys().len()).unwrap();
+                        writeln!(output_file, "clqs: ").unwrap();
+                        writeln!(output_file, "{:?}}},", clique_collection(state.clone())).unwrap();
+                    });
+                    Ok(())
+                },
             )
             .unwrap();
-            writeln!(output_file, "sendercount: {:?},", state.keys().len()).unwrap();
-            writeln!(output_file, "clqs: ").unwrap();
-            writeln!(output_file, "{:?}}},", clique_collection(state.clone())).unwrap();
-        });
     }
 }
 
@@ -345,7 +376,7 @@ proptest! {
     #![proptest_config(Config::with_cases(30))]
     #[test]
     fn round_robin_vote_count(ref chain in chain(VoteCount::arbitrary(), 15, round_robin, all_receivers, full_consensus)) {
-        assert_eq!(chain.last().unwrap_or(&HashMap::new()).keys().len(),
+        assert_eq!(chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len(),
                    if chain.len() > 0 {chain.len()} else {0},
                    "round robin with n validators should converge in n messages")
     }
@@ -369,7 +400,7 @@ proptest! {
     #![proptest_config(Config::with_cases(30))]
     #[test]
     fn round_robin_binary(ref chain in chain(boolwrapper_gen(), 15, round_robin, all_receivers, full_consensus)) {
-        assert!(chain.last().unwrap_or(&HashMap::new()).keys().len() >=
+        assert!(chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len() >=
                 chain.len(),
                 "round robin with n validators should converge in at most n messages")
     }
@@ -381,11 +412,11 @@ proptest! {
     fn round_robin_integer(ref chain in chain(integerwrapper_gen(), 2000, round_robin, all_receivers, full_consensus)) {
         // total messages until unilateral consensus
         println!("{} validators -> {:?} message(s)",
-                 match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+                 match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
                  {"0" => "Unknown",
                   x => x},
                  chain.len());
-        assert!(chain.last().unwrap_or(&HashMap::new()).keys().len() >=
+        assert!(chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len() >=
                 chain.len(),
                 "round robin with n validators should converge in at most n messages")
     }
@@ -397,7 +428,7 @@ proptest! {
     fn arbitrary_messenger_vote_count(ref chain in chain(VoteCount::arbitrary(), 8, arbitrary_in_set, some_receivers, full_consensus)) {
         // total messages until unilateral consensus
         println!("{} validators -> {:?} message(s)",
-                 match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+                 match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
                  {"0" => "Unknown",
                   x => x},
                  chain.len());
@@ -410,7 +441,7 @@ proptest! {
     fn arbitrary_messenger_binary(ref chain in chain(boolwrapper_gen(), 100, arbitrary_in_set, some_receivers, full_consensus)) {
         // total messages until unilateral consensus
         println!("{} validators -> {:?} message(s)",
-                 match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+                 match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
                  {"0" => "Unknown",
                   x => x},
                  chain.len());
@@ -423,7 +454,7 @@ proptest! {
     fn arbitrary_messenger_integer(ref chain in chain(integerwrapper_gen(), 50, arbitrary_in_set, some_receivers, full_consensus)) {
         // total messages until unilateral consensus
         println!("{} validators -> {:?} message(s)",
-                 match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+                 match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
                  {"0" => "Unknown",
                   x => x},
                  chain.len());
