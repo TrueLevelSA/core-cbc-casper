@@ -320,22 +320,12 @@ fn arbitrary_blockchain() -> BoxedStrategy<Block<u32>> {
 
 #[test]
 fn blockchain() {
-    // total messages until unilateral consensus
-    let mut output_file = OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open("blockchain_test.log")
-        .unwrap();
-
     let mut config = Config::default();
     config.source_file = Some("tests/generative_tests.rs");
 
     let mut runner = TestRunner::new(config);
 
-    for _ in 0..100 {
-        writeln!(output_file, "new chain");
-
+    for i in 0..100 {
         runner
             .run(
                 &chain(
@@ -350,10 +340,10 @@ fn blockchain() {
                         println!("attempting unwrap");
                         let state = state.as_ref().unwrap();
                         let mut output_file = OpenOptions::new()
-                            .create(false)
-                            .truncate(false)
+                            .create(true)
+                            .truncate(true)
                             .write(true)
-                            .open("blockchain_test.log")
+                            .open(format!("blockchain_test_{}.log", i))
                             .unwrap();
                         writeln!(
                             output_file,
