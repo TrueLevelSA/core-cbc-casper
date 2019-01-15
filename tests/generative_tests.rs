@@ -279,9 +279,12 @@ fn get_total_number_messages(sender_state: &SenderState<BlockMsg>) -> usize {
     blocks.len()
 }
 
-fn get_height_selected_chain(sender_state: &SenderState<BlockMsg>) -> u32 {
-    let latest_msgs = sender_state.latests_msgs();
-    let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(latest_msgs, &HashSet::new());
+fn get_height_selected_chain(
+    latest_msgs_honest: &LatestMsgsHonest<BlockMsg>,
+    sender_state: &SenderState<BlockMsg>,
+) -> u32 {
+    //    let latest_msgs = sender_state.latests_msgs();
+    //    let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(latest_msgs, &HashSet::new());
     let selected_block = Block::ghost(&latest_msgs_honest, sender_state.senders_weights());
     fn reduce(b: &Block, i: u32) -> u32 {
         match b.prevblock() {
@@ -297,12 +300,10 @@ fn get_height_selected_chain(sender_state: &SenderState<BlockMsg>) -> u32 {
 }
 
 fn get_children_of_blocks(
-    sender_state: &SenderState<BlockMsg>,
+    latest_msgs_honest: &LatestMsgsHonest<BlockMsg>,
     genesis_blocks: HashSet<Block>,
 ) -> HashSet<Block> {
     let mut children = HashSet::new();
-    let latest_msgs_honest =
-        LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
     fn reduce(b: &Block, genesis_blocks: &HashSet<Block>, children: &mut HashSet<Block>) -> () {
         match b.prevblock() {
             Some(_msg) => {
@@ -331,12 +332,10 @@ fn get_data_from_state(
     max_height_of_oracle: &u32,
     data: &mut ChainData,
 ) -> (bool) {
-    //let total_number_messages = get_total_number_messages(sender_state);
-
-    let height_selected_chain = get_height_selected_chain(sender_state);
-
-    let latest_honest_msgs =
+    let latest_msgs_honest =
         LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
+
+    let height_selected_chain = get_height_selected_chain(&latest_msgs_honest, sender_state);
 
     let mut consensus_height: i64 = -1;
 
@@ -346,19 +345,13 @@ fn get_data_from_state(
     genesis_blocks.insert(Block::from(ProtoBlock::new(None, 0)));
 
     for height in 0..max_height_of_oracle + 1 {
-        //println!("checking height {}", height);
-        //let genesis_blocks = get_blocks_at_height(sender_state, &(height as u32));
-        //if genesis_blocks.len() < 1 {
-        //    break;
-        //}
-
         let truc: Vec<bool> = genesis_blocks
             .iter()
             .cloned()
             .map(|genesis_block| {
                 let set_of_stuff = Block::safety_oracles(
                     genesis_block,
-                    &latest_honest_msgs,
+                    &latest_msgs_honest,
                     &HashSet::new(),
                     safety_threshold,
                     sender_state.senders_weights(),
@@ -375,22 +368,14 @@ fn get_data_from_state(
             break;
         };
 
-        genesis_blocks = get_children_of_blocks(sender_state, genesis_blocks);
+        genesis_blocks = get_children_of_blocks(&latest_msgs_honest, genesis_blocks);
         // cant have a consensus over children if there is none
         if genesis_blocks.len() == 0 {
             break;
         }
     }
-
     let is_consensus_satisfied = consensus_height >= *max_height_of_oracle as i64;
-    //let data = ChainData::new(
-    //    0,
-    //    0,
-    //    0,
-    //    consensus_height,
-    //    height_selected_chain,
-    //    total_number_messages,
-    //);
+
     data.consensus_height = consensus_height;
     data.longest_chain = height_selected_chain;
     (is_consensus_satisfied)
@@ -434,13 +419,6 @@ fn safety_oracle_at_height(
                 set_msgs.insert(Block::from(msg));
             }
         }
-        //            match sender_state.my_last_msg() {
-        //                Some(latest_msg) => {
-        //                    println!("new message: {:?}", Block::from(latest_msg));
-        //                    set_msgs.insert(Block::from(latest_msg));
-        //                },
-        //                _ => {},
-        //            };
     });
     let safety_oracle_detected: HashSet<bool> = state
         .iter()
@@ -670,7 +648,7 @@ fn blockchain() {
 
         let states = chain(
             arbitrary_blockchain(),
-            20,
+            5,
             round_robin, //arbitrary_in_set,//round_robin,
             some_receivers,
             safety_oracle_at_height,
