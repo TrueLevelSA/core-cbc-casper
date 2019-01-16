@@ -145,7 +145,13 @@ where
         .boxed()
 }
 
-fn full_consensus<M>(state: &HashMap<M::Sender, SenderState<M>>, _value: &u32) -> bool
+fn full_consensus<M>(
+    state: &HashMap<M::Sender, SenderState<M>>,
+    _height_of_oracle: &u32,
+    _vec_data: &mut Vec<ChainData>,
+    _chain_id: u32,
+    _set_msgs: &mut HashSet<Block>,
+) -> bool
 where
     M: CasperMsg,
 {
@@ -259,10 +265,7 @@ fn get_blocks_at_height(state: &SenderState<BlockMsg>, height: &u32) -> HashSet<
     blocks
 }
 
-fn get_total_number_messages(sender_state: &SenderState<BlockMsg>) -> usize {
-    let latest_msgs = sender_state.latests_msgs();
-    let latest_messages_honest = LatestMsgsHonest::from_latest_msgs(latest_msgs, &HashSet::new());
-
+fn get_total_number_messages(latest_msgs: &LatestMsgs<BlockMsg>) -> usize {
     fn reduce(b: &Block, blocks: &mut HashSet<Block>) -> () {
         blocks.insert(b.clone());
         match b.prevblock() {
@@ -272,8 +275,10 @@ fn get_total_number_messages(sender_state: &SenderState<BlockMsg>) -> usize {
     }
 
     let mut blocks = HashSet::new();
-    latest_messages_honest.iter().for_each(|block| {
-        reduce(&Block::from(block), &mut blocks);
+    latest_msgs.iter().for_each(|(sender, latest_msgs_sender)| {
+        latest_msgs_sender.iter().for_each(|msg| {
+            reduce(&Block::from(msg), &mut blocks);
+        });
     });
 
     blocks.len()
@@ -335,6 +340,8 @@ fn get_data_from_state(
     let latest_msgs_honest =
         LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
 
+    let number_messages = get_total_number_messages(sender_state.latests_msgs());
+
     let height_selected_chain = get_height_selected_chain(&latest_msgs_honest, sender_state);
 
     let mut consensus_height: i64 = -1;
@@ -378,6 +385,7 @@ fn get_data_from_state(
 
     data.consensus_height = consensus_height;
     data.longest_chain = height_selected_chain;
+    data.nb_messages = number_messages;
     (is_consensus_satisfied)
 }
 
@@ -426,7 +434,7 @@ fn safety_oracle_at_height(
             let mut data = ChainData::new(chain_id, state.len() as u32, *sender_id, 0, 0, 0);
             let is_consensus_satisfied =
                 get_data_from_state(sender_state, height_of_oracle, &mut data);
-            data.nb_messages = set_msgs.len();
+            //data.nb_messages = set_msgs.len();
             vec_data.push(data);
             is_consensus_satisfied
         })
@@ -590,7 +598,7 @@ where
                 .create(true)
                 .truncate(true)
                 .write(true)
-                .open(format!("stats{}.log", chain_id))
+                .open(format!("stats{:03}.log", chain_id))
                 .unwrap();
 
             let mut vec_data: Vec<ChainData> = vec![];
@@ -643,16 +651,16 @@ fn blockchain() {
 
     let mut runner = TestRunner::default();
 
-    for chain_id in 0..100 {
+    for chain_id in 0..10 {
         writeln!(output_file, "new chain").unwrap();
 
         let states = chain(
             arbitrary_blockchain(),
-            5,
+            10,
             round_robin, //arbitrary_in_set,//round_robin,
             some_receivers,
             safety_oracle_at_height,
-            5,
+            4,
             chain_id + 1, // +1 to match numbering in visualization
         )
         .new_value(&mut runner)
@@ -676,16 +684,16 @@ fn blockchain() {
     }
 }
 
-//proptest! {
-//    #![proptest_config(Config::with_cases(30))]
-//    #[test]
-//    fn round_robin_vote_count(ref chain in chain(VoteCount::arbitrary(), 15, round_robin, all_receivers, full_consensus, 0)) {
-//        assert_eq!(chain.last().unwrap_or(&HashMap::new()).keys().len(),
-//                   if chain.len() > 0 {chain.len()} else {0},
-//                   "round robin with n validators should converge in n messages")
-//    }
-//}
-//
+proptest! {
+    #![proptest_config(Config::with_cases(30))]
+    #[test]
+    fn round_robin_vote_count(ref chain in chain(VoteCount::arbitrary(), 15, round_robin, all_receivers, full_consensus, 0, 0)) {
+        assert_eq!(chain.last().unwrap_or(&HashMap::new()).keys().len(),
+                   if chain.len() > 0 {chain.len()} else {0},
+                   "round robin with n validators should converge in n messages")
+    }
+}
+
 prop_compose! {
     fn boolwrapper_gen()
         (boolean in prop::bool::ANY) -> BoolWrapper {
@@ -700,71 +708,71 @@ prop_compose! {
         }
 }
 
-//proptest! {
-//    #![proptest_config(Config::with_cases(30))]
-//    #[test]
-//    fn round_robin_binary(ref chain in chain(boolwrapper_gen(), 15, round_robin, all_receivers, full_consensus, 0)) {
-//        assert!(chain.last().unwrap_or(&HashMap::new()).keys().len() >=
-//                chain.len(),
-//                "round robin with n validators should converge in at most n messages")
-//    }
-//}
-//
-//proptest! {
-//    #![proptest_config(Config::with_cases(10))]
-//    #[test]
-//    fn round_robin_integer(ref chain in chain(integerwrapper_gen(), 2000, round_robin, all_receivers, full_consensus, 0)) {
-//        // total messages until unilateral consensus
-//        println!("{} validators -> {:?} message(s)",
-//                 match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
-//                 {"0" => "Unknown",
-//                  x => x},
-//                 chain.len());
-//        assert!(chain.last().unwrap_or(&HashMap::new()).keys().len() >=
-//                chain.len(),
-//                "round robin with n validators should converge in at most n messages")
-//    }
-//}
-//
-//proptest! {
-//    #![proptest_config(Config::with_cases(1))]
-//    #[test]
-//    fn arbitrary_messenger_vote_count(ref chain in chain(VoteCount::arbitrary(), 8, arbitrary_in_set, some_receivers, full_consensus, 0)) {
-//        // total messages until unilateral consensus
-//        println!("{} validators -> {:?} message(s)",
-//                 match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
-//                 {"0" => "Unknown",
-//                  x => x},
-//                 chain.len());
-//    }
-//}
-//
-//proptest! {
-//    #![proptest_config(Config::with_cases(1))]
-//    #[test]
-//    fn arbitrary_messenger_binary(ref chain in chain(boolwrapper_gen(), 100, arbitrary_in_set, some_receivers, full_consensus, 0)) {
-//        // total messages until unilateral consensus
-//        println!("{} validators -> {:?} message(s)",
-//                 match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
-//                 {"0" => "Unknown",
-//                  x => x},
-//                 chain.len());
-//    }
-//}
-//
-//proptest! {
-//    #![proptest_config(Config::with_cases(1))]
-//    #[test]
-//    fn arbitrary_messenger_integer(ref chain in chain(integerwrapper_gen(), 50, arbitrary_in_set, some_receivers, full_consensus, 0)) {
-//        // total messages until unilateral consensus
-//        println!("{} validators -> {:?} message(s)",
-//                 match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
-//                 {"0" => "Unknown",
-//                  x => x},
-//                 chain.len());
-//    }
-//}
-//
+proptest! {
+    #![proptest_config(Config::with_cases(30))]
+    #[test]
+    fn round_robin_binary(ref chain in chain(boolwrapper_gen(), 15, round_robin, all_receivers, full_consensus, 0, 0)) {
+        assert!(chain.last().unwrap_or(&HashMap::new()).keys().len() >=
+                chain.len(),
+                "round robin with n validators should converge in at most n messages")
+    }
+}
+
+proptest! {
+    #![proptest_config(Config::with_cases(10))]
+    #[test]
+    fn round_robin_integer(ref chain in chain(integerwrapper_gen(), 2000, round_robin, all_receivers, full_consensus, 0, 0)) {
+        // total messages until unilateral consensus
+        println!("{} validators -> {:?} message(s)",
+                 match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+                 {"0" => "Unknown",
+                  x => x},
+                 chain.len());
+        assert!(chain.last().unwrap_or(&HashMap::new()).keys().len() >=
+                chain.len(),
+                "round robin with n validators should converge in at most n messages")
+    }
+}
+
+proptest! {
+    #![proptest_config(Config::with_cases(1))]
+    #[test]
+    fn arbitrary_messenger_vote_count(ref chain in chain(VoteCount::arbitrary(), 8, arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
+        // total messages until unilateral consensus
+        println!("{} validators -> {:?} message(s)",
+                 match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+                 {"0" => "Unknown",
+                  x => x},
+                 chain.len());
+    }
+}
+
+proptest! {
+    #![proptest_config(Config::with_cases(1))]
+    #[test]
+    fn arbitrary_messenger_binary(ref chain in chain(boolwrapper_gen(), 100, arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
+        // total messages until unilateral consensus
+        println!("{} validators -> {:?} message(s)",
+                 match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+                 {"0" => "Unknown",
+                  x => x},
+                 chain.len());
+    }
+}
+
+proptest! {
+    #![proptest_config(Config::with_cases(1))]
+    #[test]
+    fn arbitrary_messenger_integer(ref chain in chain(integerwrapper_gen(), 50, arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
+        // total messages until unilateral consensus
+        println!("{} validators -> {:?} message(s)",
+                 match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+                 {"0" => "Unknown",
+                  x => x},
+                 chain.len());
+    }
+}
+
 prop_compose! {
     fn votes(senders: usize, equivocations: usize)
         (votes in prop::collection::vec(prop::bool::weighted(0.3), senders as usize),
