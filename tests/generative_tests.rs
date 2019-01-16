@@ -150,7 +150,7 @@ fn full_consensus<M>(
     _height_of_oracle: &u32,
     _vec_data: &mut Vec<ChainData>,
     _chain_id: u32,
-    _set_msgs: &mut HashSet<Block>,
+    _received_msgs: &mut HashMap<u32, HashSet<Block>>,
 ) -> bool
 where
     M: CasperMsg,
@@ -340,7 +340,7 @@ fn get_data_from_state(
     let latest_msgs_honest =
         LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
 
-    let number_messages = get_total_number_messages(sender_state.latests_msgs());
+    //let number_messages = get_total_number_messages(sender_state.latests_msgs());
 
     let height_selected_chain = get_height_selected_chain(&latest_msgs_honest, sender_state);
 
@@ -385,7 +385,7 @@ fn get_data_from_state(
 
     data.consensus_height = consensus_height;
     data.longest_chain = height_selected_chain;
-    data.nb_messages = number_messages;
+    //data.nb_messages = number_messages;
     (is_consensus_satisfied)
 }
 
@@ -419,12 +419,12 @@ fn safety_oracle_at_height(
     height_of_oracle: &u32,
     vec_data: &mut Vec<ChainData>,
     chain_id: u32,
-    set_msgs: &mut HashSet<Block>,
+    received_msgs: &mut HashMap<u32, HashSet<Block>>,
 ) -> bool {
-    state.iter().for_each(|(_, sender_state)| {
+    state.iter().for_each(|(id, sender_state)| {
         for (_, msgs) in sender_state.latests_msgs().iter() {
             for msg in msgs.iter() {
-                set_msgs.insert(Block::from(msg));
+                received_msgs.get_mut(id).unwrap().insert(Block::from(msg));
             }
         }
     });
@@ -434,7 +434,8 @@ fn safety_oracle_at_height(
             let mut data = ChainData::new(chain_id, state.len() as u32, *sender_id, 0, 0, 0);
             let is_consensus_satisfied =
                 get_data_from_state(sender_state, height_of_oracle, &mut data);
-            //data.nb_messages = set_msgs.len();
+            //data.nb_messages = set_msgs.len()o;
+            data.nb_messages = received_msgs.get(sender_id).unwrap().len();
             vec_data.push(data);
             is_consensus_satisfied
         })
@@ -530,7 +531,7 @@ where
         &u32,
         &mut Vec<ChainData>,
         u32,
-        &mut HashSet<Block>,
+        &mut HashMap<u32, HashSet<Block>>,
     ) -> bool,
 {
     (prop::sample::select((1..validator_max_count).collect::<Vec<usize>>()))
@@ -603,6 +604,11 @@ where
 
             let mut vec_data: Vec<ChainData> = vec![];
             let mut set_msgs: HashSet<Block> = HashSet::new();
+            let mut received_msgs: HashMap<u32, HashSet<Block>> = HashMap::new();
+
+            for id in validators {
+                received_msgs.insert(id, HashSet::new());
+            }
 
             writeln!(timestamp_file, "start").unwrap();
             let v = Vec::from_iter(chain.take_while(|state| {
@@ -616,7 +622,7 @@ where
                         &consensus_satisfied_value,
                         &mut vec_data,
                         chain_id,
-                        &mut set_msgs,
+                        &mut received_msgs,
                     );
                     if is_consensus_satisfied {
                         have_consensus = true
