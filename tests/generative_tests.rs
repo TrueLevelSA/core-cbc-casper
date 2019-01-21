@@ -19,7 +19,7 @@ use rand::thread_rng;
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest, SenderState};
 use casper::message::*;
 use casper::senders_weight::SendersWeight;
-use casper::traits::{Data, Estimate};
+use casper::traits::Estimate;
 
 use casper::example::binary::BoolWrapper;
 use casper::example::blockchain::{Block, BlockMsg, ProtoBlock};
@@ -35,7 +35,6 @@ fn add_message<'z, M>(
     state: &'z mut HashMap<M::Sender, SenderState<M>>,
     sender: M::Sender,
     recipients: HashSet<M::Sender>,
-    data: Option<<M::Estimate as Data>::Data>,
 ) -> &'z HashMap<M::Sender, SenderState<M>>
 where
     M: CasperMsg,
@@ -64,7 +63,6 @@ where
         sender.clone(),
         latest_delta.iter().collect(),
         &state[&sender],
-        data.clone().map(|d| d.into()),
     )
     .unwrap();
 
@@ -90,7 +88,6 @@ where
                 sender.clone(),
                 m.justification().iter().collect(),
                 &sender_state_reconstructed,
-                data.clone().map(|d| d.into()),
             )
                 .unwrap()
                 .0
@@ -133,12 +130,11 @@ fn message_event<M>(
 ) -> BoxedStrategy<HashMap<M::Sender, SenderState<M>>>
 where
     M: 'static + CasperMsg,
-    <<M as CasperMsg>::Estimate as Data>::Data: From<<M as CasperMsg>::Sender>,
 {
     (sender_strategy, receiver_strategy, Just(state))
         .prop_map(|(sender, mut receivers, mut state)| {
             receivers.remove(&sender);
-            add_message(&mut state, sender.clone(), receivers, Some(sender.into())).clone()
+            add_message(&mut state, sender.clone(), receivers).clone()
         })
         .boxed()
 }
@@ -152,7 +148,7 @@ where
         .map(|(_sender, sender_state)| {
             let latest_honest_msgs =
                 LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
-            latest_honest_msgs.mk_estimate(sender_state.senders_weights(), None)
+            latest_honest_msgs.mk_estimate(sender_state.senders_weights())
         })
         .collect();
     println!("{:?}", m);
@@ -213,7 +209,7 @@ fn chain<E: 'static, F: 'static, G: 'static, H: 'static>(
     consensus_satisfied: H,
 ) -> BoxedStrategy<Vec<HashMap<u32, SenderState<Message<E, u32>>>>>
 where
-    E: Estimate<M = Message<E, u32>> + From<u32>,
+    E: Estimate<M = Message<E, u32>>,
     F: Fn(&mut Vec<u32>) -> BoxedStrategy<u32>,
     G: Fn(&Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
     H: Fn(&HashMap<u32, SenderState<Message<E, u32>>>) -> bool,
@@ -487,7 +483,7 @@ proptest! {
         let single_equivocation: Vec<_> = messages[..nodes+1].iter().map(|message| message).collect();
         let equivocator = messages[nodes].sender();
         let (m0, _) =
-            &Message::from_msgs(0, single_equivocation.clone(), &sender_state, None)
+            &Message::from_msgs(0, single_equivocation.clone(), &sender_state)
             .unwrap();
         let equivocations: Vec<_> = single_equivocation.iter().filter(|message| message.equivocates(&m0)).collect();
         assert!(if *equivocator == 0 {equivocations.len() == 1} else {equivocations.len() == 0}, "should detect sender 0 equivocating if sender 0 equivocates");
@@ -495,7 +491,7 @@ proptest! {
         // assert_eq!(equivocations.len(), 1, "should detect sender 0 equivocating if sender 0 equivocates");
 
         let (m0, _) =
-            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &sender_state, None)
+            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &sender_state)
             .unwrap();
         let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
         assert_eq!(equivocations.len(), 1, "should detect sender 0 equivocating if sender 0 equivocates");
@@ -509,7 +505,7 @@ proptest! {
             HashSet::new(),
         );
         let (m0, _) =
-            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &sender_state, None)
+            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &sender_state)
             .unwrap();
         let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
         assert_eq!(equivocations.len(), 0, "equivocation absorbed in threshold");

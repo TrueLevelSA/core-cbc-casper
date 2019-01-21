@@ -1,7 +1,7 @@
 use justification::LatestMsgsHonest;
 use message::{CasperMsg, Message};
 use senders_weight::SendersWeight;
-use traits::{Data, Estimate, Zero};
+use traits::{Estimate, Zero};
 use weight_unit::WeightUnit;
 
 type Validator = u32;
@@ -31,7 +31,7 @@ impl Estimate for BoolWrapper {
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
-        _data: Option<<Self as Data>::Data>,
+        // _data: Option<<Self as Data>::Data>,
     ) -> Result<Self, &'static str> {
         // loop over all the latest messages
         let (true_w, false_w) = latest_msgs.iter().fold(
@@ -87,8 +87,7 @@ mod tests {
         let m0 = BinaryMsg::new(senders[0], Justification::new(), BoolWrapper(false), None);
         let m1 = BinaryMsg::new(senders[1], Justification::new(), BoolWrapper(true), None);
         let m2 = BinaryMsg::new(senders[2], Justification::new(), BoolWrapper(false), None);
-        let (m3, _) =
-            BinaryMsg::from_msgs(senders[0], vec![&m0, &m1], &sender_state, None).unwrap();
+        let (m3, _) = BinaryMsg::from_msgs(senders[0], vec![&m0, &m1], &sender_state).unwrap();
 
         assert_eq!(
             BoolWrapper::mk_estimate(
@@ -97,7 +96,6 @@ mod tests {
                     sender_state.equivocators()
                 ),
                 &senders_weights,
-                None
             )
             .unwrap(),
             BoolWrapper(true)
@@ -105,20 +103,20 @@ mod tests {
         let (mut j0, _) = Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
         // s0 and s1 vote. since tie-breaker is `true`, get `true`
         assert_eq!(
-            j0.mk_estimate(sender_state.equivocators(), &senders_weights, None)
+            j0.mk_estimate(sender_state.equivocators(), &senders_weights)
                 .unwrap(),
             BoolWrapper(true)
         );
         j0.faulty_insert(&m2, &sender_state);
         // `false` now has weight 2.0, while true has weight `1.0`
         assert_eq!(
-            j0.mk_estimate(sender_state.equivocators(), &senders_weights, None)
+            j0.mk_estimate(sender_state.equivocators(), &senders_weights)
                 .unwrap(),
             BoolWrapper(false)
         );
         j0.faulty_insert(&m3, &sender_state);
         assert_eq!(
-            j0.mk_estimate(sender_state.equivocators(), &senders_weights, None)
+            j0.mk_estimate(sender_state.equivocators(), &senders_weights)
                 .unwrap(),
             BoolWrapper(true)
         );
@@ -159,19 +157,18 @@ mod tests {
 
         // honest result of vote: false
         assert_eq!(
-            j0.mk_estimate(sender_state.equivocators(), &senders_weights, None)
+            j0.mk_estimate(sender_state.equivocators(), &senders_weights)
                 .unwrap(),
             BoolWrapper(false)
         );
 
         // assume sender 0 has seen messages from sender 1 and sender 2 and reveals this in a published message
-        let (m5, _) =
-            BinaryMsg::from_msgs(senders[0], vec![&m0, &m1, &m2], &sender_state, None).unwrap();
+        let (m5, _) = BinaryMsg::from_msgs(senders[0], vec![&m0, &m1, &m2], &sender_state).unwrap();
 
         j0.faulty_insert(&m5, &sender_state);
         // sender 0 now "votes" in the other direction and sways the result: true
         assert_eq!(
-            j0.mk_estimate(sender_state.equivocators(), &senders_weights, None)
+            j0.mk_estimate(sender_state.equivocators(), &senders_weights)
                 .unwrap(),
             BoolWrapper(true)
         );
