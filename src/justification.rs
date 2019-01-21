@@ -413,7 +413,7 @@ impl<M: CasperMsg> SenderState<M> {
             .collect();
 
         let _ = msgs_sorted_by_faultw.sort_unstable_by(|(m0, w0), (m1, w1)| {
-            w0.partial_cmp(w1).unwrap_or(m0.id().cmp(m1.id())) // tie breaker
+            w0.partial_cmp(w1).unwrap_or_else(|| m0.id().cmp(m1.id())) // tie breaker
         });
 
         // return a Vec<CasperMsg>
