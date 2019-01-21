@@ -165,7 +165,7 @@ fn safety_oracle(state: &HashMap<u32, SenderState<BlockMsg<u32>>>) -> bool {
         .map(|(_, sender_state)| {
             let latest_honest_msgs =
                 LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
-            let genesis_block = Block::from(ProtoBlock::new(None, 0));
+            let genesis_block = Block::from(ProtoBlock::new(None));
             let safety_threshold = (sender_state.senders_weights().sum_all_weights()) / 2.0;
             Block::safety_oracles(
                 genesis_block,
@@ -183,7 +183,7 @@ fn clique_collection(state: HashMap<u32, SenderState<BlockMsg<u32>>>) -> Vec<Vec
     state
         .iter()
         .map(|(_, sender_state)| {
-            let genesis_block = Block::from(ProtoBlock::new(None, 0));
+            let genesis_block = Block::from(ProtoBlock::new(None));
             let latest_honest_msgs =
                 LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
             let safety_oracles = Block::safety_oracles(
@@ -296,7 +296,7 @@ where
 }
 
 fn arbitrary_blockchain() -> BoxedStrategy<Block<u32>> {
-    let genesis_block = Block::from(ProtoBlock::new(None, 0));
+    let genesis_block = Block::from(ProtoBlock::new(None));
     Just(genesis_block).boxed()
 }
 
