@@ -8,38 +8,44 @@ before_script:
 
 stages:
   - build
-  - test
-  - example
-
-fmt:
-  stage: build
-  script:
-      # When running with --check, Rustfmt will exit with 0 if Rustfmt would
-      # not make any formatting changes to the input, and 1 if Rustfmt would
-      # make changes.
-    - cargo fmt --all -- --check
+  - tests
+  - examples
+  - format
 
 build:
   stage: build
   script:
     - cargo build
 
-test:
-  stage: test
+unit-tests:
+  stage: tests
   script:
-    - cargo test --features "integration_test"
+    - cargo test --lib
 
-doc:
-  stage: test
+integration-tests:
+  stage: tests
+  script:
+    - cargo test --test generative_tests --features "integration_test"
+
+build-doc:
+  stage: tests
   script:
     - cargo doc
 
 serde:
-  stage: example
+  stage: examples
   script:
     - cargo run --example serde
 
 ternary:
-  stage: example
+  stage: examples
   script:
     - cargo run --example ternary
+
+fmt:
+  stage: format
+  script:
+      # When running with --check, Rustfmt will exit with 0 if Rustfmt would
+      # not make any formatting changes to the input, and 1 if Rustfmt would
+      # make changes.
+    - cargo fmt --all -- --check
