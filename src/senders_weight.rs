@@ -77,12 +77,13 @@ impl<S: Sender> SendersWeight<S> {
     }
 
     pub fn sum_all_weights(&self) -> WeightUnit {
-        self.senders()
-            .unwrap()
-            .iter()
-            .fold(WeightUnit::ZERO, |acc, sender| {
+        if let Ok(senders) = self.senders() {
+            senders.iter().fold(WeightUnit::ZERO, |acc, sender| {
                 acc + self.weight(sender).unwrap_or(::std::f64::NAN)
             })
+        } else {
+            ::std::f64::NAN
+        }
     }
 }
 
