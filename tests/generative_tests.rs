@@ -29,9 +29,11 @@ use casper::example::vote_count::VoteCount;
 use std::fs::OpenOptions;
 use std::io::Write;
 
-use std::fmt;
 
 use std::time::Instant;
+
+mod tools;
+use tools::ChainData;
 
 fn add_message<'z, M>(
     state: &'z mut HashMap<M::Sender, SenderState<M>>,
@@ -167,171 +169,23 @@ where
     m.len() == 1
 }
 
-/// returns a vector of heights
-/// each height is the height of the block that is selected by ghost
-/// (applied to latest honest messages in each view)
-fn heights_from_state(state: &HashMap<u32, SenderState<BlockMsg>>) -> Vec<u32> {
-    state
-        .iter()
-        .map(|(_, sender_state)| (sender_state.latests_msgs(), sender_state.senders_weights()))
-        .map(|(latest_msgs, senders_weights)| {
-            let latest_messages_honest =
-                LatestMsgsHonest::from_latest_msgs(latest_msgs, &HashSet::new());
-            Block::ghost(&latest_messages_honest, senders_weights)
-        })
-        .map(|block| {
-            fn reduce(b: &Block, i: u32) -> u32 {
-                match b.prevblock() {
-                    Some(_msg) => reduce(&_msg, i + 1),
-                    None => i,
-                }
-            }
-            let height_this_message = match block {
-                Ok(b) => reduce(&b, 1),
-                _ => 0,
-            };
-            height_this_message
-        })
-        .collect()
-}
-
+/// Returns true when at least one validator picks a block at the specified height
 fn run_until_height(
     state: &HashMap<u32, SenderState<BlockMsg>>,
     height: &u32,
-    vec_data: &mut Vec<ChainData>,
+    _vec_data: &mut Vec<ChainData>,
     _chain_id: u32,
 ) -> bool {
-    let v: Vec<bool> = heights_from_state(state)
+    let v: Vec<bool> = tools::heights_from_state(state)
         .iter()
         .map(|v| v >= height)
         .collect();
 
-    vec_data.push(ChainData::new(0, 0, 0, 0, 0, 0));
     v.contains(&true)
 }
 
-fn get_blocks_at_next_height_from_parsed(
-    blocks_to_children: &HashMap<Block, HashSet<Block>>,
-    genesis_blocks: HashSet<Block>,
-) -> HashSet<Block> {
-    let mut set: HashSet<Block> = HashSet::new();
-
-    // blocks_to_children
-    //     .iter()
-    //     .for_each(|(block, children)| {
-    //         println!("block {:?} is mapped to {:?}", block, children);
-    //
-    //     });
-    genesis_blocks.iter().for_each(|block| {
-        //println!("trying to find childrne of {:?}", block);
-        match blocks_to_children.get(block) {
-            Some(blocks) => {
-                for _block in blocks {
-                    //      println!("child found{:?}", _block);
-                    set.insert(_block.clone());
-                }
-            }
-            None => {}
-        }
-    });
-
-    set
-}
-
-fn get_blocks_at_height(state: &SenderState<BlockMsg>, height: &u32) -> HashSet<Block> {
-    //let genesis_block = Block::from(ProtoBlock::new(None, 0));
-    let latest_msgs = state.latests_msgs();
-    let latest_messages_honest = LatestMsgsHonest::from_latest_msgs(latest_msgs, &HashSet::new());
-
-    let (blocks_to_children, genesis_blocks, _latest_messages) =
-        Block::parse_blockchains(&latest_messages_honest);
-
-    // parse_blockchains returns not only genesis blocks but also finalized blocks
-    // this returns only genesis blocks, as we need them for the next steps
-    let mut blocks: HashSet<Block> = HashSet::from_iter(genesis_blocks.iter().cloned().map(|b| {
-        fn reducer(block: Block) -> Block {
-            match block.prevblock() {
-                Some(_block) => reducer(_block),
-                None => block,
-            }
-        };
-        reducer(b)
-    }));
-
-    for _ in 0..*height {
-        blocks = get_blocks_at_next_height_from_parsed(&blocks_to_children, blocks);
-    }
-
-    blocks
-}
-
-fn get_total_number_messages(latest_msgs: &LatestMsgs<BlockMsg>) -> usize {
-    fn reduce(b: &Block, blocks: &mut HashSet<Block>) -> () {
-        blocks.insert(b.clone());
-        match b.prevblock() {
-            Some(_b) => reduce(&_b, blocks),
-            _ => {}
-        };
-    }
-
-    let mut blocks = HashSet::new();
-    latest_msgs.iter().for_each(|(sender, latest_msgs_sender)| {
-        latest_msgs_sender.iter().for_each(|msg| {
-            reduce(&Block::from(msg), &mut blocks);
-        });
-    });
-
-    blocks.len()
-}
-
-fn get_height_selected_chain(
-    latest_msgs_honest: &LatestMsgsHonest<BlockMsg>,
-    sender_state: &SenderState<BlockMsg>,
-) -> u32 {
-    //    let latest_msgs = sender_state.latests_msgs();
-    //    let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(latest_msgs, &HashSet::new());
-    let selected_block = Block::ghost(&latest_msgs_honest, sender_state.senders_weights());
-    fn reduce(b: &Block, i: u32) -> u32 {
-        match b.prevblock() {
-            Some(_msg) => reduce(&_msg, i + 1),
-            None => i,
-        }
-    }
-    let height_this_message = match selected_block {
-        Ok(b) => reduce(&b, 1),
-        _ => 0,
-    };
-    height_this_message
-}
-
-fn get_children_of_blocks(
-    latest_msgs_honest: &LatestMsgsHonest<BlockMsg>,
-    genesis_blocks: HashSet<Block>,
-) -> HashSet<Block> {
-    let mut children = HashSet::new();
-    fn reduce(b: &Block, genesis_blocks: &HashSet<Block>, children: &mut HashSet<Block>) -> () {
-        match b.prevblock() {
-            Some(_msg) => {
-                if genesis_blocks.contains(&_msg) {
-                    children.insert(b.clone());
-                    ()
-                } else {
-                    reduce(&_msg, genesis_blocks, children)
-                }
-            }
-            _ => (),
-        }
-    }
-
-    latest_msgs_honest.iter().for_each(|latest_msg| {
-        let parent = Block::from(latest_msg);
-
-        reduce(&parent, &genesis_blocks, &mut children);
-    });
-
-    children
-}
-
+/// performs safety oracle search and adds information to the data parameter
+/// info added: consensus_height and longest_chain
 fn get_data_from_state(
     sender_state: &SenderState<BlockMsg>,
     max_height_of_oracle: &u32,
@@ -340,9 +194,7 @@ fn get_data_from_state(
     let latest_msgs_honest =
         LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
 
-    //let number_messages = get_total_number_messages(sender_state.latests_msgs());
-
-    let height_selected_chain = get_height_selected_chain(&latest_msgs_honest, sender_state);
+    let height_selected_chain = tools::get_height_selected_chain(&latest_msgs_honest, sender_state);
 
     let mut consensus_height: i64 = -1;
 
@@ -375,7 +227,7 @@ fn get_data_from_state(
             break;
         };
 
-        genesis_blocks = get_children_of_blocks(&latest_msgs_honest, genesis_blocks);
+        genesis_blocks = tools::get_children_of_blocks(&latest_msgs_honest, genesis_blocks);
         // cant have a consensus over children if there is none
         if genesis_blocks.len() == 0 {
             break;
@@ -414,6 +266,9 @@ fn safety_oracle(
     safety_oracle_detected.contains(&true)
 }
 
+/// returns true if at least a safety oracle for a block at height_of_oracle
+/// adds a new data to vec_data for each new message that is sent
+/// uses received_msgs to take note of which validator received which messages
 fn safety_oracle_at_height(
     state: &HashMap<u32, SenderState<BlockMsg>>,
     height_of_oracle: &u32,
@@ -467,50 +322,6 @@ fn clique_collection(state: HashMap<u32, SenderState<BlockMsg>>) -> Vec<Vec<Vec<
             safety_oracles_vec_of_vecs
         })
         .collect()
-}
-
-struct ChainData {
-    pub chain_id: u32,
-    pub nb_nodes: u32,
-    pub node_id: u32,
-    pub consensus_height: i64,
-    pub longest_chain: u32,
-    pub nb_messages: usize,
-}
-
-impl fmt::Display for ChainData {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{};{};{};{};{};{}",
-            self.chain_id,
-            self.nb_nodes,
-            self.node_id,
-            self.consensus_height,
-            self.longest_chain,
-            self.nb_messages
-        )
-    }
-}
-
-impl ChainData {
-    fn new(
-        chain_id: u32,
-        nb_nodes: u32,
-        node_id: u32,
-        consensus_height: i64,
-        longest_chain: u32,
-        nb_messages: usize,
-    ) -> ChainData {
-        ChainData {
-            chain_id,
-            nb_nodes,
-            node_id,
-            consensus_height,
-            longest_chain,
-            nb_messages,
-        }
-    }
 }
 
 fn chain<E: 'static, F: 'static, G: 'static, H: 'static>(
@@ -603,7 +414,6 @@ where
                 .unwrap();
 
             let mut vec_data: Vec<ChainData> = vec![];
-            let mut set_msgs: HashSet<Block> = HashSet::new();
             let mut received_msgs: HashMap<u32, HashSet<Block>> = HashMap::new();
 
             for id in validators {
@@ -662,9 +472,9 @@ fn blockchain() {
 
         let states = chain(
             arbitrary_blockchain(),
-            10,
+            20,
             round_robin, //arbitrary_in_set,//round_robin,
-            some_receivers,
+            all_receivers,
             safety_oracle_at_height,
             4,
             chain_id + 1, // +1 to match numbering in visualization
