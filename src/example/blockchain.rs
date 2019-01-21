@@ -7,6 +7,7 @@ use justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use message::{CasperMsg, Message};
 use senders_weight::SendersWeight;
 use serde_derive::Serialize;
+use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 use traits::{Data, Estimate, Id, Sender, Zero};
@@ -17,12 +18,15 @@ use weight_unit::WeightUnit;
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize)]
 pub struct ProtoBlock<S: Sender> {
     prevblock: Option<Block<S>>,
-    sender: S,
+    sender_type: PhantomData<S>,
 }
 
 impl<S: Sender> ProtoBlock<S> {
-    pub fn new(prevblock: Option<Block<S>>, sender: S) -> ProtoBlock<S> {
-        ProtoBlock { prevblock, sender }
+    pub fn new(prevblock: Option<Block<S>>) -> ProtoBlock<S> {
+        ProtoBlock {
+            prevblock,
+            sender_type: PhantomData,
+        }
     }
 }
 
@@ -33,26 +37,26 @@ pub struct Block<S: Sender>((Arc<ProtoBlock<S>>, Hashed));
 #[cfg(feature = "integration_test")]
 impl<S: Sender + Into<S>> From<S> for Block<S> {
     fn from(sender: S) -> Self {
-        Block::from(ProtoBlock::new(None, sender.into()))
+        Block::from(ProtoBlock::new(None))
     }
 }
 
-#[cfg(feature = "integration_test")]
-impl<S: Sender> std::fmt::Debug for Block<S> {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self.prevblock() {
-            None => write!(
-                fmt,
-                "{:?} -> {:?}",
-                (self.sender(), self.id()),
-                None::<Block<S>>
-            ),
-            Some(block) => write!(fmt, "{:?} -> {:?}", (self.sender(), self.id()), block),
-        }
-    }
-}
+// #[cfg(feature = "integration_test")]
+// impl<S: Sender> std::fmt::Debug for Block<S> {
+//     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+//         match self.prevblock() {
+//             None => write!(
+//                 fmt,
+//                 "{:?} -> {:?}",
+//                 (self.sender(), self.id()),
+//                 None::<Block<S>>
+//             ),
+//             Some(block) => write!(fmt, "{:?} -> {:?}", (self.sender(), self.id()), block),
+//         }
+//     }
+// }
 
-#[cfg(not(feature = "integration_test"))]
+// #[cfg(not(feature = "integration_test"))]
 impl<S: Sender> std::fmt::Debug for Block<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
@@ -70,8 +74,7 @@ impl<S: Sender> std::fmt::Debug for Block<S> {
 impl<S: Sender> serde::Serialize for Block<S> {
     fn serialize<T: serde::Serializer>(&self, rhs: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
-        let mut msg = rhs.serialize_struct("Block", 2)?;
-        msg.serialize_field("sender", &self.sender())?;
+        let mut msg = rhs.serialize_struct("Block", 1)?;
         msg.serialize_field("prevblock", &self.prevblock())?;
         msg.end()
     }
@@ -107,8 +110,8 @@ impl<'z, S: Sender> From<&'z BlockMsg<S>> for Block<S> {
 }
 
 impl<S: Sender> Block<S> {
-    pub fn new(prevblock: Option<Block<S>>, sender: S) -> Self {
-        Block::from(ProtoBlock { prevblock, sender })
+    pub fn new(prevblock: Option<Block<S>>) -> Self {
+        Block::from(ProtoBlock::new(prevblock))
     }
     pub fn id(&self) -> &<Self as Id>::ID {
         &(self.0).1
@@ -116,10 +119,6 @@ impl<S: Sender> Block<S> {
     fn arc(&self) -> &Arc<ProtoBlock<S>> {
         &(self.0).0
     }
-    pub fn sender(&self) -> S {
-        self.arc().sender.clone()
-    }
-
     /// Create a new block from a prevblock message and an incomplete block
     pub fn from_prevblock_msg(
         prevblock_msg: Option<BlockMsg<S>>,
@@ -267,8 +266,12 @@ impl<S: Sender> Block<S> {
     ) -> (
         HashMap<Block<S>, HashSet<Block<S>>>,
         HashSet<Block<S>>,
-        HashSet<Block<S>>,
+        HashMap<Block<S>, S>,
     ) {
+        let latest_blocks: HashMap<Block<S>, S> = latest_msgs
+            .iter()
+            .map(|msg| (Block::from(msg), msg.sender().clone()))
+            .collect();
         // start at the tip of the blockchain
         let mut visited_parents: HashMap<Block<S>, HashSet<Block<S>>> = latest_msgs
             .iter()
@@ -280,7 +283,6 @@ impl<S: Sender> Block<S> {
             .collect();
 
         let mut queue: VecDeque<Block<S>> = visited_parents.keys().cloned().collect();
-        let latest_blocks: HashSet<Block<S>> = visited_parents.keys().cloned().collect();
         let mut genesis: HashSet<Block<S>> = HashSet::new();
         let mut was_empty = false;
         // while there are still unvisited blocks
@@ -317,14 +319,15 @@ impl<S: Sender> Block<S> {
         block: &Block<S>,
         visited: &HashMap<Block<S>, HashSet<Block<S>>>,
         // mut acc: HashSet<S>,
-        latest_blocks: &HashSet<Block<S>>,
+        latest_blocks: &HashMap<Block<S>, S>,
         b_in_lms_senders: Rc<RwLock<HashMap<Block<S>, HashSet<S>>>>,
     ) -> HashSet<S> {
         let mut senders = HashSet::new();
-        // collect this sender if this block is his latest message
-        if latest_blocks.contains(block) {
-            let _ = senders.insert(block.sender());
-        }
+        // collect this sender if this block is his proposed one from his latest
+        // message
+        latest_blocks
+            .get(block)
+            .map(|sender| senders.insert(sender.clone()));
         let res = visited
             .get(block)
             .map(|children| {
@@ -351,7 +354,7 @@ impl<S: Sender> Block<S> {
         blocks: &HashSet<Block<S>>,
         visited: &HashMap<Block<S>, HashSet<Block<S>>>,
         weights: &SendersWeight<S>,
-        latest_blocks: &HashSet<Block<S>>,
+        latest_blocks: &HashMap<Block<S>, S>,
         b_in_lms_senders: Rc<RwLock<HashMap<Block<S>, HashSet<S>>>>,
     ) -> Option<(Option<Self>, WeightUnit, HashSet<Self>)> {
         let init = Some((None, WeightUnit::ZERO, HashSet::new()));
@@ -442,14 +445,10 @@ impl<S: Sender> Estimate for Block<S> {
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
-        incomplete_block: Option<<Self as Data>::Data>,
+        _data: Option<<Self as Data>::Data>,
     ) -> Result<Self, &'static str> {
-        let incomplete_block = incomplete_block.ok_or_else(|| "incomplete_block is None")?;
         let prevblock = Block::ghost(latest_msgs, senders_weights)?;
-        Ok(Block::from(ProtoBlock {
-            prevblock: Some(prevblock),
-            ..((**incomplete_block.arc()).clone())
-        }))
+        Ok(Block::from(ProtoBlock::new(Some(prevblock))))
     }
 }
 
@@ -502,10 +501,7 @@ mod tests {
         // (s3, w=1.0)    |     \---b3
 
         // block dag
-        let genesis_block = Block::from(ProtoBlock {
-            prevblock: None,
-            sender: sender0,
-        });
+        let genesis_block = Block::from(ProtoBlock::new(None));
         let latest_msgs = Justification::new();
         let genesis_block_msg = BlockMsg::new(sender0, latest_msgs, genesis_block.clone(), None);
         assert_eq!(
@@ -514,72 +510,61 @@ mod tests {
             "genesis block with None as prevblock"
         );
 
-        let proto_b1 = Block::new(None, sender1);
+        let proto_b1 = Block::new(None);
         let (m1, _) = BlockMsg::from_msgs(
-            proto_b1.sender(),
+            sender1,
             vec![&genesis_block_msg],
             &sender_state,
             Some(proto_b1), // data
         )
         .unwrap();
 
-        let proto_b2 = Block::new(None, sender2);
+        let proto_b2 = Block::new(None);
         let (m2, _) = BlockMsg::from_msgs(
-            proto_b2.sender(),
+            sender2,
             vec![&genesis_block_msg],
             &sender_state,
             Some(proto_b2),
         )
         .unwrap();
 
-        let proto_b3 = Block::new(None, sender3);
-        let (m3, _) = BlockMsg::from_msgs(
-            proto_b3.sender(),
-            vec![&m1, &m2],
-            &sender_state,
-            Some(proto_b3),
-        )
-        .unwrap();
+        let proto_b3 = Block::new(None);
+        let (m3, _) =
+            BlockMsg::from_msgs(sender3, vec![&m1, &m2], &sender_state, Some(proto_b3)).unwrap();
 
         assert_eq!(
             m3.estimate(),
-            &Block::new(Some(Block::from(&m2)), sender3),
+            &Block::new(Some(Block::from(&m2))),
             "should build on top of m2 as sender2 has more weight"
         );
 
-        let proto_b4 = Block::new(None, sender4);
+        let proto_b4 = Block::new(None);
         let (m4, _) =
-            BlockMsg::from_msgs(proto_b4.sender(), vec![&m1], &sender_state, Some(proto_b4))
-                .unwrap();
+            BlockMsg::from_msgs(sender4, vec![&m1], &sender_state, Some(proto_b4)).unwrap();
 
         assert_eq!(
             m4.estimate(),
-            &Block::new(Some(Block::from(&m1)), sender4),
+            &Block::new(Some(Block::from(&m1))),
             "should build on top of m1 as as thats the only msg it saw"
         );
 
-        let proto_b5 = Block::new(None, sender0);
+        let proto_b5 = Block::new(None);
         // println!("\n3 {:?}", m3);
         // println!("\n4 {:?}", m4);
-        let (m5, _) = BlockMsg::from_msgs(
-            proto_b5.sender(),
-            vec![&m3, &m2],
-            &sender_state,
-            Some(proto_b5),
-        )
-        .unwrap();
+        let (m5, _) =
+            BlockMsg::from_msgs(sender0, vec![&m3, &m2], &sender_state, Some(proto_b5)).unwrap();
         // println!("\nm5 {:?}", m5);
         // println!("\nm5_estimate {:?}", Block::from(&m5));
 
         // println!();
         assert_eq!(
             m5.estimate(),
-            &Block::new(Some(Block::from(&m3)), sender0),
+            &Block::new(Some(Block::from(&m3))),
             "should build on top of "
         );
 
         let block = Block::from(&m3);
-        assert_eq!(block, Block::new(Some(Block::from(&m2)), sender3),);
+        assert_eq!(block, Block::new(Some(Block::from(&m2))),);
         // assert_eq!(block.prevblock(), Some(genesis_block),);
     }
 
@@ -616,10 +601,7 @@ mod tests {
         // let txs = BTreeSet::new();
 
         // block dag
-        let genesis_block = Block::from(ProtoBlock {
-            prevblock: None,
-            sender: senderg,
-        });
+        let genesis_block = Block::from(ProtoBlock::new(None));
         let latest_msgs = Justification::new();
         let genesis_block_msg = BlockMsg::new(senderg, latest_msgs, genesis_block.clone(), None);
         // assert_eq!(
@@ -627,23 +609,22 @@ mod tests {
         //     &genesis_block,
         //     "genesis block with None as prevblock"
         // );
-        let proto_b0 = Block::new(None, sender0);
+        let proto_b0 = Block::new(None);
         let (m0, sender_state) = BlockMsg::from_msgs(
-            proto_b0.sender(),
+            sender0,
             vec![&genesis_block_msg],
             &sender_state,
             Some(proto_b0), // data
         )
         .unwrap();
 
-        let proto_b1 = Block::new(None, sender1);
+        let proto_b1 = Block::new(None);
         let (m1, sender_state) =
-            BlockMsg::from_msgs(proto_b1.sender(), vec![&m0], &sender_state, Some(proto_b1))
-                .unwrap();
+            BlockMsg::from_msgs(sender1, vec![&m0], &sender_state, Some(proto_b1)).unwrap();
 
-        let proto_b2 = Block::new(None, sender2);
+        let proto_b2 = Block::new(None);
         let (m2, sender_state) = BlockMsg::from_msgs(
-            proto_b2.sender(),
+            sender2,
             vec![&genesis_block_msg],
             &sender_state,
             Some(proto_b2),
@@ -656,10 +637,9 @@ mod tests {
         //     "should build on top of m1 as sender1 has more weight"
         // );
 
-        let proto_b3 = Block::new(None, sender3);
+        let proto_b3 = Block::new(None);
         let (m3, sender_state) =
-            BlockMsg::from_msgs(proto_b3.sender(), vec![&m2], &sender_state, Some(proto_b3))
-                .unwrap();
+            BlockMsg::from_msgs(sender3, vec![&m2], &sender_state, Some(proto_b3)).unwrap();
 
         // assert_eq!(
         //     m3.estimate(),
@@ -667,22 +647,21 @@ mod tests {
         //     "should build on top of m0 as as thats the only msg it saw"
         // );
 
-        let proto_b4 = Block::new(None, sender4);
+        let proto_b4 = Block::new(None);
         // println!("\n3 {:?}", m2);
         // println!("\n4 {:?}", m3);
         let (m4, sender_state) =
-            BlockMsg::from_msgs(proto_b4.sender(), vec![&m2], &sender_state, Some(proto_b4))
-                .unwrap();
+            BlockMsg::from_msgs(sender4, vec![&m2], &sender_state, Some(proto_b4)).unwrap();
         // assert_eq!(
         //     m4.estimate(),
         //     &Block::new(Some(Block::from(&m2)), sender4),
         //     "should build on top of "
         // );
 
-        let proto_b5 = Block::new(None, sender5);
+        let proto_b5 = Block::new(None);
 
         let (m5, _) = BlockMsg::from_msgs(
-            proto_b5.sender(),
+            sender5,
             vec![&m0, &m1, &m2, &m3, &m4],
             &sender_state,
             Some(proto_b5),
@@ -691,7 +670,7 @@ mod tests {
 
         assert_eq!(
             m5.estimate(),
-            &Block::new(Some(Block::from(&m4)), sender5),
+            &Block::new(Some(Block::from(&m4))),
             "should build on top of b4"
         );
     }
@@ -722,30 +701,19 @@ mod tests {
         // let txs = BTreeSet::new();
 
         // block dag
-        let proto_b0 = Block::from(ProtoBlock {
-            prevblock: None,
-            sender: senders[0],
-        });
+        let proto_b0 = Block::from(ProtoBlock::new(None));
         let latest_msgs = Justification::new();
         let m0 = BlockMsg::new(senders[0], latest_msgs, proto_b0.clone(), None);
 
-        let proto_b1 = Block::new(Some(proto_b0.clone()), senders[1]);
-        let (m1, sender_state) = BlockMsg::from_msgs(
-            proto_b1.sender(),
-            vec![&m0],
-            &sender_state,
-            Some(proto_b1.clone()),
-        )
-        .unwrap();
+        let proto_b1 = Block::new(Some(proto_b0.clone()));
+        let (m1, sender_state) =
+            BlockMsg::from_msgs(senders[1], vec![&m0], &sender_state, Some(proto_b1.clone()))
+                .unwrap();
 
-        let proto_b2 = Block::new(Some(proto_b1.clone()), senders[0]);
-        let (m2, sender_state) = BlockMsg::from_msgs(
-            proto_b2.sender(),
-            vec![&m1],
-            &sender_state,
-            Some(proto_b2.clone()),
-        )
-        .unwrap();
+        let proto_b2 = Block::new(Some(proto_b1.clone()));
+        let (m2, sender_state) =
+            BlockMsg::from_msgs(senders[0], vec![&m1], &sender_state, Some(proto_b2.clone()))
+                .unwrap();
 
         // no clique yet, since senders[1] has not seen senders[0] seeing senders[1] having proto_b0 in the chain
         assert_eq!(
@@ -762,14 +730,10 @@ mod tests {
             HashSet::new()
         );
 
-        let proto_b3 = Block::new(Some(proto_b2.clone()), senders[1]);
-        let (m3, sender_state) = BlockMsg::from_msgs(
-            proto_b3.sender(),
-            vec![&m2],
-            &sender_state,
-            Some(proto_b3.clone()),
-        )
-        .unwrap();
+        let proto_b3 = Block::new(Some(proto_b2.clone()));
+        let (m3, sender_state) =
+            BlockMsg::from_msgs(senders[1], vec![&m2], &sender_state, Some(proto_b3.clone()))
+                .unwrap();
 
         // clique, since both senders have seen each other having proto_b0 in the chain
         assert_eq!(
@@ -786,23 +750,15 @@ mod tests {
             HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1]])])
         );
 
-        let proto_b4 = Block::new(Some(proto_b3.clone()), senders[2]);
-        let (m4, sender_state) = BlockMsg::from_msgs(
-            proto_b4.sender(),
-            vec![&m3],
-            &sender_state,
-            Some(proto_b4.clone()),
-        )
-        .unwrap();
+        let proto_b4 = Block::new(Some(proto_b3.clone()));
+        let (m4, sender_state) =
+            BlockMsg::from_msgs(senders[2], vec![&m3], &sender_state, Some(proto_b4.clone()))
+                .unwrap();
 
-        let proto_b5 = Block::new(Some(proto_b4.clone()), senders[1]);
-        let (m5, sender_state) = BlockMsg::from_msgs(
-            proto_b5.sender(),
-            vec![&m4],
-            &sender_state,
-            Some(proto_b5.clone()),
-        )
-        .unwrap();
+        let proto_b5 = Block::new(Some(proto_b4.clone()));
+        let (m5, sender_state) =
+            BlockMsg::from_msgs(senders[1], vec![&m4], &sender_state, Some(proto_b5.clone()))
+                .unwrap();
 
         // no second clique yet, since senders[2] has not seen senders[1] seeing senders[2] having proto_b0.clone() in the chain
         assert_eq!(
@@ -819,14 +775,10 @@ mod tests {
             HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1]])])
         );
 
-        let proto_b6 = Block::new(Some(proto_b5.clone()), senders[2]);
-        let (m6, sender_state) = BlockMsg::from_msgs(
-            proto_b6.sender(),
-            vec![&m5],
-            &sender_state,
-            Some(proto_b5.clone()),
-        )
-        .unwrap();
+        let proto_b6 = Block::new(Some(proto_b5.clone()));
+        let (m6, sender_state) =
+            BlockMsg::from_msgs(senders[2], vec![&m5], &sender_state, Some(proto_b5.clone()))
+                .unwrap();
 
         // have two cliques on proto_b0 now
         assert_eq!(
@@ -877,32 +829,19 @@ mod tests {
             HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[1], senders[2]])])
         );
 
-        let proto_b7 = Block::new(Some(proto_b6.clone()), senders[0]);
-        let (m7, sender_state) = BlockMsg::from_msgs(
-            proto_b7.sender(),
-            vec![&m6],
-            &sender_state,
-            Some(proto_b6.clone()),
-        )
-        .unwrap();
+        let proto_b7 = Block::new(Some(proto_b6.clone()));
+        let (m7, sender_state) =
+            BlockMsg::from_msgs(senders[0], vec![&m6], &sender_state, Some(proto_b6.clone()))
+                .unwrap();
 
-        let proto_b8 = Block::new(Some(proto_b7.clone()), senders[2]);
-        let (m8, sender_state) = BlockMsg::from_msgs(
-            proto_b8.sender(),
-            vec![&m7],
-            &sender_state,
-            Some(proto_b7.clone()),
-        )
-        .unwrap();
+        let proto_b8 = Block::new(Some(proto_b7.clone()));
+        let (m8, sender_state) =
+            BlockMsg::from_msgs(senders[2], vec![&m7], &sender_state, Some(proto_b7.clone()))
+                .unwrap();
 
-        let proto_b9 = Block::new(Some(proto_b8.clone()), senders[0]);
-        let (_, sender_state) = BlockMsg::from_msgs(
-            proto_b9.sender(),
-            vec![&m8],
-            &sender_state,
-            Some(proto_b8.clone()),
-        )
-        .unwrap();
+        let (_, sender_state) =
+            BlockMsg::from_msgs(senders[0], vec![&m8], &sender_state, Some(proto_b8.clone()))
+                .unwrap();
 
         // now entire network is clique
         assert_eq!(
