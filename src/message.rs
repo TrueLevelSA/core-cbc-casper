@@ -6,7 +6,7 @@ use std::sync::{Arc, RwLock};
 
 use hashed::Hashed;
 use justification::{Justification, LatestMsgsHonest, SenderState};
-use traits::{Data, Estimate, Id, Sender};
+use traits::{Estimate, Id, Sender};
 
 /// A Casper Message, that can will be sent over the network
 /// and used as a justification for a more recent message
@@ -48,7 +48,6 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
         sender: Self::Sender,
         mut new_msgs: Vec<&Self>,
         sender_state: &SenderState<Self>,
-        external_data: Option<<Self::Estimate as Data>::Data>,
     ) -> Result<(Self, SenderState<Self>), &'static str> {
         // // TODO eventually comment out these lines, and FIXME tests
         // // check whether two messages from same sender
@@ -72,8 +71,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
                 sender_state.equivocators(),
             );
 
-            let estimate =
-                latest_msgs_honest.mk_estimate(&sender_state.senders_weights(), external_data);
+            let estimate = latest_msgs_honest.mk_estimate(&sender_state.senders_weights());
             estimate.map(|e| (Self::new(sender, justification, e, None), sender_state))
         }
     }
@@ -386,8 +384,7 @@ mod tests {
         let (success, _) = j0.faulty_inserts(vec![v0].iter().cloned().collect(), &sender_state);
         assert!(success);
 
-        let external_data: Option<VoteCount> = None;
-        let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state, external_data).unwrap();
+        let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state).unwrap();
         // let m0 = &Message::new(0, justification, estimate);
 
         let mut j1 = Justification::new();
@@ -398,11 +395,11 @@ mod tests {
         let (success, _) = j1.faulty_inserts(vec![m0].iter().cloned().collect(), &sender_state);
         assert!(success);
 
-        let (msg1, _) = Message::from_msgs(0, vec![v0], &sender_state, None).unwrap();
-        let (msg2, _) = Message::from_msgs(0, vec![v0], &sender_state, None).unwrap();
+        let (msg1, _) = Message::from_msgs(0, vec![v0], &sender_state).unwrap();
+        let (msg2, _) = Message::from_msgs(0, vec![v0], &sender_state).unwrap();
         assert!(msg1 == msg2, "messages should be equal");
 
-        let (msg3, _) = Message::from_msgs(0, vec![v0, m0], &sender_state, None).unwrap();
+        let (msg3, _) = Message::from_msgs(0, vec![v0, m0], &sender_state).unwrap();
         assert!(msg1 != msg3, "msg1 should be different than msg3");
     }
 
@@ -427,7 +424,7 @@ mod tests {
         let (success, _) = j0.faulty_inserts(vec![v0].iter().cloned().collect(), &sender_state);
         assert!(success);
 
-        let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state, None).unwrap();
+        let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state).unwrap();
 
         assert!(
             !v0.depends(v0_prime),
@@ -444,7 +441,7 @@ mod tests {
         let (success, _) = j0.faulty_inserts([v0].iter().cloned().collect(), &sender_state);
         assert!(success);
 
-        let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state, None).unwrap();
+        let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state).unwrap();
 
         let mut j1 = Justification::new();
         let (success, _) = j1.faulty_inserts([v0].iter().cloned().collect(), &sender_state);
@@ -453,7 +450,7 @@ mod tests {
         let (success, _) = j1.faulty_inserts([m0].iter().cloned().collect(), &sender_state);
         assert!(success);
 
-        let (m1, _) = &Message::from_msgs(0, vec![v0, m0], &sender_state, None).unwrap();
+        let (m1, _) = &Message::from_msgs(0, vec![v0, m0], &sender_state).unwrap();
 
         assert!(m1.depends(m0), "m1 DOES depent on m0");
         assert!(!m0.depends(m1), "but m0 does NOT depend on m1");
@@ -481,9 +478,9 @@ mod tests {
         let (success, _) = j0.faulty_inserts(vec![v0].iter().cloned().collect(), &sender_state);
         assert!(success);
 
-        let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state, None).unwrap();
+        let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state).unwrap();
 
-        let (m1, _) = &Message::from_msgs(1, vec![v0], &sender_state, None).unwrap();
+        let (m1, _) = &Message::from_msgs(1, vec![v0], &sender_state).unwrap();
         assert!(!v0.equivocates(v0), "should be all good");
         assert!(!v1.equivocates(m0), "should be all good");
         assert!(!m0.equivocates(v1), "should be all good");

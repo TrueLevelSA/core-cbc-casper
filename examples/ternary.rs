@@ -47,7 +47,6 @@ impl Estimate for Value {
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Message>,
         senders_weights: &SendersWeight<Validator>,
-        _data: Option<Value>,
     ) -> Result<Self, &'static str> {
         use message::CasperMsg;
         let res: Self = latest_msgs
@@ -101,11 +100,11 @@ fn main() {
     let msg2 = Message::new(2, Justification::new(), Value::Two, None);
     let msg3 = Message::new(3, Justification::new(), Value::Zero, None);
     let msg4 = Message::new(4, Justification::new(), Value::One, None);
-    let (msg5, _) = Message::from_msgs(1, vec![&msg1, &msg2], &weights, None).unwrap();
-    let (msg6, _) = Message::from_msgs(3, vec![&msg3, &msg4], &weights, None).unwrap();
-    let (msg7, _) = Message::from_msgs(2, vec![&msg2, &msg5, &msg6], &weights, None).unwrap();
-    let (msg8, _) = Message::from_msgs(3, vec![&msg7, &msg6], &weights, None).unwrap();
-    let (msg9, _) = Message::from_msgs(4, vec![&msg4, &msg6], &weights, None).unwrap();
+    let (msg5, _) = Message::from_msgs(1, vec![&msg1, &msg2], &weights).unwrap();
+    let (msg6, _) = Message::from_msgs(3, vec![&msg3, &msg4], &weights).unwrap();
+    let (msg7, _) = Message::from_msgs(2, vec![&msg2, &msg5, &msg6], &weights).unwrap();
+    let (msg8, _) = Message::from_msgs(3, vec![&msg7, &msg6], &weights).unwrap();
+    let (msg9, _) = Message::from_msgs(4, vec![&msg4, &msg6], &weights).unwrap();
 
     assert_eq!(msg5.estimate(), &Value::Two);
     assert_eq!(msg6.estimate(), &Value::Zero);

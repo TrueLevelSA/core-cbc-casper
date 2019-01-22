@@ -22,20 +22,7 @@ pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
-        external_data: Option<<<Self::M as CasperMsg>::Estimate as Data>::Data>,
     ) -> Result<Self, &'static str>;
-}
-
-/// Describes the accessory data needed for the mk_estimate
-pub trait Data: From<<Self as Data>::Data> {
-    type Data;
-
-    // /// Checks whether this data is valid
-    // fn is_valid(&Self::Data) -> bool;
-}
-
-impl<T: Into<Self>> Data for T {
-    type Data = T;
 }
 
 pub trait Sender: Hash + Clone + Ord + Eq + Send + Sync + Debug + serde::Serialize {}

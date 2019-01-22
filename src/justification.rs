@@ -5,7 +5,7 @@ use rayon::iter::IntoParallelRefIterator;
 
 use message::CasperMsg;
 use senders_weight::SendersWeight;
-use traits::{Data, Estimate, Zero};
+use traits::{Estimate, Zero};
 use weight_unit::WeightUnit;
 
 /// Struct that holds the set of the CasperMsgs that justify
@@ -61,11 +61,11 @@ impl<M: CasperMsg> Justification<M> {
         &self,
         equivocators: &HashSet<M::Sender>,
         senders_weights: &SendersWeight<<M as CasperMsg>::Sender>,
-        data: Option<<<M as CasperMsg>::Estimate as Data>::Data>,
+        // data: Option<<<M as CasperMsg>::Estimate as Data>::Data>,
     ) -> Result<M::Estimate, &'static str> {
         let latest_msgs = LatestMsgs::from(self);
         let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(&latest_msgs, equivocators);
-        M::Estimate::mk_estimate(&latest_msgs_honest, senders_weights, data)
+        M::Estimate::mk_estimate(&latest_msgs_honest, senders_weights)
     }
 
     // Custom functions
@@ -211,9 +211,8 @@ impl<M: CasperMsg> LatestMsgsHonest<M> {
     pub fn mk_estimate(
         &self,
         senders_weights: &SendersWeight<<M as CasperMsg>::Sender>,
-        data: Option<<<M as CasperMsg>::Estimate as Data>::Data>,
     ) -> Result<M::Estimate, &'static str> {
-        M::Estimate::mk_estimate(&self, senders_weights, data)
+        M::Estimate::mk_estimate(&self, senders_weights)
     }
 }
 
@@ -491,8 +490,7 @@ mod tests {
             j0.faulty_inserts([v0].iter().cloned().collect(), &sender_state);
         assert!(success);
 
-        let (m0, _weights) =
-            &Message::from_msgs(0, vec![v0], &sender_state, None as Option<VoteCount>).unwrap();
+        let (m0, _weights) = &Message::from_msgs(0, vec![v0], &sender_state).unwrap();
 
         // let m0 = &Message::new(0, justification, estimate);
         let mut j1 = Justification::new();
