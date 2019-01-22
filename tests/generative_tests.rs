@@ -15,6 +15,7 @@ use proptest::test_runner::Config;
 use proptest::test_runner::TestRunner;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
+use rand::Rng;
 
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest, SenderState};
 use casper::message::*;
@@ -29,7 +30,6 @@ use casper::example::vote_count::VoteCount;
 use std::fs::OpenOptions;
 use std::io::Write;
 
-
 use std::time::Instant;
 
 mod tools;
@@ -37,49 +37,65 @@ use tools::ChainData;
 
 fn add_message<'z, M>(
     state: &'z mut HashMap<M::Sender, SenderState<M>>,
-    sender: M::Sender,
+    senders_data: Vec<(M::Sender, Option<<M::Estimate as Data>::Data>)>,
     recipients: HashSet<M::Sender>,
-    data: Option<<M::Estimate as Data>::Data>,
+    //    vec_data: Vec<Option<<M::Estimate as Data>::Data>>,
 ) -> &'z HashMap<M::Sender, SenderState<M>>
 where
     M: CasperMsg,
 {
-    let latest: HashSet<M> = state[&sender]
-        .latests_msgs()
+    let collected: Vec<_> = senders_data
         .iter()
-        .fold(HashSet::new(), |acc, (_, lms)| {
-            acc.union(&lms).cloned().collect()
-        });
-    let latest_delta = match state[&sender].latests_msgs().get(&sender) {
-        Some(msgs) => match msgs.len() {
-            1 => {
-                let m = msgs.iter().next().unwrap();
-                latest
-                    .iter()
-                    .filter(|lm| !m.justification().contains(lm))
-                    .cloned()
-                    .collect()
-            }
-            _ => unimplemented!(),
-        },
-        None => latest,
-    };
-    let (m, sender_state) = M::from_msgs(
-        sender.clone(),
-        latest_delta.iter().collect(),
-        &state[&sender],
-        data.clone().map(|d| d.into()),
-    )
-    .unwrap();
+        .map(|(sender, data)| {
+            // get all latest messages
+            let latest: HashSet<M> = state[&sender]
+                .latests_msgs()
+                .iter()
+                .fold(HashSet::new(), |acc, (_, lms)| {
+                    acc.union(&lms).cloned().collect()
+                });
 
-    state.insert(sender.clone(), sender_state);
-    state
-        .get_mut(&sender)
-        .unwrap()
-        .latests_msgs_as_mut()
-        .update(&m);
+            // remove all messages from latest that are contained in this sender's latest messages
+            // justification
+            let latest_delta = match state[&sender].latests_msgs().get(&sender) {
+                Some(msgs) => match msgs.len() {
+                    1 => {
+                        let m = msgs.iter().next().unwrap();
+                        latest
+                            .iter()
+                            .filter(|lm| !m.justification().contains(lm))
+                            .cloned()
+                            .collect()
+                    }
+                    _ => unimplemented!(),
+                },
+                None => latest,
+            };
+
+            //let data: Option<<M::Estimate as Data>::Data> = Some(sender.into());
+
+            let (m, sender_state) = M::from_msgs(
+                sender.clone(),
+                latest_delta.iter().collect(),
+                &state[&sender],
+                data.clone().map(|d| d.into()),
+            )
+            .unwrap();
+
+            state.insert(sender.clone(), sender_state);
+            state
+                .get_mut(&sender)
+                .unwrap()
+                .latests_msgs_as_mut()
+                .update(&m);
+
+            (m, sender, data)
+        })
+        .collect();
 
     recipients.iter().for_each(|recipient| {
+        collected.iter().cloned().for_each(|(m, sender, data)|{
+
         let sender_state_reconstructed = SenderState::new(
             state[&recipient].senders_weights().clone(),
             0.0,
@@ -107,18 +123,39 @@ where
         m.justification().iter().for_each(|m| {
             state_to_update.update(m);
         });
-    });
+    });});
     state
 }
 
-fn round_robin(val: &mut Vec<u32>) -> BoxedStrategy<u32> {
-    let v = val.pop().unwrap();
-    val.insert(0, v);
-    Just(v).boxed()
+fn max_overhead(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
+    Just(val.iter().cloned().collect()).boxed()
 }
 
-fn arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<u32> {
-    prop::sample::select(val.clone()).boxed()
+fn double_round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
+    let v = val.pop().unwrap();
+    val.insert(0, v);
+    let mut hashset = HashSet::new();
+    hashset.insert(v);
+    let offset = val.len() / 2;
+    hashset.insert(val[offset]);
+    Just(hashset).boxed()
+}
+
+fn round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
+    let v = val.pop().unwrap();
+    val.insert(0, v);
+    let mut hashset = HashSet::new();
+    hashset.insert(v);
+    Just(hashset).boxed()
+}
+
+fn arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
+    // TODO: get this out of this function
+    let mut rng = rand::thread_rng();
+    let index: usize = rng.gen_range(0, val.len());
+    let mut hashset = HashSet::new();
+    hashset.insert(val[index]);
+    Just(hashset).boxed()
 }
 
 fn all_receivers(val: &Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
@@ -132,7 +169,7 @@ fn some_receivers(val: &Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
 
 fn message_event<M>(
     state: HashMap<M::Sender, SenderState<M>>,
-    sender_strategy: BoxedStrategy<M::Sender>,
+    sender_strategy: BoxedStrategy<HashSet<M::Sender>>,
     receiver_strategy: BoxedStrategy<HashSet<M::Sender>>,
 ) -> BoxedStrategy<HashMap<M::Sender, SenderState<M>>>
 where
@@ -140,9 +177,17 @@ where
     <<M as CasperMsg>::Estimate as Data>::Data: From<<M as CasperMsg>::Sender>,
 {
     (sender_strategy, receiver_strategy, Just(state))
-        .prop_map(|(sender, mut receivers, mut state)| {
-            receivers.remove(&sender);
-            add_message(&mut state, sender.clone(), receivers, Some(sender.into())).clone()
+        .prop_map(|(senders, mut receivers, mut state)| {
+            let vec_senders: Vec<(M::Sender, Option<<M::Estimate as Data>::Data>)> = senders
+                .iter()
+                .cloned()
+                .map(|s: M::Sender| (s.clone(), Some(s.into())))
+                .collect();
+            let receivers_clone = receivers.clone();
+            //senders.iter().for_each(|sender|{
+            //    receivers_clone.remove(&sender);
+            //});
+            add_message(&mut state, vec_senders, receivers_clone).clone() //, Some(sender.into())).clone()
         })
         .boxed()
 }
@@ -282,7 +327,9 @@ fn safety_oracle_at_height(
                 received_msgs.get_mut(id).unwrap().insert(Block::from(msg));
             }
         }
+        println!("messages: {:?}", received_msgs.get(id).unwrap().len());
     });
+    println!("step");
     let safety_oracle_detected: HashSet<bool> = state
         .iter()
         .map(|(sender_id, sender_state)| {
@@ -335,7 +382,7 @@ fn chain<E: 'static, F: 'static, G: 'static, H: 'static>(
 ) -> BoxedStrategy<Vec<HashMap<u32, SenderState<Message<E, u32>>>>>
 where
     E: Estimate<M = Message<E, u32>> + From<u32>,
-    F: Fn(&mut Vec<u32>) -> BoxedStrategy<u32>,
+    F: Fn(&mut Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
     G: Fn(&Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
     H: Fn(
         &HashMap<u32, SenderState<Message<E, u32>>>,
@@ -472,16 +519,18 @@ fn blockchain() {
 
         let states = chain(
             arbitrary_blockchain(),
-            20,
-            round_robin, //arbitrary_in_set,//round_robin,
+            6,
+            max_overhead, //double_round_robin, //arbitrary_in_set,//round_robin,
             all_receivers,
             safety_oracle_at_height,
-            4,
+            2,
             chain_id + 1, // +1 to match numbering in visualization
         )
         .new_value(&mut runner)
         .unwrap()
         .current();
+
+        println!("Nb senders: {}", states.last().unwrap().keys().len());
 
         states.iter().for_each(|state| {
             writeln!(

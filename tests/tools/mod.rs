@@ -1,6 +1,6 @@
-use std::fmt;
-use std::collections::{HashMap, HashSet};
 use casper::justification::{LatestMsgsHonest, SenderState};
+use std::collections::{HashMap, HashSet};
+use std::fmt;
 
 use casper::example::blockchain::{Block, BlockMsg};
 
