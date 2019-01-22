@@ -39,7 +39,6 @@ fn add_message<'z, M>(
     state: &'z mut HashMap<M::Sender, SenderState<M>>,
     senders_data: Vec<(M::Sender, Option<<M::Estimate as Data>::Data>)>,
     recipients: HashSet<M::Sender>,
-    //    vec_data: Vec<Option<<M::Estimate as Data>::Data>>,
 ) -> &'z HashMap<M::Sender, SenderState<M>>
 where
     M: CasperMsg,
@@ -210,7 +209,6 @@ where
             latest_honest_msgs.mk_estimate(sender_state.senders_weights(), None)
         })
         .collect();
-    println!("{:?}", m);
     m.len() == 1
 }
 
@@ -327,9 +325,7 @@ fn safety_oracle_at_height(
                 received_msgs.get_mut(id).unwrap().insert(Block::from(msg));
             }
         }
-        println!("messages: {:?}", received_msgs.get(id).unwrap().len());
     });
-    println!("step");
     let safety_oracle_detected: HashSet<bool> = state
         .iter()
         .map(|(sender_id, sender_state)| {
@@ -529,8 +525,6 @@ fn blockchain() {
         .new_value(&mut runner)
         .unwrap()
         .current();
-
-        println!("Nb senders: {}", states.last().unwrap().keys().len());
 
         states.iter().for_each(|state| {
             writeln!(
