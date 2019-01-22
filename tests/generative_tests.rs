@@ -320,7 +320,9 @@ fn safety_oracle_at_height(
                 received_msgs.get_mut(id).unwrap().insert(Block::from(msg));
             }
         }
+        println!("messages: {:?}", received_msgs.get(id).unwrap().len());
     });
+    println!("step");
     let safety_oracle_detected: HashSet<bool> = state
         .iter()
         .map(|(sender_id, sender_state)| {
@@ -520,6 +522,8 @@ fn blockchain() {
         .new_value(&mut runner)
         .unwrap()
         .current();
+
+        println!("Nb senders: {}", states.last().unwrap().keys().len());
 
         states.iter().for_each(|state| {
             writeln!(
