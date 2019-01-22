@@ -271,8 +271,8 @@ impl<M: CasperMsg> LatestMsgs<M> {
     /// in the justification of the existing latest messages
     pub fn update(&mut self, new_msg: &M) -> bool {
         let sender = new_msg.sender();
-        if let Some(latest_msgs_from_sender) = self.get(sender).cloned() {
-            latest_msgs_from_sender
+        if let Some(senders_latest_msgs) = self.get(sender).cloned() {
+            senders_latest_msgs
                 .iter()
                 .filter(|&old_msg| new_msg != old_msg)
                 .fold(false, |acc, old_msg| {
@@ -315,12 +315,12 @@ impl<'z, M: CasperMsg> From<&'z Justification<M>> for LatestMsgs<M> {
     /// extract the latest messages from a justification
     fn from(j: &Justification<M>) -> Self {
         let mut latest_msgs: LatestMsgs<M> = LatestMsgs::new();
-        let mut queue: VecDeque<M> = j.iter().cloned().collect();
+        let mut queue: VecDeque<&M> = j.iter().collect();
         while let Some(msg) = queue.pop_front() {
             if latest_msgs.update(&msg) {
                 msg.justification()
                     .iter()
-                    .for_each(|m| queue.push_back(m.clone()));
+                    .for_each(|m| queue.push_back(m));
             }
         }
         latest_msgs
