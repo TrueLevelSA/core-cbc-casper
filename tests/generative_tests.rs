@@ -71,8 +71,6 @@ where
                 None => latest,
             };
 
-            //let data: Option<<M::Estimate as Data>::Data> = Some(sender.into());
-
             let (m, sender_state) = M::from_msgs(
                 sender.clone(),
                 latest_delta.iter().collect(),
@@ -183,10 +181,7 @@ where
                 .map(|s: M::Sender| (s.clone(), Some(s.into())))
                 .collect();
             let receivers_clone = receivers.clone();
-            //senders.iter().for_each(|sender|{
-            //    receivers_clone.remove(&sender);
-            //});
-            add_message(&mut state, vec_senders, receivers_clone).clone() //, Some(sender.into())).clone()
+            add_message(&mut state, vec_senders, receivers_clone).clone()
         })
         .boxed()
 }
