@@ -296,7 +296,7 @@ where
             justification,
             estimate,
         };
-        let id = id.unwrap_or(proto.getid());
+        let id = id.unwrap_or_else(|| proto.getid());
         Message(Arc::new(proto), id)
     }
 
