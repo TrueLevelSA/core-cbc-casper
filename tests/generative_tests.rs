@@ -16,15 +16,15 @@ use proptest::test_runner::TestRunner;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
-use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest, SenderState};
-use casper::message::*;
-use casper::senders_weight::SendersWeight;
-use casper::traits::{Data, Estimate};
-
 use casper::example::binary::BoolWrapper;
 use casper::example::blockchain::{Block, BlockMsg, ProtoBlock};
 use casper::example::integer::IntegerWrapper;
 use casper::example::vote_count::VoteCount;
+use casper::hashed::Hashed;
+use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest, SenderState};
+use casper::message::*;
+use casper::senders_weight::SendersWeight;
+use casper::traits::{Data, Estimate};
 
 use std::fs::OpenOptions;
 use std::io::Write;
