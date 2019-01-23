@@ -133,12 +133,11 @@ fn message_event<M>(
 ) -> BoxedStrategy<HashMap<M::Sender, SenderState<M>>>
 where
     M: 'static + CasperMsg,
-    <<M as CasperMsg>::Estimate as Data>::Data: From<<M as CasperMsg>::Sender>,
 {
     (sender_strategy, receiver_strategy, Just(state))
         .prop_map(|(sender, mut receivers, mut state)| {
             receivers.remove(&sender);
-            add_message(&mut state, sender.clone(), receivers, Some(sender.into())).clone()
+            add_message(&mut state, sender.clone(), receivers, None).clone()
         })
         .boxed()
 }
@@ -213,7 +212,7 @@ fn chain<E: 'static, F: 'static, G: 'static, H: 'static>(
     consensus_satisfied: H,
 ) -> BoxedStrategy<Vec<HashMap<u32, SenderState<Message<E, u32>>>>>
 where
-    E: Estimate<M = Message<E, u32>> + From<u32>,
+    E: Estimate<M = Message<E, u32>>,
     F: Fn(&mut Vec<u32>) -> BoxedStrategy<u32>,
     G: Fn(&Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
     H: Fn(&HashMap<u32, SenderState<Message<E, u32>>>) -> bool,
