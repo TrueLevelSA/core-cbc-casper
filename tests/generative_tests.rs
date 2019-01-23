@@ -76,11 +76,12 @@ where
         .update(&m);
 
     recipients.iter().for_each(|recipient| {
+        let latest = LatestMsgs::from(m.justification());
         let sender_state_reconstructed = SenderState::new(
             state[&recipient].senders_weights().clone(),
             0.0,
             Some(m.clone()),
-            LatestMsgs::from(m.justification()),
+            latest.clone(),
             0.0,
             HashSet::new(),
         );
@@ -98,11 +99,14 @@ where
             "Recipient must be able to reproduce the estimate from its justification and the justification only.\nSender: {:?}\nRecipient: {:?}\nNumber of Nodes: {:?}\n",
             sender, recipient, state.len(),
         );
+        let equivocators = state[&recipient].equivocators().clone();
         let state_to_update = state.get_mut(&recipient).unwrap().latests_msgs_as_mut();
+        LatestMsgsHonest::from_latest_msgs(&latest, &equivocators)
+            .iter()
+            .for_each(|m| {
+                state_to_update.update(m);
+            });
         state_to_update.update(&m);
-        m.justification().iter().for_each(|m| {
-            state_to_update.update(m);
-        });
     });
     state
 }
