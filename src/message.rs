@@ -251,13 +251,7 @@ where
     S: Sender,
 {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
-        use serde::ser::SerializeStruct;
-        let mut msg = serializer.serialize_struct("Message", 3)?;
-        let j: Vec<_> = self.justification().iter().map(Self::id).collect();
-        msg.serialize_field("sender", self.sender())?;
-        msg.serialize_field("estimate", self.estimate())?;
-        msg.serialize_field("justification", &j)?;
-        msg.end()
+        <ProtoMsg<E, S> as serde::Serialize>::serialize(&(self.0), serializer)
     }
 }
 
