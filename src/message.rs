@@ -323,7 +323,7 @@ where
     S: Sender,
 {
     fn eq(&self, rhs: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &rhs.0) || self.id() == rhs.id() // should make this line unnecessary
+        Arc::ptr_eq(&self.0, &rhs.0) || self.id() == rhs.id() // TODO: should make the second assertion unnecessary
     }
 }
 
