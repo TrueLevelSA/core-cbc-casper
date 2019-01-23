@@ -35,15 +35,14 @@ use std::time::Instant;
 mod tools;
 use tools::ChainData;
 
-fn add_message<'z, M>(
+fn create_messages<'z, M>(
     state: &'z mut HashMap<M::Sender, SenderState<M>>,
     senders_data: Vec<(M::Sender, Option<<M::Estimate as Data>::Data>)>,
-    recipients: HashSet<M::Sender>,
-) -> &'z HashMap<M::Sender, SenderState<M>>
+) -> Vec<(M, M::Sender, Option<<M::Estimate as Data>::Data>)>
 where
     M: CasperMsg,
 {
-    let collected: Vec<_> = senders_data
+    senders_data
         .iter()
         .map(|(sender, data)| {
             // get all latest messages
@@ -86,12 +85,21 @@ where
                 .latests_msgs_as_mut()
                 .update(&m);
 
-            (m, sender, data)
+            (m, sender.clone(), data.clone())
         })
-        .collect();
+        .collect()
+}
 
+fn add_messages<'z, M>(
+    state: &'z mut HashMap<M::Sender, SenderState<M>>,
+    messages_senders_datas: Vec<(M, M::Sender, Option<<M::Estimate as Data>::Data>)>,
+    recipients: HashSet<M::Sender>,
+) -> &'z HashMap<M::Sender, SenderState<M>>
+where
+    M: CasperMsg,
+{
     recipients.iter().for_each(|recipient| {
-        collected.iter().cloned().for_each(|(m, sender, data)|{
+        messages_senders_datas.iter().cloned().for_each(|(m, sender, data)|{
 
         let sender_state_reconstructed = SenderState::new(
             state[&recipient].senders_weights().clone(),
@@ -180,8 +188,8 @@ where
                 .cloned()
                 .map(|s: M::Sender| (s.clone(), Some(s.into())))
                 .collect();
-            let receivers_clone = receivers.clone();
-            add_message(&mut state, vec_senders, receivers_clone).clone()
+            let vec_datas = create_messages(&mut state, vec_senders);
+            add_messages(&mut state, vec_datas, receivers).clone()
         })
         .boxed()
 }
@@ -513,7 +521,7 @@ fn blockchain() {
         let states = chain(
             arbitrary_blockchain(),
             6,
-            max_overhead, //double_round_robin, //arbitrary_in_set,//round_robin,
+            double_round_robin, // max_overhead, //double_round_robin, //arbitrary_in_set,//round_robin,
             all_receivers,
             safety_oracle_at_height,
             2,
