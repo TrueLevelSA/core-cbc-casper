@@ -93,42 +93,44 @@ where
 fn add_messages<'z, M>(
     state: &'z mut HashMap<M::Sender, SenderState<M>>,
     messages_senders_datas: Vec<(M, M::Sender, Option<<M::Estimate as Data>::Data>)>,
-    recipients: HashSet<M::Sender>,
+    vec_recipients: Vec<&HashSet<M::Sender>>,
 ) -> &'z HashMap<M::Sender, SenderState<M>>
 where
     M: CasperMsg,
 {
-    recipients.iter().for_each(|recipient| {
-        messages_senders_datas.iter().cloned().for_each(|(m, sender, data)|{
+    vec_recipients.iter().zip(messages_senders_datas.iter())
+        .for_each(|(recipients, (m, sender, data))|{
+        recipients.iter().for_each(|recipient| {
 
-        let sender_state_reconstructed = SenderState::new(
-            state[&recipient].senders_weights().clone(),
-            0.0,
-            Some(m.clone()),
-            LatestMsgs::from(m.justification()),
-            0.0,
-            HashSet::new(),
-        );
-        assert_eq!(
-            m.estimate(),
-            M::from_msgs(
-                sender.clone(),
-                m.justification().iter().collect(),
-                &sender_state_reconstructed,
-                data.clone().map(|d| d.into()),
-            )
-                .unwrap()
-                .0
-                .estimate(),
-            "Recipient must be able to reproduce the estimate from its justification and the justification only.\nSender: {:?}\nRecipient: {:?}\nNumber of Nodes: {:?}\n",
-            sender, recipient, state.len(),
-        );
-        let state_to_update = state.get_mut(&recipient).unwrap().latests_msgs_as_mut();
-        state_to_update.update(&m);
-        m.justification().iter().for_each(|m| {
-            state_to_update.update(m);
+            let sender_state_reconstructed = SenderState::new(
+                state[&recipient].senders_weights().clone(),
+                0.0,
+                Some(m.clone()),
+                LatestMsgs::from(m.justification()),
+                0.0,
+                HashSet::new(),
+            );
+            assert_eq!(
+                m.estimate(),
+                M::from_msgs(
+                    sender.clone(),
+                    m.justification().iter().collect(),
+                    &sender_state_reconstructed,
+                    data.clone().map(|d| d.into()),
+                )
+                    .unwrap()
+                    .0
+                    .estimate(),
+                "Recipient must be able to reproduce the estimate from its justification and the justification only.\nSender: {:?}\nRecipient: {:?}\nNumber of Nodes: {:?}\n",
+                sender, recipient, state.len(),
+            );
+            let state_to_update = state.get_mut(&recipient).unwrap().latests_msgs_as_mut();
+            state_to_update.update(&m);
+            m.justification().iter().for_each(|m| {
+                state_to_update.update(m);
+            });
         });
-    });});
+        });
     state
 }
 
@@ -156,40 +158,92 @@ fn round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
 
 fn arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
     // TODO: get this out of this function
-    let mut rng = rand::thread_rng();
-    let index: usize = rng.gen_range(0, val.len());
-    let mut hashset = HashSet::new();
-    hashset.insert(val[index]);
-    Just(hashset).boxed()
+    // or use prop::collection::hash_set
+    prop::collection::hash_set(prop::sample::select(val.clone()), 1).boxed()
+    //let mut rng = rand::thread_rng();
+    //let index: usize = rng.gen_range(0, val.len());
+    //let mut hashset = HashSet::new();
+    //hashset.insert(val[index]);
+    //Just(hashset).boxed()
 }
 
-fn all_receivers(val: &Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
+fn all_receivers(
+    val: &Vec<u32>,
+    sender_strategy: BoxedStrategy<HashSet<u32>>,
+) -> BoxedStrategy<HashMap<u32, HashSet<u32>>> {
     let v = HashSet::from_iter(val.iter().cloned());
-    Just(v).boxed()
+    sender_strategy
+        .prop_flat_map(move |senders| {
+            let mut hashmap: HashMap<u32, HashSet<u32>> = HashMap::new();
+            senders.iter().for_each(|sender| {
+                hashmap.insert(*sender, v.clone());
+            });
+            Just(hashmap)
+        })
+        .boxed()
+
+    //Just(v).boxed()
 }
 
-fn some_receivers(val: &Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
-    prop::collection::hash_set(prop::sample::select(val.clone()), 0..(val.len() + 1)).boxed()
+fn some_receivers(
+    val: &Vec<u32>,
+    sender_strategy: BoxedStrategy<HashSet<u32>>,
+) -> BoxedStrategy<HashMap<u32, HashSet<u32>>> {
+    // let v = HashSet::from_iter(val.iter().cloned());
+    let v = val.clone();
+    sender_strategy
+        .prop_flat_map(move |senders| {
+            let mut hashmap: HashMap<u32, HashSet<u32>> = HashMap::new();
+            //let vec_senders_receivers: Vec<(u32, HashSet<u32>)> =
+            senders.iter().map(|sender| {
+                let mut rng = rand::thread_rng();
+                let nb = rng.gen_range(0, v.len());
+                let mut hs: HashSet<u32> = HashSet::new();
+                for i in 0..nb {
+                    hs.insert(*rng.choose(&v).unwrap());
+                }
+                //TODO: use proptest:
+                // prop::collection::hash_set(prop::sample::select(v.clone()), 0..(v.len() + 1))
+                //     .prop_map(|set_rec| {
+                //         (sender.clone(), set_rec.clone())
+                //     }).boxed()
+                hashmap.insert(*sender, hs);
+            });
+
+            Just(hashmap)
+        })
+        .boxed()
+
+    //    prop::collection::hash_map(sender_strategy, , ).boxed()
 }
 
 fn message_event<M>(
     state: HashMap<M::Sender, SenderState<M>>,
-    sender_strategy: BoxedStrategy<HashSet<M::Sender>>,
-    receiver_strategy: BoxedStrategy<HashSet<M::Sender>>,
+    //sender_strategy: BoxedStrategy<HashSet<M::Sender>>,
+    sender_receiver_strategy: BoxedStrategy<HashMap<M::Sender, HashSet<M::Sender>>>,
 ) -> BoxedStrategy<HashMap<M::Sender, SenderState<M>>>
 where
     M: 'static + CasperMsg,
     <<M as CasperMsg>::Estimate as Data>::Data: From<<M as CasperMsg>::Sender>,
 {
-    (sender_strategy, receiver_strategy, Just(state))
-        .prop_map(|(senders, mut receivers, mut state)| {
-            let vec_senders: Vec<(M::Sender, Option<<M::Estimate as Data>::Data>)> = senders
-                .iter()
-                .cloned()
-                .map(|s: M::Sender| (s.clone(), Some(s.into())))
-                .collect();
+    (sender_receiver_strategy, Just(state))
+        .prop_map(|(map_sender_receivers, mut state)| {
+            let mut vec_receivers = vec![];
+            //FIXME iterate over tuples (k, v) instead of over the keys
+            let vec_senders: Vec<(M::Sender, Option<<M::Estimate as Data>::Data>)> =
+                map_sender_receivers
+                    .keys()
+                    //.iter()
+                    .cloned()
+                    .map(|s: M::Sender| {
+                        // FIXME is order of collect same as order of map? if not: iterate over the
+                        // collected instead of the map
+                        vec_receivers.push(map_sender_receivers.get(&s).unwrap());
+                        (s.clone(), Some(s.into()))
+                    })
+                    .collect();
             let vec_datas = create_messages(&mut state, vec_senders);
-            add_messages(&mut state, vec_datas, receivers).clone()
+            add_messages(&mut state, vec_datas, vec_receivers).clone()
         })
         .boxed()
 }
@@ -384,7 +438,7 @@ fn chain<E: 'static, F: 'static, G: 'static, H: 'static>(
 where
     E: Estimate<M = Message<E, u32>> + From<u32>,
     F: Fn(&mut Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
-    G: Fn(&Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
+    G: Fn(&Vec<u32>, BoxedStrategy<HashSet<u32>>) -> BoxedStrategy<HashMap<u32, HashSet<u32>>>,
     H: Fn(
         &HashMap<u32, SenderState<Message<E, u32>>>,
         &u32,
@@ -437,8 +491,8 @@ where
             let mut senders = validators.clone();
             let chain = iter::repeat_with(|| {
                 let sender_strategy = message_producer_strategy(&mut senders);
-                let receiver_strategy = message_receiver_strategy(&senders);
-                state = message_event(state.clone(), sender_strategy, receiver_strategy)
+                let receiver_strategy = message_receiver_strategy(&senders, sender_strategy);
+                state = message_event(state.clone(), receiver_strategy)
                     .new_value(&mut runner)
                     .unwrap()
                     .current();
