@@ -194,8 +194,7 @@ fn some_receivers(
     sender_strategy
         .prop_flat_map(move |senders| {
             let mut hashmap: HashMap<u32, HashSet<u32>> = HashMap::new();
-            //let vec_senders_receivers: Vec<(u32, HashSet<u32>)> =
-            senders.iter().map(|sender| {
+            senders.iter().for_each(|sender| {
                 let mut rng = rand::thread_rng();
                 let nb = rng.gen_range(0, v.len());
                 let mut hs: HashSet<u32> = HashSet::new();
@@ -575,8 +574,8 @@ fn blockchain() {
         let states = chain(
             arbitrary_blockchain(),
             6,
-            double_round_robin, // max_overhead, //double_round_robin, //arbitrary_in_set,//round_robin,
-            all_receivers,
+            round_robin, // max_overhead, //double_round_robin, //arbitrary_in_set,//round_robin,
+            some_receivers,//all_receivers,
             safety_oracle_at_height,
             2,
             chain_id + 1, // +1 to match numbering in visualization
