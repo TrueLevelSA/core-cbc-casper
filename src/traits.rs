@@ -12,13 +12,13 @@ extern crate blake2;
 extern crate itertools;
 pub extern crate serde;
 
-/// Describes an estimate, or a value of the consensus at a certain time
+/// Defines a latest honest msgs based creation of an estimate (i.e., a value
+/// resulting from the consensus). E.g., in the blockchain case, that is a a new
+/// block whose prevblock is the most endorsed by weight by the validators.
 pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {
     type M: CasperMsg<Estimate = Self>;
 
-    /// Choses an estimate from a set of latest messages
-    /// The finalized_msg value can be used in order not to recursively
-    /// go back to the genesis
+    /// Makes an estimate from a set of latest messages
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
@@ -29,9 +29,6 @@ pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {
 /// Describes the accessory data needed for the mk_estimate
 pub trait Data: From<<Self as Data>::Data> {
     type Data;
-
-    // /// Checks whether this data is valid
-    // fn is_valid(&Self::Data) -> bool;
 }
 
 impl<T: Into<Self>> Data for T {
