@@ -35,16 +35,28 @@ use std::time::Instant;
 mod tools;
 use tools::ChainData;
 
+/// create a message for each sender in the senders_recipients_data vector
+/// messages are added to theirs senders state
 fn create_messages<'z, M>(
     state: &'z mut HashMap<M::Sender, SenderState<M>>,
-    senders_data: Vec<(M::Sender, Option<<M::Estimate as Data>::Data>)>,
-) -> Vec<(M, M::Sender, Option<<M::Estimate as Data>::Data>)>
+    senders_recipients_data: Vec<(
+        M::Sender,
+        HashSet<M::Sender>,
+        Option<<M::Estimate as Data>::Data>,
+    )>,
+) -> Vec<(
+    M,
+    M::Sender,
+    HashSet<M::Sender>,
+    Option<<M::Estimate as Data>::Data>,
+)>
 where
     M: CasperMsg,
 {
-    senders_data
-        .iter()
-        .map(|(sender, data)| {
+    senders_recipients_data
+        // into_iter because we dont want to clone datas at the end
+        .into_iter()
+        .map(|(sender, recipients, data)| {
             // get all latest messages
             let latest: HashSet<M> = state[&sender]
                 .latests_msgs()
@@ -85,21 +97,27 @@ where
                 .latests_msgs_as_mut()
                 .update(&m);
 
-            (m, sender.clone(), data.clone())
+            (m, sender, recipients, data)
         })
         .collect()
 }
 
+/// send messages to the recipients they're meant to be sent to
+/// state of the recipients are updated accordingly
 fn add_messages<'z, M>(
     state: &'z mut HashMap<M::Sender, SenderState<M>>,
-    messages_senders_datas: Vec<(M, M::Sender, Option<<M::Estimate as Data>::Data>)>,
-    vec_recipients: Vec<&HashSet<M::Sender>>,
+    messages_senders_recipients_datas: Vec<(
+        M,
+        M::Sender,
+        HashSet<M::Sender>,
+        Option<<M::Estimate as Data>::Data>,
+    )>,
 ) -> &'z HashMap<M::Sender, SenderState<M>>
 where
     M: CasperMsg,
 {
-    vec_recipients.iter().zip(messages_senders_datas.iter())
-        .for_each(|(recipients, (m, sender, data))|{
+    messages_senders_recipients_datas.iter()
+        .for_each(|(m, sender, recipients, data)|{
         recipients.iter().for_each(|recipient| {
 
             let sender_state_reconstructed = SenderState::new(
@@ -157,14 +175,7 @@ fn round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
 }
 
 fn arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
-    // TODO: get this out of this function
-    // or use prop::collection::hash_set
     prop::collection::hash_set(prop::sample::select(val.clone()), 1).boxed()
-    //let mut rng = rand::thread_rng();
-    //let index: usize = rng.gen_range(0, val.len());
-    //let mut hashset = HashSet::new();
-    //hashset.insert(val[index]);
-    //Just(hashset).boxed()
 }
 
 fn all_receivers(
@@ -181,8 +192,6 @@ fn all_receivers(
             Just(hashmap)
         })
         .boxed()
-
-    //Just(v).boxed()
 }
 
 fn some_receivers(
@@ -212,13 +221,10 @@ fn some_receivers(
             Just(hashmap)
         })
         .boxed()
-
-    //    prop::collection::hash_map(sender_strategy, , ).boxed()
 }
 
 fn message_event<M>(
     state: HashMap<M::Sender, SenderState<M>>,
-    //sender_strategy: BoxedStrategy<HashSet<M::Sender>>,
     sender_receiver_strategy: BoxedStrategy<HashMap<M::Sender, HashSet<M::Sender>>>,
 ) -> BoxedStrategy<HashMap<M::Sender, SenderState<M>>>
 where
@@ -227,22 +233,20 @@ where
 {
     (sender_receiver_strategy, Just(state))
         .prop_map(|(map_sender_receivers, mut state)| {
-            let mut vec_receivers = vec![];
-            //FIXME iterate over tuples (k, v) instead of over the keys
-            let vec_senders: Vec<(M::Sender, Option<<M::Estimate as Data>::Data>)> =
-                map_sender_receivers
-                    .keys()
-                    //.iter()
-                    .cloned()
-                    .map(|s: M::Sender| {
-                        // FIXME is order of collect same as order of map? if not: iterate over the
-                        // collected instead of the map
-                        vec_receivers.push(map_sender_receivers.get(&s).unwrap());
-                        (s.clone(), Some(s.into()))
-                    })
-                    .collect();
-            let vec_datas = create_messages(&mut state, vec_senders);
-            add_messages(&mut state, vec_datas, vec_receivers).clone()
+            let vec_senders_recipients_datas: Vec<(
+                M::Sender,
+                HashSet<M::Sender>,
+                Option<<M::Estimate as Data>::Data>,
+            )> = map_sender_receivers
+                // into_iter because cloning is unwanted
+                .into_iter()
+                .map(|(s, r): (M::Sender, HashSet<M::Sender>)| {
+                    let data: <M::Estimate as Data>::Data = s.clone().into();
+                    (s, r, Some(data))
+                })
+                .collect();
+            let vec_datas = create_messages(&mut state, vec_senders_recipients_datas);
+            add_messages(&mut state, vec_datas).clone()
         })
         .boxed()
 }
@@ -336,7 +340,6 @@ fn get_data_from_state(
 
     data.consensus_height = consensus_height;
     data.longest_chain = height_selected_chain;
-    //data.nb_messages = number_messages;
     (is_consensus_satisfied)
 }
 
@@ -375,6 +378,7 @@ fn safety_oracle_at_height(
     chain_id: u32,
     received_msgs: &mut HashMap<u32, HashSet<Block>>,
 ) -> bool {
+    println!("step");
     state.iter().for_each(|(id, sender_state)| {
         for (_, msgs) in sender_state.latests_msgs().iter() {
             for msg in msgs.iter() {
@@ -383,14 +387,12 @@ fn safety_oracle_at_height(
         }
         println!("messages: {:?}", received_msgs.get(id).unwrap().len());
     });
-    println!("step");
     let safety_oracle_detected: HashSet<bool> = state
         .iter()
         .map(|(sender_id, sender_state)| {
             let mut data = ChainData::new(chain_id, state.len() as u32, *sender_id, 0, 0, 0);
             let is_consensus_satisfied =
                 get_data_from_state(sender_state, height_of_oracle, &mut data);
-            //data.nb_messages = set_msgs.len()o;
             data.nb_messages = received_msgs.get(sender_id).unwrap().len();
             vec_data.push(data);
             is_consensus_satisfied
@@ -575,7 +577,7 @@ fn blockchain() {
             arbitrary_blockchain(),
             6,
             round_robin, // max_overhead, //double_round_robin, //arbitrary_in_set,//round_robin,
-            some_receivers,//all_receivers,
+            all_receivers, //some_receivers,//all_receivers,
             safety_oracle_at_height,
             2,
             chain_id + 1, // +1 to match numbering in visualization
@@ -603,175 +605,175 @@ fn blockchain() {
     }
 }
 
-proptest! {
-    #![proptest_config(Config::with_cases(30))]
-    #[test]
-    fn round_robin_vote_count(ref chain in chain(VoteCount::arbitrary(), 15, round_robin, all_receivers, full_consensus, 0, 0)) {
-        assert_eq!(chain.last().unwrap_or(&HashMap::new()).keys().len(),
-                   if chain.len() > 0 {chain.len()} else {0},
-                   "round robin with n validators should converge in n messages")
-    }
-}
-
-prop_compose! {
-    fn boolwrapper_gen()
-        (boolean in prop::bool::ANY) -> BoolWrapper {
-            BoolWrapper::new(boolean)
-        }
-}
-
-prop_compose! {
-    fn integerwrapper_gen()
-        (int in prop::num::u32::ANY) -> IntegerWrapper {
-            IntegerWrapper::new(int)
-        }
-}
-
-proptest! {
-    #![proptest_config(Config::with_cases(30))]
-    #[test]
-    fn round_robin_binary(ref chain in chain(boolwrapper_gen(), 15, round_robin, all_receivers, full_consensus, 0, 0)) {
-        assert!(chain.last().unwrap_or(&HashMap::new()).keys().len() >=
-                chain.len(),
-                "round robin with n validators should converge in at most n messages")
-    }
-}
-
-proptest! {
-    #![proptest_config(Config::with_cases(10))]
-    #[test]
-    fn round_robin_integer(ref chain in chain(integerwrapper_gen(), 2000, round_robin, all_receivers, full_consensus, 0, 0)) {
-        // total messages until unilateral consensus
-        println!("{} validators -> {:?} message(s)",
-                 match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
-                 {"0" => "Unknown",
-                  x => x},
-                 chain.len());
-        assert!(chain.last().unwrap_or(&HashMap::new()).keys().len() >=
-                chain.len(),
-                "round robin with n validators should converge in at most n messages")
-    }
-}
-
-proptest! {
-    #![proptest_config(Config::with_cases(1))]
-    #[test]
-    fn arbitrary_messenger_vote_count(ref chain in chain(VoteCount::arbitrary(), 8, arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
-        // total messages until unilateral consensus
-        println!("{} validators -> {:?} message(s)",
-                 match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
-                 {"0" => "Unknown",
-                  x => x},
-                 chain.len());
-    }
-}
-
-proptest! {
-    #![proptest_config(Config::with_cases(1))]
-    #[test]
-    fn arbitrary_messenger_binary(ref chain in chain(boolwrapper_gen(), 100, arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
-        // total messages until unilateral consensus
-        println!("{} validators -> {:?} message(s)",
-                 match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
-                 {"0" => "Unknown",
-                  x => x},
-                 chain.len());
-    }
-}
-
-proptest! {
-    #![proptest_config(Config::with_cases(1))]
-    #[test]
-    fn arbitrary_messenger_integer(ref chain in chain(integerwrapper_gen(), 50, arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
-        // total messages until unilateral consensus
-        println!("{} validators -> {:?} message(s)",
-                 match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
-                 {"0" => "Unknown",
-                  x => x},
-                 chain.len());
-    }
-}
-
-prop_compose! {
-    fn votes(senders: usize, equivocations: usize)
-        (votes in prop::collection::vec(prop::bool::weighted(0.3), senders as usize),
-         equivocations in Just(equivocations),
-         senders in Just(senders))
-         -> (Vec<Message<VoteCount, u32>>, HashSet<u32>, usize)
-    {
-        let mut validators: Vec<u32> = (0..senders as u32).collect();
-        validators.shuffle(&mut thread_rng());
-        let equivocators: HashSet<u32> = HashSet::from_iter(validators[0..equivocations].iter().cloned());
-
-        let mut messages = vec![];
-        votes
-            .iter()
-            .enumerate()
-            .for_each(|(sender, vote)|
-                      {messages.push(VoteCount::create_vote_msg(sender as u32, vote.clone()))});
-        equivocators
-            .iter()
-            .for_each(|equivocator|
-                      {let vote = !votes[*equivocator as usize];
-                       messages.push(VoteCount::create_vote_msg(*equivocator as u32, vote))});
-        (messages, equivocators, senders)
-    }
-}
-
-proptest! {
-    #![proptest_config(Config::with_cases(1000))]
-    #[test]
-    fn detect_equivocation(ref vote_tuple in votes(5, 5)) {
-        let (messages, equivocators, nodes) = vote_tuple;
-        let nodes = nodes.clone();
-        let senders: Vec<u32> = (0..nodes as u32).collect();
-        let weights: Vec<f64> =
-            iter::repeat(1.0).take(nodes as usize).collect();
-        let senders_weights = SendersWeight::new(
-            senders
-                .iter()
-                .cloned()
-                .zip(weights.iter().cloned())
-                .collect(),
-        );
-        let sender_state = SenderState::new(
-            senders_weights.clone(),
-            0.0,
-            None,
-            LatestMsgs::new(),
-            0.0,
-            HashSet::new(),
-        );
-
-        // here, only take one equivocation
-        let single_equivocation: Vec<_> = messages[..nodes+1].iter().map(|message| message).collect();
-        let equivocator = messages[nodes].sender();
-        let (m0, _) =
-            &Message::from_msgs(0, single_equivocation.clone(), &sender_state, None)
-            .unwrap();
-        let equivocations: Vec<_> = single_equivocation.iter().filter(|message| message.equivocates(&m0)).collect();
-        assert!(if *equivocator == 0 {equivocations.len() == 1} else {equivocations.len() == 0}, "should detect sender 0 equivocating if sender 0 equivocates");
-        // the following commented test should fail
-        // assert_eq!(equivocations.len(), 1, "should detect sender 0 equivocating if sender 0 equivocates");
-
-        let (m0, _) =
-            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &sender_state, None)
-            .unwrap();
-        let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
-        assert_eq!(equivocations.len(), 1, "should detect sender 0 equivocating if sender 0 equivocates");
-
-        let sender_state = SenderState::new(
-            senders_weights,
-            0.0,
-            None,
-            LatestMsgs::new(),
-            equivocators.len() as f64,
-            HashSet::new(),
-        );
-        let (m0, _) =
-            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &sender_state, None)
-            .unwrap();
-        let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
-        assert_eq!(equivocations.len(), 0, "equivocation absorbed in threshold");
-    }
-}
+//proptest! {
+//    #![proptest_config(Config::with_cases(30))]
+//    #[test]
+//    fn round_robin_vote_count(ref chain in chain(VoteCount::arbitrary(), 15, round_robin, all_receivers, full_consensus, 0, 0)) {
+//        assert_eq!(chain.last().unwrap_or(&HashMap::new()).keys().len(),
+//                   if chain.len() > 0 {chain.len()} else {0},
+//                   "round robin with n validators should converge in n messages")
+//    }
+//}
+//
+//prop_compose! {
+//    fn boolwrapper_gen()
+//        (boolean in prop::bool::ANY) -> BoolWrapper {
+//            BoolWrapper::new(boolean)
+//        }
+//}
+//
+//prop_compose! {
+//    fn integerwrapper_gen()
+//        (int in prop::num::u32::ANY) -> IntegerWrapper {
+//            IntegerWrapper::new(int)
+//        }
+//}
+//
+//proptest! {
+//    #![proptest_config(Config::with_cases(30))]
+//    #[test]
+//    fn round_robin_binary(ref chain in chain(boolwrapper_gen(), 15, round_robin, all_receivers, full_consensus, 0, 0)) {
+//        assert!(chain.last().unwrap_or(&HashMap::new()).keys().len() >=
+//                chain.len(),
+//                "round robin with n validators should converge in at most n messages")
+//    }
+//}
+//
+//proptest! {
+//    #![proptest_config(Config::with_cases(10))]
+//    #[test]
+//    fn round_robin_integer(ref chain in chain(integerwrapper_gen(), 2000, round_robin, all_receivers, full_consensus, 0, 0)) {
+//        // total messages until unilateral consensus
+//        println!("{} validators -> {:?} message(s)",
+//                 match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+//                 {"0" => "Unknown",
+//                  x => x},
+//                 chain.len());
+//        assert!(chain.last().unwrap_or(&HashMap::new()).keys().len() >=
+//                chain.len(),
+//                "round robin with n validators should converge in at most n messages")
+//    }
+//}
+//
+//proptest! {
+//    #![proptest_config(Config::with_cases(1))]
+//    #[test]
+//    fn arbitrary_messenger_vote_count(ref chain in chain(VoteCount::arbitrary(), 8, arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
+//        // total messages until unilateral consensus
+//        println!("{} validators -> {:?} message(s)",
+//                 match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+//                 {"0" => "Unknown",
+//                  x => x},
+//                 chain.len());
+//    }
+//}
+//
+//proptest! {
+//    #![proptest_config(Config::with_cases(1))]
+//    #[test]
+//    fn arbitrary_messenger_binary(ref chain in chain(boolwrapper_gen(), 100, arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
+//        // total messages until unilateral consensus
+//        println!("{} validators -> {:?} message(s)",
+//                 match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+//                 {"0" => "Unknown",
+//                  x => x},
+//                 chain.len());
+//    }
+//}
+//
+//proptest! {
+//    #![proptest_config(Config::with_cases(1))]
+//    #[test]
+//    fn arbitrary_messenger_integer(ref chain in chain(integerwrapper_gen(), 50, arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
+//        // total messages until unilateral consensus
+//        println!("{} validators -> {:?} message(s)",
+//                 match chain.last().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+//                 {"0" => "Unknown",
+//                  x => x},
+//                 chain.len());
+//    }
+//}
+//
+//prop_compose! {
+//    fn votes(senders: usize, equivocations: usize)
+//        (votes in prop::collection::vec(prop::bool::weighted(0.3), senders as usize),
+//         equivocations in Just(equivocations),
+//         senders in Just(senders))
+//         -> (Vec<Message<VoteCount, u32>>, HashSet<u32>, usize)
+//    {
+//        let mut validators: Vec<u32> = (0..senders as u32).collect();
+//        validators.shuffle(&mut thread_rng());
+//        let equivocators: HashSet<u32> = HashSet::from_iter(validators[0..equivocations].iter().cloned());
+//
+//        let mut messages = vec![];
+//        votes
+//            .iter()
+//            .enumerate()
+//            .for_each(|(sender, vote)|
+//                      {messages.push(VoteCount::create_vote_msg(sender as u32, vote.clone()))});
+//        equivocators
+//            .iter()
+//            .for_each(|equivocator|
+//                      {let vote = !votes[*equivocator as usize];
+//                       messages.push(VoteCount::create_vote_msg(*equivocator as u32, vote))});
+//        (messages, equivocators, senders)
+//    }
+//}
+//
+//proptest! {
+//    #![proptest_config(Config::with_cases(1000))]
+//    #[test]
+//    fn detect_equivocation(ref vote_tuple in votes(5, 5)) {
+//        let (messages, equivocators, nodes) = vote_tuple;
+//        let nodes = nodes.clone();
+//        let senders: Vec<u32> = (0..nodes as u32).collect();
+//        let weights: Vec<f64> =
+//            iter::repeat(1.0).take(nodes as usize).collect();
+//        let senders_weights = SendersWeight::new(
+//            senders
+//                .iter()
+//                .cloned()
+//                .zip(weights.iter().cloned())
+//                .collect(),
+//        );
+//        let sender_state = SenderState::new(
+//            senders_weights.clone(),
+//            0.0,
+//            None,
+//            LatestMsgs::new(),
+//            0.0,
+//            HashSet::new(),
+//        );
+//
+//        // here, only take one equivocation
+//        let single_equivocation: Vec<_> = messages[..nodes+1].iter().map(|message| message).collect();
+//        let equivocator = messages[nodes].sender();
+//        let (m0, _) =
+//            &Message::from_msgs(0, single_equivocation.clone(), &sender_state, None)
+//            .unwrap();
+//        let equivocations: Vec<_> = single_equivocation.iter().filter(|message| message.equivocates(&m0)).collect();
+//        assert!(if *equivocator == 0 {equivocations.len() == 1} else {equivocations.len() == 0}, "should detect sender 0 equivocating if sender 0 equivocates");
+//        // the following commented test should fail
+//        // assert_eq!(equivocations.len(), 1, "should detect sender 0 equivocating if sender 0 equivocates");
+//
+//        let (m0, _) =
+//            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &sender_state, None)
+//            .unwrap();
+//        let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
+//        assert_eq!(equivocations.len(), 1, "should detect sender 0 equivocating if sender 0 equivocates");
+//
+//        let sender_state = SenderState::new(
+//            senders_weights,
+//            0.0,
+//            None,
+//            LatestMsgs::new(),
+//            equivocators.len() as f64,
+//            HashSet::new(),
+//        );
+//        let (m0, _) =
+//            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &sender_state, None)
+//            .unwrap();
+//        let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
+//        assert_eq!(equivocations.len(), 0, "equivocation absorbed in threshold");
+//    }
+//}
