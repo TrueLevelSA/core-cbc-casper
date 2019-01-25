@@ -18,13 +18,15 @@ use weight_unit::WeightUnit;
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize)]
 pub struct ProtoBlock<S: Sender> {
     prevblock: Option<Block<S>>,
+    data_commit: Hashed,
     sender_type: PhantomData<S>,
 }
 
 impl<S: Sender> ProtoBlock<S> {
-    pub fn new(prevblock: Option<Block<S>>) -> ProtoBlock<S> {
+    pub fn new(prevblock: Option<Block<S>>, data_commit: Hashed) -> ProtoBlock<S> {
         ProtoBlock {
             prevblock,
+            data_commit,
             sender_type: PhantomData,
         }
     }
@@ -36,7 +38,7 @@ pub struct Block<S: Sender>((Arc<ProtoBlock<S>>, Hashed));
 
 impl<S: Sender> Default for Block<S> {
     fn default() -> Self {
-        Block::new(None)
+        Block::new(None, None)
     }
 }
 // #[cfg(feature = "integration_test")]
@@ -101,13 +103,6 @@ impl<S: Sender> PartialEq for Block<S> {
     }
 }
 
-impl<S: Sender> From<ProtoBlock<S>> for Block<S> {
-    fn from(protoblock: ProtoBlock<S>) -> Self {
-        let id = protoblock.getid();
-        Block((Arc::new(protoblock), id))
-    }
-}
-
 impl<'z, S: Sender> From<&'z BlockMsg<S>> for Block<S> {
     fn from(msg: &BlockMsg<S>) -> Self {
         msg.estimate().clone()
@@ -115,8 +110,11 @@ impl<'z, S: Sender> From<&'z BlockMsg<S>> for Block<S> {
 }
 
 impl<S: Sender> Block<S> {
-    pub fn new(prevblock: Option<Block<S>>) -> Self {
-        Block::from(ProtoBlock::new(prevblock))
+    pub fn new(prevblock: Option<Block<S>>, data_commit: Option<Hashed>) -> Self {
+        let data_commit = data_commit.unwrap_or_default();
+        let proto = ProtoBlock::new(prevblock, data_commit);
+        let id = proto.getid();
+        Block((Arc::new(proto), id))
     }
     pub fn id(&self) -> &<Self as Id>::ID {
         &(self.0).1
@@ -129,14 +127,10 @@ impl<S: Sender> Block<S> {
         prevblock_msg: Option<BlockMsg<S>>,
         // a incomplete_block is a block with a None prevblock (ie, Estimate) AND is
         // not a genesis_block
-        incomplete_block: Block<S>,
+        data_commit: Option<Hashed>,
     ) -> Self {
         let prevblock = prevblock_msg.map(|m| Block::from(&m));
-        let block = Block::from(ProtoBlock {
-            prevblock,
-            ..((**incomplete_block.arc()).clone())
-        });
-        block
+        Block::new(prevblock, data_commit)
     }
 
     /// Math definition of blockchain membership
@@ -450,10 +444,11 @@ impl<S: Sender> Estimate for Block<S> {
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
-        _data: Option<<Self as Data>::Data>,
+        data_commit: Option<<Self as Data>::Data>,
     ) -> Result<Self, &'static str> {
         let prevblock = Block::ghost(latest_msgs, senders_weights)?;
-        Ok(Block::from(ProtoBlock::new(Some(prevblock))))
+        let data_commit = data_commit.map(|Block((b, _))| b.data_commit.clone());
+        Ok(Block::new(Some(prevblock), data_commit))
     }
 }
 
@@ -506,7 +501,7 @@ mod tests {
         // (s3, w=1.0)    |     \---b3
 
         // block dag
-        let genesis_block = Block::from(ProtoBlock::new(None));
+        let genesis_block = Block::default();
         let latest_msgs = Justification::new();
         let genesis_block_msg = BlockMsg::new(sender0, latest_msgs, genesis_block.clone(), None);
         assert_eq!(
@@ -606,7 +601,7 @@ mod tests {
         // let txs = BTreeSet::new();
 
         // block dag
-        let genesis_block = Block::from(ProtoBlock::new(None));
+        let genesis_block = Block::default();
         let latest_msgs = Justification::new();
         let genesis_block_msg = BlockMsg::new(senderg, latest_msgs, genesis_block.clone(), None);
         // assert_eq!(
