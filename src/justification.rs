@@ -492,7 +492,7 @@ mod tests {
         assert!(success);
 
         let (m0, _weights) =
-            &Message::from_msgs(0, vec![v0], &sender_state, None as Option<VoteCount>).unwrap();
+            &Message::from_msgs(0, vec![v0], &sender_state, None as Option<VoteCount>, None).unwrap();
 
         // let m0 = &Message::new(0, justification, estimate);
         let mut j1 = Justification::new();

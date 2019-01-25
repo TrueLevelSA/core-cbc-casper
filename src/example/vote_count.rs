@@ -8,7 +8,7 @@ use proptest::prelude::*;
 use justification::{Justification, LatestMsgsHonest};
 use message::{CasperMsg, Message};
 use senders_weight::SendersWeight;
-use traits::{Estimate, Sender, Zero};
+use traits::{Estimate, Sender, Zero, Data};
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]
 pub struct VoteCount {
     yes: u32,
@@ -152,8 +152,7 @@ impl Estimate for VoteCount {
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         _weights: &SendersWeight<Voter>, // all voters have same weight
-        _external_data: Option<Self>,
-        // _external_data: Option<Self::Data>,
+        _external_data: Option<<Self as Data>::Data>,
     ) -> Result<Self, &'static str> {
         // the estimates are actually the original votes of each of the voters /
         // validators

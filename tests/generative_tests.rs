@@ -65,6 +65,7 @@ where
         latest_delta.iter().collect(),
         &state[&sender],
         data.clone().map(|d| d.into()),
+        None,
     )
     .unwrap();
 
@@ -92,6 +93,7 @@ where
                 m.justification().iter().collect(),
                 &sender_state_reconstructed,
                 data.clone().map(|d| d.into()),
+                None,
             )
                 .unwrap()
                 .0
@@ -168,7 +170,7 @@ fn safety_oracle(state: &HashMap<u32, SenderState<BlockMsg<u32>>>) -> bool {
         .map(|(_, sender_state)| {
             let latest_honest_msgs =
                 LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
-            let genesis_block = Block::from(ProtoBlock::new(None));
+            let genesis_block = Block::default();
             let safety_threshold = (sender_state.senders_weights().sum_all_weights()) / 2.0;
             Block::safety_oracles(
                 genesis_block,
@@ -186,7 +188,7 @@ fn clique_collection(state: HashMap<u32, SenderState<BlockMsg<u32>>>) -> Vec<Vec
     state
         .iter()
         .map(|(_, sender_state)| {
-            let genesis_block = Block::from(ProtoBlock::new(None));
+            let genesis_block = Block::default();
             let latest_honest_msgs =
                 LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
             let safety_oracles = Block::safety_oracles(
@@ -299,7 +301,7 @@ where
 }
 
 fn arbitrary_blockchain() -> BoxedStrategy<Block<u32>> {
-    let genesis_block = Block::from(ProtoBlock::new(None));
+    let genesis_block = Block::default();
     Just(genesis_block).boxed()
 }
 
@@ -490,7 +492,7 @@ proptest! {
         let single_equivocation: Vec<_> = messages[..nodes+1].iter().map(|message| message).collect();
         let equivocator = messages[nodes].sender();
         let (m0, _) =
-            &Message::from_msgs(0, single_equivocation.clone(), &sender_state, None)
+            &Message::from_msgs(0, single_equivocation.clone(), &sender_state, None, None)
             .unwrap();
         let equivocations: Vec<_> = single_equivocation.iter().filter(|message| message.equivocates(&m0)).collect();
         assert!(if *equivocator == 0 {equivocations.len() == 1} else {equivocations.len() == 0}, "should detect sender 0 equivocating if sender 0 equivocates");
@@ -498,7 +500,7 @@ proptest! {
         // assert_eq!(equivocations.len(), 1, "should detect sender 0 equivocating if sender 0 equivocates");
 
         let (m0, _) =
-            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &sender_state, None)
+            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &sender_state, None, None)
             .unwrap();
         let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
         assert_eq!(equivocations.len(), 1, "should detect sender 0 equivocating if sender 0 equivocates");
@@ -512,7 +514,7 @@ proptest! {
             HashSet::new(),
         );
         let (m0, _) =
-            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &sender_state, None)
+            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &sender_state, None, None)
             .unwrap();
         let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
         assert_eq!(equivocations.len(), 0, "equivocation absorbed in threshold");
