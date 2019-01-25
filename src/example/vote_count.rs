@@ -8,7 +8,7 @@ use proptest::prelude::*;
 use justification::{Justification, LatestMsgsHonest};
 use message::{CasperMsg, Message};
 use senders_weight::SendersWeight;
-use traits::{Estimate, Sender, Zero, Data};
+use traits::{Data, Estimate, Sender, Zero};
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]
 pub struct VoteCount {
     yes: u32,

@@ -318,9 +318,7 @@ impl<'z, M: CasperMsg> From<&'z Justification<M>> for LatestMsgs<M> {
         let mut queue: VecDeque<&M> = j.iter().collect();
         while let Some(msg) = queue.pop_front() {
             if latest_msgs.update(&msg) {
-                msg.justification()
-                    .iter()
-                    .for_each(|m| queue.push_back(m));
+                msg.justification().iter().for_each(|m| queue.push_back(m));
             }
         }
         latest_msgs
@@ -492,7 +490,8 @@ mod tests {
         assert!(success);
 
         let (m0, _weights) =
-            &Message::from_msgs(0, vec![v0], &sender_state, None as Option<VoteCount>, None).unwrap();
+            &Message::from_msgs(0, vec![v0], &sender_state, None as Option<VoteCount>, None)
+                .unwrap();
 
         // let m0 = &Message::new(0, justification, estimate);
         let mut j1 = Justification::new();

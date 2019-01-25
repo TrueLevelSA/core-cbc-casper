@@ -166,7 +166,8 @@ mod tests {
 
         // assume sender 0 has seen messages from sender 1 and sender 2 and reveals this in a published message
         let (m5, _) =
-            BinaryMsg::from_msgs(senders[0], vec![&m0, &m1, &m2], &sender_state, None, None).unwrap();
+            BinaryMsg::from_msgs(senders[0], vec![&m0, &m1, &m2], &sender_state, None, None)
+                .unwrap();
 
         j0.faulty_insert(&m5, &sender_state);
         // sender 0 now "votes" in the other direction and sways the result: true

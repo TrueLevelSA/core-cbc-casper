@@ -532,7 +532,8 @@ mod tests {
 
         let proto_b3 = Block::new(None, None);
         let (m3, _) =
-            BlockMsg::from_msgs(sender3, vec![&m1, &m2], &sender_state, Some(proto_b3), None).unwrap();
+            BlockMsg::from_msgs(sender3, vec![&m1, &m2], &sender_state, Some(proto_b3), None)
+                .unwrap();
 
         assert_eq!(
             m3.estimate(),
@@ -554,7 +555,8 @@ mod tests {
         // println!("\n3 {:?}", m3);
         // println!("\n4 {:?}", m4);
         let (m5, _) =
-            BlockMsg::from_msgs(sender0, vec![&m3, &m2], &sender_state, Some(proto_b5), None).unwrap();
+            BlockMsg::from_msgs(sender0, vec![&m3, &m2], &sender_state, Some(proto_b5), None)
+                .unwrap();
         // println!("\nm5 {:?}", m5);
         // println!("\nm5_estimate {:?}", Block::from(&m5));
 
@@ -711,14 +713,24 @@ mod tests {
         let m0 = BlockMsg::new(senders[0], latest_msgs, proto_b0.clone(), None);
 
         let proto_b1 = Block::new(Some(proto_b0.clone()), None);
-        let (m1, sender_state) =
-            BlockMsg::from_msgs(senders[1], vec![&m0], &sender_state, Some(proto_b1.clone()), None)
-                .unwrap();
+        let (m1, sender_state) = BlockMsg::from_msgs(
+            senders[1],
+            vec![&m0],
+            &sender_state,
+            Some(proto_b1.clone()),
+            None,
+        )
+        .unwrap();
 
         let proto_b2 = Block::new(Some(proto_b1.clone()), None);
-        let (m2, sender_state) =
-            BlockMsg::from_msgs(senders[0], vec![&m1], &sender_state, Some(proto_b2.clone()), None)
-                .unwrap();
+        let (m2, sender_state) = BlockMsg::from_msgs(
+            senders[0],
+            vec![&m1],
+            &sender_state,
+            Some(proto_b2.clone()),
+            None,
+        )
+        .unwrap();
 
         // no clique yet, since senders[1] has not seen senders[0] seeing senders[1] having proto_b0 in the chain
         assert_eq!(
@@ -736,9 +748,14 @@ mod tests {
         );
 
         let proto_b3 = Block::new(Some(proto_b2.clone()), None);
-        let (m3, sender_state) =
-            BlockMsg::from_msgs(senders[1], vec![&m2], &sender_state, Some(proto_b3.clone()), None)
-                .unwrap();
+        let (m3, sender_state) = BlockMsg::from_msgs(
+            senders[1],
+            vec![&m2],
+            &sender_state,
+            Some(proto_b3.clone()),
+            None,
+        )
+        .unwrap();
 
         // clique, since both senders have seen each other having proto_b0 in the chain
         assert_eq!(
@@ -756,14 +773,24 @@ mod tests {
         );
 
         let proto_b4 = Block::new(Some(proto_b3.clone()), None);
-        let (m4, sender_state) =
-            BlockMsg::from_msgs(senders[2], vec![&m3], &sender_state, Some(proto_b4.clone()), None)
-                .unwrap();
+        let (m4, sender_state) = BlockMsg::from_msgs(
+            senders[2],
+            vec![&m3],
+            &sender_state,
+            Some(proto_b4.clone()),
+            None,
+        )
+        .unwrap();
 
         let proto_b5 = Block::new(Some(proto_b4.clone()), None);
-        let (m5, sender_state) =
-            BlockMsg::from_msgs(senders[1], vec![&m4], &sender_state, Some(proto_b5.clone()), None)
-                .unwrap();
+        let (m5, sender_state) = BlockMsg::from_msgs(
+            senders[1],
+            vec![&m4],
+            &sender_state,
+            Some(proto_b5.clone()),
+            None,
+        )
+        .unwrap();
 
         // no second clique yet, since senders[2] has not seen senders[1] seeing senders[2] having proto_b0.clone() in the chain
         assert_eq!(
@@ -781,9 +808,14 @@ mod tests {
         );
 
         let proto_b6 = Block::new(Some(proto_b5.clone()), None);
-        let (m6, sender_state) =
-            BlockMsg::from_msgs(senders[2], vec![&m5], &sender_state, Some(proto_b5.clone()), None)
-                .unwrap();
+        let (m6, sender_state) = BlockMsg::from_msgs(
+            senders[2],
+            vec![&m5],
+            &sender_state,
+            Some(proto_b5.clone()),
+            None,
+        )
+        .unwrap();
 
         // have two cliques on proto_b0 now
         assert_eq!(
@@ -835,18 +867,33 @@ mod tests {
         );
 
         let proto_b7 = Block::new(Some(proto_b6.clone()), None);
-        let (m7, sender_state) =
-            BlockMsg::from_msgs(senders[0], vec![&m6], &sender_state, Some(proto_b6.clone()), None)
-                .unwrap();
+        let (m7, sender_state) = BlockMsg::from_msgs(
+            senders[0],
+            vec![&m6],
+            &sender_state,
+            Some(proto_b6.clone()),
+            None,
+        )
+        .unwrap();
 
         let proto_b8 = Block::new(Some(proto_b7.clone()), None);
-        let (m8, sender_state) =
-            BlockMsg::from_msgs(senders[2], vec![&m7], &sender_state, Some(proto_b7.clone()), None)
-                .unwrap();
+        let (m8, sender_state) = BlockMsg::from_msgs(
+            senders[2],
+            vec![&m7],
+            &sender_state,
+            Some(proto_b7.clone()),
+            None,
+        )
+        .unwrap();
 
-        let (_, sender_state) =
-            BlockMsg::from_msgs(senders[0], vec![&m8], &sender_state, Some(proto_b8.clone()), None)
-                .unwrap();
+        let (_, sender_state) = BlockMsg::from_msgs(
+            senders[0],
+            vec![&m8],
+            &sender_state,
+            Some(proto_b8.clone()),
+            None,
+        )
+        .unwrap();
 
         // now entire network is clique
         assert_eq!(

@@ -248,9 +248,14 @@ mod tests {
         let m2 = IntegerMsg::new(senders[2], Justification::new(), IntegerWrapper(3), None);
         let m3 = IntegerMsg::new(senders[3], Justification::new(), IntegerWrapper(4), None);
 
-        let (m4, _) =
-            IntegerMsg::from_msgs(senders[3], vec![&m0, &m1, &m2, &m3], &sender_state, None, None)
-                .unwrap();
+        let (m4, _) = IntegerMsg::from_msgs(
+            senders[3],
+            vec![&m0, &m1, &m2, &m3],
+            &sender_state,
+            None,
+            None,
+        )
+        .unwrap();
 
         let (mut j0, _) = Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
         assert_eq!(
