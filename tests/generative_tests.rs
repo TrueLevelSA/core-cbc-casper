@@ -13,7 +13,8 @@ use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::Config;
 use proptest::test_runner::TestRunner;
-use proptest::prelude::Rng;
+use proptest::prelude::XorShiftRng;
+
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
@@ -194,6 +195,20 @@ fn all_receivers(
         .boxed()
 }
 
+fn simple_all_receivers(
+    sender: &u32,
+    possible_senders: &Vec<u32>,
+    rng: &mut XorShiftRng,
+) -> HashSet<u32> {
+    let nb = rng.gen_range(0, possible_senders.len());
+    let mut hs: HashSet<u32> = HashSet::new();
+    for i in 0..nb {
+        hs.insert(*rng.choose(possible_senders).unwrap());
+    }
+
+    hs
+}
+
 fn some_receivers(
     val: &Vec<u32>,
     sender_strategy: BoxedStrategy<HashSet<u32>>,
@@ -204,11 +219,7 @@ fn some_receivers(
         .prop_perturb(move |senders,mut rng| {
             let mut hashmap: HashMap<u32, HashSet<u32>> = HashMap::new();
             senders.iter().for_each(|sender| {
-                let nb = rng.gen_range(0, v.len());
-                let mut hs: HashSet<u32> = HashSet::new();
-                for i in 0..nb {
-                    hs.insert(*rng.choose(&v).unwrap());
-                }
+                let hs = simple_all_receivers(sender, &v, &mut rng);
                 hashmap.insert(*sender, hs);
             });
 
