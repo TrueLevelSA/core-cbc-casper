@@ -10,10 +10,10 @@ use std::iter::FromIterator;
 
 use proptest::prelude::*;
 
+use proptest::prelude::XorShiftRng;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::Config;
 use proptest::test_runner::TestRunner;
-use proptest::prelude::XorShiftRng;
 
 use rand::seq::SliceRandom;
 use rand::thread_rng;
@@ -153,10 +153,16 @@ where
     state
 }
 
+/// sender strategy that selects all the senders
 fn max_overhead(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
     Just(val.iter().cloned().collect()).boxed()
 }
 
+/// sender strategy that selects 2 validators in a round robin manner
+/// senders in a single step are selected in such a way that they are at a maximal distance between
+/// each other
+/// for example, if we have validators [1,2,3,4,5,6], selected validators will be:
+/// (1, 4), (2, 5), (3, 6), (4, 1), (5, 2), (6, 3)
 fn double_round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
     let v = val.pop().unwrap();
     val.insert(0, v);
@@ -167,6 +173,7 @@ fn double_round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
     Just(hashset).boxed()
 }
 
+/// sender strategy that selects one validator at each step, in a round robin manner
 fn round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
     let v = val.pop().unwrap();
     val.insert(0, v);
@@ -175,51 +182,52 @@ fn round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
     Just(hashset).boxed()
 }
 
+/// sender strategy that picks one validator in the set at random, in a uniform manner
 fn arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
     prop::collection::hash_set(prop::sample::select(val.clone()), 1).boxed()
 }
 
-fn all_receivers(
-    val: &Vec<u32>,
-    sender_strategy: BoxedStrategy<HashSet<u32>>,
-) -> BoxedStrategy<HashMap<u32, HashSet<u32>>> {
-    let v = HashSet::from_iter(val.iter().cloned());
-    sender_strategy
-        .prop_flat_map(move |senders| {
-            let mut hashmap: HashMap<u32, HashSet<u32>> = HashMap::new();
-            senders.iter().for_each(|sender| {
-                hashmap.insert(*sender, v.clone());
-            });
-            Just(hashmap)
-        })
-        .boxed()
-}
-
-fn simple_all_receivers(
-    sender: &u32,
+/// receiver stratefy that picks between 0 and N receivers at random, N being the number of validators
+fn some_receivers(
+    _sender: &u32,
     possible_senders: &Vec<u32>,
     rng: &mut XorShiftRng,
 ) -> HashSet<u32> {
     let nb = rng.gen_range(0, possible_senders.len());
     let mut hs: HashSet<u32> = HashSet::new();
-    for i in 0..nb {
+    // FIXME: this is constant time, however the number of receivers is not uniform as we always
+    // pick from the same vec of senders and put them in a hashset, there are some collisons
+    for _ in 0..nb {
         hs.insert(*rng.choose(possible_senders).unwrap());
     }
 
     hs
 }
 
-fn some_receivers(
-    val: &Vec<u32>,
+/// receiver strategy that picks all the receivers
+fn all_receivers(
+    _sender: &u32,
+    possible_senders: &Vec<u32>,
+    _rng: &mut XorShiftRng,
+) -> HashSet<u32> {
+    HashSet::from_iter(possible_senders.iter().cloned())
+}
+
+/// maps each sender from the sender_strategy to a set of receivers, using the receivers_selector
+/// function
+fn create_receiver_strategy(
+    validators: &Vec<u32>,
     sender_strategy: BoxedStrategy<HashSet<u32>>,
+    receivers_selector: fn(&u32, &Vec<u32>, &mut XorShiftRng) -> HashSet<u32>,
 ) -> BoxedStrategy<HashMap<u32, HashSet<u32>>> {
-    // let v = HashSet::from_iter(val.iter().cloned());
-    let v = val.clone();
+    let v = validators.clone();
     sender_strategy
-        .prop_perturb(move |senders,mut rng| {
+        // prop_perturb uses a Rng based on the proptest seed, it can therefore safely be used to
+        // create random data as they can be re-obtained
+        .prop_perturb(move |senders, mut rng| {
             let mut hashmap: HashMap<u32, HashSet<u32>> = HashMap::new();
             senders.iter().for_each(|sender| {
-                let hs = simple_all_receivers(sender, &v, &mut rng);
+                let hs = receivers_selector(sender, &v, &mut rng);
                 hashmap.insert(*sender, hs);
             });
 
@@ -228,7 +236,7 @@ fn some_receivers(
         .boxed()
 }
 
-fn message_event<M>(
+fn message_events<M>(
     state: HashMap<M::Sender, SenderState<M>>,
     sender_receiver_strategy: BoxedStrategy<HashMap<M::Sender, HashSet<M::Sender>>>,
 ) -> BoxedStrategy<HashMap<M::Sender, SenderState<M>>>
@@ -245,6 +253,7 @@ where
             )> = map_sender_receivers
                 // into_iter because cloning is unwanted
                 .into_iter()
+                // explicit typing needed for into()
                 .map(|(s, r): (M::Sender, HashSet<M::Sender>)| {
                     let data: <M::Estimate as Data>::Data = s.clone().into();
                     (s, r, Some(data))
@@ -294,6 +303,8 @@ fn run_until_height(
 
 /// performs safety oracle search and adds information to the data parameter
 /// info added: consensus_height and longest_chain
+/// return true if some safety oracle is detected at max_heaight_of_oracle
+/// the threshold for the safety oracle is set to half of the sum of the senders weights
 fn get_data_from_state(
     sender_state: &SenderState<BlockMsg>,
     max_height_of_oracle: &u32,
@@ -383,14 +394,12 @@ fn safety_oracle_at_height(
     chain_id: u32,
     received_msgs: &mut HashMap<u32, HashSet<Block>>,
 ) -> bool {
-    println!("step");
     state.iter().for_each(|(id, sender_state)| {
         for (_, msgs) in sender_state.latests_msgs().iter() {
             for msg in msgs.iter() {
                 received_msgs.get_mut(id).unwrap().insert(Block::from(msg));
             }
         }
-        println!("messages: {:?}", received_msgs.get(id).unwrap().len());
     });
     let safety_oracle_detected: HashSet<bool> = state
         .iter()
@@ -432,11 +441,11 @@ fn clique_collection(state: HashMap<u32, SenderState<BlockMsg>>) -> Vec<Vec<Vec<
         .collect()
 }
 
-fn chain<E: 'static, F: 'static, G: 'static, H: 'static>(
+fn chain<E: 'static, F: 'static, H: 'static>(
     consensus_value_strategy: BoxedStrategy<E>,
     validator_max_count: usize,
     message_producer_strategy: F,
-    message_receiver_strategy: G,
+    message_receiver_strategy: fn(&u32, &Vec<u32>, &mut XorShiftRng) -> HashSet<u32>,
     consensus_satisfied: H,
     consensus_satisfied_value: u32,
     chain_id: u32,
@@ -444,7 +453,7 @@ fn chain<E: 'static, F: 'static, G: 'static, H: 'static>(
 where
     E: Estimate<M = Message<E, u32>> + From<u32>,
     F: Fn(&mut Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
-    G: Fn(&Vec<u32>, BoxedStrategy<HashSet<u32>>) -> BoxedStrategy<HashMap<u32, HashSet<u32>>>,
+    //G: Fn(&Vec<u32>, BoxedStrategy<HashSet<u32>>) -> BoxedStrategy<HashMap<u32, HashSet<u32>>>,
     H: Fn(
         &HashMap<u32, SenderState<Message<E, u32>>>,
         &u32,
@@ -497,8 +506,10 @@ where
             let mut senders = validators.clone();
             let chain = iter::repeat_with(|| {
                 let sender_strategy = message_producer_strategy(&mut senders);
-                let receiver_strategy = message_receiver_strategy(&senders, sender_strategy);
-                state = message_event(state.clone(), receiver_strategy)
+                let receiver_strategy =
+                    create_receiver_strategy(&senders, sender_strategy, message_receiver_strategy);
+
+                state = message_events(state.clone(), receiver_strategy)
                     .new_value(&mut runner)
                     .unwrap()
                     .current();
@@ -582,7 +593,7 @@ fn blockchain() {
             arbitrary_blockchain(),
             6,
             round_robin, // max_overhead, //double_round_robin, //arbitrary_in_set,//round_robin,
-            some_receivers, //some_receivers,//all_receivers,
+            all_receivers, //some_receivers, //some_receivers,//all_receivers,
             safety_oracle_at_height,
             2,
             chain_id + 1, // +1 to match numbering in visualization
@@ -590,8 +601,6 @@ fn blockchain() {
         .new_value(&mut runner)
         .unwrap()
         .current();
-
-        println!("Nb senders: {}", states.last().unwrap().keys().len());
 
         states.iter().for_each(|state| {
             writeln!(
