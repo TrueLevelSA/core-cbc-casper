@@ -173,6 +173,18 @@ fn double_round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
     Just(hashset).boxed()
 }
 
+fn triple_round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
+    let v = val.pop().unwrap();
+    val.insert(0, v);
+    let mut hashset = HashSet::new();
+    hashset.insert(v);
+    let offset = val.len() / 3;
+    hashset.insert(val[offset]);
+
+    let offset = (offset * 2) % val.len();
+    hashset.insert(val[offset]);
+    Just(hashset).boxed()
+}
 /// sender strategy that selects one validator at each step, in a round robin manner
 fn round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
     let v = val.pop().unwrap();
@@ -202,6 +214,32 @@ fn some_receivers(
     }
 
     hs
+}
+
+/// receiver strategy that picks half the receiver set at random
+/// if |receiver set| is odd, then either |r_s|/2 or |r_s|/2 + 1 receivers are picked
+fn half_receivers(
+    _sender: &u32,
+    possible_senders: &Vec<u32>,
+    rng: &mut XorShiftRng,
+) -> HashSet<u32> {
+    let nb = possible_senders.len() / 2;
+    let nb = if nb <= 0 { 1 } else {
+        // if we have an odd number of validators, we either pick len/2 or len/2 +1
+        if nb*2 != possible_senders.len() {
+            let offset = rng.gen_range(0,2);
+            nb + offset
+        } else {
+            nb
+        }
+    };
+    let mut v_senders = possible_senders.clone();
+    let mut hashset = HashSet::new();
+    for i in 0..nb {
+        let index = rng.gen_range(0, v_senders.len());
+        hashset.insert(v_senders.remove(index));
+    }
+    hashset
 }
 
 /// receiver strategy that picks all the receivers
