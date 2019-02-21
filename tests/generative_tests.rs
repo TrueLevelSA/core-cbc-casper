@@ -224,10 +224,12 @@ fn half_receivers(
     rng: &mut XorShiftRng,
 ) -> HashSet<u32> {
     let nb = possible_senders.len() / 2;
-    let nb = if nb <= 0 { 1 } else {
+    let nb = if nb <= 0 {
+        1
+    } else {
         // if we have an odd number of validators, we either pick len/2 or len/2 +1
-        if nb*2 != possible_senders.len() {
-            let offset = rng.gen_range(0,2);
+        if nb * 2 != possible_senders.len() {
+            let offset = rng.gen_range(0, 2);
             nb + offset
         } else {
             nb
@@ -624,16 +626,16 @@ fn blockchain() {
 
     let mut runner = TestRunner::default();
 
-    for chain_id in 0..10 {
+    for chain_id in 0..2 {
         writeln!(output_file, "new chain").unwrap();
 
         let states = chain(
             arbitrary_blockchain(),
-            6,
-            round_robin, // max_overhead, //double_round_robin, //arbitrary_in_set,//round_robin,
-            all_receivers, //some_receivers, //some_receivers,//all_receivers,
+            20,
+            arbitrary_in_set, // max_overhead, //double_round_robin, //arbitrary_in_set,//round_robin,
+            half_receivers,   //some_receivers, //some_receivers,//all_receivers,
             safety_oracle_at_height,
-            2,
+            4,
             chain_id + 1, // +1 to match numbering in visualization
         )
         .new_value(&mut runner)
