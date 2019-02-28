@@ -328,7 +328,7 @@ fn arbitrary_blockchain() -> BoxedStrategy<Block<u32>> {
 
 #[test]
 fn blockchain() {
-    let mut config = Config::default();
+    let mut config = Config::with_cases(1);
     config.source_file = Some("tests/generative_tests.rs");
 
     let mut runner = TestRunner::new(config);
