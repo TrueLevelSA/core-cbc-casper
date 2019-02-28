@@ -268,7 +268,7 @@ where
                 match state.clone() {
                     Ok(st) => {
                         state = message_event(st, sender_strategy, receiver_strategy)
-                            .new_value(&mut runner)
+                            .new_tree(&mut runner)
                             .unwrap()
                             .current();
                         state.clone()
@@ -375,18 +375,16 @@ proptest! {
     }
 }
 
-prop_compose! {
-    fn boolwrapper_gen()
-        (boolean in prop::bool::ANY) -> BoolWrapper {
-            BoolWrapper::new(boolean)
-        }
+fn boolwrapper_gen() -> BoxedStrategy<BoolWrapper> {
+    any::<bool>()
+        .prop_map(|boolean| BoolWrapper::new(boolean))
+        .boxed()
 }
 
-prop_compose! {
-    fn integerwrapper_gen()
-        (int in prop::num::u32::ANY) -> IntegerWrapper {
-            IntegerWrapper::new(int)
-        }
+fn integerwrapper_gen() -> BoxedStrategy<IntegerWrapper> {
+    any::<u32>()
+        .prop_map(|int| IntegerWrapper::new(int))
+        .boxed()
 }
 
 proptest! {
