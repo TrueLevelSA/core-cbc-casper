@@ -338,7 +338,7 @@ fn blockchain() {
             .run(
                 &chain(
                     arbitrary_blockchain(),
-                    36,
+                    6,
                     arbitrary_in_set,
                     some_receivers,
                     safety_oracle,
