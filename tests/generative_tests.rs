@@ -1,7 +1,6 @@
 #![cfg(feature = "integration_test")]
-#[macro_use]
-extern crate proptest;
 extern crate casper;
+extern crate proptest;
 extern crate rand;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -12,7 +11,7 @@ use proptest::prelude::*;
 
 use proptest::strategy::ValueTree;
 use proptest::test_runner::Config;
-use proptest::test_runner::TestRunner;
+use proptest::test_runner::{RngAlgorithm, TestRng, TestRunner};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
@@ -220,11 +219,17 @@ where
     G: Fn(&Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
     H: Fn(&HashMap<u32, SenderState<Message<E, u32>>>) -> bool,
 {
-    (prop::sample::select((1..validator_max_count).collect::<Vec<usize>>()))
-        .prop_flat_map(move |validators| {
-            (prop::collection::vec(consensus_value_strategy.clone(), validators))
+    (
+        prop::sample::select((1..validator_max_count).collect::<Vec<usize>>()),
+        any::<[u8; 32]>(),
+    )
+        .prop_flat_map(move |(validators, seed)| {
+            (
+                prop::collection::vec(consensus_value_strategy.clone(), validators),
+                Just(seed),
+            )
         })
-        .prop_map(move |votes| {
+        .prop_map(move |(votes, seed)| {
             let mut state = HashMap::new();
             let mut validators: Vec<u32> = (0..votes.len() as u32).collect();
 
@@ -261,7 +266,10 @@ where
             });
 
             let mut state = Ok(state);
-            let mut runner = TestRunner::default();
+            let mut runner = TestRunner::new_with_rng(
+                ProptestConfig::default(),
+                TestRng::from_seed(RngAlgorithm::ChaCha, &seed),
+            );
             let chain = iter::repeat_with(|| {
                 let sender_strategy = message_producer_strategy(&mut validators);
                 let receiver_strategy = message_receiver_strategy(&validators);
@@ -337,7 +345,6 @@ fn blockchain() {
                 ),
                 |chain| {
                     chain.iter().for_each(|state| {
-                        println!("attempting unwrap");
                         let state = state.as_ref().unwrap();
                         let mut output_file = OpenOptions::new()
                             .create(true)
