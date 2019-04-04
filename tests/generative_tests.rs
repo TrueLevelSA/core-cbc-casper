@@ -153,11 +153,20 @@ fn max_overhead(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
     Just(val.iter().cloned().collect()).boxed()
 }
 
-/// sender strategy that selects 2 validators in a round robin manner
+/// sender strategy that selects one validator at each step, in a round robin manner
+fn round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
+    let v = val.pop().unwrap();
+    val.insert(0, v);
+    let mut hashset = HashSet::new();
+    hashset.insert(v);
+    Just(hashset).boxed()
+}
+
+/// sender strategy that selects two validators in a weaved round robin manner
 /// senders in a single step are selected in such a way that they are at a maximal distance between
 /// each other
 /// for example, if we have validators [1,2,3,4,5,6], selected validators will be:
-/// (1, 4), (2, 5), (3, 6), (4, 1), (5, 2), (6, 3)
+/// (1, 4), (2, 5), (3, 6), and further equivalent permutations
 fn double_round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
     let v = val.pop().unwrap();
     val.insert(0, v);
@@ -168,6 +177,11 @@ fn double_round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
     Just(hashset).boxed()
 }
 
+/// sender strategy that selects three validators in a weaved round robin manner
+/// senders in a single step are selected in such a way that they are at a maximal distance between
+/// each other
+/// for example, if we have validators [1,2,3,4,5,6], selected validators will be:
+/// (1, 3, 5), (2, 4, 6), and further equivalent permutations
 fn triple_round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
     let v = val.pop().unwrap();
     val.insert(0, v);
@@ -178,14 +192,6 @@ fn triple_round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
 
     let offset = (offset * 2) % val.len();
     hashset.insert(val[offset]);
-    Just(hashset).boxed()
-}
-/// sender strategy that selects one validator at each step, in a round robin manner
-fn round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
-    let v = val.pop().unwrap();
-    val.insert(0, v);
-    let mut hashset = HashSet::new();
-    hashset.insert(v);
     Just(hashset).boxed()
 }
 
