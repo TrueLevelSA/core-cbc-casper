@@ -189,6 +189,16 @@ fn arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
     prop::collection::hash_set(prop::sample::select(val.clone()), 1).boxed()
 }
 
+/// sender strategy that picks some number of validators in the set at random, in a uniform manner
+fn parallel_arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
+    let validators = val.clone();
+    prop::sample::select((1..validators.len()).collect::<Vec<usize>>())
+        .prop_flat_map(move |val_count| {
+            prop::collection::hash_set(prop::sample::select(validators.clone()), val_count)
+        })
+        .boxed()
+}
+
 /// receiver strategy that picks between 0 and n receivers at random, n being the number of validators
 fn some_receivers(_sender: &u32, possible_senders: &Vec<u32>, rng: &mut TestRng) -> HashSet<u32> {
     let n = rng.gen_range(0, possible_senders.len());
@@ -714,6 +724,19 @@ proptest! {
     #![proptest_config(Config::with_cases(1))]
     #[test]
     fn arbitrary_messenger_vote_count(ref chain in chain(VoteCount::arbitrary(), 8, arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
+        // total messages until unilateral consensus
+        println!("{} validators -> {:?} message(s)",
+                 match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+                 {"0" => "Unknown",
+                  x => x},
+                 chain.len());
+    }
+}
+
+proptest! {
+    #![proptest_config(Config::with_cases(1))]
+    #[test]
+    fn parallel_arbitrary_messenger_vote_count(ref chain in chain(VoteCount::arbitrary(), 8, parallel_arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
         // total messages until unilateral consensus
         println!("{} validators -> {:?} message(s)",
                  match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
