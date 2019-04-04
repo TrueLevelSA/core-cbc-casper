@@ -37,15 +37,8 @@ use tools::ChainData;
 /// messages are added to theirs senders state
 fn create_messages<'z, M>(
     state: &'z mut HashMap<M::Sender, SenderState<M>>,
-    senders_recipients_data: Vec<(
-        M::Sender,
-        HashSet<M::Sender>,
-    )>,
-) -> Vec<(
-    M,
-    M::Sender,
-    HashSet<M::Sender>,
-)>
+    senders_recipients_data: Vec<(M::Sender, HashSet<M::Sender>)>,
+) -> Vec<(M, M::Sender, HashSet<M::Sender>)>
 where
     M: CasperMsg,
 {
@@ -101,11 +94,7 @@ where
 /// state of the recipients are updated accordingly
 fn add_messages<M>(
     state: &mut HashMap<M::Sender, SenderState<M>>,
-    messages_senders_recipients_datas: Vec<(
-        M,
-        M::Sender,
-        HashSet<M::Sender>,
-    )>,
+    messages_senders_recipients_datas: Vec<(M, M::Sender, HashSet<M::Sender>)>,
 ) -> Result<(), &'static str>
 where
     M: CasperMsg,
@@ -201,11 +190,7 @@ fn arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
 }
 
 /// receiver strategy that picks between 0 and n receivers at random, n being the number of validators
-fn some_receivers(
-    _sender: &u32,
-    possible_senders: &Vec<u32>,
-    rng: &mut TestRng,
-) -> HashSet<u32> {
+fn some_receivers(_sender: &u32, possible_senders: &Vec<u32>, rng: &mut TestRng) -> HashSet<u32> {
     let n = rng.gen_range(0, possible_senders.len());
     let mut receivers: HashSet<u32> = HashSet::new();
     // FIXME: this is constant time, however the number of receivers is not uniform as we always
@@ -219,11 +204,7 @@ fn some_receivers(
 
 /// receiver strategy that picks half the receiver set at random
 /// if |receiver set| is odd, then either |r_s|/2 or |r_s|/2 + 1 receivers are picked
-fn half_receivers(
-    _sender: &u32,
-    possible_senders: &Vec<u32>,
-    rng: &mut TestRng,
-) -> HashSet<u32> {
+fn half_receivers(_sender: &u32, possible_senders: &Vec<u32>, rng: &mut TestRng) -> HashSet<u32> {
     let n = possible_senders.len() / 2;
     let n = if n <= 0 {
         1
@@ -246,11 +227,7 @@ fn half_receivers(
 }
 
 /// receiver strategy that picks all the receivers
-fn all_receivers(
-    _sender: &u32,
-    possible_senders: &Vec<u32>,
-    _rng: &mut TestRng,
-) -> HashSet<u32> {
+fn all_receivers(_sender: &u32, possible_senders: &Vec<u32>, _rng: &mut TestRng) -> HashSet<u32> {
     HashSet::from_iter(possible_senders.iter().cloned())
 }
 
@@ -286,17 +263,13 @@ where
 {
     (sender_receiver_strategy, Just(state))
         .prop_map(|(map_sender_receivers, mut state)| {
-            let vec_senders_recipients_datas: Vec<(
-                M::Sender,
-                HashSet<M::Sender>,
-            )> = map_sender_receivers
-                // into_iter because cloning is unwanted
-                .into_iter()
-                // explicit typing needed for into()
-                .map(|(s, r): (M::Sender, HashSet<M::Sender>)| {
-                    (s, r)
-                })
-                .collect();
+            let vec_senders_recipients_datas: Vec<(M::Sender, HashSet<M::Sender>)> =
+                map_sender_receivers
+                    // into_iter because cloning is unwanted
+                    .into_iter()
+                    // explicit typing needed for into()
+                    .map(|(s, r): (M::Sender, HashSet<M::Sender>)| (s, r))
+                    .collect();
             let vec_datas = create_messages(&mut state, vec_senders_recipients_datas);
             let result = add_messages(&mut state, vec_datas);
             match result {
@@ -517,7 +490,8 @@ where
         .prop_map(move |(votes, seed)| {
             let mut state = HashMap::new();
             let mut validators: Vec<u32> = (0..votes.len() as u32).collect();
-            let mut received_msgs: HashMap<u32, HashSet<Block<u32>>> = HashMap::from(validators.iter().map(|v| (*v, HashSet::new())).collect());
+            let mut received_msgs: HashMap<u32, HashSet<Block<u32>>> =
+                HashMap::from(validators.iter().map(|v| (*v, HashSet::new())).collect());
 
             let weights: Vec<f64> = iter::repeat(1.0).take(votes.len() as usize).collect();
 
@@ -559,8 +533,11 @@ where
 
             let chain = iter::repeat_with(|| {
                 let sender_strategy = message_producer_strategy(&mut validators);
-                let receiver_strategy =
-                    create_receiver_strategy(&validators, sender_strategy, message_receiver_strategy);
+                let receiver_strategy = create_receiver_strategy(
+                    &validators,
+                    sender_strategy,
+                    message_receiver_strategy,
+                );
 
                 match state.clone() {
                     Ok(st) => {
@@ -585,39 +562,39 @@ where
                 .open("timestamp.log")
                 .unwrap();
 
-        let mut stats_file = OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open(format!("stats{:03}.log", chain_id))
-        .unwrap();
+            let mut stats_file = OpenOptions::new()
+                .create(true)
+                .truncate(true)
+                .write(true)
+                .open(format!("stats{:03}.log", chain_id))
+                .unwrap();
 
-        let mut vec_data: Vec<ChainData> = vec![];
+            let mut vec_data: Vec<ChainData> = vec![];
 
-        writeln!(timestamp_file, "start").unwrap();
-        let v = Vec::from_iter(chain.take_while(|state| {
-            writeln!(timestamp_file, "{:?}", start.elapsed().subsec_micros()).unwrap();
-            start = Instant::now();
-            match (state, no_err) {
-                (Ok(st), true) => {
-                    if have_consensus {
-                        false
-                    } else {
-                        if consensus_satisfied(
-                            st,
-                            &consensus_satisfied_value,
-                            &mut vec_data,
-                            chain_id,
-                            &mut received_msgs,
-                        ) {
-                            have_consensus = true
+            writeln!(timestamp_file, "start").unwrap();
+            let v = Vec::from_iter(chain.take_while(|state| {
+                writeln!(timestamp_file, "{:?}", start.elapsed().subsec_micros()).unwrap();
+                start = Instant::now();
+                match (state, no_err) {
+                    (Ok(st), true) => {
+                        if have_consensus {
+                            false
+                        } else {
+                            if consensus_satisfied(
+                                st,
+                                &consensus_satisfied_value,
+                                &mut vec_data,
+                                chain_id,
+                                &mut received_msgs,
+                            ) {
+                                have_consensus = true
+                            }
+                            true
                         }
-                        true
                     }
-                }
-                (Err(_), true) => {
-                    no_err = false;
-                    true
+                    (Err(_), true) => {
+                        no_err = false;
+                        true
                     }
                     (_, false) => false,
                 }

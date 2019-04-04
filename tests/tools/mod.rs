@@ -100,7 +100,11 @@ pub fn get_children_of_blocks(
     genesis_blocks: HashSet<Block<u32>>,
 ) -> HashSet<Block<u32>> {
     let mut children = HashSet::new();
-    fn reduce(b: &Block<u32>, genesis_blocks: &HashSet<Block<u32>>, children: &mut HashSet<Block<u32>>) -> () {
+    fn reduce(
+        b: &Block<u32>,
+        genesis_blocks: &HashSet<Block<u32>>,
+        children: &mut HashSet<Block<u32>>,
+    ) -> () {
         match b.prevblock() {
             Some(_msg) => {
                 if genesis_blocks.contains(&_msg) {
