@@ -200,21 +200,21 @@ fn arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
     prop::collection::hash_set(prop::sample::select(val.clone()), 1).boxed()
 }
 
-/// receiver stratefy that picks between 0 and N receivers at random, N being the number of validators
+/// receiver strategy that picks between 0 and n receivers at random, n being the number of validators
 fn some_receivers(
     _sender: &u32,
     possible_senders: &Vec<u32>,
     rng: &mut TestRng,
 ) -> HashSet<u32> {
-    let nb = rng.gen_range(0, possible_senders.len());
-    let mut hs: HashSet<u32> = HashSet::new();
+    let n = rng.gen_range(0, possible_senders.len());
+    let mut receivers: HashSet<u32> = HashSet::new();
     // FIXME: this is constant time, however the number of receivers is not uniform as we always
     // pick from the same vec of senders and put them in a hashset, there are some collisons
-    for _ in 0..nb {
-        hs.insert(*rng.choose(possible_senders).unwrap());
+    for _ in 0..n {
+        receivers.insert(*rng.choose(possible_senders).unwrap());
     }
 
-    hs
+    receivers
 }
 
 /// receiver strategy that picks half the receiver set at random
@@ -224,21 +224,21 @@ fn half_receivers(
     possible_senders: &Vec<u32>,
     rng: &mut TestRng,
 ) -> HashSet<u32> {
-    let nb = possible_senders.len() / 2;
-    let nb = if nb <= 0 {
+    let n = possible_senders.len() / 2;
+    let n = if n <= 0 {
         1
     } else {
         // if we have an odd number of validators, we either pick len/2 or len/2 +1
-        if nb * 2 != possible_senders.len() {
+        if n * 2 != possible_senders.len() {
             let offset = rng.gen_range(0, 2);
-            nb + offset
+            n + offset
         } else {
-            nb
+            n
         }
     };
     let mut v_senders = possible_senders.clone();
     let mut hashset = HashSet::new();
-    for i in 0..nb {
+    for i in 0..n {
         let index = rng.gen_range(0, v_senders.len());
         hashset.insert(v_senders.remove(index));
     }
