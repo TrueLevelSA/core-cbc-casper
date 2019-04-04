@@ -511,6 +511,7 @@ where
         .prop_map(move |(votes, seed)| {
             let mut state = HashMap::new();
             let mut validators: Vec<u32> = (0..votes.len() as u32).collect();
+            let mut received_msgs: HashMap<u32, HashSet<Block<u32>>> = HashMap::from(validators.iter().map(|v| (*v, HashSet::new())).collect());
 
             let weights: Vec<f64> = iter::repeat(1.0).take(votes.len() as usize).collect();
 
@@ -549,11 +550,11 @@ where
                 ProptestConfig::default(),
                 TestRng::from_seed(RngAlgorithm::ChaCha, &seed),
             );
+
             let chain = iter::repeat_with(|| {
-                let mut senders = validators.clone();
-                let sender_strategy = message_producer_strategy(&mut senders);
+                let sender_strategy = message_producer_strategy(&mut validators);
                 let receiver_strategy =
-                    create_receiver_strategy(&senders, sender_strategy, message_receiver_strategy);
+                    create_receiver_strategy(&validators, sender_strategy, message_receiver_strategy);
 
                 match state.clone() {
                     Ok(st) => {
@@ -586,11 +587,6 @@ where
         .unwrap();
 
         let mut vec_data: Vec<ChainData> = vec![];
-        let mut received_msgs: HashMap<u32, HashSet<Block<u32>>> = HashMap::new();
-
-        for id in validators.clone() {
-            received_msgs.insert(id, HashSet::new());
-        }
 
         writeln!(timestamp_file, "start").unwrap();
         let v = Vec::from_iter(chain.take_while(|state| {
