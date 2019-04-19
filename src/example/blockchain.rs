@@ -34,12 +34,12 @@ impl<S: Sender> ProtoBlock<S> {
 #[derive(Clone, Eq, Hash)]
 pub struct Block<S: Sender>((Arc<ProtoBlock<S>>, Hashed));
 
-// #[cfg(feature = "integration_test")]
-// impl<S: Sender + Into<S>> From<S> for Block<S> {
-//     fn from(sender: S) -> Self {
-//         Block::from(ProtoBlock::new(None))
-//     }
-// }
+#[cfg(feature = "integration_test")]
+impl<S: Sender + Into<S>> From<S> for Block<S> {
+    fn from(sender: S) -> Self {
+        Block::from(ProtoBlock::new(None))
+    }
+}
 
 // #[cfg(feature = "integration_test")]
 // impl<S: Sender> std::fmt::Debug for Block<S> {
