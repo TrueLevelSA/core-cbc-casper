@@ -21,3 +21,7 @@ pub mod traits;
 pub mod weight_unit;
 
 pub mod example;
+
+extern crate flame;
+#[macro_use]
+extern crate flamer;

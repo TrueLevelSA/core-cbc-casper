@@ -61,18 +61,30 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
 
         // update latest_msgs in sender_state with new_msgs
         let mut justification = Justification::new();
+        #[cfg(feature = "integration_test")]
+        flame::start("faulty_inserts");
         let (success, sender_state) = justification.faulty_inserts(new_msgs, &sender_state);
+        #[cfg(feature = "integration_test")]
+        flame::end("faulty_inserts");
 
         if !success && new_msgs_len > 0 {
             Err("None of the messages could be added to the state!")
         } else {
+            #[cfg(feature = "integration_test")]
+            flame::start("honest_from_latest_msgs");
             let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(
                 sender_state.latests_msgs(),
                 sender_state.equivocators(),
             );
+            #[cfg(feature = "integration_test")]
+            flame::end("honest_from_latest_msgs");
 
+            #[cfg(feature = "integration_test")]
+            flame::start("mk_estimate");
             let estimate = latest_msgs_honest.mk_estimate(&sender_state.senders_weights());
-            estimate.map(|e| (Self::new(sender, justification, e, None), sender_state))
+            #[cfg(feature = "integration_test")]
+            flame::end("mk_estimate");
+            flame::span_of("message_creation", || estimate.map(|e| (Self::new(sender, justification, e, None), sender_state)))
         }
     }
 

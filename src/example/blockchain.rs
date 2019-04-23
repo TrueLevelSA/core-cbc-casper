@@ -135,6 +135,7 @@ impl<S: Sender> Block<S> {
     }
 
     /// Math definition of blockchain membership
+    #[flame]
     pub fn is_member(&self, rhs: &Self) -> bool {
         self == rhs
             || rhs
@@ -144,6 +145,7 @@ impl<S: Sender> Block<S> {
                 .unwrap_or(false)
     }
 
+    #[flame]
     pub fn safety_oracles(
         block: Block<S>,
         latest_msgs_honest: &LatestMsgsHonest<BlockMsg<S>>,
@@ -261,6 +263,7 @@ impl<S: Sender> Block<S> {
     /// the hashmap maps blocks to their respective children
     /// the set contains all the blocks that have a None
     /// as their prevblock (aka genesis blocks or finalized blocks)
+    #[flame]
     pub fn parse_blockchains(
         latest_msgs: &LatestMsgsHonest<BlockMsg<S>>,
     ) -> (
@@ -315,6 +318,7 @@ impl<S: Sender> Block<S> {
         (visited_parents, genesis, latest_blocks)
     }
     /// used to collect the validators that produced blocks for each side of a fork
+    #[flame]
     fn collect_validators(
         block: &Block<S>,
         visited: &HashMap<Block<S>, HashSet<Block<S>>>,

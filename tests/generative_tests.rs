@@ -1,7 +1,13 @@
 #![cfg(feature = "integration_test")]
 extern crate casper;
+#[macro_use]
+extern crate flamer;
+
+extern crate flame;
 extern crate proptest;
 extern crate rand;
+
+use std::fs::File;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::iter;
@@ -30,6 +36,7 @@ use std::io::Write;
 
 use std::time::Instant;
 
+#[flame]
 fn add_message<M>(
     state: &mut HashMap<M::Sender, SenderState<M>>,
     sender: M::Sender,
@@ -38,12 +45,15 @@ fn add_message<M>(
 where
     M: CasperMsg,
 {
+    flame::start("latest");
     let latest: HashSet<M> = state[&sender]
         .latests_msgs()
         .iter()
         .fold(HashSet::new(), |acc, (_, lms)| {
             acc.union(&lms).cloned().collect()
         });
+    flame::end("latest");
+    flame::start("latest_delta");
     let latest_delta = match state[&sender].latests_msgs().get(&sender) {
         Some(msgs) => match msgs.len() {
             1 => {
@@ -58,12 +68,15 @@ where
         },
         None => latest,
     };
+    flame::end("latest_delta");
+    flame::start("from_msgs");
     let (m, sender_state) = M::from_msgs(
         sender.clone(),
         latest_delta.iter().collect(),
         &state[&sender],
     )
     .unwrap();
+    flame::end("from_msgs");
 
     state.insert(sender.clone(), sender_state);
     state
@@ -72,15 +85,17 @@ where
         .latests_msgs_as_mut()
         .update(&m);
 
+    flame::start("result");
     let result: Result<(),&'static str> = recipients.into_iter().map(|recipient| {
-        let sender_state_reconstructed = SenderState::new(
+        let sender_state_reconstructed = flame::span_of("sender_state_reconstruction", || SenderState::new(
             state[&recipient].senders_weights().clone(),
             0.0,
             Some(m.clone()),
             LatestMsgs::from(m.justification()),
             0.0,
             HashSet::new(),
-        );
+        ));
+        flame::start("estimate_comparison");
         if m.estimate()
             != M::from_msgs(
                 sender.clone(),
@@ -93,15 +108,20 @@ where
         {
             return Err("Recipient must be able to reproduce the estimate from its justification and the justification only.");
         }
+        flame::end("estimate_comparison");
 
+
+        flame::start("state_update");
         let state_to_update = state.get_mut(&recipient).unwrap().latests_msgs_as_mut();
         state_to_update.update(&m);
         m.justification().iter().for_each(|m| {
             state_to_update.update(m);
         });
+        flame::end("state_update");
 
         Ok(())
     }).collect();
+    flame::end("result");
     result
 }
 
@@ -327,6 +347,7 @@ fn arbitrary_blockchain() -> BoxedStrategy<Block<u32>> {
 }
 
 #[test]
+#[flame]
 fn blockchain() {
     let mut config = Config::with_cases(1);
     config.source_file = Some("tests/generative_tests.rs");
@@ -369,7 +390,10 @@ fn blockchain() {
                 },
             )
             .unwrap();
+        flame::dump_html(&mut File::create(format!("flame-graph-{}.html", i)).unwrap()).unwrap();
+        // println!("{:?}", flame::spans());
     }
+
 }
 
 proptest! {
