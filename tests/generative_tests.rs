@@ -393,7 +393,6 @@ fn blockchain() {
         flame::dump_html(&mut File::create(format!("flame-graph-{}.html", i)).unwrap()).unwrap();
         // println!("{:?}", flame::spans());
     }
-
 }
 
 proptest! {

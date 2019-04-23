@@ -84,7 +84,10 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
             let estimate = latest_msgs_honest.mk_estimate(&sender_state.senders_weights());
             #[cfg(feature = "integration_test")]
             flame::end("mk_estimate");
-            flame::span_of("message_creation", || estimate.map(|e| (Self::new(sender, justification, e, None), sender_state)))
+
+            flame::span_of("message_creation", || {
+                estimate.map(|e| (Self::new(sender, justification, e, None), sender_state))
+            })
         }
     }
 
