@@ -550,9 +550,15 @@ fn blockchain() {
     let mut config = Config::with_cases(1);
     config.source_file = Some("tests/generative_tests.rs");
 
-    let mut runner = TestRunner::new(config);
-
-    for chain_id in 0..2 {
+    for chain_id in 0..10 {
+        // TestRunners run only N times when using Config::with_cases(N);
+        // so we have to create a new runner with said config each time we want
+        // to simulate a new blockchain.
+        // We could increase N but chain_id would be the same for each run and overwrite
+        // the blockhain_test_n.log
+        // As of 0.9.2, it is not possible to get the current run index for a runner in order
+        // to replace the chain_id with something more elegant
+        let mut runner = TestRunner::new(config.clone());
         runner
             .run(
                 &chain(
