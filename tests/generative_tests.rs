@@ -559,6 +559,17 @@ fn blockchain() {
         // As of 0.9.2, it is not possible to get the current run index for a runner in order
         // to replace the chain_id with something more elegant
         let mut runner = TestRunner::new(config.clone());
+
+        // truncate if the file already exists
+        let output_file = OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(format!("blockchain_test_{}.log", chain_id))
+            .unwrap();
+        // close file handle with truncate option
+        drop(output_file);
+
         runner
             .run(
                 &chain(
@@ -568,14 +579,14 @@ fn blockchain() {
                     all_receivers,
                     safety_oracle_at_height,
                     4,
-                    chain_id + 1, // +1 to match numbering in visualization
+                    chain_id,
                 ),
                 |chain| {
                     chain.iter().for_each(|state| {
                         let state = state.as_ref().unwrap();
                         let mut output_file = OpenOptions::new()
                             .create(true)
-                            .truncate(true)
+                            .append(true)
                             .write(true)
                             .open(format!("blockchain_test_{}.log", chain_id))
                             .unwrap();
