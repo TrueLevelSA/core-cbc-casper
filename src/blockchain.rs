@@ -112,12 +112,15 @@ impl<S: Sender> Block<S> {
     pub fn new(prevblock: Option<Block<S>>) -> Self {
         Block::from(ProtoBlock::new(prevblock))
     }
+
     pub fn id(&self) -> &<Self as Id>::ID {
         &(self.0).1
     }
+
     fn arc(&self) -> &Arc<ProtoBlock<S>> {
         &(self.0).0
     }
+
     /// Create a new block from a prevblock message and an incomplete block
     pub fn from_prevblock_msg(
         prevblock_msg: Option<BlockMsg<S>>,
@@ -313,6 +316,7 @@ impl<S: Sender> Block<S> {
         }
         (visited_parents, genesis, latest_blocks)
     }
+
     /// used to collect the validators that produced blocks for each side of a fork
     fn collect_validators(
         block: &Block<S>,

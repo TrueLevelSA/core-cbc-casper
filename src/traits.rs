@@ -5,13 +5,6 @@ use crate::message;
 use justification::LatestMsgsHonest;
 use util::weight::SendersWeight;
 
-extern crate serde_derive;
-
-extern crate bincode;
-extern crate blake2;
-extern crate itertools;
-pub extern crate serde;
-
 /// Describes an estimate, or a value of the consensus at a certain time
 pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {
     type M: message::Trait<Estimate = Self>;

@@ -7,8 +7,8 @@ use proptest::prelude::*;
 
 use casper::justification::{Justification, LatestMsgsHonest};
 use casper::message::{self, Trait};
-use casper::traits::{Estimate, Sender, Zero};
-use casper::util::weight::{SendersWeight, WeightUnit};
+use casper::traits::{Estimate, Zero};
+use casper::util::weight::SendersWeight;
 
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]
 pub struct VoteCount {
@@ -17,7 +17,7 @@ pub struct VoteCount {
 }
 
 #[cfg(feature = "integration_test")]
-impl<S: Sender> From<S> for VoteCount {
+impl<S: casper::traits::Sender> From<S> for VoteCount {
     fn from(_sender: S) -> Self {
         VoteCount::default()
     }
@@ -85,7 +85,6 @@ impl VoteCount {
         message::Message::new(sender, justification, estimate, None)
     }
 
-    ///
     fn get_vote_msgs(
         latest_msgs: &LatestMsgsHonest<message::Message<Self, Voter>>,
     ) -> HashSet<message::Message<Self, Voter>> {

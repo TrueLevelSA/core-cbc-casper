@@ -1,7 +1,6 @@
 use rayon::prelude::*;
 use std::collections::HashSet;
 use std::fmt::Debug;
-//use std::hash::{Hash, Hasher};
 use std::sync::{Arc, RwLock};
 
 use crate::util::hash::Hash;

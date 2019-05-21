@@ -1,14 +1,14 @@
 extern crate casper;
 
+mod common;
+use common::integer::*;
+
 use std::collections::HashSet;
 
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest, SenderState};
 use casper::message::Trait;
 use casper::traits::Estimate;
 use casper::util::weight::SendersWeight;
-
-mod common;
-use common::integer::*;
 
 #[test]
 fn equal_weight() {

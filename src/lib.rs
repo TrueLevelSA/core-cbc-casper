@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 extern crate digest;
 #[cfg(feature = "integration_test")]
 extern crate proptest;
