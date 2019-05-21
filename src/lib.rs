@@ -17,6 +17,5 @@ pub mod blockchain;
 pub mod hashed;
 pub mod justification;
 pub mod message;
-pub mod senders_weight;
 pub mod traits;
-pub mod weight_unit;
+pub mod util;

@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use casper::justification::{Justification, LatestMsgs, SenderState};
 use casper::message::{self, Trait};
-use casper::senders_weight::SendersWeight;
+use casper::util::weight::SendersWeight;
 
 mod common;
 use common::vote_count::VoteCount;

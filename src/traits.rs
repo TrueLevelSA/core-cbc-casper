@@ -3,7 +3,7 @@ use std::hash::Hash;
 
 use crate::message;
 use justification::LatestMsgsHonest;
-use senders_weight::SendersWeight;
+use util::weight::SendersWeight;
 
 extern crate serde_derive;
 

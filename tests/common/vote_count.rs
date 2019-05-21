@@ -7,8 +7,8 @@ use proptest::prelude::*;
 
 use casper::justification::{Justification, LatestMsgsHonest};
 use casper::message::{self, Trait};
-use casper::senders_weight::SendersWeight;
 use casper::traits::{Estimate, Sender, Zero};
+use casper::util::weight::{SendersWeight, WeightUnit};
 
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]
 pub struct VoteCount {

@@ -4,9 +4,8 @@ use std::fmt::{Debug, Formatter};
 use rayon::iter::IntoParallelRefIterator;
 
 use crate::message;
-use senders_weight::SendersWeight;
 use traits::{Estimate, Zero};
-use weight_unit::WeightUnit;
+use util::weight::{SendersWeight, WeightUnit};
 
 /// Struct that holds the set of the message::Traits that justify
 /// the current message

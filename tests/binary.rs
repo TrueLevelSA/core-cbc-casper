@@ -4,8 +4,8 @@ use std::collections::HashSet;
 
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest, SenderState};
 use casper::message::Trait;
-use casper::senders_weight::SendersWeight;
 use casper::traits::Estimate;
+use casper::util::weight::SendersWeight;
 
 mod common;
 use common::binary::*;
