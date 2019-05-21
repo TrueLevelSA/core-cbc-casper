@@ -10,7 +10,7 @@ use traits::{Estimate, Id, Sender};
 
 /// A Casper Message, that can will be sent over the network
 /// and used as a justification for a more recent message
-pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Serialize {
+pub trait Trait: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Serialize {
     // To be implemented on concrete struct
     type Sender: Sender;
     type Estimate: Estimate<M = Self>;
@@ -80,8 +80,8 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
     fn equivocates_indirect(
         &self,
         rhs: &Self,
-        mut equivocators: HashSet<<Self as CasperMsg>::Sender>,
-    ) -> (bool, HashSet<<Self as CasperMsg>::Sender>) {
+        mut equivocators: HashSet<<Self as Trait>::Sender>,
+    ) -> (bool, HashSet<<Self as Trait>::Sender>) {
         let is_equivocation = self.equivocates(rhs);
         let init = if is_equivocation {
             equivocators.insert(self.sender().clone());
@@ -123,7 +123,7 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
         // thus, highly parallelizable. when it shortcuts, because in one thread
         // a dependency was found, the function returns true and all the
         // computation on the other threads will be canceled.
-        fn recurse<M: CasperMsg>(lhs: &M, rhs: &M, visited: Arc<RwLock<HashSet<M>>>) -> bool {
+        fn recurse<M: Trait>(lhs: &M, rhs: &M, visited: Arc<RwLock<HashSet<M>>>) -> bool {
             let justification = lhs.justification();
 
             // Math definition of dependency
@@ -168,7 +168,7 @@ where
     justification: Justification<Message<E, S>>,
 }
 
-/// Boxing of a ProtoMsg, that will implement the trait CasperMsg
+/// Boxing of a ProtoMsg, that will implement the trait message::Trait
 #[derive(Eq, Clone, Default)]
 pub struct Message<E, S>(Arc<ProtoMsg<E, S>>, Hashed)
 where
@@ -259,7 +259,7 @@ where
     }
 }
 
-impl<E, S> CasperMsg for Message<E, S>
+impl<E, S> self::Trait for Message<E, S>
 where
     E: Estimate<M = Self>,
     S: Sender,

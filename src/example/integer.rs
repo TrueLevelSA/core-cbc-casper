@@ -1,5 +1,5 @@
+use crate::message::{self, Trait};
 use justification::LatestMsgsHonest;
-use message::{CasperMsg, Message};
 use senders_weight::SendersWeight;
 use std::collections::HashSet;
 use std::iter::FromIterator;
@@ -23,7 +23,7 @@ impl<S: ::traits::Sender> From<S> for IntegerWrapper {
     }
 }
 
-pub type IntegerMsg = Message<IntegerWrapper /*Estimate*/, Validator /*Sender*/>;
+pub type IntegerMsg = message::Message<IntegerWrapper /*Estimate*/, Validator /*Sender*/>;
 
 #[derive(Clone, Eq, Debug, Ord, PartialOrd, PartialEq, Hash)]
 pub struct Tx;
@@ -34,7 +34,7 @@ impl Estimate for IntegerWrapper {
 
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
+        senders_weights: &SendersWeight<<<Self as Estimate>::M as message::Trait>::Sender>,
     ) -> Result<Self, &'static str> {
         let mut msgs_sorted_by_estimate = Vec::from_iter(latest_msgs.iter().fold(
             HashSet::new(),

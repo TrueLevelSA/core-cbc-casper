@@ -2,9 +2,9 @@ use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::convert::From;
 use std::iter::Iterator;
 
+use crate::message::{self, Trait};
 use hashed::Hashed;
 use justification::{Justification, LatestMsgs, LatestMsgsHonest};
-use message::{CasperMsg, Message};
 use senders_weight::SendersWeight;
 use serde_derive::Serialize;
 use std::marker::PhantomData;
@@ -30,7 +30,7 @@ impl<S: Sender> ProtoBlock<S> {
     }
 }
 
-/// Boxing of a block, will be implemented as a CasperMsg
+/// Boxing of a block, will be implemented as a message::Trait
 #[derive(Clone, Eq, Hash)]
 pub struct Block<S: Sender>((Arc<ProtoBlock<S>>, Hashed));
 
@@ -88,7 +88,7 @@ impl<S: Sender> Id for Block<S> {
     type ID = Hashed;
 }
 
-pub type BlockMsg<S> = Message<Block<S> /*Estimate*/, S /*Sender*/>;
+pub type BlockMsg<S> = message::Message<Block<S> /*Estimate*/, S /*Sender*/>;
 
 impl<S: Sender> PartialEq for Block<S> {
     fn eq(&self, rhs: &Self) -> bool {
@@ -147,14 +147,14 @@ impl<S: Sender> Block<S> {
     pub fn safety_oracles(
         block: Block<S>,
         latest_msgs_honest: &LatestMsgsHonest<BlockMsg<S>>,
-        equivocators: &HashSet<<BlockMsg<S> as CasperMsg>::Sender>,
+        equivocators: &HashSet<<BlockMsg<S> as message::Trait>::Sender>,
         safety_oracle_threshold: WeightUnit,
         weights: &SendersWeight<S>,
-    ) -> HashSet<BTreeSet<<BlockMsg<S> as CasperMsg>::Sender>> {
+    ) -> HashSet<BTreeSet<<BlockMsg<S> as message::Trait>::Sender>> {
         fn latest_in_justification<S: Sender>(
             j: &Justification<BlockMsg<S>>,
-            equivocators: &HashSet<<BlockMsg<S> as CasperMsg>::Sender>,
-        ) -> HashMap<<BlockMsg<S> as CasperMsg>::Sender, BlockMsg<S>> {
+            equivocators: &HashSet<<BlockMsg<S> as message::Trait>::Sender>,
+        ) -> HashMap<<BlockMsg<S> as message::Trait>::Sender, BlockMsg<S>> {
             LatestMsgsHonest::from_latest_msgs(&LatestMsgs::from(j), equivocators)
                 .iter()
                 .map(|m| (m.sender().clone(), m.clone()))
@@ -423,7 +423,7 @@ impl<S: Sender> Block<S> {
 
     pub fn ghost(
         latest_msgs: &LatestMsgsHonest<BlockMsg<S>>,
-        senders_weights: &SendersWeight<<BlockMsg<S> as CasperMsg>::Sender>,
+        senders_weights: &SendersWeight<<BlockMsg<S> as message::Trait>::Sender>,
     ) -> Result<Self, &'static str> {
         let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_msgs);
         let b_in_lms_senders = Rc::new(RwLock::new(HashMap::<Block<S>, HashSet<S>>::new()));
@@ -444,7 +444,7 @@ impl<S: Sender> Estimate for Block<S> {
 
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
+        senders_weights: &SendersWeight<<<Self as Estimate>::M as message::Trait>::Sender>,
         // _data: Option<<Self as Data>::Data>,
     ) -> Result<Self, &'static str> {
         let prevblock = Block::ghost(latest_msgs, senders_weights)?;

@@ -5,10 +5,11 @@ use std::ops::Add;
 #[cfg(feature = "integration_test")]
 use proptest::prelude::*;
 
+use crate::message::{self, Trait};
 use justification::{Justification, LatestMsgsHonest};
-use message::{CasperMsg, Message};
 use senders_weight::SendersWeight;
 use traits::{Estimate, Sender, Zero};
+
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]
 pub struct VoteCount {
     yes: u32,
@@ -74,31 +75,31 @@ impl VoteCount {
 
     /// Creates a new empty vote message, issued by the sender
     /// with no justification
-    pub fn create_vote_msg(sender: u32, vote: bool) -> Message<Self, u32> {
+    pub fn create_vote_msg(sender: u32, vote: bool) -> message::Message<Self, u32> {
         let justification = Justification::new();
         let estimate = match vote {
             true => VoteCount { yes: 1, no: 0 },
             false => VoteCount { yes: 0, no: 1 },
         };
 
-        Message::new(sender, justification, estimate, None)
+        message::Message::new(sender, justification, estimate, None)
     }
 
     ///
     fn get_vote_msgs(
-        latest_msgs: &LatestMsgsHonest<Message<Self, Voter>>,
-    ) -> HashSet<Message<Self, Voter>> {
+        latest_msgs: &LatestMsgsHonest<message::Message<Self, Voter>>,
+    ) -> HashSet<message::Message<Self, Voter>> {
         fn recursor(
-            latest_msgs: &Justification<Message<VoteCount, Voter>>,
-            acc: HashSet<Message<VoteCount, Voter>>,
-        ) -> HashSet<Message<VoteCount, Voter>> {
+            latest_msgs: &Justification<message::Message<VoteCount, Voter>>,
+            acc: HashSet<message::Message<VoteCount, Voter>>,
+        ) -> HashSet<message::Message<VoteCount, Voter>> {
             latest_msgs.iter().fold(acc, |mut acc_prime, m| {
                 match m.justification().len() {
                     0 => {
                         // vote found, vote is a message with 0 justification
                         let estimate = m.estimate().clone();
                         if VoteCount::is_valid_vote(&estimate) {
-                            let equivocation = Message::new(
+                            let equivocation = message::Message::new(
                                 m.sender().clone(),
                                 m.justification().clone(),
                                 VoteCount::toggle_vote(&estimate),
@@ -136,7 +137,7 @@ impl VoteCount {
 }
 
 type Voter = u32;
-pub type VoteMsg = Message<VoteCount, Voter>;
+pub type VoteMsg = message::Message<VoteCount, Voter>;
 
 impl Sender for Voter {}
 
@@ -170,8 +171,8 @@ mod count_votes {
     use std::collections::HashSet;
 
     use super::*;
+    use crate::message;
     use justification::{Justification, LatestMsgs};
-    use message::{CasperMsg, Message};
 
     #[test]
     fn count_votes() {
@@ -198,7 +199,7 @@ mod count_votes {
         let (success, _) = j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights);
         assert!(success);
 
-        let (m0, _) = &Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
+        let (m0, _) = &message::Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
         let mut j1 = Justification::new();
         let (success, _) = j1.faulty_inserts(vec![v1].iter().cloned().collect(), &weights);
         assert!(success);
@@ -206,18 +207,18 @@ mod count_votes {
         let (success, _) = j1.faulty_inserts(vec![m0].iter().cloned().collect(), &weights);
         assert!(success);
 
-        let (m1, _) = &Message::from_msgs(1, vec![v1, m0], None, &weights, None).unwrap();
+        let (m1, _) = &message::Message::from_msgs(1, vec![v1, m0], None, &weights, None).unwrap();
         assert_eq!(
-            Message::estimate(m1).clone(),
+            message::Message::estimate(m1).clone(),
             VoteCount { yes: 1, no: 1 },
             "should have 1 yes, and 1 no vote, found {:?}",
-            Message::estimate(m1).clone(),
+            message::Message::estimate(m1).clone(),
         );
 
         let (success, _) = j1.faulty_inserts(vec![v0_prime].iter().cloned().collect(), &weights);
         assert!(success);
 
-        let (m1_prime, _) = &Message::from_msgs(
+        let (m1_prime, _) = &message::Message::from_msgs(
             1,
             vec![v1, m0, v0_prime].iter().cloned().collect(),
             None,
@@ -226,9 +227,9 @@ mod count_votes {
         )
         .unwrap();
         assert_eq!(
-            Message::estimate(m1_prime).clone(),
+            message::Message::estimate(m1_prime).clone(),
             VoteCount { yes: 1, no: 0 },
             "should have 1 yes, and 0 no vote, found {:?}, the equivocation vote should cancels out the normal vote",
-            Message::estimate(&m1_prime).clone())
+            message::Message::estimate(&m1_prime).clone())
     }
 }

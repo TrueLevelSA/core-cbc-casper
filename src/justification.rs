@@ -3,24 +3,24 @@ use std::fmt::{Debug, Formatter};
 
 use rayon::iter::IntoParallelRefIterator;
 
-use message::CasperMsg;
+use crate::message;
 use senders_weight::SendersWeight;
 use traits::{Estimate, Zero};
 use weight_unit::WeightUnit;
 
-/// Struct that holds the set of the CasperMsgs that justify
+/// Struct that holds the set of the message::Traits that justify
 /// the current message
 /// Works like a Vec
 #[derive(Eq, PartialEq, Clone, Default, Hash)]
-pub struct Justification<M: CasperMsg>(Vec<M>);
+pub struct Justification<M: message::Trait>(Vec<M>);
 
-impl<M: CasperMsg> Justification<M> {
+impl<M: message::Trait> Justification<M> {
     /// Re-exports from Vec wrapping M
     pub fn new() -> Self {
         Justification(Vec::new())
     }
 
-    /// creates a new Justification instance from a Vec of CasperMsg
+    /// creates a new Justification instance from a Vec of message::Trait
     /// and a SenderState
     pub fn from_msgs(msgs: Vec<M>, sender_state: &SenderState<M>) -> (Self, SenderState<M>) {
         let mut j = Justification::new();
@@ -60,8 +60,8 @@ impl<M: CasperMsg> Justification<M> {
     pub fn mk_estimate(
         &self,
         equivocators: &HashSet<M::Sender>,
-        senders_weights: &SendersWeight<<M as CasperMsg>::Sender>,
-        // data: Option<<<M as CasperMsg>::Estimate as Data>::Data>,
+        senders_weights: &SendersWeight<<M as message::Trait>::Sender>,
+        // data: Option<<<M as message::Trait>::Estimate as Data>::Data>,
     ) -> Result<M::Estimate, &'static str> {
         let latest_msgs = LatestMsgs::from(self);
         let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(&latest_msgs, equivocators);
@@ -160,16 +160,16 @@ impl<M: CasperMsg> Justification<M> {
     }
 }
 
-impl<M: CasperMsg> Debug for Justification<M> {
+impl<M: message::Trait> Debug for Justification<M> {
     fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
         write!(f, "{:?}", self.0)
     }
 }
 
 /// Set of latest honest messages
-pub struct LatestMsgsHonest<M: CasperMsg>(HashSet<M>);
+pub struct LatestMsgsHonest<M: message::Trait>(HashSet<M>);
 
-impl<M: CasperMsg> LatestMsgsHonest<M> {
+impl<M: message::Trait> LatestMsgsHonest<M> {
     /// Create an empty set
     fn new() -> Self {
         LatestMsgsHonest(HashSet::new())
@@ -210,7 +210,7 @@ impl<M: CasperMsg> LatestMsgsHonest<M> {
 
     pub fn mk_estimate(
         &self,
-        senders_weights: &SendersWeight<<M as CasperMsg>::Sender>,
+        senders_weights: &SendersWeight<<M as message::Trait>::Sender>,
     ) -> Result<M::Estimate, &'static str> {
         M::Estimate::mk_estimate(&self, senders_weights)
     }
@@ -220,9 +220,9 @@ impl<M: CasperMsg> LatestMsgsHonest<M> {
 /// Latest messages from a sender are all their messages that are not
 /// in the dependency of another of their messages
 #[derive(Eq, PartialEq, Clone, Default, Debug)]
-pub struct LatestMsgs<M: CasperMsg>(HashMap<<M as CasperMsg>::Sender, HashSet<M>>);
+pub struct LatestMsgs<M: message::Trait>(HashMap<<M as message::Trait>::Sender, HashSet<M>>);
 
-impl<M: CasperMsg> LatestMsgs<M> {
+impl<M: message::Trait> LatestMsgs<M> {
     /// Create an empty map
     pub fn new() -> Self {
         LatestMsgs(HashMap::new())
@@ -310,7 +310,7 @@ impl<M: CasperMsg> LatestMsgs<M> {
     }
 }
 
-impl<'z, M: CasperMsg> From<&'z Justification<M>> for LatestMsgs<M> {
+impl<'z, M: message::Trait> From<&'z Justification<M>> for LatestMsgs<M> {
     /// extract the latest messages from a justification
     fn from(j: &Justification<M>) -> Self {
         let mut latest_msgs: LatestMsgs<M> = LatestMsgs::new();
@@ -325,9 +325,9 @@ impl<'z, M: CasperMsg> From<&'z Justification<M>> for LatestMsgs<M> {
         latest_msgs
     }
 }
-// impl<'z, M: CasperMsg> From<&'z Justification<M>> for LatestMsgs<M> {
+// impl<'z, M: message::Trait> From<&'z Justification<M>> for LatestMsgs<M> {
 //     fn from(j: &Justification<M>) -> Self {
-//         fn recur_func<M: CasperMsg>(
+//         fn recur_func<M: message::Trait>(
 //             j: &Justification<M>,
 //             latest_msgs: LatestMsgs<M>,
 //         ) -> LatestMsgs<M> {
@@ -342,7 +342,7 @@ impl<'z, M: CasperMsg> From<&'z Justification<M>> for LatestMsgs<M> {
 
 /// struct that stores the inner state of the sender
 #[derive(Debug, Clone)]
-pub struct SenderState<M: CasperMsg> {
+pub struct SenderState<M: message::Trait> {
     /// current state total fault weight
     state_fault_weight: WeightUnit,
     /// fault tolerance threshold
@@ -356,7 +356,7 @@ pub struct SenderState<M: CasperMsg> {
     equivocators: HashSet<M::Sender>,
 }
 
-impl<M: CasperMsg> SenderState<M> {
+impl<M: message::Trait> SenderState<M> {
     pub fn new(
         senders_weights: SendersWeight<M::Sender>,
         state_fault_weight: WeightUnit,
@@ -415,7 +415,7 @@ impl<M: CasperMsg> SenderState<M> {
             w0.partial_cmp(w1).unwrap_or_else(|| m0.id().cmp(m1.id())) // tie breaker
         });
 
-        // return a Vec<CasperMsg>
+        // return a Vec<message::Trait>
         msgs_sorted_by_faultw
             .iter()
             .map(|(m, _)| m)
@@ -428,8 +428,8 @@ impl<M: CasperMsg> SenderState<M> {
 mod tests {
     use super::*;
 
+    use crate::message::{self, Trait};
     use example::vote_count::VoteCount;
-    use message::Message;
 
     #[test]
     fn faulty_inserts_sorted() {
@@ -490,9 +490,9 @@ mod tests {
             j0.faulty_inserts([v0].iter().cloned().collect(), &sender_state);
         assert!(success);
 
-        let (m0, _weights) = &Message::from_msgs(0, vec![v0], &sender_state).unwrap();
+        let (m0, _weights) = &message::Message::from_msgs(0, vec![v0], &sender_state).unwrap();
 
-        // let m0 = &Message::new(0, justification, estimate);
+        // let m0 = &message::Message::new(0, justification, estimate);
         let mut j1 = Justification::new();
         let (success, sender_state) =
             j1.faulty_inserts(vec![v1].iter().cloned().collect(), &sender_state);

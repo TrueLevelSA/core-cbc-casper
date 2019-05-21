@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 use std::hash::Hash;
 
+use crate::message;
 use justification::LatestMsgsHonest;
-use message::CasperMsg;
 use senders_weight::SendersWeight;
 
 extern crate serde_derive;
@@ -14,14 +14,14 @@ pub extern crate serde;
 
 /// Describes an estimate, or a value of the consensus at a certain time
 pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {
-    type M: CasperMsg<Estimate = Self>;
+    type M: message::Trait<Estimate = Self>;
 
     /// Choses an estimate from a set of latest messages
     /// The finalized_msg value can be used in order not to recursively
     /// go back to the genesis
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
+        senders_weights: &SendersWeight<<<Self as Estimate>::M as message::Trait>::Sender>,
     ) -> Result<Self, &'static str>;
 }
 

@@ -16,7 +16,7 @@ use rand::seq::SliceRandom;
 use rand::thread_rng;
 
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest, SenderState};
-use casper::message::*;
+use casper::message::{self, Message, Trait};
 use casper::senders_weight::SendersWeight;
 use casper::traits::Estimate;
 
@@ -40,7 +40,7 @@ fn create_messages<'z, M>(
     senders_recipients_data: Vec<(M::Sender, HashSet<M::Sender>)>,
 ) -> Vec<(M, M::Sender, HashSet<M::Sender>)>
 where
-    M: CasperMsg,
+    M: message::Trait,
 {
     senders_recipients_data
         // into_iter because we dont want to clone datas at the end
@@ -97,7 +97,7 @@ fn add_messages<M>(
     messages_senders_recipients_datas: Vec<(M, M::Sender, HashSet<M::Sender>)>,
 ) -> Result<(), &'static str>
 where
-    M: CasperMsg,
+    M: message::Trait,
 {
     let result = messages_senders_recipients_datas.into_iter()
         .map(|(m, sender, recipients)|{
@@ -269,7 +269,7 @@ fn message_events<M>(
     sender_receiver_strategy: BoxedStrategy<HashMap<M::Sender, HashSet<M::Sender>>>,
 ) -> BoxedStrategy<Result<HashMap<M::Sender, SenderState<M>>, &'static str>>
 where
-    M: 'static + CasperMsg,
+    M: 'static + message::Trait,
 {
     (sender_receiver_strategy, Just(state))
         .prop_map(|(map_sender_receivers, mut state)| {
@@ -298,7 +298,7 @@ fn full_consensus<M>(
     _received_msgs: &mut HashMap<u32, HashSet<Block<u32>>>,
 ) -> bool
 where
-    M: CasperMsg,
+    M: message::Trait,
 {
     let m: HashSet<_> = state
         .iter()
