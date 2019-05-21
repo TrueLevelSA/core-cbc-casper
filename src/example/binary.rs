@@ -1,5 +1,5 @@
+use crate::message::{self, Trait};
 use justification::LatestMsgsHonest;
-use message::{CasperMsg, Message};
 use senders_weight::SendersWeight;
 use traits::{Estimate, Zero};
 use weight_unit::WeightUnit;
@@ -22,7 +22,7 @@ impl<S: ::traits::Sender> From<S> for BoolWrapper {
     }
 }
 
-pub type BinaryMsg = Message<BoolWrapper /*Estimate*/, Validator /*Sender*/>;
+pub type BinaryMsg = message::Message<BoolWrapper /*Estimate*/, Validator /*Sender*/>;
 
 impl Estimate for BoolWrapper {
     type M = BinaryMsg;
@@ -30,7 +30,7 @@ impl Estimate for BoolWrapper {
     /// weighted count of the votes contained in the latest messages
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        senders_weights: &SendersWeight<<<Self as Estimate>::M as CasperMsg>::Sender>,
+        senders_weights: &SendersWeight<<<Self as Estimate>::M as message::Trait>::Sender>,
         // _data: Option<<Self as Data>::Data>,
     ) -> Result<Self, &'static str> {
         // loop over all the latest messages

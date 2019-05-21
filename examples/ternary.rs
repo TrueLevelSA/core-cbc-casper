@@ -48,7 +48,7 @@ impl Estimate for Value {
         latest_msgs: &LatestMsgsHonest<Message>,
         senders_weights: &SendersWeight<Validator>,
     ) -> Result<Self, &'static str> {
-        use message::CasperMsg;
+        use message::Trait;
         let res: Self = latest_msgs
             .iter()
             .map(|msg| (msg.estimate(), senders_weights.weight(msg.sender())))
@@ -68,7 +68,7 @@ impl Estimate for Value {
 
 fn main() {
     use casper::justification::{Justification, LatestMsgs, SenderState};
-    use casper::message::CasperMsg;
+    use casper::message::Trait;
     use std::collections::HashSet;
 
     let senders: Vec<u32> = (1..=4).collect();
