@@ -27,6 +27,14 @@ pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {
 
 pub trait Sender: Hash + Clone + Ord + Eq + Send + Sync + Debug + serde::Serialize {}
 
+// Default implementations
+impl Sender for u8 {}
+impl Sender for u32 {}
+impl Sender for u64 {}
+impl Sender for i8 {}
+impl Sender for i32 {}
+impl Sender for i64 {}
+
 /// Define how to compare the trait type to zero
 pub trait Zero<T: PartialEq> {
     const ZERO: T;

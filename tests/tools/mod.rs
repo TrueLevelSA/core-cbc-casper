@@ -1,8 +1,8 @@
-use casper::justification::{LatestMsgsHonest, SenderState};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
-use casper::example::blockchain::{Block, BlockMsg};
+use casper::blockchain::{Block, BlockMsg};
+use casper::justification::{LatestMsgsHonest, SenderState};
 
 pub struct ChainData {
     pub chain_id: u32,
