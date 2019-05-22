@@ -1,14 +1,14 @@
 use casper::justification::LatestMsgsHonest;
 use casper::message::{self, Trait};
-use casper::senders_weight::SendersWeight;
 use casper::traits::{Estimate, Zero};
-use casper::weight_unit::WeightUnit;
+use casper::util::weight::{SendersWeight, WeightUnit};
 
 type Validator = u32;
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, serde_derive::Serialize)]
 pub struct BoolWrapper(pub bool);
 
+#[cfg(feature = "integration_test")]
 impl BoolWrapper {
     pub fn new(estimate: bool) -> Self {
         BoolWrapper(estimate)

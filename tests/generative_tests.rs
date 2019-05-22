@@ -18,8 +18,8 @@ use rand::thread_rng;
 use casper::blockchain::{Block, BlockMsg, ProtoBlock};
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest, SenderState};
 use casper::message::{self, Message, Trait};
-use casper::senders_weight::SendersWeight;
 use casper::traits::Estimate;
+use casper::util::weight::SendersWeight;
 
 mod common;
 use common::binary::BoolWrapper;

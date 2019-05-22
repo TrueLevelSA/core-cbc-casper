@@ -1,16 +1,17 @@
 use rayon::prelude::*;
 use std::collections::HashSet;
 use std::fmt::Debug;
-use std::hash::{Hash, Hasher};
 use std::sync::{Arc, RwLock};
 
-use hashed::Hashed;
+use crate::util::hash::Hash;
 use justification::{Justification, LatestMsgsHonest, SenderState};
 use traits::{Estimate, Id, Sender};
 
 /// A Casper Message, that can will be sent over the network
 /// and used as a justification for a more recent message
-pub trait Trait: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Serialize {
+pub trait Trait:
+    std::hash::Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Serialize
+{
     // To be implemented on concrete struct
     type Sender: Sender;
     type Estimate: Estimate<M = Self>;
@@ -170,7 +171,7 @@ where
 
 /// Boxing of a ProtoMsg, that will implement the trait message::Trait
 #[derive(Eq, Clone, Default)]
-pub struct Message<E, S>(Arc<ProtoMsg<E, S>>, Hashed)
+pub struct Message<E, S>(Arc<ProtoMsg<E, S>>, Hash)
 where
     E: Estimate<M = Message<E, S>>,
     S: Sender;
@@ -212,7 +213,7 @@ where
     E: Estimate<M = Message<E, S>>,
     S: Sender,
 {
-    type ID = Hashed;
+    type ID = Hash;
 }
 
 impl<E, S> Id for Message<E, S>
@@ -220,7 +221,7 @@ where
     E: Estimate<M = Self>,
     S: Sender,
 {
-    type ID = Hashed;
+    type ID = Hash;
     fn getid(&self) -> Self::ID {
         self.1.clone()
     }
@@ -305,12 +306,12 @@ where
     // }
 }
 
-impl<E, S> Hash for Message<E, S>
+impl<E, S> std::hash::Hash for Message<E, S>
 where
     E: Estimate<M = Self>,
     S: Sender,
 {
-    fn hash<H: Hasher>(&self, state: &mut H) {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.id().hash(state)
     }
 }

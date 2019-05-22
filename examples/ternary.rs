@@ -4,8 +4,8 @@ use std::convert::From;
 
 use casper::justification::LatestMsgsHonest;
 use casper::message;
-use casper::senders_weight::SendersWeight;
 use casper::traits::Estimate;
+use casper::util::weight::SendersWeight;
 
 type Validator = u32;
 

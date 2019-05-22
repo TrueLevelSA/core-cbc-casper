@@ -1,13 +1,13 @@
 extern crate casper;
 
+mod common;
+use common::vote_count::VoteCount;
+
 use std::collections::HashSet;
 
 use casper::justification::{Justification, LatestMsgs, SenderState};
 use casper::message::{Message, Trait};
-use casper::senders_weight::SendersWeight;
-
-mod common;
-use common::vote_count::VoteCount;
+use casper::util::weight::SendersWeight;
 
 #[test]
 fn msg_equality() {

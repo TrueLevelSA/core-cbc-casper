@@ -3,14 +3,7 @@ use std::hash::Hash;
 
 use crate::message;
 use justification::LatestMsgsHonest;
-use senders_weight::SendersWeight;
-
-extern crate serde_derive;
-
-extern crate bincode;
-extern crate blake2;
-extern crate itertools;
-pub extern crate serde;
+use util::weight::SendersWeight;
 
 /// Describes an estimate, or a value of the consensus at a certain time
 pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {
