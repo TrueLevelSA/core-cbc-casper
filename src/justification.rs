@@ -344,16 +344,16 @@ impl<'z, M: message::Trait> From<&'z Justification<M>> for LatestMsgs<M> {
 #[derive(Debug, Clone)]
 pub struct SenderState<M: message::Trait> {
     /// current state total fault weight
-    pub state_fault_weight: WeightUnit,
+    state_fault_weight: WeightUnit,
     /// fault tolerance threshold
-    pub thr: WeightUnit,
+    thr: WeightUnit,
     /// current validator set, mapped to their respective weights
-    pub senders_weights: SendersWeight<M::Sender>,
+    senders_weights: SendersWeight<M::Sender>,
     /// this sender's last message
     /// TODO: better name?
-    pub my_last_msg: Option<M>,
-    pub latest_msgs: LatestMsgs<M>,
-    pub equivocators: HashSet<M::Sender>,
+    my_last_msg: Option<M>,
+    latest_msgs: LatestMsgs<M>,
+    equivocators: HashSet<M::Sender>,
 }
 
 impl<M: message::Trait> SenderState<M> {
@@ -383,6 +383,10 @@ impl<M: message::Trait> SenderState<M> {
         &self.senders_weights
     }
 
+    pub fn set_senders_weights(&mut self, weights: SendersWeight<M::Sender>) {
+        self.senders_weights = weights
+    }
+
     pub fn my_last_msg(&self) -> &Option<M> {
         &self.my_last_msg
     }
@@ -397,6 +401,14 @@ impl<M: message::Trait> SenderState<M> {
 
     pub fn fault_weight(&self) -> WeightUnit {
         self.state_fault_weight
+    }
+
+    pub fn set_fault_weight(&mut self, fault_weight: WeightUnit) {
+        self.state_fault_weight = fault_weight
+    }
+
+    pub fn set_threshold(&mut self, thresh: WeightUnit) {
+        self.thr = thresh
     }
 
     /// get msgs and fault weight overhead and equivocators overhead sorted
