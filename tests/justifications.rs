@@ -89,28 +89,19 @@ fn faulty_inserts() {
     );
 
     sender_state.set_threshold(1.0);
-    let (success, _) = j1.clone().faulty_insert(
-        v0_prime,
-        &sender_state
-    );
+    let (success, _) = j1.clone().faulty_insert(v0_prime, &sender_state);
     assert!(success,
         "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set"
     );
 
-    let (_, sender_state2) = j1.clone().faulty_insert(
-        v0_prime,
-        &sender_state
-    );
+    let (_, sender_state2) = j1.clone().faulty_insert(v0_prime, &sender_state);
     assert_eq!(
         sender_state2.fault_weight(), 1.0,
         "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set, and thus the state_fault_weight should be incremented to 1.0"
     );
 
     sender_state.set_fault_weight(0.1);
-    let (success, _) = j1.clone().faulty_insert(
-        v0_prime,
-        &sender_state
-    );
+    let (success, _) = j1.clone().faulty_insert(v0_prime, &sender_state);
     assert!(!success,
         "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as the fault threshold gets crossed for the set"
     );
@@ -132,10 +123,7 @@ fn faulty_inserts() {
 
     sender_state.set_fault_weight(1.0);
     sender_state.set_threshold(2.0);
-    let (success, _) = j1.clone().faulty_insert(
-        v0_prime,
-        &sender_state
-    );
+    let (success, _) = j1.clone().faulty_insert(v0_prime, &sender_state);
     assert!(success,
         "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the thr doesnt get crossed for the set"
     );
@@ -143,19 +131,13 @@ fn faulty_inserts() {
     let senders_weights = SendersWeight::new([].iter().cloned().collect());
     sender_state.set_senders_weights(senders_weights);
     // bug found
-    let (success, _) = j1.clone().faulty_insert(
-        v0_prime,
-        &sender_state
-    );
+    let (success, _) = j1.clone().faulty_insert(v0_prime, &sender_state);
     assert!(
         !success,
         "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we can't know the weight of the sender, which could be Infinity"
     );
 
-    let (_, sender_state) = j1.clone().faulty_insert(
-        v0_prime,
-        &sender_state
-    );
+    let (_, sender_state) = j1.clone().faulty_insert(v0_prime, &sender_state);
     assert_eq!(
             sender_state.fault_weight(),
         1.0,
