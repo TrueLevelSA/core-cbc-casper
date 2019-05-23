@@ -3,7 +3,7 @@
 image: rust:1.32.0
 
 before_script:
-  - cargo version
+  - cargo version --verbose
   - rustup component add rustfmt
 
 stages:
@@ -15,7 +15,7 @@ stages:
 build:
   stage: build
   script:
-    - cargo build
+    - cargo build --verbose
 
 unit-tests:
   stage: tests
@@ -48,4 +48,4 @@ fmt:
       # When running with --check, Rustfmt will exit with 0 if Rustfmt would
       # not make any formatting changes to the input, and 1 if Rustfmt would
       # make changes.
-    - cargo fmt --all -- --check
+    - cargo fmt --all --verbose -- --check --verbose
