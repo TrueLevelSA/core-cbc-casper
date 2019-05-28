@@ -3,7 +3,7 @@
 CBC Casper Abstract Message Library
 ===
 
-**DISCLAIMER:** This library is experimental, under develepment, not reviewed,
+**DISCLAIMER:** This library is experimental, under development, not reviewed,
 and might change dramatically.
 
 The purpose of this library is to abstractly define the CBC Casper, as defined
@@ -14,17 +14,17 @@ casper family. We aimed at pushing as much functionality as possible directly to
 the abstract message layer, in such a way that a developer can create a protocol
 fairly easy using this library.
 
-The design decision was to be as general as possible, and leave all the specific
-stuff for the implementer of the protocol. For the time being, we aim at
-mathematical correctness, and mostly purely functional protocol executions,
-rather than on performance. The idea is to have a mathematicaly correct and
-possibly ineficient version of functions that can be used as ground truth for
-comparing with efficient versions.
+The design decision is to be as general as possible, and leave all specifics
+for the implementer of the protocol. For the time being, we aim at
+mathematical correctness and mostly purely functional protocol executions,
+rather than on performance. The idea is to have a mathematically correct and
+possibly inefficient implementations of functions that can be used as ground truth for
+comparing with efficient implementations.
 
 ## Using the library
 
 To benefit from the CBC Casper safety proofs this library builds upon,
-developers have to implement the `message::Trait`. This trait in turn
+developers have to implement `message::Trait`. This trait in turn
 requires implementing other traits in this library, such as the `Sender` trait
 for validators, the `Estimate` trait for the estimate, and the `Data` trait if
 the estimate carries data.
@@ -33,12 +33,12 @@ One generic type implements the `message::Trait`, namely
 `message::Message<Estimate, Sender>`, and can be used to helps getting to a
 compliant `message::Trait` concrete type implementation easily.
 
-We also present an basic blockchain implementation heavily under developement
-and experiment. You can also find an other implementation of an integer
+We also present a basic blockchain implementation heavily under developement.
+You can also find another implementation of an integer
 consensus in `tests/`.
 
 But in order to get started using the library, the best way is to study the
-examples folder (under developement). It is also instructive to run the tests.
+examples folder (under development). It is also instructive to run the tests.
 
 ### Cargo
 
@@ -47,7 +47,7 @@ dependencies with
 
 ```
 [dependencies]
-capser = { git = "https://github.com/TrueLevelSA/cbc-casper-msg" }
+casper = { git = "https://github.com/TrueLevelSA/cbc-casper-msg" }
 ```
 
 ## Example
@@ -60,13 +60,13 @@ the protocol.
 
 ### Performance
 
-As mentionned earlier our current focus is on the correctness of the
+As mentioned earlier, our current focus is on the correctness of the
 implementation rather than on performance.
 
 ## Tests
 
 We use the crate `proptest` to generate properties tests. The library has a
-feature `integration_test` used by the proptest framework. To run specificaly
+feature `integration_test` used by the proptest framework. To run specifically
 the `proptest` tests use:
 
 ```
