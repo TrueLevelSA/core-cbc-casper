@@ -1,7 +1,12 @@
 [package]
 name = "casper"
+description = "Abstractly define the CBC Casper message stucture and define functions for the construction and proper execution of protocols of the Casper family."
 version = "0.0.0"
-authors = ["pZ4 <pz4@protonmail.ch>"]
+license-file = "LICENSE"
+authors = ["pZ4 <pz4@protonmail.ch>", "Lederstrumpf", "h4sh3d <h4sh3d@truelevel.io>"]
+homepage = "https://github.com/TrueLevelSA/cbc-casper-msg"
+repository = "https://github.com/TrueLevelSA/cbc-casper-msg"
+readme = "README.md"
 
 [dependencies]
 rayon = "*"
