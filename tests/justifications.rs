@@ -20,10 +20,12 @@ fn faulty_inserts_sorted() {
     let v1_prime = &VoteCount::create_vote_msg(1, false);
     let v2 = &VoteCount::create_vote_msg(2, true);
     let v2_prime = &VoteCount::create_vote_msg(2, false);
+
     let mut latest_msgs = LatestMsgs::new();
     latest_msgs.update(v0);
     latest_msgs.update(v1);
     latest_msgs.update(v2);
+
     let sender_state = SenderState::new(
         senders_weights.clone(),
         0.0,
@@ -32,7 +34,6 @@ fn faulty_inserts_sorted() {
         3.0,
         HashSet::new(),
     );
-
     let mut j = Justification::new();
     let sorted_msgs = sender_state
         .sort_by_faultweight(vec![v2_prime, v1_prime, v0_prime].iter().cloned().collect());
@@ -82,61 +83,123 @@ fn faulty_inserts() {
         j1.faulty_inserts(vec![m0].iter().cloned().collect(), &sender_state);
     assert!(success);
 
-    let (success, mut sender_state) = j1.faulty_insert(v0_prime, &sender_state);
+    let (success, sender_state) = j1.faulty_insert(v0_prime, &sender_state);
     assert!(
         !success,
         "$v0_prime$ should conflict with $v0$ through $m0$, and we should reject as our fault tolerance thr is zero"
     );
 
-    let sender_state = SenderState::from_state(sender_state, None, None, None, None, Some(1.0), None);
-    let (success, _) = j1.clone().faulty_insert(v0_prime, &sender_state);
+    let (success, _) = j1.clone().faulty_insert(
+        v0_prime,
+        &SenderState::from_state(
+            sender_state.clone(),
+            None,
+            None,
+            None,
+            None,
+            Some(1.0),
+            None,
+        ),
+    );
     assert!(success,
         "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set"
     );
 
-    let (_, sender_state2) = j1.clone().faulty_insert(v0_prime, &sender_state);
+    let (_, sender_state2) = j1.clone().faulty_insert(
+        v0_prime,
+        &SenderState::from_state(
+            sender_state.clone(),
+            None,
+            None,
+            None,
+            None,
+            Some(1.0),
+            None,
+        ),
+    );
     assert_eq!(
         sender_state2.fault_weight(), 1.0,
         "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set, and thus the state_fault_weight should be incremented to 1.0"
     );
 
-    let sender_state = SenderState::from_state(sender_state, None, Some(0.1), None, None, None, None);
-    let (success, _) = j1.clone().faulty_insert(v0_prime, &sender_state);
+    let (success, _) = j1.clone().faulty_insert(
+        v0_prime,
+        &SenderState::from_state(
+            sender_state.clone(),
+            None,
+            Some(0.1),
+            None,
+            None,
+            Some(1.0),
+            None,
+        ),
+    );
     assert!(!success,
         "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as the fault threshold gets crossed for the set"
     );
 
     let (_, sender_state2) = j1.clone().faulty_insert(
         v0_prime,
-        &SenderState::new(
-            senders_weights.clone(),
-            0.1,
+        &SenderState::from_state(
+            sender_state.clone(),
             None,
-            LatestMsgs::new(),
-            1.0,
-            HashSet::new(),
+            Some(0.1),
+            None,
+            None,
+            Some(1.0),
+            None,
         ),
     );
     assert_eq!(sender_state2.fault_weight(), 0.1,
         "$v0_prime$ conflicts with $v0$ through $m0$, and we should NOT accept this fault as the fault threshold gets crossed for the set, and thus the state_fault_weight should not be incremented"
     );
 
-    let sender_state = SenderState::from_state(sender_state, None, Some(1.0), None, None, Some(2.0), None);
-    let (success, _) = j1.clone().faulty_insert(v0_prime, &sender_state);
+    let (success, _) = j1.clone().faulty_insert(
+        v0_prime,
+        &SenderState::from_state(
+            sender_state.clone(),
+            None,
+            Some(1.0),
+            None,
+            None,
+            Some(2.0),
+            None,
+        ),
+    );
     assert!(success,
         "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the thr doesnt get crossed for the set"
     );
 
     let senders_weights = SendersWeight::new([].iter().cloned().collect());
-    let sender_state = SenderState::from_state(sender_state, Some(senders_weights), None, None, None, None, None);
     // bug found
-    let (success, _) = j1.clone().faulty_insert(v0_prime, &sender_state);
+    let (success, _) = j1.clone().faulty_insert(
+        v0_prime,
+        &SenderState::from_state(
+            sender_state.clone(),
+            Some(senders_weights.clone()),
+            Some(1.0),
+            None,
+            None,
+            Some(2.0),
+            None,
+        ),
+    );
     assert!(
         !success,
         "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we can't know the weight of the sender, which could be Infinity"
     );
 
-    let (_, sender_state) = j1.clone().faulty_insert(v0_prime, &sender_state);
+    let (_, sender_state) = j1.clone().faulty_insert(
+        v0_prime,
+        &SenderState::new(
+            senders_weights.clone(),
+            1.0,
+            None,
+            LatestMsgs::new(),
+            2.0,
+            HashSet::new(),
+        ),
+    );
     assert_eq!(
             sender_state.fault_weight(),
         1.0,
