@@ -88,7 +88,7 @@ fn faulty_inserts() {
         "$v0_prime$ should conflict with $v0$ through $m0$, and we should reject as our fault tolerance thr is zero"
     );
 
-    sender_state.set_threshold(1.0);
+    let sender_state = SenderState::from_state(sender_state, None, None, None, None, Some(1.0), None);
     let (success, _) = j1.clone().faulty_insert(v0_prime, &sender_state);
     assert!(success,
         "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set"
@@ -100,7 +100,7 @@ fn faulty_inserts() {
         "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set, and thus the state_fault_weight should be incremented to 1.0"
     );
 
-    sender_state.set_fault_weight(0.1);
+    let sender_state = SenderState::from_state(sender_state, None, Some(0.1), None, None, None, None);
     let (success, _) = j1.clone().faulty_insert(v0_prime, &sender_state);
     assert!(!success,
         "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as the fault threshold gets crossed for the set"
@@ -121,15 +121,14 @@ fn faulty_inserts() {
         "$v0_prime$ conflicts with $v0$ through $m0$, and we should NOT accept this fault as the fault threshold gets crossed for the set, and thus the state_fault_weight should not be incremented"
     );
 
-    sender_state.set_fault_weight(1.0);
-    sender_state.set_threshold(2.0);
+    let sender_state = SenderState::from_state(sender_state, None, Some(1.0), None, None, Some(2.0), None);
     let (success, _) = j1.clone().faulty_insert(v0_prime, &sender_state);
     assert!(success,
         "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the thr doesnt get crossed for the set"
     );
 
     let senders_weights = SendersWeight::new([].iter().cloned().collect());
-    sender_state.set_senders_weights(senders_weights);
+    let sender_state = SenderState::from_state(sender_state, Some(senders_weights), None, None, None, None, None);
     // bug found
     let (success, _) = j1.clone().faulty_insert(v0_prime, &sender_state);
     assert!(

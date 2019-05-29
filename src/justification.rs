@@ -401,10 +401,6 @@ impl<M: message::Trait> SenderState<M> {
         &self.senders_weights
     }
 
-    pub fn set_senders_weights(&mut self, weights: SendersWeight<M::Sender>) {
-        self.senders_weights = weights
-    }
-
     pub fn my_last_msg(&self) -> &Option<M> {
         &self.my_last_msg
     }
@@ -419,14 +415,6 @@ impl<M: message::Trait> SenderState<M> {
 
     pub fn fault_weight(&self) -> WeightUnit {
         self.state_fault_weight
-    }
-
-    pub fn set_fault_weight(&mut self, fault_weight: WeightUnit) {
-        self.state_fault_weight = fault_weight
-    }
-
-    pub fn set_threshold(&mut self, thresh: WeightUnit) {
-        self.thr = thresh
     }
 
     /// get msgs and fault weight overhead and equivocators overhead sorted
