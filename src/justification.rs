@@ -374,6 +374,25 @@ impl<M: message::Trait> SenderState<M> {
         }
     }
 
+    pub fn from_state(
+        sender_state: SenderState<M>,
+        senders_weights: Option<SendersWeight<M::Sender>>,
+        state_fault_weight: Option<WeightUnit>,
+        my_last_msg: Option<Option<M>>,
+        latest_msgs: Option<LatestMsgs<M>>,
+        thr: Option<WeightUnit>,
+        equivocators: Option<HashSet<M::Sender>>,
+    ) -> SenderState<M> {
+        SenderState {
+            senders_weights: senders_weights.unwrap_or(sender_state.senders_weights),
+            state_fault_weight: state_fault_weight.unwrap_or(sender_state.state_fault_weight),
+            my_last_msg: my_last_msg.unwrap_or(sender_state.my_last_msg),
+            latest_msgs: latest_msgs.unwrap_or(sender_state.latest_msgs),
+            thr: thr.unwrap_or(sender_state.thr),
+            equivocators: equivocators.unwrap_or(sender_state.equivocators),
+        }
+    }
+
     pub fn equivocators(&self) -> &HashSet<M::Sender> {
         &self.equivocators
     }
