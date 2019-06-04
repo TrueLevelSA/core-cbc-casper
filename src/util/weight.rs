@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, LockResult, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use traits::{Sender, Zero};
+use crate::traits::{Sender, Zero};
 
 pub type WeightUnit = f64;
 

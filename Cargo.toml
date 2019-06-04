@@ -8,6 +8,8 @@ homepage = "https://github.com/TrueLevelSA/cbc-casper-msg"
 repository = "https://github.com/TrueLevelSA/cbc-casper-msg"
 readme = "README.md"
 
+edition = "2018"
+
 [dependencies]
 rayon = "*"
 digest = "0.7"

@@ -1,9 +1,9 @@
 use std::fmt::Debug;
 use std::hash::Hash;
 
+use crate::justification::LatestMsgsHonest;
 use crate::message;
-use justification::LatestMsgsHonest;
-use util::weight::SendersWeight;
+use crate::util::weight::SendersWeight;
 
 /// Describes an estimate, or a value of the consensus at a certain time
 pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {

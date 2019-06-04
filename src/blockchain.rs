@@ -1,4 +1,3 @@
-use serde_derive::Serialize;
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::convert::From;
 use std::iter::Iterator;
@@ -6,11 +5,13 @@ use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
+use serde_derive::Serialize;
+
+use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use crate::message::{self, Trait};
-use justification::{Justification, LatestMsgs, LatestMsgsHonest};
-use traits::{Estimate, Id, Sender, Zero};
-use util::hash::Hash;
-use util::weight::{SendersWeight, WeightUnit};
+use crate::traits::{Estimate, Id, Sender, Zero};
+use crate::util::hash::Hash;
+use crate::util::weight::{SendersWeight, WeightUnit};
 
 /// a genesis block should be a block with estimate Block with prevblock =
 /// None and data. data will be the unique identifier of this blockchain
@@ -457,11 +458,13 @@ impl<S: Sender> Estimate for Block<S> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::{BTreeSet, HashSet};
     use std::iter;
     use std::iter::FromIterator;
 
-    use super::*;
-    use justification::{Justification, LatestMsgs, SenderState};
+    use crate::blockchain::{Block, BlockMsg, ProtoBlock, SendersWeight};
+    use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest, SenderState};
+    use crate::message::Trait;
 
     #[test]
     fn example_usage() {

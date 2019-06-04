@@ -1,11 +1,12 @@
-use rayon::prelude::*;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::sync::{Arc, RwLock};
 
+use rayon::prelude::*;
+
+use crate::justification::{Justification, LatestMsgsHonest, SenderState};
+use crate::traits::{Estimate, Id, Sender};
 use crate::util::hash::Hash;
-use justification::{Justification, LatestMsgsHonest, SenderState};
-use traits::{Estimate, Id, Sender};
 
 /// A Casper Message, that can will be sent over the network
 /// and used as a justification for a more recent message
