@@ -19,7 +19,8 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, LockResult, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use crate::traits::{Sender, Zero};
+use crate::sender;
+use crate::traits::Zero;
 
 pub type WeightUnit = f64;
 
@@ -34,9 +35,9 @@ impl Zero<WeightUnit> for WeightUnit {
 // RwLock locks only before writing, while Mutex locks to both read and write
 
 #[derive(Clone, Default, Debug)]
-pub struct SendersWeight<S: Sender>(Arc<RwLock<HashMap<S, WeightUnit>>>);
+pub struct SendersWeight<S: sender::Trait>(Arc<RwLock<HashMap<S, WeightUnit>>>);
 
-impl<S: Sender> SendersWeight<S> {
+impl<S: sender::Trait> SendersWeight<S> {
     /// creates a new SendersWeight from a HashMap
     pub fn new(senders_weight: HashMap<S, WeightUnit>) -> Self {
         SendersWeight(Arc::new(RwLock::new(senders_weight)))

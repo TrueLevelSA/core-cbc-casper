@@ -32,5 +32,6 @@ extern crate serde_derive;
 pub mod blockchain;
 pub mod justification;
 pub mod message;
+pub mod sender;
 pub mod traits;
 pub mod util;

@@ -25,6 +25,8 @@ use proptest::prelude::*;
 
 use casper::justification::{Justification, LatestMsgsHonest};
 use casper::message::{self, Trait};
+#[cfg(feature = "integration_test")]
+use casper::sender;
 use casper::traits::{Estimate, Zero};
 use casper::util::weight::SendersWeight;
 
@@ -35,7 +37,7 @@ pub struct VoteCount {
 }
 
 #[cfg(feature = "integration_test")]
-impl<S: casper::traits::Sender> From<S> for VoteCount {
+impl<S: sender::Trait> From<S> for VoteCount {
     fn from(_sender: S) -> Self {
         VoteCount::default()
     }

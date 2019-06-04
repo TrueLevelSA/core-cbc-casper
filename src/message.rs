@@ -23,7 +23,8 @@ use std::sync::{Arc, RwLock};
 use rayon::prelude::*;
 
 use crate::justification::{Justification, LatestMsgsHonest, SenderState};
-use crate::traits::{Estimate, Id, Sender};
+use crate::sender;
+use crate::traits::{Estimate, Id};
 use crate::util::hash::Hash;
 
 /// A Casper Message, that can will be sent over the network
@@ -32,7 +33,7 @@ pub trait Trait:
     std::hash::Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Serialize
 {
     // To be implemented on concrete struct
-    type Sender: Sender;
+    type Sender: sender::Trait;
     type Estimate: Estimate<M = Self>;
 
     /// returns the validator who sent this message
@@ -181,7 +182,7 @@ pub trait Trait:
 struct ProtoMsg<E, S>
 where
     E: Estimate<M = Message<E, S>>,
-    S: Sender,
+    S: sender::Trait,
 {
     estimate: E,
     sender: S,
@@ -193,7 +194,7 @@ where
 pub struct Message<E, S>(Arc<ProtoMsg<E, S>>, Hash)
 where
     E: Estimate<M = Message<E, S>>,
-    S: Sender;
+    S: sender::Trait;
 
 /*
 // TODO start we should make messages lazy. continue this after async-await is better
@@ -230,7 +231,7 @@ where
 impl<E, S> Id for ProtoMsg<E, S>
 where
     E: Estimate<M = Message<E, S>>,
-    S: Sender,
+    S: sender::Trait,
 {
     type ID = Hash;
 }
@@ -238,7 +239,7 @@ where
 impl<E, S> Id for Message<E, S>
 where
     E: Estimate<M = Self>,
-    S: Sender,
+    S: sender::Trait,
 {
     type ID = Hash;
     fn getid(&self) -> Self::ID {
@@ -249,7 +250,7 @@ where
 impl<E, S> serde::Serialize for ProtoMsg<E, S>
 where
     E: Estimate<M = Message<E, S>>,
-    S: Sender,
+    S: sender::Trait,
 {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
@@ -266,7 +267,7 @@ where
 impl<E, S> serde::Serialize for Message<E, S>
 where
     E: Estimate<M = Self>,
-    S: Sender,
+    S: sender::Trait,
 {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
@@ -282,7 +283,7 @@ where
 impl<E, S> self::Trait for Message<E, S>
 where
     E: Estimate<M = Self>,
-    S: Sender,
+    S: sender::Trait,
 {
     type Estimate = E;
     type Sender = S;
@@ -328,7 +329,7 @@ where
 impl<E, S> std::hash::Hash for Message<E, S>
 where
     E: Estimate<M = Self>,
-    S: Sender,
+    S: sender::Trait,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.id().hash(state)
@@ -338,7 +339,7 @@ where
 impl<E, S> PartialEq for Message<E, S>
 where
     E: Estimate<M = Self>,
-    S: Sender,
+    S: sender::Trait,
 {
     fn eq(&self, rhs: &Self) -> bool {
         Arc::ptr_eq(&self.0, &rhs.0) || self.id() == rhs.id() // should make this line unnecessary
@@ -348,7 +349,7 @@ where
 impl<E, S> Debug for Message<E, S>
 where
     E: Estimate<M = Self>,
-    S: Sender,
+    S: sender::Trait,
 {
     // Note: format used for rendering illustrative gifs from generative tests; modify with care
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
