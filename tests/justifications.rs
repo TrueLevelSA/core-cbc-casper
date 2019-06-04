@@ -23,8 +23,9 @@ use common::vote_count::VoteCount;
 
 use std::collections::HashSet;
 
-use casper::justification::{Justification, LatestMsgs, SenderState};
+use casper::justification::{Justification, LatestMsgs};
 use casper::message::{self, Trait};
+use casper::sender;
 use casper::util::weight::SendersWeight;
 
 #[test]
@@ -44,7 +45,7 @@ fn faulty_inserts_sorted() {
     latest_msgs.update(v1);
     latest_msgs.update(v2);
 
-    let sender_state = SenderState::new(
+    let sender_state = sender::State::new(
         senders_weights.clone(),
         0.0,
         None,
@@ -77,7 +78,7 @@ fn faulty_inserts() {
     let v1 = &VoteCount::create_vote_msg(1, true);
     let mut j0 = Justification::new();
 
-    let sender_state = SenderState::new(
+    let sender_state = sender::State::new(
         senders_weights.clone(),
         0.0,
         None,
@@ -109,7 +110,7 @@ fn faulty_inserts() {
 
     let (success, _) = j1.clone().faulty_insert(
         v0_prime,
-        &SenderState::from_state(
+        &sender::State::from_state(
             sender_state.clone(),
             None,
             None,
@@ -125,7 +126,7 @@ fn faulty_inserts() {
 
     let (_, sender_state2) = j1.clone().faulty_insert(
         v0_prime,
-        &SenderState::from_state(
+        &sender::State::from_state(
             sender_state.clone(),
             None,
             None,
@@ -142,7 +143,7 @@ fn faulty_inserts() {
 
     let (success, _) = j1.clone().faulty_insert(
         v0_prime,
-        &SenderState::from_state(
+        &sender::State::from_state(
             sender_state.clone(),
             None,
             Some(0.1),
@@ -158,7 +159,7 @@ fn faulty_inserts() {
 
     let (_, sender_state2) = j1.clone().faulty_insert(
         v0_prime,
-        &SenderState::from_state(
+        &sender::State::from_state(
             sender_state.clone(),
             None,
             Some(0.1),
@@ -174,7 +175,7 @@ fn faulty_inserts() {
 
     let (success, _) = j1.clone().faulty_insert(
         v0_prime,
-        &SenderState::from_state(
+        &sender::State::from_state(
             sender_state.clone(),
             None,
             Some(1.0),
@@ -192,7 +193,7 @@ fn faulty_inserts() {
     // bug found
     let (success, _) = j1.clone().faulty_insert(
         v0_prime,
-        &SenderState::from_state(
+        &sender::State::from_state(
             sender_state.clone(),
             Some(senders_weights.clone()),
             Some(1.0),
@@ -209,7 +210,7 @@ fn faulty_inserts() {
 
     let (_, sender_state) = j1.clone().faulty_insert(
         v0_prime,
-        &SenderState::new(
+        &sender::State::new(
             senders_weights.clone(),
             1.0,
             None,

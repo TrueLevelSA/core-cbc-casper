@@ -22,6 +22,7 @@ use std::fmt::{Debug, Formatter};
 use rayon::iter::IntoParallelRefIterator;
 
 use crate::message;
+use crate::sender;
 use crate::traits::{Estimate, Zero};
 use crate::util::weight::{SendersWeight, WeightUnit};
 
@@ -38,8 +39,8 @@ impl<M: message::Trait> Justification<M> {
     }
 
     /// creates a new Justification instance from a Vec of message::Trait
-    /// and a SenderState
-    pub fn from_msgs(msgs: Vec<M>, sender_state: &SenderState<M>) -> (Self, SenderState<M>) {
+    /// and a sender::State
+    pub fn from_msgs(msgs: Vec<M>, sender_state: &sender::State<M>) -> (Self, sender::State<M>) {
         let mut j = Justification::new();
         let msgs: HashSet<_> = msgs.iter().collect();
         let (_, sender_state) = j.faulty_inserts(msgs, sender_state);
@@ -93,8 +94,8 @@ impl<M: message::Trait> Justification<M> {
     pub fn faulty_inserts(
         &mut self,
         msgs: HashSet<&M>,
-        sender_state: &SenderState<M>,
-    ) -> (bool, SenderState<M>) {
+        sender_state: &sender::State<M>,
+    ) -> (bool, sender::State<M>) {
         let msgs = sender_state.sort_by_faultweight(msgs);
         // do the actual insertions to the state
         msgs.iter().fold(
@@ -112,8 +113,8 @@ impl<M: message::Trait> Justification<M> {
     pub fn faulty_insert(
         &mut self,
         msg: &M,
-        sender_state: &SenderState<M>,
-    ) -> (bool, SenderState<M>) {
+        sender_state: &sender::State<M>,
+    ) -> (bool, sender::State<M>) {
         let mut sender_state = sender_state.clone();
         let is_equivocation = sender_state.latest_msgs.equivocate(msg);
 
@@ -156,13 +157,13 @@ impl<M: message::Trait> Justification<M> {
     }
 
     /// this function sets the weight of the equivocator to zero right away
-    /// (returned on SenderState) and add his message to the state, since now his
+    /// (returned on sender::State) and add his message to the state, since now his
     /// equivocation doesnt count to the state fault weight anymore
     pub fn faulty_insert_with_slash(
         &mut self,
         msg: &M,
-        mut sender_state: SenderState<M>,
-    ) -> (bool, SenderState<M>) {
+        mut sender_state: sender::State<M>,
+    ) -> (bool, sender::State<M>) {
         let is_equivocation = sender_state.latest_msgs.equivocate(msg);
         if is_equivocation {
             let sender = msg.sender();
@@ -320,7 +321,7 @@ impl<M: message::Trait> LatestMsgs<M> {
     }
 
     /// checks whether msg_new equivocates with latest msgs
-    fn equivocate(&self, msg_new: &M) -> bool {
+    pub(crate) fn equivocate(&self, msg_new: &M) -> bool {
         self.get(msg_new.sender())
             .map(|latest_msgs| latest_msgs.iter().any(|m| m.equivocates(&msg_new)))
             .unwrap_or(false)
@@ -356,110 +357,3 @@ impl<'z, M: message::Trait> From<&'z Justification<M>> for LatestMsgs<M> {
 //         recur_func(j, LatestMsgs::new())
 //     }
 // }
-
-/// struct that stores the inner state of the sender
-#[derive(Debug, Clone)]
-pub struct SenderState<M: message::Trait> {
-    /// current state total fault weight
-    state_fault_weight: WeightUnit,
-    /// fault tolerance threshold
-    thr: WeightUnit,
-    /// current validator set, mapped to their respective weights
-    senders_weights: SendersWeight<M::Sender>,
-    /// this sender's last message
-    /// TODO: better name?
-    my_last_msg: Option<M>,
-    latest_msgs: LatestMsgs<M>,
-    equivocators: HashSet<M::Sender>,
-}
-
-impl<M: message::Trait> SenderState<M> {
-    pub fn new(
-        senders_weights: SendersWeight<M::Sender>,
-        state_fault_weight: WeightUnit,
-        my_last_msg: Option<M>,
-        latest_msgs: LatestMsgs<M>,
-        thr: WeightUnit,
-        equivocators: HashSet<M::Sender>,
-    ) -> Self {
-        SenderState {
-            senders_weights,
-            equivocators,
-            state_fault_weight,
-            thr,
-            my_last_msg,
-            latest_msgs,
-        }
-    }
-
-    pub fn from_state(
-        sender_state: SenderState<M>,
-        senders_weights: Option<SendersWeight<M::Sender>>,
-        state_fault_weight: Option<WeightUnit>,
-        my_last_msg: Option<Option<M>>,
-        latest_msgs: Option<LatestMsgs<M>>,
-        thr: Option<WeightUnit>,
-        equivocators: Option<HashSet<M::Sender>>,
-    ) -> SenderState<M> {
-        SenderState {
-            senders_weights: senders_weights.unwrap_or(sender_state.senders_weights),
-            state_fault_weight: state_fault_weight.unwrap_or(sender_state.state_fault_weight),
-            my_last_msg: my_last_msg.unwrap_or(sender_state.my_last_msg),
-            latest_msgs: latest_msgs.unwrap_or(sender_state.latest_msgs),
-            thr: thr.unwrap_or(sender_state.thr),
-            equivocators: equivocators.unwrap_or(sender_state.equivocators),
-        }
-    }
-
-    pub fn equivocators(&self) -> &HashSet<M::Sender> {
-        &self.equivocators
-    }
-
-    pub fn senders_weights(&self) -> &SendersWeight<M::Sender> {
-        &self.senders_weights
-    }
-
-    pub fn my_last_msg(&self) -> &Option<M> {
-        &self.my_last_msg
-    }
-
-    pub fn latests_msgs(&self) -> &LatestMsgs<M> {
-        &self.latest_msgs
-    }
-
-    pub fn latests_msgs_as_mut(&mut self) -> &mut LatestMsgs<M> {
-        &mut self.latest_msgs
-    }
-
-    pub fn fault_weight(&self) -> WeightUnit {
-        self.state_fault_weight
-    }
-
-    /// get msgs and fault weight overhead and equivocators overhead sorted
-    /// by fault weight overhead against the current sender_state
-    pub fn sort_by_faultweight<'z>(&self, msgs: HashSet<&'z M>) -> Vec<&'z M> {
-        let mut msgs_sorted_by_faultw: Vec<_> = msgs
-            .iter()
-            .filter_map(|&msg| {
-                // equivocations in relation to state
-                let sender = msg.sender();
-                if !self.equivocators.contains(sender) && self.latest_msgs.equivocate(msg) {
-                    self.senders_weights.weight(sender).map(|w| (msg, w)).ok()
-                } else {
-                    Some((msg, WeightUnit::ZERO))
-                }
-            })
-            .collect();
-
-        let _ = msgs_sorted_by_faultw.sort_unstable_by(|(m0, w0), (m1, w1)| {
-            w0.partial_cmp(w1).unwrap_or_else(|| m0.id().cmp(m1.id())) // tie breaker
-        });
-
-        // return a Vec<message::Trait>
-        msgs_sorted_by_faultw
-            .iter()
-            .map(|(m, _)| m)
-            .cloned()
-            .collect()
-    }
-}

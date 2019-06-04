@@ -34,8 +34,9 @@ use rand::seq::SliceRandom;
 use rand::thread_rng;
 
 use casper::blockchain::{Block, BlockMsg, ProtoBlock};
-use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest, SenderState};
+use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use casper::message::{self, Message, Trait};
+use casper::sender;
 use casper::traits::Estimate;
 use casper::util::weight::SendersWeight;
 
@@ -55,7 +56,7 @@ use tools::ChainData;
 /// create a message for each sender in the senders_recipients_data vector
 /// messages are added to theirs senders state
 fn create_messages<'z, M>(
-    state: &'z mut HashMap<M::Sender, SenderState<M>>,
+    state: &'z mut HashMap<M::Sender, sender::State<M>>,
     senders_recipients_data: Vec<(M::Sender, HashSet<M::Sender>)>,
 ) -> Vec<(M, M::Sender, HashSet<M::Sender>)>
 where
@@ -112,7 +113,7 @@ where
 /// send messages to the recipients they're meant to be sent to
 /// state of the recipients are updated accordingly
 fn add_messages<M>(
-    state: &mut HashMap<M::Sender, SenderState<M>>,
+    state: &mut HashMap<M::Sender, sender::State<M>>,
     messages_senders_recipients_datas: Vec<(M, M::Sender, HashSet<M::Sender>)>,
 ) -> Result<(), &'static str>
 where
@@ -122,7 +123,7 @@ where
         .map(|(m, sender, recipients)|{
         recipients.into_iter().map(|recipient| {
 
-            let sender_state_reconstructed = SenderState::new(
+            let sender_state_reconstructed = sender::State::new(
                 state[&recipient].senders_weights().clone(),
                 0.0,
                 Some(m.clone()),
@@ -284,9 +285,9 @@ fn create_receiver_strategy(
 }
 
 fn message_events<M>(
-    state: HashMap<M::Sender, SenderState<M>>,
+    state: HashMap<M::Sender, sender::State<M>>,
     sender_receiver_strategy: BoxedStrategy<HashMap<M::Sender, HashSet<M::Sender>>>,
-) -> BoxedStrategy<Result<HashMap<M::Sender, SenderState<M>>, &'static str>>
+) -> BoxedStrategy<Result<HashMap<M::Sender, sender::State<M>>, &'static str>>
 where
     M: 'static + message::Trait,
 {
@@ -310,7 +311,7 @@ where
 }
 
 fn full_consensus<M>(
-    state: &HashMap<M::Sender, SenderState<M>>,
+    state: &HashMap<M::Sender, sender::State<M>>,
     _height_of_oracle: &u32,
     _vec_data: &mut Vec<ChainData>,
     _chain_id: u32,
@@ -332,7 +333,7 @@ where
 
 /// Returns true when at least one validator picks a block at the specified height
 fn run_until_height(
-    state: &HashMap<u32, SenderState<BlockMsg<u32>>>,
+    state: &HashMap<u32, sender::State<BlockMsg<u32>>>,
     height: &u32,
     _vec_data: &mut Vec<ChainData>,
     _chain_id: u32,
@@ -350,7 +351,7 @@ fn run_until_height(
 /// return true if some safety oracle is detected at max_heaight_of_oracle
 /// the threshold for the safety oracle is set to half of the sum of the senders weights
 fn get_data_from_state(
-    sender_state: &SenderState<BlockMsg<u32>>,
+    sender_state: &sender::State<BlockMsg<u32>>,
     max_height_of_oracle: &u32,
     data: &mut ChainData,
 ) -> (bool) {
@@ -404,7 +405,7 @@ fn get_data_from_state(
 }
 
 fn safety_oracle(
-    state: &HashMap<u32, SenderState<BlockMsg<u32>>>,
+    state: &HashMap<u32, sender::State<BlockMsg<u32>>>,
     _height_of_oracle: &u32,
     _vec_data: &mut Vec<ChainData>,
     _chain_id: u32,
@@ -432,7 +433,7 @@ fn safety_oracle(
 /// adds a new data to vec_data for each new message that is sent
 /// uses received_msgs to take note of which validator received which messages
 fn safety_oracle_at_height(
-    state: &HashMap<u32, SenderState<BlockMsg<u32>>>,
+    state: &HashMap<u32, sender::State<BlockMsg<u32>>>,
     height_of_oracle: &u32,
     vec_data: &mut Vec<ChainData>,
     chain_id: u32,
@@ -459,7 +460,7 @@ fn safety_oracle_at_height(
     safety_oracle_detected.contains(&true)
 }
 
-fn clique_collection(state: HashMap<u32, SenderState<BlockMsg<u32>>>) -> Vec<Vec<Vec<u32>>> {
+fn clique_collection(state: HashMap<u32, sender::State<BlockMsg<u32>>>) -> Vec<Vec<Vec<u32>>> {
     state
         .iter()
         .map(|(_, sender_state)| {
@@ -493,13 +494,13 @@ fn chain<E: 'static, F: 'static, H: 'static>(
     consensus_satisfied: H,
     consensus_satisfied_value: u32,
     chain_id: u32,
-) -> BoxedStrategy<Vec<Result<HashMap<u32, SenderState<Message<E, u32>>>, &'static str>>>
+) -> BoxedStrategy<Vec<Result<HashMap<u32, sender::State<Message<E, u32>>>, &'static str>>>
 where
     E: Estimate<M = Message<E, u32>> + From<u32>,
     F: Fn(&mut Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
     //G: Fn(&Vec<u32>, BoxedStrategy<HashSet<u32>>) -> BoxedStrategy<HashMap<u32, HashSet<u32>>>,
     H: Fn(
-        &HashMap<u32, SenderState<Message<E, u32>>>,
+        &HashMap<u32, sender::State<Message<E, u32>>>,
         &u32,
         &mut Vec<ChainData>,
         u32,
@@ -543,7 +544,7 @@ where
                 j.insert(m.clone());
                 state.insert(
                     *validator,
-                    SenderState::new(
+                    sender::State::new(
                         senders_weights.clone(),
                         0.0,
                         Some(m),
@@ -833,7 +834,7 @@ proptest! {
                 .zip(weights.iter().cloned())
                 .collect(),
         );
-        let sender_state = SenderState::new(
+        let sender_state = sender::State::new(
             senders_weights.clone(),
             0.0,
             None,
@@ -859,7 +860,7 @@ proptest! {
         let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
         assert_eq!(equivocations.len(), 1, "should detect sender 0 equivocating if sender 0 equivocates");
 
-        let sender_state = SenderState::new(
+        let sender_state = sender::State::new(
             senders_weights,
             0.0,
             None,

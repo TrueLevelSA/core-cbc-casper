@@ -23,8 +23,9 @@ use common::integer::*;
 
 use std::collections::HashSet;
 
-use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest, SenderState};
+use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use casper::message::Trait;
+use casper::sender;
 use casper::traits::Estimate;
 use casper::util::weight::SendersWeight;
 
@@ -41,7 +42,7 @@ fn equal_weight() {
             .collect(),
     );
 
-    let sender_state = SenderState::new(
+    let sender_state = sender::State::new(
         senders_weights.clone(),
         0.0, // state fault weight
         None,
@@ -102,7 +103,7 @@ fn uneven_weights_1() {
             .collect(),
     );
 
-    let sender_state = SenderState::new(
+    let sender_state = sender::State::new(
         senders_weights.clone(),
         0.0, // state fault weight
         None,
@@ -163,7 +164,7 @@ fn uneven_weights_4() {
             .collect(),
     );
 
-    let sender_state = SenderState::new(
+    let sender_state = sender::State::new(
         senders_weights.clone(),
         0.0, // state fault weight
         None,

@@ -22,7 +22,7 @@ use std::sync::{Arc, RwLock};
 
 use rayon::prelude::*;
 
-use crate::justification::{Justification, LatestMsgsHonest, SenderState};
+use crate::justification::{Justification, LatestMsgsHonest};
 use crate::sender;
 use crate::traits::{Estimate, Id};
 use crate::util::hash::Hash;
@@ -68,8 +68,8 @@ pub trait Trait:
     fn from_msgs(
         sender: Self::Sender,
         mut new_msgs: Vec<&Self>,
-        sender_state: &SenderState<Self>,
-    ) -> Result<(Self, SenderState<Self>), &'static str> {
+        sender_state: &sender::State<Self>,
+    ) -> Result<(Self, sender::State<Self>), &'static str> {
         // // TODO eventually comment out these lines, and FIXME tests
         // // check whether two messages from same sender
         // let mut senders = HashSet::new();

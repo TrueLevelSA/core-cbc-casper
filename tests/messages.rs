@@ -23,8 +23,9 @@ use common::vote_count::VoteCount;
 
 use std::collections::HashSet;
 
-use casper::justification::{Justification, LatestMsgs, SenderState};
+use casper::justification::{Justification, LatestMsgs};
 use casper::message::{Message, Trait};
+use casper::sender;
 use casper::util::weight::SendersWeight;
 
 #[test]
@@ -42,7 +43,7 @@ fn msg_equality() {
     let senders_weights =
         SendersWeight::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
 
-    let sender_state = SenderState::new(
+    let sender_state = sender::State::new(
         senders_weights,
         0.0,
         None,
@@ -82,7 +83,7 @@ fn msg_depends() {
     let senders_weights =
         SendersWeight::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
 
-    let sender_state = SenderState::new(
+    let sender_state = sender::State::new(
         senders_weights,
         0.0,
         None,
@@ -136,7 +137,7 @@ fn msg_equivocates() {
 
     let senders_weights =
         SendersWeight::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
-    let sender_state = SenderState::new(
+    let sender_state = sender::State::new(
         senders_weights,
         0.0,
         None,
@@ -174,7 +175,7 @@ fn msg_equivocates() {
 //     let senders_weights = SendersWeight::new(
 //         [(sender0, 1.0), (sender1, 1.0)].iter().cloned().collect(),
 //     );
-//     let sender_state = SenderState::new(
+//     let sender_state = sender::State::new(
 //         senders_weights.clone(),
 //         0.0,
 //         None,

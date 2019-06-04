@@ -482,8 +482,9 @@ mod tests {
     use std::iter::FromIterator;
 
     use crate::blockchain::{Block, BlockMsg, ProtoBlock, SendersWeight};
-    use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest, SenderState};
+    use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest};
     use crate::message::Trait;
+    use crate::sender;
 
     #[test]
     fn example_usage() {
@@ -501,7 +502,7 @@ mod tests {
             .cloned()
             .collect(),
         );
-        let sender_state = SenderState::new(
+        let sender_state = sender::State::new(
             senders_weights.clone(),
             0.0,  // state fault weight
             None, // latest messages
@@ -596,7 +597,7 @@ mod tests {
             .collect(),
         );
 
-        let sender_state = SenderState::new(
+        let sender_state = sender::State::new(
             senders_weights.clone(),
             0.0,  // state fault weight
             None, // latest messages
@@ -671,7 +672,7 @@ mod tests {
                 .collect(),
         );
 
-        let sender_state = SenderState::new(
+        let sender_state = sender::State::new(
             senders_weights.clone(),
             0.0,  // state fault weight
             None, // latest messages

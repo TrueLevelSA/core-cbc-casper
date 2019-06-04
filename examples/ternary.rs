@@ -85,9 +85,11 @@ impl Estimate for Value {
 }
 
 fn main() {
-    use casper::justification::{Justification, LatestMsgs, SenderState};
-    use casper::message::Trait;
     use std::collections::HashSet;
+
+    use casper::justification::{Justification, LatestMsgs};
+    use casper::message::Trait;
+    use casper::sender;
 
     let senders: Vec<u32> = (1..=4).collect();
     let weights = [0.6, 1.0, 2.0, 1.3];
@@ -100,7 +102,7 @@ fn main() {
             .collect(),
     );
 
-    let weights = SenderState::new(
+    let weights = sender::State::new(
         senders_weights.clone(),
         0.0, // state fault weight
         None,
