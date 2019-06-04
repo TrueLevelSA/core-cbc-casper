@@ -45,9 +45,8 @@ pub struct State<M: message::Trait> {
     pub(crate) thr: WeightUnit,
     /// current validator set, mapped to their respective weights
     pub(crate) senders_weights: SendersWeight<M::Sender>,
-    /// this sender's last message
-    /// TODO: better name?
-    pub(crate) my_last_msg: Option<M>,
+    /// this sender's latest message
+    pub(crate) own_latest_msg: Option<M>,
     pub(crate) latest_msgs: LatestMsgs<M>,
     pub(crate) equivocators: HashSet<M::Sender>,
 }
@@ -56,7 +55,7 @@ impl<M: message::Trait> State<M> {
     pub fn new(
         senders_weights: SendersWeight<M::Sender>,
         state_fault_weight: WeightUnit,
-        my_last_msg: Option<M>,
+        own_latest_msg: Option<M>,
         latest_msgs: LatestMsgs<M>,
         thr: WeightUnit,
         equivocators: HashSet<M::Sender>,
@@ -66,7 +65,7 @@ impl<M: message::Trait> State<M> {
             equivocators,
             state_fault_weight,
             thr,
-            my_last_msg,
+            own_latest_msg,
             latest_msgs,
         }
     }
@@ -75,7 +74,7 @@ impl<M: message::Trait> State<M> {
         sender_state: State<M>,
         senders_weights: Option<SendersWeight<M::Sender>>,
         state_fault_weight: Option<WeightUnit>,
-        my_last_msg: Option<Option<M>>,
+        own_latest_msg: Option<Option<M>>,
         latest_msgs: Option<LatestMsgs<M>>,
         thr: Option<WeightUnit>,
         equivocators: Option<HashSet<M::Sender>>,
@@ -83,7 +82,7 @@ impl<M: message::Trait> State<M> {
         State {
             senders_weights: senders_weights.unwrap_or(sender_state.senders_weights),
             state_fault_weight: state_fault_weight.unwrap_or(sender_state.state_fault_weight),
-            my_last_msg: my_last_msg.unwrap_or(sender_state.my_last_msg),
+            own_latest_msg: own_latest_msg.unwrap_or(sender_state.own_latest_msg),
             latest_msgs: latest_msgs.unwrap_or(sender_state.latest_msgs),
             thr: thr.unwrap_or(sender_state.thr),
             equivocators: equivocators.unwrap_or(sender_state.equivocators),
@@ -98,8 +97,8 @@ impl<M: message::Trait> State<M> {
         &self.senders_weights
     }
 
-    pub fn my_last_msg(&self) -> &Option<M> {
-        &self.my_last_msg
+    pub fn own_latest_msg(&self) -> &Option<M> {
+        &self.own_latest_msg
     }
 
     pub fn latests_msgs(&self) -> &LatestMsgs<M> {
