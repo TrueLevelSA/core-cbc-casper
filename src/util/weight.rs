@@ -2,7 +2,16 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, LockResult, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use traits::{Sender, Zero};
-use weight_unit::WeightUnit;
+
+pub type WeightUnit = f64;
+
+impl Zero<WeightUnit> for WeightUnit {
+    const ZERO: Self = 0.0f64;
+
+    fn is_zero(val: &Self) -> bool {
+        val > &-::std::f64::EPSILON && val < &::std::f64::EPSILON
+    }
+}
 
 // RwLock locks only before writing, while Mutex locks to both read and write
 

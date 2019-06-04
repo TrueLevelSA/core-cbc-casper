@@ -5,10 +5,10 @@ use std::ops::Add;
 #[cfg(feature = "integration_test")]
 use proptest::prelude::*;
 
-use crate::message::{self, Trait};
-use justification::{Justification, LatestMsgsHonest};
-use senders_weight::SendersWeight;
-use traits::{Estimate, Sender, Zero};
+use casper::justification::{Justification, LatestMsgsHonest};
+use casper::message::{self, Trait};
+use casper::traits::{Estimate, Zero};
+use casper::util::weight::SendersWeight;
 
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]
 pub struct VoteCount {
@@ -17,7 +17,7 @@ pub struct VoteCount {
 }
 
 #[cfg(feature = "integration_test")]
-impl<S: Sender> From<S> for VoteCount {
+impl<S: casper::traits::Sender> From<S> for VoteCount {
     fn from(_sender: S) -> Self {
         VoteCount::default()
     }
@@ -85,7 +85,6 @@ impl VoteCount {
         message::Message::new(sender, justification, estimate, None)
     }
 
-    ///
     fn get_vote_msgs(
         latest_msgs: &LatestMsgsHonest<message::Message<Self, Voter>>,
     ) -> HashSet<message::Message<Self, Voter>> {
@@ -139,7 +138,7 @@ impl VoteCount {
 type Voter = u32;
 pub type VoteMsg = message::Message<VoteCount, Voter>;
 
-impl Sender for Voter {}
+//impl Sender for Voter {}
 
 impl Estimate for VoteCount {
     // the estimator just counts votes, which in this case are the unjustified
@@ -162,74 +161,5 @@ impl Estimate for VoteCount {
             .iter()
             .fold(Self::ZERO, |acc, vote| acc + vote.estimate().clone());
         Ok(votes)
-    }
-}
-
-#[cfg(tests)]
-mod count_votes {
-
-    use std::collections::HashSet;
-
-    use super::*;
-    use crate::message;
-    use justification::{Justification, LatestMsgs};
-
-    #[test]
-    fn count_votes() {
-        use justification::SenderState;
-        use senders_weight::SendersWeight;
-
-        let senders_weights =
-            SendersWeight::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
-
-        let v0 = &VoteCount::create_vote_msg(0, false);
-        let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
-        let v1 = &VoteCount::create_vote_msg(1, true);
-        let mut j0 = Justification::new();
-
-        let weights = SenderState::new(
-            senders_weights,
-            0.0,
-            None,
-            LatestMsgs::new(),
-            2.0,
-            HashSet::new(),
-        );
-
-        let (success, _) = j0.faulty_inserts(vec![v0].iter().cloned().collect(), &weights);
-        assert!(success);
-
-        let (m0, _) = &message::Message::from_msgs(0, vec![v0], None, &weights, None).unwrap();
-        let mut j1 = Justification::new();
-        let (success, _) = j1.faulty_inserts(vec![v1].iter().cloned().collect(), &weights);
-        assert!(success);
-
-        let (success, _) = j1.faulty_inserts(vec![m0].iter().cloned().collect(), &weights);
-        assert!(success);
-
-        let (m1, _) = &message::Message::from_msgs(1, vec![v1, m0], None, &weights, None).unwrap();
-        assert_eq!(
-            message::Message::estimate(m1).clone(),
-            VoteCount { yes: 1, no: 1 },
-            "should have 1 yes, and 1 no vote, found {:?}",
-            message::Message::estimate(m1).clone(),
-        );
-
-        let (success, _) = j1.faulty_inserts(vec![v0_prime].iter().cloned().collect(), &weights);
-        assert!(success);
-
-        let (m1_prime, _) = &message::Message::from_msgs(
-            1,
-            vec![v1, m0, v0_prime].iter().cloned().collect(),
-            None,
-            &weights,
-            None,
-        )
-        .unwrap();
-        assert_eq!(
-            message::Message::estimate(m1_prime).clone(),
-            VoteCount { yes: 1, no: 0 },
-            "should have 1 yes, and 0 no vote, found {:?}, the equivocation vote should cancels out the normal vote",
-            message::Message::estimate(&m1_prime).clone())
     }
 }

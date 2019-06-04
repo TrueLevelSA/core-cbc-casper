@@ -4,9 +4,8 @@ use std::fmt::{Debug, Formatter};
 use rayon::iter::IntoParallelRefIterator;
 
 use crate::message;
-use senders_weight::SendersWeight;
 use traits::{Estimate, Zero};
-use weight_unit::WeightUnit;
+use util::weight::{SendersWeight, WeightUnit};
 
 /// Struct that holds the set of the message::Traits that justify
 /// the current message
@@ -375,6 +374,25 @@ impl<M: message::Trait> SenderState<M> {
         }
     }
 
+    pub fn from_state(
+        sender_state: SenderState<M>,
+        senders_weights: Option<SendersWeight<M::Sender>>,
+        state_fault_weight: Option<WeightUnit>,
+        my_last_msg: Option<Option<M>>,
+        latest_msgs: Option<LatestMsgs<M>>,
+        thr: Option<WeightUnit>,
+        equivocators: Option<HashSet<M::Sender>>,
+    ) -> SenderState<M> {
+        SenderState {
+            senders_weights: senders_weights.unwrap_or(sender_state.senders_weights),
+            state_fault_weight: state_fault_weight.unwrap_or(sender_state.state_fault_weight),
+            my_last_msg: my_last_msg.unwrap_or(sender_state.my_last_msg),
+            latest_msgs: latest_msgs.unwrap_or(sender_state.latest_msgs),
+            thr: thr.unwrap_or(sender_state.thr),
+            equivocators: equivocators.unwrap_or(sender_state.equivocators),
+        }
+    }
+
     pub fn equivocators(&self) -> &HashSet<M::Sender> {
         &self.equivocators
     }
@@ -395,9 +413,13 @@ impl<M: message::Trait> SenderState<M> {
         &mut self.latest_msgs
     }
 
+    pub fn fault_weight(&self) -> WeightUnit {
+        self.state_fault_weight
+    }
+
     /// get msgs and fault weight overhead and equivocators overhead sorted
     /// by fault weight overhead against the current sender_state
-    fn sort_by_faultweight<'z>(&self, msgs: HashSet<&'z M>) -> Vec<&'z M> {
+    pub fn sort_by_faultweight<'z>(&self, msgs: HashSet<&'z M>) -> Vec<&'z M> {
         let mut msgs_sorted_by_faultw: Vec<_> = msgs
             .iter()
             .filter_map(|&msg| {
@@ -421,187 +443,5 @@ impl<M: message::Trait> SenderState<M> {
             .map(|(m, _)| m)
             .cloned()
             .collect()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use crate::message::{self, Trait};
-    use example::vote_count::VoteCount;
-
-    #[test]
-    fn faulty_inserts_sorted() {
-        let senders_weights =
-            SendersWeight::new([(0, 1.0), (1, 2.0), (2, 3.0)].iter().cloned().collect());
-
-        let v0 = &VoteCount::create_vote_msg(0, false);
-        let v0_prime = &VoteCount::create_vote_msg(0, true);
-        let v1 = &VoteCount::create_vote_msg(1, true);
-        let v1_prime = &VoteCount::create_vote_msg(1, false);
-        let v2 = &VoteCount::create_vote_msg(2, true);
-        let v2_prime = &VoteCount::create_vote_msg(2, false);
-        let mut sender_state = SenderState {
-            senders_weights: senders_weights.clone(),
-            state_fault_weight: 0.0,
-            my_last_msg: None,
-            thr: 3.0,
-            equivocators: HashSet::new(),
-            latest_msgs: LatestMsgs::new(),
-        };
-        let mut j = Justification::new();
-        let _ = sender_state.latest_msgs.update(v0);
-        let _ = sender_state.latest_msgs.update(v1);
-        let _ = sender_state.latest_msgs.update(v2);
-        let sorted_msgs = sender_state
-            .sort_by_faultweight(vec![v2_prime, v1_prime, v0_prime].iter().cloned().collect());
-        let (_, sender_state) =
-            sorted_msgs
-                .iter()
-                .fold((false, sender_state), |(success, sender_state), &m| {
-                    let (s, w) = j.faulty_insert(m, &sender_state);
-                    (s || success, w)
-                });
-        assert!(j.contains(v0_prime));
-        assert!(j.contains(v1_prime));
-        assert!(!j.contains(v2_prime));
-        assert_eq!(sender_state.state_fault_weight, 3.0);
-    }
-    #[test]
-    fn faulty_inserts() {
-        let senders_weights =
-            SendersWeight::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
-        let v0 = &VoteCount::create_vote_msg(0, false);
-        let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
-        let v1 = &VoteCount::create_vote_msg(1, true);
-        let mut j0 = Justification::new();
-
-        let sender_state = SenderState {
-            senders_weights: senders_weights.clone(),
-            state_fault_weight: (0.0),
-            my_last_msg: None,
-            thr: 0.0,
-            equivocators: HashSet::new(),
-            latest_msgs: LatestMsgs::new(),
-        };
-
-        let (success, sender_state) =
-            j0.faulty_inserts([v0].iter().cloned().collect(), &sender_state);
-        assert!(success);
-
-        let (m0, _weights) = &message::Message::from_msgs(0, vec![v0], &sender_state).unwrap();
-
-        // let m0 = &message::Message::new(0, justification, estimate);
-        let mut j1 = Justification::new();
-        let (success, sender_state) =
-            j1.faulty_inserts(vec![v1].iter().cloned().collect(), &sender_state);
-        assert!(success);
-
-        let (success, sender_state) =
-            j1.faulty_inserts(vec![m0].iter().cloned().collect(), &sender_state);
-        assert!(success);
-
-        let (success, sender_state) = j1.faulty_insert(v0_prime, &sender_state);
-        assert!(
-            !success,
-            "$v0_prime$ should conflict with $v0$ through $m0$, and we should reject as our fault tolerance thr is zero"
-        );
-
-        let (success, _) = j1.clone().faulty_insert(
-            v0_prime,
-            &SenderState {
-                senders_weights: senders_weights.clone(),
-                state_fault_weight: (0.0),
-                my_last_msg: None,
-                thr: 1.0,
-                equivocators: HashSet::new(),
-                latest_msgs: LatestMsgs::new(),
-            },
-        );
-        assert!(success,
-            "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set"
-        );
-
-        let (_, sender_state2) = j1.clone().faulty_insert(
-            v0_prime,
-            &SenderState {
-                thr: 1.0,
-                ..sender_state.clone()
-            },
-        );
-        assert_eq!(
-            sender_state2.state_fault_weight, 1.0,
-            "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set, and thus the state_fault_weight should be incremented to 1.0"
-        );
-
-        let (success, _) = j1.clone().faulty_insert(
-            v0_prime,
-            &SenderState {
-                state_fault_weight: (0.1),
-                thr: 1.0,
-                ..sender_state.clone()
-            },
-        );
-        assert!(!success,
-            "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as the fault threshold gets crossed for the set"
-        );
-
-        let (_, sender_state2) = j1.clone().faulty_insert(
-            v0_prime,
-            &SenderState {
-                state_fault_weight: (0.1),
-                thr: 1.0,
-                ..sender_state.clone()
-            },
-        );
-        assert_eq!(sender_state2.state_fault_weight, 0.1,
-            "$v0_prime$ conflicts with $v0$ through $m0$, and we should NOT accept this fault as the fault threshold gets crossed for the set, and thus the state_fault_weight should not be incremented"
-        );
-
-        let (success, _) = j1.clone().faulty_insert(
-            v0_prime,
-            &SenderState {
-                state_fault_weight: (1.0),
-                thr: 2.0,
-                ..sender_state.clone()
-            },
-        );
-        assert!(success,
-            "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the thr doesnt get crossed for the set"
-        );
-
-        let senders_weights = SendersWeight::new([].iter().cloned().collect());
-        // bug found
-        let (success, _) = j1.clone().faulty_insert(
-            v0_prime,
-            &SenderState {
-                senders_weights: senders_weights.clone(),
-                state_fault_weight: 1.0,
-                thr: 2.0,
-                ..sender_state.clone()
-            },
-        );
-        assert!(
-            !success,
-            "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we can't know the weight of the sender, which could be Infinity"
-        );
-
-        let (_, sender_state) = j1.clone().faulty_insert(
-            v0_prime,
-            &SenderState {
-                senders_weights: senders_weights.clone(),
-                state_fault_weight: (1.0),
-                my_last_msg: None,
-                thr: 2.0,
-                equivocators: HashSet::new(),
-                latest_msgs: LatestMsgs::new(),
-            },
-        );
-        assert_eq!(
-                sender_state.state_fault_weight,
-            1.0,
-            "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we can't know the weight of the sender, which could be Infinity, and thus the state_fault_weight should be unchanged"
-        );
     }
 }

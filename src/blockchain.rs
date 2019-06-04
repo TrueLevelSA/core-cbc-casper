@@ -1,17 +1,16 @@
+use serde_derive::Serialize;
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::convert::From;
 use std::iter::Iterator;
-
-use crate::message::{self, Trait};
-use hashed::Hashed;
-use justification::{Justification, LatestMsgs, LatestMsgsHonest};
-use senders_weight::SendersWeight;
-use serde_derive::Serialize;
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
+
+use crate::message::{self, Trait};
+use justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use traits::{Estimate, Id, Sender, Zero};
-use weight_unit::WeightUnit;
+use util::hash::Hash;
+use util::weight::{SendersWeight, WeightUnit};
 
 /// a genesis block should be a block with estimate Block with prevblock =
 /// None and data. data will be the unique identifier of this blockchain
@@ -32,7 +31,7 @@ impl<S: Sender> ProtoBlock<S> {
 
 /// Boxing of a block, will be implemented as a message::Trait
 #[derive(Clone, Eq, Hash)]
-pub struct Block<S: Sender>((Arc<ProtoBlock<S>>, Hashed));
+pub struct Block<S: Sender>((Arc<ProtoBlock<S>>, Hash));
 
 #[cfg(feature = "integration_test")]
 impl<S: Sender + Into<S>> From<S> for Block<S> {
@@ -66,7 +65,7 @@ impl<S: Sender> std::fmt::Debug for Block<S> {
             self.prevblock()
                 .as_ref()
                 .map(|p| p.id())
-                .unwrap_or(&Hashed::default())
+                .unwrap_or(&Hash::default())
         )
     }
 }
@@ -81,11 +80,11 @@ impl<S: Sender> serde::Serialize for Block<S> {
 }
 
 impl<S: Sender> Id for ProtoBlock<S> {
-    type ID = Hashed;
+    type ID = Hash;
 }
 
 impl<S: Sender> Id for Block<S> {
-    type ID = Hashed;
+    type ID = Hash;
 }
 
 pub type BlockMsg<S> = message::Message<Block<S> /*Estimate*/, S /*Sender*/>;
@@ -113,12 +112,15 @@ impl<S: Sender> Block<S> {
     pub fn new(prevblock: Option<Block<S>>) -> Self {
         Block::from(ProtoBlock::new(prevblock))
     }
+
     pub fn id(&self) -> &<Self as Id>::ID {
         &(self.0).1
     }
+
     fn arc(&self) -> &Arc<ProtoBlock<S>> {
         &(self.0).0
     }
+
     /// Create a new block from a prevblock message and an incomplete block
     pub fn from_prevblock_msg(
         prevblock_msg: Option<BlockMsg<S>>,
@@ -314,6 +316,7 @@ impl<S: Sender> Block<S> {
         }
         (visited_parents, genesis, latest_blocks)
     }
+
     /// used to collect the validators that produced blocks for each side of a fork
     fn collect_validators(
         block: &Block<S>,

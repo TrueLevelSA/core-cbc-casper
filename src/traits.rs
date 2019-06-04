@@ -3,14 +3,7 @@ use std::hash::Hash;
 
 use crate::message;
 use justification::LatestMsgsHonest;
-use senders_weight::SendersWeight;
-
-extern crate serde_derive;
-
-extern crate bincode;
-extern crate blake2;
-extern crate itertools;
-pub extern crate serde;
+use util::weight::SendersWeight;
 
 /// Describes an estimate, or a value of the consensus at a certain time
 pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {
@@ -26,6 +19,14 @@ pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {
 }
 
 pub trait Sender: Hash + Clone + Ord + Eq + Send + Sync + Debug + serde::Serialize {}
+
+// Default implementations
+impl Sender for u8 {}
+impl Sender for u32 {}
+impl Sender for u64 {}
+impl Sender for i8 {}
+impl Sender for i32 {}
+impl Sender for i64 {}
 
 /// Define how to compare the trait type to zero
 pub trait Zero<T: PartialEq> {

@@ -17,12 +17,12 @@ build:
   script:
     - cargo build --verbose
 
-unit-tests:
+tests:
   stage: tests
   script:
-    - cargo test --lib
+    - cargo test
 
-integration-tests:
+generative-tests:
   stage: tests
   script:
     - cargo test --test generative_tests --features "integration_test"
