@@ -39,8 +39,7 @@
 //!
 //! To benefit from the CBC Casper safety proofs this library builds upon, developers have to
 //! implement `message::Trait`. This trait in turn requires implementing other traits in this
-//! library, such as the `sender::Trait` for validators, the `Estimate` trait for the estimate, and
-//! the `Data` trait if the estimate carries data.
+//! library, such as the `sender::Trait` for validators, and the `Estimate` trait for the estimate.
 //!
 //! One generic type implements the `message::Trait`, namely `message::Message<Estimate,
 //! sender::Trait>`, and can be used to helps getting to a compliant `message::Trait` concrete type
