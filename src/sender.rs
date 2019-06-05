@@ -16,6 +16,49 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! ## Validators
+//!
+//! Validators produce and recieve messages (`message::Trait`) from other validators in the
+//! network. When a validator want to produce a message he needs to collect his justification
+//! (`Justification`) and run an estimator (`Estimate`) to get a value. See [§ Estimator
+//! Function](../justification/index.html#estimator-function) in § Justification.
+//!
+//! ## Consensus Rules
+//!
+//! These rules classify two types of faults: the *invalid message* fault, and the *equivocation* fault.
+//!
+//!  1. The proposed value must be in the set of consensus values returned by the application of
+//!     the estimator function on the justification.
+//!  1. The validator cannot make two messages with
+//!     *  two different values, or
+//!     *  two different justifications,
+//!
+//! such that **_either message is not later than the other_**.
+//!
+//! ### Violation of Consensus Rules
+//!
+//!  1. **Invalid Message Faults:** The violation of the first rule results in the message being
+//!     invalid, and can be detected by everyone who receives the message. The receiver runs the
+//!     estimator function on the justification of the message, and checks whether the proposed
+//!     value is in the set of values returned by the estimator. All messages which do not violate
+//!     this rule are valid messages.
+//!  1. **Equivocation Faults:** The violation of the second rule cannot be detected by anyone who
+//!     receives only one of the two messages violating this rule. This violation is a type of
+//!     Byzantine failure which we call equivocation. We refer to the violation of this rule as
+//!     faults.
+//!
+//! When a node (`sender::Trait`) equivocates, it is basically executing multiple separate
+//! instances of the protocol, and may attempt to show messages from a single instance of these
+//! executions to separate peers in the network. To clarify what separate instances of the protocol
+//! are: consider a validator who violates consensus *rule 2* by generating messages **A** and
+//! **B** that break the rule. The validator then starts maintaining two histories of protocol
+//! execution, one in which only message **A** is generated, and the other in which only message
+//! **B** is generated. In each single version of protocol execution, the validator has not
+//! equivocated.
+//!
+//! Source: [Casper CBC, Simplified!](https://medium.com/@aditya.asgaonkar/casper-cbc-simplified-2370922f9aa6),
+//! by Aditya Asgaonkar.
+
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -25,10 +68,11 @@ use crate::message;
 use crate::traits::Zero;
 use crate::util::weight::{SendersWeight, WeightUnit};
 
-/// All casper actors that send messages have to implement the sender trait
+/// All casper actors that send messages, aka validators, have to implement the sender trait
 pub trait Trait: Hash + Clone + Ord + Eq + Send + Sync + Debug + serde::Serialize {}
 
 // Default implementations
+
 impl Trait for u8 {}
 impl Trait for u32 {}
 impl Trait for u64 {}
@@ -36,7 +80,8 @@ impl Trait for i8 {}
 impl Trait for i32 {}
 impl Trait for i64 {}
 
-/// struct that stores the inner state of the sender
+/// Inner state of a sender. Sender's state implement `message::Trait` allowing senders to produce
+/// messages based on their latest view of the network.
 #[derive(Debug, Clone)]
 pub struct State<M: message::Trait> {
     /// current state total fault weight

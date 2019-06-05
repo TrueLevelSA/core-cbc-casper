@@ -14,28 +14,26 @@ casper family. We aimed at pushing as much functionality as possible directly to
 the abstract message layer, in such a way that a developer can create a protocol
 fairly easy using this library.
 
-The design decision is to be as general as possible, and leave all specifics
-for the implementer of the protocol. For the time being, we aim at
-mathematical correctness and mostly purely functional protocol executions,
-rather than on performance. The idea is to have a mathematically correct and
-possibly inefficient implementations of functions that can be used as ground truth for
+The design decision is to be as general as possible, and leave all specifics for
+the implementer of the protocol. For the time being, we aim at mathematical
+correctness and mostly purely functional protocol executions, rather than on
+performance. The idea is to have a mathematically correct and possibly
+inefficient implementations of functions that can be used as ground truth for
 comparing with efficient implementations.
 
 ## Using the library
 
 To benefit from the CBC Casper safety proofs this library builds upon,
-developers have to implement `message::Trait`. This trait in turn
-requires implementing other traits in this library, such as the `Sender` trait
-for validators, the `Estimate` trait for the estimate, and the `Data` trait if
-the estimate carries data.
+developers have to implement `message::Trait`. This trait in turn requires
+implementing other traits in this library, such as the `sender::Trait` trait for
+validators, and the `Estimate` trait for the estimate.
 
 One generic type implements the `message::Trait`, namely
-`message::Message<Estimate, Sender>`, and can be used to helps getting to a
-compliant `message::Trait` concrete type implementation easily.
+`message::Message<Estimate, sender::Trait>`, and can be used to helps getting to
+a compliant `message::Trait` concrete type implementation easily.
 
 We also present a basic blockchain implementation heavily under developement.
-You can also find another implementation of an integer
-consensus in `tests/`.
+You can also find another implementation of an integer consensus in `tests/`.
 
 But in order to get started using the library, the best way is to study the
 examples folder (under development). It is also instructive to run the tests.
@@ -53,8 +51,8 @@ casper = { git = "https://github.com/TrueLevelSA/cbc-casper-msg" }
 ## Example
 
 We present an example of naive consensus protocol: a ternary consensus that uses
-the generic type `message::Message<Estimate, Sender>` implementation to generate
-the protocol.
+the generic type `message::Message<Estimate, sender::Trait>` implementation to
+generate the protocol.
 
 ## Known limitations
 

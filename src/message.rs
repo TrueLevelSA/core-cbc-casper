@@ -16,6 +16,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! ## Messages
+//!
+//! Messages are the pieces of information generated and passed around by validators while
+//! participating in the consensus forming process. In the Casper CBC consensus mechanism, messages
+//! have the following structure:
+//!
+//! ```text
+//! Message structure = (value, validator, justification)
+//! ```
+//!
+//! Let us break down the message structure:
+//!
+//!  * **Value:** The value is the item that the validator proposes the network to come to
+//!               consensus on. These values have to be from the set of consensus values. If we are
+//!               building an integer consensus algorithm, then the consensus values will be
+//!               integers. If we are building a blockchain consensus algorithm, then these
+//!               consensus values will be blocks.
+//!  * **Validator:** This is the validator who is generating the message.
+//!  * **Justification:** The justification of a message is the set of messages that the validator
+//!                       has seen and acknowledged while generating that particular message. The
+//!                       justification is supposed to “justify” the proposed value.
+//!
+//! Source: [Casper CBC, Simplified!](https://medium.com/@aditya.asgaonkar/casper-cbc-simplified-2370922f9aa6),
+//! by Aditya Asgaonkar.
+
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::sync::{Arc, RwLock};
@@ -27,24 +52,28 @@ use crate::sender;
 use crate::traits::{Estimate, Id};
 use crate::util::hash::Hash;
 
-/// A Casper Message, that can will be sent over the network
-/// and used as a justification for a more recent message
+/// Abstraction of a Casper message, contain a value (`Estimate`) that will be sent over the
+/// network by validators (`sender::Trait`) and used as `Justification` for a more recent messages.
 pub trait Trait:
     std::hash::Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Serialize
 {
-    // To be implemented on concrete struct
+    /// Defines the validator type that generated this message
     type Sender: sender::Trait;
+
+    /// Defines the estimate type, or value, contained in that message
+    /// The estimate type must be compatible with `message::Trait`
     type Estimate: Estimate<M = Self>;
 
-    /// returns the validator who sent this message
+    /// Returns the validator, or sender, who sent this message
     fn sender(&self) -> &Self::Sender;
 
-    /// returns the estimate of this message
+    /// Returns the estimate, or value, of this message
     fn estimate(&self) -> &Self::Estimate;
 
-    /// returns the justification of this message
+    /// Returns the justification of this message
     fn justification<'z>(&'z self) -> &'z Justification<Self>;
 
+    // TODO(h4sh3d): remove because getid() is already available
     fn id(&self) -> &Self::ID;
 
     /// creates a new instance of this message
@@ -177,7 +206,7 @@ pub trait Trait:
     }
 }
 
-/// Mathematical definition of a casper message
+// Mathematical definition of a casper message with (value, validator, justification)
 #[derive(Clone, Default, Eq, PartialEq)]
 struct ProtoMsg<E, S>
 where
@@ -189,7 +218,35 @@ where
     justification: Justification<Message<E, S>>,
 }
 
-/// Boxing of a ProtoMsg, that will implement the trait message::Trait
+/// Concrete Casper message implementing `message::Trait` containing a value as `Estimate`, a
+/// validator as `sender::Trait`, and a justification as `Justification`.
+///
+/// # Example
+///
+/// Declare a `Message` type that contains a `Value` as estimate/value, send by validators
+/// represented with `u64`.
+///
+/// ```
+/// extern crate casper;
+///
+/// use casper::message;
+///
+/// #[derive(Debug, Hash, Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
+/// enum Value {
+///     Zero = 0,
+///     One = 1,
+///     Two = 2,
+/// };
+///
+/// // Implement Estimate for Value...
+///
+/// type Validator = u64;
+///
+/// type Message = message::Message<Value, Validator>;
+/// ```
+///
+/// `Value` must implement `Estimate` to be valid for a `message::Message` and to produce
+/// estimates.
 #[derive(Eq, Clone, Default)]
 pub struct Message<E, S>(Arc<ProtoMsg<E, S>>, Hash)
 where

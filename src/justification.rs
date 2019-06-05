@@ -16,6 +16,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! # Later Messages
+//!
+//! If message *A* is in the justification of message *B*, then message *B* is **later** than
+//! message *A*.
+//!
+//! # Estimator Function
+//!
+//! The **estimator function takes the justification** (which is a set of messages) as input, and
+//! **returns the set of consensus values** that are “justified” by the input.  For example, in an
+//! integer consensus setting, the estimator will return integer values. In a blockchain setting,
+//! the the estimator will return blocks which can be added on top of the current tip detected from
+//! the blocks in the messages in the inputted justification.
+//!
+//! Source: [Casper CBC, Simplified!](https://medium.com/@aditya.asgaonkar/casper-cbc-simplified-2370922f9aa6),
+//! by Aditya Asgaonkar.
+
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Debug, Formatter};
 
