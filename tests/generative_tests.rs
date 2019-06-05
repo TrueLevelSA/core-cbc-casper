@@ -33,7 +33,7 @@ use proptest::test_runner::{RngAlgorithm, TestRng, TestRunner};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
-use casper::blockchain::{Block, BlockMsg, ProtoBlock};
+use casper::blockchain::{self, Block, ProtoBlock};
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use casper::message::{self, Message, Trait};
 use casper::sender;
@@ -333,7 +333,7 @@ where
 
 /// Returns true when at least one validator picks a block at the specified height
 fn run_until_height(
-    state: &HashMap<u32, sender::State<BlockMsg<u32>>>,
+    state: &HashMap<u32, sender::State<blockchain::Message<u32>>>,
     height: &u32,
     _vec_data: &mut Vec<ChainData>,
     _chain_id: u32,
@@ -351,7 +351,7 @@ fn run_until_height(
 /// return true if some safety oracle is detected at max_heaight_of_oracle
 /// the threshold for the safety oracle is set to half of the sum of the senders weights
 fn get_data_from_state(
-    sender_state: &sender::State<BlockMsg<u32>>,
+    sender_state: &sender::State<blockchain::Message<u32>>,
     max_height_of_oracle: &u32,
     data: &mut ChainData,
 ) -> (bool) {
@@ -405,7 +405,7 @@ fn get_data_from_state(
 }
 
 fn safety_oracle(
-    state: &HashMap<u32, sender::State<BlockMsg<u32>>>,
+    state: &HashMap<u32, sender::State<blockchain::Message<u32>>>,
     _height_of_oracle: &u32,
     _vec_data: &mut Vec<ChainData>,
     _chain_id: u32,
@@ -433,7 +433,7 @@ fn safety_oracle(
 /// adds a new data to vec_data for each new message that is sent
 /// uses received_msgs to take note of which validator received which messages
 fn safety_oracle_at_height(
-    state: &HashMap<u32, sender::State<BlockMsg<u32>>>,
+    state: &HashMap<u32, sender::State<blockchain::Message<u32>>>,
     height_of_oracle: &u32,
     vec_data: &mut Vec<ChainData>,
     chain_id: u32,
@@ -460,7 +460,7 @@ fn safety_oracle_at_height(
     safety_oracle_detected.contains(&true)
 }
 
-fn clique_collection(state: HashMap<u32, sender::State<BlockMsg<u32>>>) -> Vec<Vec<Vec<u32>>> {
+fn clique_collection(state: HashMap<u32, sender::State<blockchain::Message<u32>>>) -> Vec<Vec<Vec<u32>>> {
     state
         .iter()
         .map(|(_, sender_state)| {

@@ -33,7 +33,7 @@ use crate::util::hash::Hash;
 use crate::util::weight::{SendersWeight, WeightUnit};
 
 /// Casper message (`message::Message`) for a `Block` send by a validator `S: sender::Trait`
-pub type BlockMsg<S> = message::Message<Block<S> /*Estimate*/, S /*Sender*/>;
+pub type Message<S> = message::Message<Block<S> /*Estimate*/, S /*Sender*/>;
 
 /// a genesis block should be a block with estimate Block with prevblock =
 /// None and data. data will be the unique identifier of this blockchain
@@ -107,14 +107,14 @@ impl<S: sender::Trait> From<ProtoBlock<S>> for Block<S> {
     }
 }
 
-impl<'z, S: sender::Trait> From<&'z BlockMsg<S>> for Block<S> {
-    fn from(msg: &BlockMsg<S>) -> Self {
+impl<'z, S: sender::Trait> From<&'z Message<S>> for Block<S> {
+    fn from(msg: &Message<S>) -> Self {
         msg.estimate().clone()
     }
 }
 
 impl<S: sender::Trait> Estimate for Block<S> {
-    type M = BlockMsg<S>;
+    type M = Message<S>;
 
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
@@ -141,7 +141,7 @@ impl<S: sender::Trait> Block<S> {
 
     /// Create a new block from a prevblock message and an incomplete block
     pub fn from_prevblock_msg(
-        prevblock_msg: Option<BlockMsg<S>>,
+        prevblock_msg: Option<Message<S>>,
         // a incomplete_block is a block with a None prevblock (ie, Estimate) AND is
         // not a genesis_block
         incomplete_block: Block<S>,
@@ -166,27 +166,27 @@ impl<S: sender::Trait> Block<S> {
 
     pub fn safety_oracles(
         block: Block<S>,
-        latest_msgs_honest: &LatestMsgsHonest<BlockMsg<S>>,
-        equivocators: &HashSet<<BlockMsg<S> as message::Trait>::Sender>,
+        latest_msgs_honest: &LatestMsgsHonest<Message<S>>,
+        equivocators: &HashSet<<Message<S> as message::Trait>::Sender>,
         safety_oracle_threshold: WeightUnit,
         weights: &SendersWeight<S>,
-    ) -> HashSet<BTreeSet<<BlockMsg<S> as message::Trait>::Sender>> {
+    ) -> HashSet<BTreeSet<<Message<S> as message::Trait>::Sender>> {
         fn latest_in_justification<S: sender::Trait>(
-            j: &Justification<BlockMsg<S>>,
-            equivocators: &HashSet<<BlockMsg<S> as message::Trait>::Sender>,
-        ) -> HashMap<<BlockMsg<S> as message::Trait>::Sender, BlockMsg<S>> {
+            j: &Justification<Message<S>>,
+            equivocators: &HashSet<<Message<S> as message::Trait>::Sender>,
+        ) -> HashMap<<Message<S> as message::Trait>::Sender, Message<S>> {
             LatestMsgsHonest::from_latest_msgs(&LatestMsgs::from(j), equivocators)
                 .iter()
                 .map(|m| (m.sender().clone(), m.clone()))
                 .collect()
         }
 
-        let latest_containing_block: HashSet<&BlockMsg<S>> = latest_msgs_honest
+        let latest_containing_block: HashSet<&Message<S>> = latest_msgs_honest
             .iter()
             .filter(|&msg| block.is_member(&Block::from(msg)))
             .collect();
 
-        let latest_agreeing_in_sender_view: HashMap<S, HashMap<S, BlockMsg<S>>> =
+        let latest_agreeing_in_sender_view: HashMap<S, HashMap<S, Message<S>>> =
             latest_containing_block
                 .iter()
                 .map(|m| {
@@ -282,7 +282,7 @@ impl<S: sender::Trait> Block<S> {
     /// the set contains all the blocks that have a None
     /// as their prevblock (aka genesis blocks or finalized blocks)
     pub fn parse_blockchains(
-        latest_msgs: &LatestMsgsHonest<BlockMsg<S>>,
+        latest_msgs: &LatestMsgsHonest<Message<S>>,
     ) -> (
         HashMap<Block<S>, HashSet<Block<S>>>,
         HashSet<Block<S>>,
@@ -443,8 +443,8 @@ impl<S: sender::Trait> Block<S> {
     }
 
     pub fn ghost(
-        latest_msgs: &LatestMsgsHonest<BlockMsg<S>>,
-        senders_weights: &SendersWeight<<BlockMsg<S> as message::Trait>::Sender>,
+        latest_msgs: &LatestMsgsHonest<Message<S>>,
+        senders_weights: &SendersWeight<<Message<S> as message::Trait>::Sender>,
     ) -> Result<Self, &'static str> {
         let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_msgs);
         let b_in_lms_senders = Rc::new(RwLock::new(HashMap::<Block<S>, HashSet<S>>::new()));
@@ -466,7 +466,7 @@ mod tests {
     use std::iter;
     use std::iter::FromIterator;
 
-    use crate::blockchain::{Block, BlockMsg, ProtoBlock, SendersWeight};
+    use crate::blockchain::{Block, Message, ProtoBlock, SendersWeight};
     use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest};
     use crate::message::Trait;
     use crate::sender;
@@ -514,7 +514,7 @@ mod tests {
         // block dag
         let genesis_block = Block::from(ProtoBlock::new(None));
         let latest_msgs = Justification::new();
-        let genesis_block_msg = BlockMsg::new(sender0, latest_msgs, genesis_block.clone(), None);
+        let genesis_block_msg = Message::new(sender0, latest_msgs, genesis_block.clone(), None);
         assert_eq!(
             &Block::from(&genesis_block_msg),
             &genesis_block,
@@ -522,12 +522,12 @@ mod tests {
         );
 
         let (m1, _) =
-            BlockMsg::from_msgs(sender1, vec![&genesis_block_msg], &sender_state).unwrap();
+            Message::from_msgs(sender1, vec![&genesis_block_msg], &sender_state).unwrap();
 
         let (m2, _) =
-            BlockMsg::from_msgs(sender2, vec![&genesis_block_msg], &sender_state).unwrap();
+            Message::from_msgs(sender2, vec![&genesis_block_msg], &sender_state).unwrap();
 
-        let (m3, _) = BlockMsg::from_msgs(sender3, vec![&m1, &m2], &sender_state).unwrap();
+        let (m3, _) = Message::from_msgs(sender3, vec![&m1, &m2], &sender_state).unwrap();
 
         assert_eq!(
             m3.estimate(),
@@ -535,7 +535,7 @@ mod tests {
             "should build on top of m2 as sender2 has more weight"
         );
 
-        let (m4, _) = BlockMsg::from_msgs(sender4, vec![&m1], &sender_state).unwrap();
+        let (m4, _) = Message::from_msgs(sender4, vec![&m1], &sender_state).unwrap();
 
         assert_eq!(
             m4.estimate(),
@@ -545,7 +545,7 @@ mod tests {
 
         // println!("\n3 {:?}", m3);
         // println!("\n4 {:?}", m4);
-        let (m5, _) = BlockMsg::from_msgs(sender0, vec![&m3, &m2], &sender_state).unwrap();
+        let (m5, _) = Message::from_msgs(sender0, vec![&m3, &m2], &sender_state).unwrap();
         // println!("\nm5 {:?}", m5);
         // println!("\nm5_estimate {:?}", Block::from(&m5));
 
@@ -596,19 +596,19 @@ mod tests {
         // block dag
         let genesis_block = Block::from(ProtoBlock::new(None));
         let latest_msgs = Justification::new();
-        let genesis_block_msg = BlockMsg::new(senderg, latest_msgs, genesis_block.clone(), None);
+        let genesis_block_msg = Message::new(senderg, latest_msgs, genesis_block.clone(), None);
         // assert_eq!(
         //     &Block::from(&genesis_block_msg),
         //     &genesis_block,
         //     "genesis block with None as prevblock"
         // );
         let (m0, sender_state) =
-            BlockMsg::from_msgs(sender0, vec![&genesis_block_msg], &sender_state).unwrap();
+            Message::from_msgs(sender0, vec![&genesis_block_msg], &sender_state).unwrap();
 
-        let (m1, sender_state) = BlockMsg::from_msgs(sender1, vec![&m0], &sender_state).unwrap();
+        let (m1, sender_state) = Message::from_msgs(sender1, vec![&m0], &sender_state).unwrap();
 
         let (m2, sender_state) =
-            BlockMsg::from_msgs(sender2, vec![&genesis_block_msg], &sender_state).unwrap();
+            Message::from_msgs(sender2, vec![&genesis_block_msg], &sender_state).unwrap();
 
         // assert_eq!(
         //     m2.estimate(),
@@ -616,7 +616,7 @@ mod tests {
         //     "should build on top of m1 as sender1 has more weight"
         // );
 
-        let (m3, sender_state) = BlockMsg::from_msgs(sender3, vec![&m2], &sender_state).unwrap();
+        let (m3, sender_state) = Message::from_msgs(sender3, vec![&m2], &sender_state).unwrap();
 
         // assert_eq!(
         //     m3.estimate(),
@@ -626,7 +626,7 @@ mod tests {
 
         // println!("\n3 {:?}", m2);
         // println!("\n4 {:?}", m3);
-        let (m4, sender_state) = BlockMsg::from_msgs(sender4, vec![&m2], &sender_state).unwrap();
+        let (m4, sender_state) = Message::from_msgs(sender4, vec![&m2], &sender_state).unwrap();
         // assert_eq!(
         //     m4.estimate(),
         //     &Block::new(Some(Block::from(&m2)), sender4),
@@ -634,7 +634,7 @@ mod tests {
         // );
 
         let (m5, _) =
-            BlockMsg::from_msgs(sender5, vec![&m0, &m1, &m2, &m3, &m4], &sender_state).unwrap();
+            Message::from_msgs(sender5, vec![&m0, &m1, &m2, &m3, &m4], &sender_state).unwrap();
 
         assert_eq!(
             m5.estimate(),
@@ -669,13 +669,13 @@ mod tests {
         // block dag
         let proto_b0 = Block::from(ProtoBlock::new(None));
         let latest_msgs = Justification::new();
-        let m0 = BlockMsg::new(senders[0], latest_msgs, proto_b0.clone(), None);
+        let m0 = Message::new(senders[0], latest_msgs, proto_b0.clone(), None);
 
         let proto_b1 = Block::new(Some(proto_b0.clone()));
-        let (m1, sender_state) = BlockMsg::from_msgs(senders[1], vec![&m0], &sender_state).unwrap();
+        let (m1, sender_state) = Message::from_msgs(senders[1], vec![&m0], &sender_state).unwrap();
 
         let proto_b2 = Block::new(Some(proto_b1.clone()));
-        let (m2, sender_state) = BlockMsg::from_msgs(senders[0], vec![&m1], &sender_state).unwrap();
+        let (m2, sender_state) = Message::from_msgs(senders[0], vec![&m1], &sender_state).unwrap();
 
         // no clique yet, since senders[1] has not seen senders[0] seeing senders[1] having proto_b0 in the chain
         assert_eq!(
@@ -692,7 +692,7 @@ mod tests {
             HashSet::new()
         );
 
-        let (m3, sender_state) = BlockMsg::from_msgs(senders[1], vec![&m2], &sender_state).unwrap();
+        let (m3, sender_state) = Message::from_msgs(senders[1], vec![&m2], &sender_state).unwrap();
 
         // clique, since both senders have seen each other having proto_b0 in the chain
         assert_eq!(
@@ -709,9 +709,9 @@ mod tests {
             HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1]])])
         );
 
-        let (m4, sender_state) = BlockMsg::from_msgs(senders[2], vec![&m3], &sender_state).unwrap();
+        let (m4, sender_state) = Message::from_msgs(senders[2], vec![&m3], &sender_state).unwrap();
 
-        let (m5, sender_state) = BlockMsg::from_msgs(senders[1], vec![&m4], &sender_state).unwrap();
+        let (m5, sender_state) = Message::from_msgs(senders[1], vec![&m4], &sender_state).unwrap();
 
         // no second clique yet, since senders[2] has not seen senders[1] seeing senders[2] having proto_b0.clone() in the chain
         assert_eq!(
@@ -728,7 +728,7 @@ mod tests {
             HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1]])])
         );
 
-        let (m6, sender_state) = BlockMsg::from_msgs(senders[2], vec![&m5], &sender_state).unwrap();
+        let (m6, sender_state) = Message::from_msgs(senders[2], vec![&m5], &sender_state).unwrap();
 
         // have two cliques on proto_b0 now
         assert_eq!(
@@ -779,11 +779,11 @@ mod tests {
             HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[1], senders[2]])])
         );
 
-        let (m7, sender_state) = BlockMsg::from_msgs(senders[0], vec![&m6], &sender_state).unwrap();
+        let (m7, sender_state) = Message::from_msgs(senders[0], vec![&m6], &sender_state).unwrap();
 
-        let (m8, sender_state) = BlockMsg::from_msgs(senders[2], vec![&m7], &sender_state).unwrap();
+        let (m8, sender_state) = Message::from_msgs(senders[2], vec![&m7], &sender_state).unwrap();
 
-        let (_, sender_state) = BlockMsg::from_msgs(senders[0], vec![&m8], &sender_state).unwrap();
+        let (_, sender_state) = Message::from_msgs(senders[0], vec![&m8], &sender_state).unwrap();
 
         // now entire network is clique
         assert_eq!(
