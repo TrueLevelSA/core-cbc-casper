@@ -518,11 +518,9 @@ mod tests {
             "genesis block with None as prevblock"
         );
 
-        let (m1, _) =
-            Message::from_msgs(sender1, vec![&genesis_block_msg], &sender_state).unwrap();
+        let (m1, _) = Message::from_msgs(sender1, vec![&genesis_block_msg], &sender_state).unwrap();
 
-        let (m2, _) =
-            Message::from_msgs(sender2, vec![&genesis_block_msg], &sender_state).unwrap();
+        let (m2, _) = Message::from_msgs(sender2, vec![&genesis_block_msg], &sender_state).unwrap();
 
         let (m3, _) = Message::from_msgs(sender3, vec![&m1, &m2], &sender_state).unwrap();
 

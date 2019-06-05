@@ -460,7 +460,9 @@ fn safety_oracle_at_height(
     safety_oracle_detected.contains(&true)
 }
 
-fn clique_collection(state: HashMap<u32, sender::State<blockchain::Message<u32>>>) -> Vec<Vec<Vec<u32>>> {
+fn clique_collection(
+    state: HashMap<u32, sender::State<blockchain::Message<u32>>>,
+) -> Vec<Vec<Vec<u32>>> {
     state
         .iter()
         .map(|(_, sender_state)| {
