@@ -35,8 +35,6 @@ use crate::util::weight::{SendersWeight, WeightUnit};
 /// Casper message (`message::Message`) for a `Block` send by a validator `S: sender::Trait`
 pub type Message<S> = message::Message<Block<S> /*Estimate*/, S /*Sender*/>;
 
-/// a genesis block should be a block with estimate Block with prevblock =
-/// None and data. data will be the unique identifier of this blockchain
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize)]
 pub struct ProtoBlock<S: sender::Trait> {
     prevblock: Option<Block<S>>,
@@ -56,7 +54,6 @@ impl<S: sender::Trait> Id for ProtoBlock<S> {
     type ID = Hash;
 }
 
-/// Boxing of a block, will be implemented as a message::Trait
 #[derive(Clone, Eq, Hash)]
 pub struct Block<S: sender::Trait>((Arc<ProtoBlock<S>>, Hash));
 
