@@ -18,7 +18,9 @@
 
 //! ## Messages
 //!
-//! Messages are the pieces of information generated and passed around by validators while participating in the consensus forming process. In the Casper CBC consensus mechanism, messages have the following structure:
+//! Messages are the pieces of information generated and passed around by validators while
+//! participating in the consensus forming process. In the Casper CBC consensus mechanism, messages
+//! have the following structure:
 //!
 //! ```text
 //! Message structure = (value, validator, justification)
@@ -51,7 +53,7 @@ use crate::traits::{Estimate, Id};
 use crate::util::hash::Hash;
 
 /// Abstraction of a Casper message, contain a value (`Estimate`) that will be sent over the
-/// network by validators (`Sender`) and used as `Justification` for a more recent messages.
+/// network by validators (`sender::Trait`) and used as `Justification` for a more recent messages.
 pub trait Trait:
     std::hash::Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Serialize
 {
@@ -217,7 +219,7 @@ where
 }
 
 /// Concrete Casper message implementing `message::Trait` containing a value as `Estimate`, a
-/// validator as `Sender`, and a justification as `Justification`.
+/// validator as `sender::Trait`, and a justification as `Justification`.
 ///
 /// # Example
 ///
