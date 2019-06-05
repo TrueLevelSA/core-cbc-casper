@@ -120,3 +120,7 @@ pub mod sender;
 pub mod traits;
 /// Utility module for various types and components.
 pub mod util;
+
+pub use blockchain::{Block, Message};
+pub use justification::Justification;
+pub use sender::State;
