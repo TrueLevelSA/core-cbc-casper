@@ -116,7 +116,6 @@ impl<S: sender::Trait> Estimate for Block<S> {
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         senders_weights: &SendersWeight<<<Self as Estimate>::M as message::Trait>::Sender>,
-        // _data: Option<<Self as Data>::Data>,
     ) -> Result<Self, &'static str> {
         let prevblock = Block::ghost(latest_msgs, senders_weights)?;
         Ok(Block::from(ProtoBlock::new(Some(prevblock))))
@@ -136,11 +135,11 @@ impl<S: sender::Trait> Block<S> {
         &(self.0).0
     }
 
-    /// Create a new block from a prevblock message and an incomplete block
+    /// Create a new block from a prevblock message and an incomplete block.
     pub fn from_prevblock_msg(
         prevblock_msg: Option<Message<S>>,
-        // a incomplete_block is a block with a None prevblock (ie, Estimate) AND is
-        // not a genesis_block
+        // a incomplete_block is a block with a None prevblock (ie, Estimate) AND is not a
+        // genesis_block
         incomplete_block: Block<S>,
     ) -> Self {
         let prevblock = prevblock_msg.map(|m| Block::from(&m));
@@ -151,7 +150,7 @@ impl<S: sender::Trait> Block<S> {
         block
     }
 
-    /// Math definition of blockchain membership
+    /// Mathematical definition of blockchain membership.
     pub fn is_member(&self, rhs: &Self) -> bool {
         self == rhs
             || rhs
@@ -205,7 +204,6 @@ impl<S: sender::Trait> Block<S> {
                     seen_agreeing
                         .keys()
                         .filter(|senderb| {
-                            // println!("Some {:?}", senderb);
                             if latest_agreeing_in_sender_view.contains_key(senderb) {
                                 latest_agreeing_in_sender_view[senderb]
                                     .contains_key(&sender.clone())
@@ -217,7 +215,7 @@ impl<S: sender::Trait> Block<S> {
                 )
             })
             .collect();
-        // println!("neighbours: {:?}", neighbours);
+
         fn bron_kerbosch<S: sender::Trait>(
             r: HashSet<&S>,
             p: HashSet<&S>,
@@ -225,7 +223,6 @@ impl<S: sender::Trait> Block<S> {
             mx_clqs: &mut HashSet<BTreeSet<S>>,
             neighbours: HashMap<&S, HashSet<&S>>,
         ) {
-            // println!("recursed");
             if p.is_empty() && x.is_empty() {
                 let rnew: BTreeSet<S> = r.into_iter().map(|x| x.clone()).collect();
                 mx_clqs.insert(rnew);
@@ -263,21 +260,13 @@ impl<S: sender::Trait> Block<S> {
             .collect()
     }
 
-    // pub fn set_as_final(&mut self) -> () {
-    //     let mut proto_block = (**self.0).clone();
-    //     proto_block.prevblock = None;
-    //     *self.0 = Arc::new(proto_block);
-    // }
-
     pub fn prevblock(&self) -> Option<Self> {
         self.arc().prevblock.as_ref().cloned()
     }
 
-    /// parses blockchain using the latest honest messages
-    /// the return value is a tuple containing a map and a set
-    /// the hashmap maps blocks to their respective children
-    /// the set contains all the blocks that have a None
-    /// as their prevblock (aka genesis blocks or finalized blocks)
+    /// Parses blockchain using the latest honest messages the return value is a tuple containing a
+    /// map and a set. The hashmap maps blocks to their respective children. The set contains all
+    /// the blocks that have a None as their prevblock (aka genesis blocks or finalized blocks).
     pub fn parse_blockchains(
         latest_msgs: &LatestMsgsHonest<Message<S>>,
     ) -> (
@@ -302,6 +291,7 @@ impl<S: sender::Trait> Block<S> {
         let mut queue: VecDeque<Block<S>> = visited_parents.keys().cloned().collect();
         let mut genesis: HashSet<Block<S>> = HashSet::new();
         let mut was_empty = false;
+
         // while there are still unvisited blocks
         while let Some(child) = queue.pop_front() {
             match (child.prevblock(), was_empty && genesis.is_empty()) {
@@ -311,7 +301,8 @@ impl<S: sender::Trait> Block<S> {
                         was_empty = true
                     }
                     if visited_parents.contains_key(&parent) {
-                        // visited parent before, fork found, add new child and don't add parent to queue (since it is already in the queue)
+                        // visited parent before, fork found, add new child and don't add parent to
+                        // queue (since it is already in the queue)
                         visited_parents.get_mut(&parent).map(|parents_children| {
                             parents_children.insert(child);
                         });
@@ -332,17 +323,15 @@ impl<S: sender::Trait> Block<S> {
         (visited_parents, genesis, latest_blocks)
     }
 
-    /// used to collect the validators that produced blocks for each side of a fork
+    /// Collects the validators that produced blocks for each side of a fork.
     fn collect_validators(
         block: &Block<S>,
         visited: &HashMap<Block<S>, HashSet<Block<S>>>,
-        // mut acc: HashSet<S>,
         latest_blocks: &HashMap<Block<S>, S>,
         b_in_lms_senders: Rc<RwLock<HashMap<Block<S>, HashSet<S>>>>,
     ) -> HashSet<S> {
         let mut senders = HashSet::new();
-        // collect this sender if this block is his proposed one from his latest
-        // message
+        // collect this sender if this block is his proposed one from his latest message
         latest_blocks
             .get(block)
             .map(|sender| senders.insert(sender.clone()));
@@ -367,7 +356,7 @@ impl<S: sender::Trait> Block<S> {
         res
     }
 
-    /// find heaviest block
+    /// Find heaviest block.
     fn pick_heaviest(
         blocks: &HashSet<Block<S>>,
         visited: &HashMap<Block<S>, HashSet<Block<S>>>,
@@ -470,8 +459,8 @@ mod tests {
 
     #[test]
     fn example_usage() {
-        let (sender0, sender1, sender2, sender3, sender4) = (0, 1, 2, 3, 4); // miner identities
-        let (weight0, weight1, weight2, weight3, weight4) = (1.0, 1.0, 2.0, 1.0, 1.1); // and their corresponding sender_state
+        let (sender0, sender1, sender2, sender3, sender4) = (0, 1, 2, 3, 4);
+        let (weight0, weight1, weight2, weight3, weight4) = (1.0, 1.0, 2.0, 1.0, 1.1);
         let senders_weights = SendersWeight::new(
             [
                 (sender0, weight0),
@@ -492,8 +481,6 @@ mod tests {
             1.0,            // subjective fault weight threshold
             HashSet::new(), // equivocators
         );
-
-        // let txs = BTreeSet::new();
 
         // msg dag
         // (s0, w=1.0)   gen            m5
@@ -538,13 +525,8 @@ mod tests {
             "should build on top of m1 as as thats the only msg it saw"
         );
 
-        // println!("\n3 {:?}", m3);
-        // println!("\n4 {:?}", m4);
         let (m5, _) = Message::from_msgs(sender0, vec![&m3, &m2], &sender_state).unwrap();
-        // println!("\nm5 {:?}", m5);
-        // println!("\nm5_estimate {:?}", Block::from(&m5));
 
-        // println!();
         assert_eq!(
             m5.estimate(),
             &Block::new(Some(Block::from(&m3))),
@@ -553,14 +535,13 @@ mod tests {
 
         let block = Block::from(&m3);
         assert_eq!(block, Block::new(Some(Block::from(&m2))),);
-        // assert_eq!(block.prevblock(), Some(genesis_block),);
     }
 
     #[test]
     fn test2() {
-        let (senderg, sender0, sender1, sender2, sender3, sender4, sender5) = (0, 1, 2, 3, 4, 5, 6); // miner identities
+        let (senderg, sender0, sender1, sender2, sender3, sender4, sender5) = (0, 1, 2, 3, 4, 5, 6);
         let (weightg, weight0, weight1, weight2, weight3, weight4, weight5) =
-            (1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.0); // and their corresponding sender_state
+            (1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.0);
 
         let senders_weights = SendersWeight::new(
             [
@@ -586,17 +567,11 @@ mod tests {
             HashSet::new(), // equivocators
         );
 
-        // let txs = BTreeSet::new();
-
         // block dag
         let genesis_block = Block::from(ProtoBlock::new(None));
         let latest_msgs = Justification::new();
         let genesis_block_msg = Message::new(senderg, latest_msgs, genesis_block.clone(), None);
-        // assert_eq!(
-        //     &Block::from(&genesis_block_msg),
-        //     &genesis_block,
-        //     "genesis block with None as prevblock"
-        // );
+
         let (m0, sender_state) =
             Message::from_msgs(sender0, vec![&genesis_block_msg], &sender_state).unwrap();
 
@@ -605,28 +580,9 @@ mod tests {
         let (m2, sender_state) =
             Message::from_msgs(sender2, vec![&genesis_block_msg], &sender_state).unwrap();
 
-        // assert_eq!(
-        //     m2.estimate(),
-        //     &Block::new(Some(Block::from(&m1)), sender2),
-        //     "should build on top of m1 as sender1 has more weight"
-        // );
-
         let (m3, sender_state) = Message::from_msgs(sender3, vec![&m2], &sender_state).unwrap();
 
-        // assert_eq!(
-        //     m3.estimate(),
-        //     &Block::new(Some(Block::from(&m0)), sender3),
-        //     "should build on top of m0 as as thats the only msg it saw"
-        // );
-
-        // println!("\n3 {:?}", m2);
-        // println!("\n4 {:?}", m3);
         let (m4, sender_state) = Message::from_msgs(sender4, vec![&m2], &sender_state).unwrap();
-        // assert_eq!(
-        //     m4.estimate(),
-        //     &Block::new(Some(Block::from(&m2)), sender4),
-        //     "should build on top of "
-        // );
 
         let (m5, _) =
             Message::from_msgs(sender5, vec![&m0, &m1, &m2, &m3, &m4], &sender_state).unwrap();
@@ -672,7 +628,8 @@ mod tests {
         let proto_b2 = Block::new(Some(proto_b1.clone()));
         let (m2, sender_state) = Message::from_msgs(senders[0], vec![&m1], &sender_state).unwrap();
 
-        // no clique yet, since senders[1] has not seen senders[0] seeing senders[1] having proto_b0 in the chain
+        // no clique yet, since senders[1] has not seen senders[0] seeing senders[1] having
+        // proto_b0 in the chain
         assert_eq!(
             Block::safety_oracles(
                 proto_b0.clone(),
@@ -708,7 +665,8 @@ mod tests {
 
         let (m5, sender_state) = Message::from_msgs(senders[1], vec![&m4], &sender_state).unwrap();
 
-        // no second clique yet, since senders[2] has not seen senders[1] seeing senders[2] having proto_b0.clone() in the chain
+        // no second clique yet, since senders[2] has not seen senders[1] seeing senders[2] having
+        // proto_b0.clone() in the chain
         assert_eq!(
             Block::safety_oracles(
                 proto_b0.clone(),
