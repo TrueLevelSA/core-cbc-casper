@@ -112,6 +112,7 @@ pub mod blockchain;
 pub mod justification;
 /// Messages are generated and passed around by validators in the effort of trying to reach consensus.
 pub mod message;
+/// Senders are the consensus forming peers nodes in the network are called validators.
 pub mod sender;
 pub mod traits;
 pub mod util;
