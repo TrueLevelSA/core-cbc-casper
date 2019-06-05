@@ -32,6 +32,9 @@ use crate::traits::{Estimate, Id, Zero};
 use crate::util::hash::Hash;
 use crate::util::weight::{SendersWeight, WeightUnit};
 
+/// Casper message (`message::Message`) for a `Block` send by a validator `S: sender::Trait`
+pub type BlockMsg<S> = message::Message<Block<S> /*Estimate*/, S /*Sender*/>;
+
 /// a genesis block should be a block with estimate Block with prevblock =
 /// None and data. data will be the unique identifier of this blockchain
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize)]
@@ -49,6 +52,10 @@ impl<S: sender::Trait> ProtoBlock<S> {
     }
 }
 
+impl<S: sender::Trait> Id for ProtoBlock<S> {
+    type ID = Hash;
+}
+
 /// Boxing of a block, will be implemented as a message::Trait
 #[derive(Clone, Eq, Hash)]
 pub struct Block<S: sender::Trait>((Arc<ProtoBlock<S>>, Hash));
@@ -60,22 +67,6 @@ impl<S: sender::Trait + Into<S>> From<S> for Block<S> {
     }
 }
 
-// #[cfg(feature = "integration_test")]
-// impl<S: Sender> std::fmt::Debug for Block<S> {
-//     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-//         match self.prevblock() {
-//             None => write!(
-//                 fmt,
-//                 "{:?} -> {:?}",
-//                 (self.sender(), self.id()),
-//                 None::<Block<S>>
-//             ),
-//             Some(block) => write!(fmt, "{:?} -> {:?}", (self.sender(), self.id()), block),
-//         }
-//     }
-// }
-
-// #[cfg(not(feature = "integration_test"))]
 impl<S: sender::Trait> std::fmt::Debug for Block<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
@@ -99,15 +90,9 @@ impl<S: sender::Trait> serde::Serialize for Block<S> {
     }
 }
 
-impl<S: sender::Trait> Id for ProtoBlock<S> {
-    type ID = Hash;
-}
-
 impl<S: sender::Trait> Id for Block<S> {
     type ID = Hash;
 }
-
-pub type BlockMsg<S> = message::Message<Block<S> /*Estimate*/, S /*Sender*/>;
 
 impl<S: sender::Trait> PartialEq for Block<S> {
     fn eq(&self, rhs: &Self) -> bool {
@@ -125,6 +110,19 @@ impl<S: sender::Trait> From<ProtoBlock<S>> for Block<S> {
 impl<'z, S: sender::Trait> From<&'z BlockMsg<S>> for Block<S> {
     fn from(msg: &BlockMsg<S>) -> Self {
         msg.estimate().clone()
+    }
+}
+
+impl<S: sender::Trait> Estimate for Block<S> {
+    type M = BlockMsg<S>;
+
+    fn mk_estimate(
+        latest_msgs: &LatestMsgsHonest<Self::M>,
+        senders_weights: &SendersWeight<<<Self as Estimate>::M as message::Trait>::Sender>,
+        // _data: Option<<Self as Data>::Data>,
+    ) -> Result<Self, &'static str> {
+        let prevblock = Block::ghost(latest_msgs, senders_weights)?;
+        Ok(Block::from(ProtoBlock::new(Some(prevblock))))
     }
 }
 
@@ -459,19 +457,6 @@ impl<S: sender::Trait> Block<S> {
         )
         .and_then(|(opt_block, ..)| opt_block)
         .ok_or_else(|| "Failed to get prevblock using ghost.")
-    }
-}
-
-impl<S: sender::Trait> Estimate for Block<S> {
-    type M = BlockMsg<S>;
-
-    fn mk_estimate(
-        latest_msgs: &LatestMsgsHonest<Self::M>,
-        senders_weights: &SendersWeight<<<Self as Estimate>::M as message::Trait>::Sender>,
-        // _data: Option<<Self as Data>::Data>,
-    ) -> Result<Self, &'static str> {
-        let prevblock = Block::ghost(latest_msgs, senders_weights)?;
-        Ok(Block::from(ProtoBlock::new(Some(prevblock))))
     }
 }
 
