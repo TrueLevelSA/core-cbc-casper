@@ -18,6 +18,8 @@
 
 use casper::justification::LatestMsgsHonest;
 use casper::message::{self, Trait};
+#[cfg(feature = "integration_test")]
+use casper::sender;
 use casper::traits::{Estimate, Zero};
 use casper::util::weight::{SendersWeight, WeightUnit};
 
@@ -34,7 +36,7 @@ impl BoolWrapper {
 }
 
 #[cfg(feature = "integration_test")]
-impl<S: casper::traits::Sender> From<S> for BoolWrapper {
+impl<S: sender::Trait> From<S> for BoolWrapper {
     fn from(_sender: S) -> Self {
         BoolWrapper::new(bool::default())
     }

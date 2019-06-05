@@ -21,6 +21,8 @@ use std::iter::FromIterator;
 
 use casper::justification::LatestMsgsHonest;
 use casper::message::{self, Trait};
+#[cfg(feature = "integration_test")]
+use casper::sender;
 use casper::traits::{Estimate, Zero};
 use casper::util::weight::{SendersWeight, WeightUnit};
 
@@ -37,7 +39,7 @@ impl IntegerWrapper {
 }
 
 #[cfg(feature = "integration_test")]
-impl<S: casper::traits::Sender> From<S> for IntegerWrapper {
+impl<S: sender::Trait> From<S> for IntegerWrapper {
     fn from(_sender: S) -> Self {
         IntegerWrapper::new(u32::default())
     }

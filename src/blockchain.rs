@@ -26,20 +26,21 @@ use std::sync::{Arc, RwLock};
 use serde_derive::Serialize;
 
 use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest};
-use crate::message::{self, Trait};
-use crate::traits::{Estimate, Id, Sender, Zero};
+use crate::message::{self, Trait as MTrait};
+use crate::sender;
+use crate::traits::{Estimate, Id, Zero};
 use crate::util::hash::Hash;
 use crate::util::weight::{SendersWeight, WeightUnit};
 
 /// a genesis block should be a block with estimate Block with prevblock =
 /// None and data. data will be the unique identifier of this blockchain
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize)]
-pub struct ProtoBlock<S: Sender> {
+pub struct ProtoBlock<S: sender::Trait> {
     prevblock: Option<Block<S>>,
     sender_type: PhantomData<S>,
 }
 
-impl<S: Sender> ProtoBlock<S> {
+impl<S: sender::Trait> ProtoBlock<S> {
     pub fn new(prevblock: Option<Block<S>>) -> ProtoBlock<S> {
         ProtoBlock {
             prevblock,
@@ -50,10 +51,10 @@ impl<S: Sender> ProtoBlock<S> {
 
 /// Boxing of a block, will be implemented as a message::Trait
 #[derive(Clone, Eq, Hash)]
-pub struct Block<S: Sender>((Arc<ProtoBlock<S>>, Hash));
+pub struct Block<S: sender::Trait>((Arc<ProtoBlock<S>>, Hash));
 
 #[cfg(feature = "integration_test")]
-impl<S: Sender + Into<S>> From<S> for Block<S> {
+impl<S: sender::Trait + Into<S>> From<S> for Block<S> {
     fn from(sender: S) -> Self {
         Block::from(ProtoBlock::new(None))
     }
@@ -75,7 +76,7 @@ impl<S: Sender + Into<S>> From<S> for Block<S> {
 // }
 
 // #[cfg(not(feature = "integration_test"))]
-impl<S: Sender> std::fmt::Debug for Block<S> {
+impl<S: sender::Trait> std::fmt::Debug for Block<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -89,7 +90,7 @@ impl<S: Sender> std::fmt::Debug for Block<S> {
     }
 }
 
-impl<S: Sender> serde::Serialize for Block<S> {
+impl<S: sender::Trait> serde::Serialize for Block<S> {
     fn serialize<T: serde::Serializer>(&self, rhs: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
         let mut msg = rhs.serialize_struct("Block", 1)?;
@@ -98,36 +99,36 @@ impl<S: Sender> serde::Serialize for Block<S> {
     }
 }
 
-impl<S: Sender> Id for ProtoBlock<S> {
+impl<S: sender::Trait> Id for ProtoBlock<S> {
     type ID = Hash;
 }
 
-impl<S: Sender> Id for Block<S> {
+impl<S: sender::Trait> Id for Block<S> {
     type ID = Hash;
 }
 
 pub type BlockMsg<S> = message::Message<Block<S> /*Estimate*/, S /*Sender*/>;
 
-impl<S: Sender> PartialEq for Block<S> {
+impl<S: sender::Trait> PartialEq for Block<S> {
     fn eq(&self, rhs: &Self) -> bool {
         Arc::ptr_eq(self.arc(), rhs.arc()) || self.id() == rhs.id()
     }
 }
 
-impl<S: Sender> From<ProtoBlock<S>> for Block<S> {
+impl<S: sender::Trait> From<ProtoBlock<S>> for Block<S> {
     fn from(protoblock: ProtoBlock<S>) -> Self {
         let id = protoblock.getid();
         Block((Arc::new(protoblock), id))
     }
 }
 
-impl<'z, S: Sender> From<&'z BlockMsg<S>> for Block<S> {
+impl<'z, S: sender::Trait> From<&'z BlockMsg<S>> for Block<S> {
     fn from(msg: &BlockMsg<S>) -> Self {
         msg.estimate().clone()
     }
 }
 
-impl<S: Sender> Block<S> {
+impl<S: sender::Trait> Block<S> {
     pub fn new(prevblock: Option<Block<S>>) -> Self {
         Block::from(ProtoBlock::new(prevblock))
     }
@@ -172,7 +173,7 @@ impl<S: Sender> Block<S> {
         safety_oracle_threshold: WeightUnit,
         weights: &SendersWeight<S>,
     ) -> HashSet<BTreeSet<<BlockMsg<S> as message::Trait>::Sender>> {
-        fn latest_in_justification<S: Sender>(
+        fn latest_in_justification<S: sender::Trait>(
             j: &Justification<BlockMsg<S>>,
             equivocators: &HashSet<<BlockMsg<S> as message::Trait>::Sender>,
         ) -> HashMap<<BlockMsg<S> as message::Trait>::Sender, BlockMsg<S>> {
@@ -222,7 +223,7 @@ impl<S: Sender> Block<S> {
             })
             .collect();
         // println!("neighbours: {:?}", neighbours);
-        fn bron_kerbosch<S: Sender>(
+        fn bron_kerbosch<S: sender::Trait>(
             r: HashSet<&S>,
             p: HashSet<&S>,
             x: HashSet<&S>,
@@ -461,7 +462,7 @@ impl<S: Sender> Block<S> {
     }
 }
 
-impl<S: Sender> Estimate for Block<S> {
+impl<S: sender::Trait> Estimate for Block<S> {
     type M = BlockMsg<S>;
 
     fn mk_estimate(
@@ -481,8 +482,9 @@ mod tests {
     use std::iter::FromIterator;
 
     use crate::blockchain::{Block, BlockMsg, ProtoBlock, SendersWeight};
-    use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest, SenderState};
+    use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest};
     use crate::message::Trait;
+    use crate::sender;
 
     #[test]
     fn example_usage() {
@@ -500,7 +502,7 @@ mod tests {
             .cloned()
             .collect(),
         );
-        let sender_state = SenderState::new(
+        let sender_state = sender::State::new(
             senders_weights.clone(),
             0.0,  // state fault weight
             None, // latest messages
@@ -595,7 +597,7 @@ mod tests {
             .collect(),
         );
 
-        let sender_state = SenderState::new(
+        let sender_state = sender::State::new(
             senders_weights.clone(),
             0.0,  // state fault weight
             None, // latest messages
@@ -670,7 +672,7 @@ mod tests {
                 .collect(),
         );
 
-        let sender_state = SenderState::new(
+        let sender_state = sender::State::new(
             senders_weights.clone(),
             0.0,  // state fault weight
             None, // latest messages
