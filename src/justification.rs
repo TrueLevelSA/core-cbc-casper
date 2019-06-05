@@ -16,9 +16,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Justifications are supposed to “justify” the proposed values. Justifications of messages are
-//! sets of messages that validators has seen and acknowledged while generating messages.
-//!
 //! # Later Messages
 //!
 //! If message *A* is in the justification of message *B*, then message *B* is **later** than
