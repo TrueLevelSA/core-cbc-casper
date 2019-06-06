@@ -36,7 +36,7 @@ use crate::util::weight::{SendersWeight, WeightUnit};
 pub type Message<S> = message::Message<Block<S> /*Estimate*/, S /*Sender*/>;
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize)]
-pub struct ProtoBlock<S: sender::Trait> {
+struct ProtoBlock<S: sender::Trait> {
     prevblock: Option<Block<S>>,
     sender_type: PhantomData<S>,
 }

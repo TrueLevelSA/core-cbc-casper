@@ -33,7 +33,7 @@ use proptest::test_runner::{RngAlgorithm, TestRng, TestRunner};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
-use casper::blockchain::{self, Block, ProtoBlock};
+use casper::blockchain::{self, Block};
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use casper::message::{self, Message, Trait};
 use casper::sender;
@@ -365,7 +365,7 @@ fn get_data_from_state(
     let safety_threshold = (sender_state.senders_weights().sum_all_weights()) / 2.0;
 
     let mut genesis_blocks = HashSet::new();
-    genesis_blocks.insert(Block::from(ProtoBlock::new(None)));
+    genesis_blocks.insert(Block::new(None));
 
     for height in 0..max_height_of_oracle + 1 {
         let truc: Vec<bool> = genesis_blocks
@@ -415,7 +415,7 @@ fn safety_oracle(
         .map(|(_, sender_state)| {
             let latest_honest_msgs =
                 LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
-            let genesis_block = Block::from(ProtoBlock::new(None));
+            let genesis_block = Block::new(None);
             let safety_threshold = (sender_state.senders_weights().sum_all_weights()) / 2.0;
             Block::safety_oracles(
                 genesis_block,
@@ -466,7 +466,7 @@ fn clique_collection(
     state
         .iter()
         .map(|(_, sender_state)| {
-            let genesis_block = Block::from(ProtoBlock::new(None));
+            let genesis_block = Block::new(None);
             let latest_honest_msgs =
                 LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
             let safety_oracles = Block::safety_oracles(
@@ -642,7 +642,7 @@ where
 }
 
 fn arbitrary_blockchain() -> BoxedStrategy<Block<u32>> {
-    let genesis_block = Block::from(ProtoBlock::new(None));
+    let genesis_block = Block::new(None);
     Just(genesis_block).boxed()
 }
 
