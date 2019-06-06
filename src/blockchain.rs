@@ -50,13 +50,9 @@ impl<S: sender::Trait> ProtoBlock<S> {
     }
 }
 
-impl<S: sender::Trait> Id for ProtoBlock<S> {
-    type ID = Hash;
-}
-
 /// Simplest structure of a block with a `prevblock` pointer for runing Casper on a blockchain.
 #[derive(Clone, Eq, Hash)]
-pub struct Block<S: sender::Trait>((Arc<ProtoBlock<S>>, Hash));
+pub struct Block<S: sender::Trait>(Arc<ProtoBlock<S>>);
 
 #[cfg(feature = "integration_test")]
 impl<S: sender::Trait + Into<S>> From<S> for Block<S> {
@@ -70,11 +66,11 @@ impl<S: sender::Trait> std::fmt::Debug for Block<S> {
         write!(
             f,
             "{:?} -> {:?}",
-            self.id(),
+            self.getid(),
             self.prevblock()
                 .as_ref()
-                .map(|p| p.id())
-                .unwrap_or(&Hash::default())
+                .map(|p| p.getid())
+                .unwrap_or(Hash::default())
         )
     }
 }
@@ -94,14 +90,13 @@ impl<S: sender::Trait> Id for Block<S> {
 
 impl<S: sender::Trait> PartialEq for Block<S> {
     fn eq(&self, rhs: &Self) -> bool {
-        Arc::ptr_eq(self.arc(), rhs.arc()) || self.id() == rhs.id()
+        Arc::ptr_eq(self.arc(), rhs.arc()) || self.getid() == rhs.getid()
     }
 }
 
 impl<S: sender::Trait> From<ProtoBlock<S>> for Block<S> {
     fn from(protoblock: ProtoBlock<S>) -> Self {
-        let id = protoblock.getid();
-        Block((Arc::new(protoblock), id))
+        Block(Arc::new(protoblock))
     }
 }
 
@@ -128,12 +123,8 @@ impl<S: sender::Trait> Block<S> {
         Block::from(ProtoBlock::new(prevblock))
     }
 
-    pub fn id(&self) -> &<Self as Id>::ID {
-        &(self.0).1
-    }
-
     fn arc(&self) -> &Arc<ProtoBlock<S>> {
-        &(self.0).0
+        &self.0
     }
 
     /// Create a new block from a prevblock message and an incomplete block.
@@ -400,7 +391,7 @@ impl<S: sender::Trait> Block<S> {
                         b_res
                     } else {
                         // break ties with blockhash
-                        let ord = b_block.as_ref().map(|b| b.id().cmp(block.id()));
+                        let ord = b_block.as_ref().map(|b| b.getid().cmp(&block.getid()));
                         match ord {
                             Some(std::cmp::Ordering::Greater) => res,
                             Some(std::cmp::Ordering::Less) => b_res,
