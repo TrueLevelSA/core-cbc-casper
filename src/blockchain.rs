@@ -54,6 +54,7 @@ impl<S: sender::Trait> Id for ProtoBlock<S> {
     type ID = Hash;
 }
 
+/// Simplest structure of a block with a `prevblock` pointer for runing Casper on a blockchain.
 #[derive(Clone, Eq, Hash)]
 pub struct Block<S: sender::Trait>((Arc<ProtoBlock<S>>, Hash));
 
