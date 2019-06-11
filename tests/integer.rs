@@ -46,7 +46,7 @@ fn equal_weight() {
         senders_weights.clone(),
         0.0, // state fault weight
         None,
-        LatestMsgs::new(),
+        LatestMsgs::empty(),
         1.0,            // subjective fault weight threshold
         HashSet::new(), // equivocators
     );
@@ -107,7 +107,7 @@ fn uneven_weights_1() {
         senders_weights.clone(),
         0.0, // state fault weight
         None,
-        LatestMsgs::new(),
+        LatestMsgs::empty(),
         1.0,            // subjective fault weight threshold
         HashSet::new(), // equivocators
     );
@@ -168,7 +168,7 @@ fn uneven_weights_4() {
         senders_weights.clone(),
         0.0, // state fault weight
         None,
-        LatestMsgs::new(),
+        LatestMsgs::empty(),
         1.0,            // subjective fault weight threshold
         HashSet::new(), // equivocators
     );

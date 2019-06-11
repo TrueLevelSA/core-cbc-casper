@@ -470,7 +470,7 @@ mod tests {
             senders_weights.clone(),
             0.0,  // state fault weight
             None, // latest messages
-            LatestMsgs::new(),
+            LatestMsgs::empty(),
             1.0,            // subjective fault weight threshold
             HashSet::new(), // equivocators
         );
@@ -574,7 +574,7 @@ mod tests {
             senders_weights.clone(),
             0.0,  // state fault weight
             None, // latest messages
-            LatestMsgs::new(),
+            LatestMsgs::empty(),
             1.0,            // subjective fault weight threshold
             HashSet::new(), // equivocators
         );
@@ -669,7 +669,7 @@ mod tests {
             senders_weights.clone(),
             0.0,  // state fault weight
             None, // latest messages
-            LatestMsgs::new(),
+            LatestMsgs::empty(),
             1.0,            // subjective fault weight threshold
             HashSet::new(), // equivocators
         );

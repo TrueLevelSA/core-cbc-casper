@@ -106,7 +106,7 @@ fn main() {
         senders_weights.clone(),
         0.0, // state fault weight
         None,
-        LatestMsgs::new(),
+        LatestMsgs::empty(),
         1.0,            // subjective fault weight threshold
         HashSet::new(), // equivocators
     );

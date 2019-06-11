@@ -835,7 +835,7 @@ proptest! {
             senders_weights.clone(),
             0.0,
             None,
-            LatestMsgs::new(),
+            LatestMsgs::empty(),
             0.0,
             HashSet::new(),
         );
@@ -861,7 +861,7 @@ proptest! {
             senders_weights,
             0.0,
             None,
-            LatestMsgs::new(),
+            LatestMsgs::empty(),
             equivocators.len() as f64,
             HashSet::new(),
         );

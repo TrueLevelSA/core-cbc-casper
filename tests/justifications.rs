@@ -40,7 +40,7 @@ fn faulty_inserts_sorted() {
     let v2 = &VoteCount::create_vote_msg(2, true);
     let v2_prime = &VoteCount::create_vote_msg(2, false);
 
-    let mut latest_msgs = LatestMsgs::new();
+    let mut latest_msgs = LatestMsgs::empty();
     latest_msgs.update(v0);
     latest_msgs.update(v1);
     latest_msgs.update(v2);
@@ -82,7 +82,7 @@ fn faulty_inserts() {
         senders_weights.clone(),
         0.0,
         None,
-        LatestMsgs::new(),
+        LatestMsgs::empty(),
         0.0,
         HashSet::new(),
     );
@@ -214,7 +214,7 @@ fn faulty_inserts() {
             senders_weights.clone(),
             1.0,
             None,
-            LatestMsgs::new(),
+            LatestMsgs::empty(),
             2.0,
             HashSet::new(),
         ),

@@ -108,22 +108,16 @@ impl<M: message::Trait> Justification<M> {
     ) -> (bool, sender::State<M>) {
         let msgs = state.sort_by_faultweight(msgs);
         // do the actual insertions to the state
-        msgs.iter().fold(
-            (false, state.clone()),
-            |(success, state), &msg| {
+        msgs.iter()
+            .fold((false, state.clone()), |(success, state), &msg| {
                 let (success_prime, sender_state_prime) = self.faulty_insert(msg, &state);
                 (success || success_prime, sender_state_prime)
-            },
-        )
+            })
     }
 
     /// This function makes no assumption on how to treat the equivocator. it adds the msg to the
     /// justification only if it will not cross the fault tolerance threshold.
-    pub fn faulty_insert(
-        &mut self,
-        msg: &M,
-        state: &sender::State<M>,
-    ) -> (bool, sender::State<M>) {
+    pub fn faulty_insert(&mut self, msg: &M, state: &sender::State<M>) -> (bool, sender::State<M>) {
         let mut state = state.clone();
         let is_equivocation = state.latest_msgs.equivocate(msg);
 
@@ -191,21 +185,21 @@ impl<M: message::Trait> Debug for Justification<M> {
     }
 }
 
-/// Set of latest honest messages
+/// Set of latest honest messages for each validator.
 pub struct LatestMsgsHonest<M: message::Trait>(HashSet<M>);
 
 impl<M: message::Trait> LatestMsgsHonest<M> {
-    /// Create an empty set
-    fn new() -> Self {
+    /// Create an empty latest honest messages set.
+    fn empty() -> Self {
         LatestMsgsHonest(HashSet::new())
     }
 
-    /// Insert message to the set
+    /// Insert message to the set.
     fn insert(&mut self, msg: M) -> bool {
         self.0.insert(msg)
     }
 
-    /// Filters the latest messages
+    /// Filters the latest messages to retreive the latest honest messages and remove equivocators.
     pub fn from_latest_msgs(
         latest_msgs: &LatestMsgs<M>,
         equivocators: &HashSet<M::Sender>,
@@ -219,7 +213,7 @@ impl<M: message::Trait> LatestMsgsHonest<M> {
                     msgs.iter().next()
                 }
             })
-            .fold(LatestMsgsHonest::new(), |mut acc, msg| {
+            .fold(LatestMsgsHonest::empty(), |mut acc, msg| {
                 acc.insert(msg.clone());
                 acc
             })
@@ -241,58 +235,60 @@ impl<M: message::Trait> LatestMsgsHonest<M> {
     }
 }
 
-/// Mapping between senders and their latests messages
-/// Latest messages from a sender are all their messages that are not
-/// in the dependency of another of their messages
+/// Mapping between senders and their latests messages. Latest messages from a sender are all
+/// their messages that are not in the dependency of another of their messages.
 #[derive(Eq, PartialEq, Clone, Default, Debug)]
 pub struct LatestMsgs<M: message::Trait>(HashMap<<M as message::Trait>::Sender, HashSet<M>>);
 
 impl<M: message::Trait> LatestMsgs<M> {
-    /// Create an empty map
-    pub fn new() -> Self {
+    /// Create an empty set of latest messages.
+    pub fn empty() -> Self {
         LatestMsgs(HashMap::new())
     }
 
-    /// insert a new set of messages for a sender
+    /// Insert a new set of messages for a sender.
     pub fn insert(&mut self, k: M::Sender, v: HashSet<M>) -> Option<HashSet<M>> {
         self.0.insert(k, v)
     }
 
-    /// checks whether a sender is already contained in the map
+    /// Checks whether a sender is already contained in the map.
     pub fn contains_key(&self, k: &M::Sender) -> bool {
         self.0.contains_key(k)
     }
 
-    /// get a set of messages sent by the sender
+    /// Get a set of messages sent by the sender.
     pub fn get(&self, k: &M::Sender) -> Option<&HashSet<M>> {
         self.0.get(k)
     }
 
-    /// get a set of messages sent by the sender as mut
+    /// Get a mutable set of messages sent by the sender.
     pub fn get_mut(&mut self, k: &M::Sender) -> Option<&mut HashSet<M>> {
         self.0.get_mut(k)
     }
 
+    /// Get an iterator on the set.
     pub fn iter(&self) -> std::collections::hash_map::Iter<M::Sender, HashSet<M>> {
         self.0.iter()
     }
 
+    /// Get the set size.
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
+    /// Get the set keys, i.e. the senders.
     pub fn keys(&self) -> std::collections::hash_map::Keys<M::Sender, HashSet<M>> {
         self.0.keys()
     }
 
+    /// Get the set values, i.e. the messages.
     pub fn values(&self) -> std::collections::hash_map::Values<'_, M::Sender, HashSet<M>> {
         self.0.values()
     }
 
-    /// update the data structure by adding a new message
-    /// return true if new_message is a valid latest message,
-    /// aka the first message of a sender or a message that is not
-    /// in the justification of the existing latest messages
+    /// Update the data structure by adding a new message. Return true if the new message is a
+    /// valid latest message, i.e. the first message of a sender or a message that is not in the
+    /// justification of the existing latest messages.
     pub fn update(&mut self, new_msg: &M) -> bool {
         let sender = new_msg.sender();
         if let Some(latest_msgs_from_sender) = self.get(sender).cloned() {
@@ -327,7 +323,7 @@ impl<M: message::Trait> LatestMsgs<M> {
         }
     }
 
-    /// checks whether msg_new equivocates with latest msgs
+    /// Checks whether the new message equivocates with latest messages.
     pub(crate) fn equivocate(&self, msg_new: &M) -> bool {
         self.get(msg_new.sender())
             .map(|latest_msgs| latest_msgs.iter().any(|m| m.equivocates(&msg_new)))
@@ -336,9 +332,9 @@ impl<M: message::Trait> LatestMsgs<M> {
 }
 
 impl<'z, M: message::Trait> From<&'z Justification<M>> for LatestMsgs<M> {
-    /// extract the latest messages from a justification
+    /// Extract the latest messages from a justification
     fn from(j: &Justification<M>) -> Self {
-        let mut latest_msgs: LatestMsgs<M> = LatestMsgs::new();
+        let mut latest_msgs: LatestMsgs<M> = LatestMsgs::empty();
         let mut queue: VecDeque<M> = j.iter().cloned().collect();
         while let Some(msg) = queue.pop_front() {
             if latest_msgs.update(&msg) {
@@ -350,17 +346,3 @@ impl<'z, M: message::Trait> From<&'z Justification<M>> for LatestMsgs<M> {
         latest_msgs
     }
 }
-// impl<'z, M: message::Trait> From<&'z Justification<M>> for LatestMsgs<M> {
-//     fn from(j: &Justification<M>) -> Self {
-//         fn recur_func<M: message::Trait>(
-//             j: &Justification<M>,
-//             latest_msgs: LatestMsgs<M>,
-//         ) -> LatestMsgs<M> {
-//             j.iter().fold(latest_msgs, |mut acc, m| {
-//                 acc.update(m);
-//                 recur_func(m.justification(), acc)
-//             })
-//         }
-//         recur_func(j, LatestMsgs::new())
-//     }
-// }

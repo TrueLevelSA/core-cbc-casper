@@ -47,7 +47,7 @@ fn msg_equality() {
         senders_weights,
         0.0,
         None,
-        LatestMsgs::new(),
+        LatestMsgs::empty(),
         0.0,
         HashSet::new(),
     );
@@ -87,7 +87,7 @@ fn msg_depends() {
         senders_weights,
         0.0,
         None,
-        LatestMsgs::new(),
+        LatestMsgs::empty(),
         0.0,
         HashSet::new(),
     );
@@ -141,7 +141,7 @@ fn msg_equivocates() {
         senders_weights,
         0.0,
         None,
-        LatestMsgs::new(),
+        LatestMsgs::empty(),
         0.0,
         HashSet::new(),
     );
@@ -179,7 +179,7 @@ fn msg_equivocates() {
 //         senders_weights.clone(),
 //         0.0,
 //         None,
-//         LatestMsgs::new(),
+//         LatestMsgs::empty(),
 //         0.0,
 //         HashSet::new(),
 //     );

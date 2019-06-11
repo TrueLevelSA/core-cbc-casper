@@ -145,10 +145,12 @@ impl VoteCount {
             })
         }
 
-        let j = latest_msgs.iter().fold(Justification::empty(), |mut acc, m| {
-            acc.insert(m.clone());
-            acc
-        });
+        let j = latest_msgs
+            .iter()
+            .fold(Justification::empty(), |mut acc, m| {
+                acc.insert(m.clone());
+                acc
+            });
         // start recursion
         recursor(&j, HashSet::new())
     }
