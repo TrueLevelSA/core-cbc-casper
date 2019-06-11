@@ -466,7 +466,7 @@ mod tests {
             .cloned()
             .collect(),
         );
-        let sender_state = sender::State::new(
+        let state = sender::State::new(
             senders_weights.clone(),
             0.0,  // state fault weight
             None, // latest messages
@@ -490,21 +490,21 @@ mod tests {
             "genesis block with None as prevblock"
         );
 
-        let (m1, _) = Message::from_msgs(sender1, vec![&genesis_block_msg], &sender_state).unwrap();
+        let (m1, _) = Message::from_msgs(sender1, vec![&genesis_block_msg], &state).unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)     \--m1
         // (s2, w=2.0)
         // (s3, w=1.0)
         // (s4, w=1.1)
 
-        let (m2, _) = Message::from_msgs(sender2, vec![&genesis_block_msg], &sender_state).unwrap();
+        let (m2, _) = Message::from_msgs(sender2, vec![&genesis_block_msg], &state).unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)    |\--m1
         // (s2, w=2.0)    \---m2
         // (s3, w=1.0)
         // (s4, w=1.1)
 
-        let (m3, _) = Message::from_msgs(sender3, vec![&m1, &m2], &sender_state).unwrap();
+        let (m3, _) = Message::from_msgs(sender3, vec![&m1, &m2], &state).unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)    |\--m1
         // (s2, w=2.0)    \---m2
@@ -517,7 +517,7 @@ mod tests {
             "should build on top of m2 as sender2 has more weight"
         );
 
-        let (m4, _) = Message::from_msgs(sender4, vec![&m1], &sender_state).unwrap();
+        let (m4, _) = Message::from_msgs(sender4, vec![&m1], &state).unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)    |\--m1-------\
         // (s2, w=2.0)    \---m2       |
@@ -530,7 +530,7 @@ mod tests {
             "should build on top of m1 as thats the only msg it saw"
         );
 
-        let (m5, _) = Message::from_msgs(sender0, vec![&m3, &m2], &sender_state).unwrap();
+        let (m5, _) = Message::from_msgs(sender0, vec![&m3, &m2], &state).unwrap();
         // (s0, w=1.0)   gen               m5
         // (s1, w=1.0)    |\--m1-------\   |
         // (s2, w=2.0)    \---m2       |   |
@@ -570,7 +570,7 @@ mod tests {
             .collect(),
         );
 
-        let sender_state = sender::State::new(
+        let state = sender::State::new(
             senders_weights.clone(),
             0.0,  // state fault weight
             None, // latest messages
@@ -590,8 +590,7 @@ mod tests {
         // (s4, w=1.1)
         // (s5, w=1.0)
 
-        let (m0, sender_state) =
-            Message::from_msgs(sender0, vec![&genesis_block_msg], &sender_state).unwrap();
+        let (m0, _) = Message::from_msgs(sender0, vec![&genesis_block_msg], &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)     \--m0
         // (s1, w=1.0)
@@ -600,7 +599,7 @@ mod tests {
         // (s4, w=1.1)
         // (s5, w=1.0)
 
-        let (m1, sender_state) = Message::from_msgs(sender1, vec![&m0], &sender_state).unwrap();
+        let (m1, _) = Message::from_msgs(sender1, vec![&m0], &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)     \--m0
         // (s1, w=1.0)         \--m1
@@ -609,9 +608,7 @@ mod tests {
         // (s4, w=1.1)
         // (s5, w=1.0)
 
-        let (m2, sender_state) =
-            Message::from_msgs(sender2, vec![&genesis_block_msg], &sender_state).unwrap();
-        // FIXME: sender_state is shared and makes sender2 build on top of sender1 (m1)
+        let (m2, _) = Message::from_msgs(sender2, vec![&genesis_block_msg], &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -620,7 +617,7 @@ mod tests {
         // (s4, w=1.1)
         // (s5, w=1.0)
 
-        let (m3, sender_state) = Message::from_msgs(sender3, vec![&m2], &sender_state).unwrap();
+        let (m3, _) = Message::from_msgs(sender3, vec![&m2], &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -629,7 +626,7 @@ mod tests {
         // (s4, w=1.1)
         // (s5, w=1.0)
 
-        let (m4, sender_state) = Message::from_msgs(sender4, vec![&m2], &sender_state).unwrap();
+        let (m4, _) = Message::from_msgs(sender4, vec![&m2], &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -638,8 +635,7 @@ mod tests {
         // (s4, w=1.1)                \-------m4
         // (s5, w=1.0)
 
-        let (m5, _) =
-            Message::from_msgs(sender5, vec![&m0, &m1, &m2, &m3, &m4], &sender_state).unwrap();
+        let (m5, _) = Message::from_msgs(sender5, vec![&m0, &m1, &m2, &m3, &m4], &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -669,7 +665,7 @@ mod tests {
                 .collect(),
         );
 
-        let sender_state = sender::State::new(
+        let state = sender::State::new(
             senders_weights.clone(),
             0.0,  // state fault weight
             None, // latest messages
@@ -684,75 +680,63 @@ mod tests {
         let m0 = Message::new(senders[0], latest_msgs, proto_b0.clone(), None);
 
         let proto_b1 = Block::new(Some(proto_b0.clone()));
-        let (m1, sender_state) = Message::from_msgs(senders[1], vec![&m0], &sender_state).unwrap();
+        let (m1, state) = Message::from_msgs(senders[1], vec![&m0], &state).unwrap();
 
         let proto_b2 = Block::new(Some(proto_b1.clone()));
-        let (m2, sender_state) = Message::from_msgs(senders[0], vec![&m1], &sender_state).unwrap();
+        let (m2, state) = Message::from_msgs(senders[0], vec![&m1], &state).unwrap();
 
         // no clique yet, since senders[1] has not seen senders[0] seeing senders[1] having
         // proto_b0 in the chain
         assert_eq!(
             Block::safety_oracles(
                 proto_b0.clone(),
-                &LatestMsgsHonest::from_latest_msgs(
-                    sender_state.latests_msgs(),
-                    sender_state.equivocators()
-                ),
-                sender_state.equivocators(),
+                &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
+                state.equivocators(),
                 2.0,
                 &senders_weights
             ),
             HashSet::new()
         );
 
-        let (m3, sender_state) = Message::from_msgs(senders[1], vec![&m2], &sender_state).unwrap();
+        let (m3, state) = Message::from_msgs(senders[1], vec![&m2], &state).unwrap();
 
         // clique, since both senders have seen each other having proto_b0 in the chain
         assert_eq!(
             Block::safety_oracles(
                 proto_b0.clone(),
-                &LatestMsgsHonest::from_latest_msgs(
-                    sender_state.latests_msgs(),
-                    sender_state.equivocators()
-                ),
-                sender_state.equivocators(),
+                &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
+                state.equivocators(),
                 1.0,
                 &senders_weights
             ),
             HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1]])])
         );
 
-        let (m4, sender_state) = Message::from_msgs(senders[2], vec![&m3], &sender_state).unwrap();
+        let (m4, state) = Message::from_msgs(senders[2], vec![&m3], &state).unwrap();
 
-        let (m5, sender_state) = Message::from_msgs(senders[1], vec![&m4], &sender_state).unwrap();
+        let (m5, state) = Message::from_msgs(senders[1], vec![&m4], &state).unwrap();
 
         // no second clique yet, since senders[2] has not seen senders[1] seeing senders[2] having
         // proto_b0.clone() in the chain
         assert_eq!(
             Block::safety_oracles(
                 proto_b0.clone(),
-                &LatestMsgsHonest::from_latest_msgs(
-                    sender_state.latests_msgs(),
-                    sender_state.equivocators()
-                ),
-                sender_state.equivocators(),
+                &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
+                state.equivocators(),
                 1.0,
                 &senders_weights
             ),
             HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1]])])
         );
 
-        let (m6, sender_state) = Message::from_msgs(senders[2], vec![&m5], &sender_state).unwrap();
+        let (m6, state) = Message::from_msgs(senders[2], vec![&m5], &state).unwrap();
 
         // have two cliques on proto_b0 now
         assert_eq!(
             Block::safety_oracles(
                 proto_b0.clone(),
-                &LatestMsgsHonest::from_latest_msgs(
-                    sender_state.latests_msgs(),
-                    sender_state.equivocators()
-                ),
-                sender_state.equivocators(),
+                &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
+                state.equivocators(),
                 1.0,
                 &senders_weights
             ),
@@ -765,11 +749,8 @@ mod tests {
         assert_eq!(
             Block::safety_oracles(
                 proto_b1.clone(),
-                &LatestMsgsHonest::from_latest_msgs(
-                    sender_state.latests_msgs(),
-                    sender_state.equivocators()
-                ),
-                sender_state.equivocators(),
+                &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
+                state.equivocators(),
                 1.0,
                 &senders_weights
             ),
@@ -782,32 +763,26 @@ mod tests {
         assert_eq!(
             Block::safety_oracles(
                 proto_b2.clone(),
-                &LatestMsgsHonest::from_latest_msgs(
-                    sender_state.latests_msgs(),
-                    sender_state.equivocators()
-                ),
-                sender_state.equivocators(),
+                &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
+                state.equivocators(),
                 1.0,
                 &senders_weights
             ),
             HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[1], senders[2]])])
         );
 
-        let (m7, sender_state) = Message::from_msgs(senders[0], vec![&m6], &sender_state).unwrap();
+        let (m7, state) = Message::from_msgs(senders[0], vec![&m6], &state).unwrap();
 
-        let (m8, sender_state) = Message::from_msgs(senders[2], vec![&m7], &sender_state).unwrap();
+        let (m8, state) = Message::from_msgs(senders[2], vec![&m7], &state).unwrap();
 
-        let (_, sender_state) = Message::from_msgs(senders[0], vec![&m8], &sender_state).unwrap();
+        let (_, state) = Message::from_msgs(senders[0], vec![&m8], &state).unwrap();
 
         // now entire network is clique
         assert_eq!(
             Block::safety_oracles(
                 proto_b0.clone(),
-                &LatestMsgsHonest::from_latest_msgs(
-                    sender_state.latests_msgs(),
-                    sender_state.equivocators()
-                ),
-                sender_state.equivocators(),
+                &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
+                state.equivocators(),
                 1.0,
                 &senders_weights
             ),
@@ -818,11 +793,8 @@ mod tests {
         assert_eq!(
             Block::safety_oracles(
                 proto_b2.clone(),
-                &LatestMsgsHonest::from_latest_msgs(
-                    sender_state.latests_msgs(),
-                    sender_state.equivocators()
-                ),
-                sender_state.equivocators(),
+                &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
+                state.equivocators(),
                 1.0,
                 &senders_weights
             ),
