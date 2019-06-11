@@ -541,7 +541,6 @@ where
                     *validator,
                     j.clone(),
                     votes[*validator as usize].clone(),
-                    None,
                 );
                 j.insert(m.clone());
                 state.insert(

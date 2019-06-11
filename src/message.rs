@@ -73,15 +73,11 @@ pub trait Trait:
     /// Returns the justification of this message
     fn justification<'z>(&'z self) -> &'z Justification<Self>;
 
-    // TODO(h4sh3d): remove because getid() is already available
-    fn id(&self) -> &Self::ID;
-
     /// creates a new instance of this message
     fn new(
         sender: Self::Sender,
         justification: Justification<Self>,
         estimate: Self::Estimate,
-        id: Option<Self::ID>,
     ) -> Self;
 
     /// Create a message from newly received messages.
@@ -107,7 +103,7 @@ pub trait Trait:
             );
 
             let estimate = latest_msgs_honest.mk_estimate(&sender_state.senders_weights());
-            estimate.map(|e| (Self::new(sender, justification, e, None), sender_state))
+            estimate.map(|e| (Self::new(sender, justification, e), sender_state))
         }
     }
 
@@ -219,7 +215,7 @@ where
         use serde::ser::SerializeStruct;
 
         let mut msg = serializer.serialize_struct("Message", 3)?;
-        let j: Vec<_> = self.justification.iter().map(Message::id).collect();
+        let j: Vec<_> = self.justification.iter().map(Message::getid).collect();
         msg.serialize_field("sender", &self.sender)?;
         msg.serialize_field("estimate", &self.estimate)?;
         msg.serialize_field("justification", &j)?;
@@ -268,8 +264,10 @@ where
     S: sender::Trait,
 {
     type ID = Hash;
+
+    // Redefine getid to not recompute the hash every time
     fn getid(&self) -> Self::ID {
-        self.1.clone()
+        self.1
     }
 }
 
@@ -279,13 +277,7 @@ where
     S: sender::Trait,
 {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
-        use serde::ser::SerializeStruct;
-        let mut msg = serializer.serialize_struct("Message", 3)?;
-        let j: Vec<_> = self.justification().iter().map(Self::id).collect();
-        msg.serialize_field("sender", self.sender())?;
-        msg.serialize_field("estimate", self.estimate())?;
-        msg.serialize_field("justification", &j)?;
-        msg.end()
+        serde::Serialize::serialize(&self.0, serializer)
     }
 }
 
@@ -309,22 +301,18 @@ where
         &self.0.justification
     }
 
-    fn id(&self) -> &<Self as Id>::ID {
-        &self.1
-    }
-
     fn new(
         sender: S,
         justification: Justification<Self>,
         estimate: E,
-        id: Option<Self::ID>,
     ) -> Self {
         let proto = ProtoMsg {
             sender,
             justification,
             estimate,
         };
-        let id = id.unwrap_or_else(|| proto.getid());
+        // Message is not mutable, id is computed only once at creation
+        let id = proto.getid();
         Message(Arc::new(proto), id)
     }
 }
@@ -335,7 +323,7 @@ where
     S: sender::Trait,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id().hash(state)
+        self.getid().hash(state)
     }
 }
 
@@ -345,7 +333,7 @@ where
     S: sender::Trait,
 {
     fn eq(&self, rhs: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &rhs.0) || self.id() == rhs.id() // should make this line unnecessary
+        Arc::ptr_eq(&self.0, &rhs.0) || self.getid() == rhs.getid() // should make this line unnecessary
     }
 }
 
