@@ -202,6 +202,31 @@ where
     justification: Justification<Message<E, S>>,
 }
 
+impl<E, S> Id for ProtoMsg<E, S>
+where
+    E: Estimate<M = Message<E, S>>,
+    S: sender::Trait,
+{
+    type ID = Hash;
+}
+
+impl<E, S> serde::Serialize for ProtoMsg<E, S>
+where
+    E: Estimate<M = Message<E, S>>,
+    S: sender::Trait,
+{
+    fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
+        use serde::ser::SerializeStruct;
+
+        let mut msg = serializer.serialize_struct("Message", 3)?;
+        let j: Vec<_> = self.justification.iter().map(Message::id).collect();
+        msg.serialize_field("sender", &self.sender)?;
+        msg.serialize_field("estimate", &self.estimate)?;
+        msg.serialize_field("justification", &j)?;
+        msg.end()
+    }
+}
+
 /// Concrete Casper message implementing `message::Trait` containing a value as `Estimate`, a
 /// validator as `sender::Trait`, and a justification as `Justification`.
 ///
@@ -237,14 +262,6 @@ where
     E: Estimate<M = Message<E, S>>,
     S: sender::Trait;
 
-impl<E, S> Id for ProtoMsg<E, S>
-where
-    E: Estimate<M = Message<E, S>>,
-    S: sender::Trait,
-{
-    type ID = Hash;
-}
-
 impl<E, S> Id for Message<E, S>
 where
     E: Estimate<M = Self>,
@@ -253,23 +270,6 @@ where
     type ID = Hash;
     fn getid(&self) -> Self::ID {
         self.1.clone()
-    }
-}
-
-impl<E, S> serde::Serialize for ProtoMsg<E, S>
-where
-    E: Estimate<M = Message<E, S>>,
-    S: sender::Trait,
-{
-    fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
-        use serde::ser::SerializeStruct;
-
-        let mut msg = serializer.serialize_struct("Message", 3)?;
-        let j: Vec<_> = self.justification.iter().map(Message::id).collect();
-        msg.serialize_field("sender", &self.sender)?;
-        msg.serialize_field("estimate", &self.estimate)?;
-        msg.serialize_field("justification", &j)?;
-        msg.end()
     }
 }
 
