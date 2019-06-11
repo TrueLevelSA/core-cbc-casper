@@ -73,38 +73,19 @@ pub trait Trait:
     /// Returns the justification of this message
     fn justification<'z>(&'z self) -> &'z Justification<Self>;
 
-    // TODO(h4sh3d): remove because getid() is already available
-    fn id(&self) -> &Self::ID;
-
     /// creates a new instance of this message
     fn new(
         sender: Self::Sender,
         justification: Justification<Self>,
         estimate: Self::Estimate,
-        id: Option<Self::ID>,
     ) -> Self;
 
-    // this function is used to clean up memory. when a msg is final, there's no
-    // need to keep its justifications. when dropping its justification, all the
-    // Msgs (Arc) which are referenced on the justification will get dropped
-    // from memory
-    // fn set_as_final(&mut self);
-
-    // Following methods are actual implementations
-
-    /// create a msg from newly received messages
-    /// finalized_msg allows to shortcut the recursive checks
+    /// Create a message from newly received messages.
     fn from_msgs(
         sender: Self::Sender,
         mut new_msgs: Vec<&Self>,
         sender_state: &sender::State<Self>,
     ) -> Result<(Self, sender::State<Self>), &'static str> {
-        // // TODO eventually comment out these lines, and FIXME tests
-        // // check whether two messages from same sender
-        // let mut senders = HashSet::new();
-        // let dup_senders = new_msgs.iter().any(|msg| !senders.insert(msg.sender()));
-        // assert!(!dup_senders, "A sender can only have one, and only one, latest message");
-
         // dedup by putting msgs into a hashset
         let new_msgs: HashSet<_> = new_msgs.drain(..).collect();
         let new_msgs_len = new_msgs.len();
@@ -122,11 +103,11 @@ pub trait Trait:
             );
 
             let estimate = latest_msgs_honest.mk_estimate(&sender_state.senders_weights());
-            estimate.map(|e| (Self::new(sender, justification, e, None), sender_state))
+            estimate.map(|e| (Self::new(sender, justification, e), sender_state))
         }
     }
 
-    /// insanely expensive
+    // FIXME: insanely expensive to compute
     fn equivocates_indirect(
         &self,
         rhs: &Self,
@@ -142,9 +123,8 @@ pub trait Trait:
         self.justification().iter().fold(
             init,
             |(acc_has_equivocations, acc_equivocators), self_prime| {
-                // note the rotation between rhs and self, done because
-                // descending only on self, thus rhs has to become self on the
-                // recursion to get its justification visited
+                // note the rotation between rhs and self, done because descending only on self,
+                // thus rhs has to become self on the recursion to get its justification visited
                 let (has_equivocation, equivocators) =
                     rhs.equivocates_indirect(self_prime, acc_equivocators.clone());
                 let acc_equivocators = acc_equivocators.union(&equivocators).cloned().collect();
@@ -158,8 +138,8 @@ pub trait Trait:
         self != rhs && self.sender() == rhs.sender() && !rhs.depends(self) && !self.depends(rhs)
     }
 
-    /// checks whether self depends on rhs
-    /// returns true if rhs is somewhere in the justification of self
+    /// Checks whether self depends on rhs or not. Returns true if rhs is somewhere in the
+    /// justification of self.
     fn depends(&self, rhs: &Self) -> bool {
         // although the recursion ends supposedly only at genesis message, the
         // trick is the following: it short-circuits while descending on the
@@ -200,7 +180,7 @@ pub trait Trait:
         recurse(self, rhs, visited)
     }
 
-    /// checks whether ther is a circular dependency between self and rhs
+    /// Checks whether ther is a circular dependency between self and rhs.
     fn is_circular(&self, rhs: &Self) -> bool {
         rhs.depends(self) && self.depends(rhs)
     }
@@ -216,6 +196,31 @@ where
     estimate: E,
     sender: S,
     justification: Justification<Message<E, S>>,
+}
+
+impl<E, S> Id for ProtoMsg<E, S>
+where
+    E: Estimate<M = Message<E, S>>,
+    S: sender::Trait,
+{
+    type ID = Hash;
+}
+
+impl<E, S> serde::Serialize for ProtoMsg<E, S>
+where
+    E: Estimate<M = Message<E, S>>,
+    S: sender::Trait,
+{
+    fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
+        use serde::ser::SerializeStruct;
+
+        let mut msg = serializer.serialize_struct("Message", 3)?;
+        let j: Vec<_> = self.justification.iter().map(Message::getid).collect();
+        msg.serialize_field("sender", &self.sender)?;
+        msg.serialize_field("estimate", &self.estimate)?;
+        msg.serialize_field("justification", &j)?;
+        msg.end()
+    }
 }
 
 /// Concrete Casper message implementing `message::Trait` containing a value as `Estimate`, a
@@ -253,71 +258,16 @@ where
     E: Estimate<M = Message<E, S>>,
     S: sender::Trait;
 
-/*
-// TODO start we should make messages lazy. continue this after async-await is better
-// documented
-
-enum MsgStatus {
-Unchecked,
-Valid,
-Invalid,
-}
-
-struct Message<E, S, D>
-where
-    E: Estimate,
-    S: Sender,
-{
-    status: MsgStatus,
-    msg: Future<Item = Message<E, S, D>, Error = Error>,
-}
-// TODO end
-*/
-
-// impl<E, S> From<ProtoMsg<E, S>> for Message<E, S>
-// where
-//     E: Estimate<M = Self>,
-//     S: Sender,
-// {
-//     fn from(msg: ProtoMsg<E, S>) -> Self {
-//         let id = msg.getid();
-//         Message(Arc::new(msg), id)
-//     }
-// }
-
-impl<E, S> Id for ProtoMsg<E, S>
-where
-    E: Estimate<M = Message<E, S>>,
-    S: sender::Trait,
-{
-    type ID = Hash;
-}
-
 impl<E, S> Id for Message<E, S>
 where
     E: Estimate<M = Self>,
     S: sender::Trait,
 {
     type ID = Hash;
+
+    // Redefine getid to not recompute the hash every time
     fn getid(&self) -> Self::ID {
-        self.1.clone()
-    }
-}
-
-impl<E, S> serde::Serialize for ProtoMsg<E, S>
-where
-    E: Estimate<M = Message<E, S>>,
-    S: sender::Trait,
-{
-    fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
-        use serde::ser::SerializeStruct;
-
-        let mut msg = serializer.serialize_struct("Message", 3)?;
-        let j: Vec<_> = self.justification.iter().map(Message::id).collect();
-        msg.serialize_field("sender", &self.sender)?;
-        msg.serialize_field("estimate", &self.estimate)?;
-        msg.serialize_field("justification", &j)?;
-        msg.end()
+        self.1
     }
 }
 
@@ -327,13 +277,7 @@ where
     S: sender::Trait,
 {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
-        use serde::ser::SerializeStruct;
-        let mut msg = serializer.serialize_struct("Message", 3)?;
-        let j: Vec<_> = self.justification().iter().map(Self::id).collect();
-        msg.serialize_field("sender", self.sender())?;
-        msg.serialize_field("estimate", self.estimate())?;
-        msg.serialize_field("justification", &j)?;
-        msg.end()
+        serde::Serialize::serialize(&self.0, serializer)
     }
 }
 
@@ -357,30 +301,16 @@ where
         &self.0.justification
     }
 
-    fn id(&self) -> &<Self as Id>::ID {
-        &self.1
-    }
-
-    fn new(
-        sender: S,
-        justification: Justification<Self>,
-        estimate: E,
-        id: Option<Self::ID>,
-    ) -> Self {
+    fn new(sender: S, justification: Justification<Self>, estimate: E) -> Self {
         let proto = ProtoMsg {
             sender,
             justification,
             estimate,
         };
-        let id = id.unwrap_or_else(|| proto.getid());
+        // Message is not mutable, id is computed only once at creation
+        let id = proto.getid();
         Message(Arc::new(proto), id)
     }
-
-    // fn set_as_final(&mut self) {
-    //     let mut proto_msg = (**self.0).clone();
-    //     proto_msg.justification = Justification::new();
-    //     *self.0 = Arc::new(proto_msg);
-    // }
 }
 
 impl<E, S> std::hash::Hash for Message<E, S>
@@ -389,7 +319,7 @@ where
     S: sender::Trait,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id().hash(state)
+        self.getid().hash(state)
     }
 }
 
@@ -399,7 +329,7 @@ where
     S: sender::Trait,
 {
     fn eq(&self, rhs: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &rhs.0) || self.id() == rhs.id() // should make this line unnecessary
+        Arc::ptr_eq(&self.0, &rhs.0) || self.getid() == rhs.getid() // should make this line unnecessary
     }
 }
 
@@ -410,13 +340,6 @@ where
 {
     // Note: format used for rendering illustrative gifs from generative tests; modify with care
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "M{:?}({:?})",
-            // "M{:?}({:?}) -> {:?}",
-            self.sender(),
-            self.estimate().clone(),
-            // self.justification()
-        )
+        write!(f, "M{:?}({:?})", self.sender(), self.estimate().clone())
     }
 }

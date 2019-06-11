@@ -51,9 +51,9 @@ fn equal_weight() {
         HashSet::new(), // equivocators
     );
 
-    let m0 = BinaryMsg::new(senders[0], Justification::new(), BoolWrapper(false), None);
-    let m1 = BinaryMsg::new(senders[1], Justification::new(), BoolWrapper(true), None);
-    let m2 = BinaryMsg::new(senders[2], Justification::new(), BoolWrapper(false), None);
+    let m0 = BinaryMsg::new(senders[0], Justification::new(), BoolWrapper(false));
+    let m1 = BinaryMsg::new(senders[1], Justification::new(), BoolWrapper(true));
+    let m2 = BinaryMsg::new(senders[2], Justification::new(), BoolWrapper(false));
     let (m3, _) = BinaryMsg::from_msgs(senders[0], vec![&m0, &m1], &sender_state).unwrap();
 
     assert_eq!(
@@ -111,11 +111,11 @@ fn vote_swaying() {
         HashSet::new(), // equivocators
     );
 
-    let m0 = BinaryMsg::new(senders[0], Justification::new(), BoolWrapper(false), None);
-    let m1 = BinaryMsg::new(senders[1], Justification::new(), BoolWrapper(true), None);
-    let m2 = BinaryMsg::new(senders[2], Justification::new(), BoolWrapper(true), None);
-    let m3 = BinaryMsg::new(senders[3], Justification::new(), BoolWrapper(false), None);
-    let m4 = BinaryMsg::new(senders[4], Justification::new(), BoolWrapper(false), None);
+    let m0 = BinaryMsg::new(senders[0], Justification::new(), BoolWrapper(false));
+    let m1 = BinaryMsg::new(senders[1], Justification::new(), BoolWrapper(true));
+    let m2 = BinaryMsg::new(senders[2], Justification::new(), BoolWrapper(true));
+    let m3 = BinaryMsg::new(senders[3], Justification::new(), BoolWrapper(false));
+    let m4 = BinaryMsg::new(senders[4], Justification::new(), BoolWrapper(false));
 
     let (mut j0, _) = Justification::from_msgs(
         vec![m0.clone(), m1.clone(), m2.clone(), m3.clone(), m4.clone()],
