@@ -19,7 +19,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
-use casper::blockchain::{Block, BlockMsg};
+use casper::blockchain::{Block, Message};
 use casper::justification::LatestMsgsHonest;
 use casper::sender;
 
@@ -70,7 +70,7 @@ impl ChainData {
 /// returns a vector of heights
 /// each height is the height of the block that is selected by ghost
 /// (applied to latest honest messages in each view)
-pub fn heights_from_state(state: &HashMap<u32, sender::State<BlockMsg<u32>>>) -> Vec<u32> {
+pub fn heights_from_state(state: &HashMap<u32, sender::State<Message<u32>>>) -> Vec<u32> {
     state
         .iter()
         .map(|(_, sender_state)| (sender_state.latests_msgs(), sender_state.senders_weights()))
@@ -97,8 +97,8 @@ pub fn heights_from_state(state: &HashMap<u32, sender::State<BlockMsg<u32>>>) ->
 
 /// returns the height of the GHOST-selected chain
 pub fn get_height_selected_chain(
-    latest_msgs_honest: &LatestMsgsHonest<BlockMsg<u32>>,
-    sender_state: &sender::State<BlockMsg<u32>>,
+    latest_msgs_honest: &LatestMsgsHonest<Message<u32>>,
+    sender_state: &sender::State<Message<u32>>,
 ) -> u32 {
     let selected_block = Block::ghost(&latest_msgs_honest, sender_state.senders_weights());
     fn reduce(b: &Block<u32>, i: u32) -> u32 {
@@ -115,7 +115,7 @@ pub fn get_height_selected_chain(
 }
 
 pub fn get_children_of_blocks(
-    latest_msgs_honest: &LatestMsgsHonest<BlockMsg<u32>>,
+    latest_msgs_honest: &LatestMsgsHonest<Message<u32>>,
     genesis_blocks: HashSet<Block<u32>>,
 ) -> HashSet<Block<u32>> {
     let mut children = HashSet::new();
