@@ -116,10 +116,10 @@ fn main() {
     // 3: (0)  (0)       (0)
     // 4: (1)  (0)
 
-    let msg1 = Message::new(1, Justification::new(), Value::One);
-    let msg2 = Message::new(2, Justification::new(), Value::Two);
-    let msg3 = Message::new(3, Justification::new(), Value::Zero);
-    let msg4 = Message::new(4, Justification::new(), Value::One);
+    let msg1 = Message::new(1, Justification::empty(), Value::One);
+    let msg2 = Message::new(2, Justification::empty(), Value::Two);
+    let msg3 = Message::new(3, Justification::empty(), Value::Zero);
+    let msg4 = Message::new(4, Justification::empty(), Value::One);
     let (msg5, _) = Message::from_msgs(1, vec![&msg1, &msg2], &weights).unwrap();
     let (msg6, _) = Message::from_msgs(3, vec![&msg3, &msg4], &weights).unwrap();
     let (msg7, _) = Message::from_msgs(2, vec![&msg2, &msg5, &msg6], &weights).unwrap();

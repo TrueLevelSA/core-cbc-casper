@@ -476,7 +476,7 @@ mod tests {
         );
 
         let genesis_block = Block::from(ProtoBlock::new(None));
-        let latest_msgs = Justification::new();
+        let latest_msgs = Justification::empty();
         let genesis_block_msg = Message::new(sender0, latest_msgs, genesis_block.clone());
         // (s0, w=1.0)   gen
         // (s1, w=1.0)
@@ -580,7 +580,7 @@ mod tests {
         );
 
         let genesis_block = Block::from(ProtoBlock::new(None));
-        let latest_msgs = Justification::new();
+        let latest_msgs = Justification::empty();
         let genesis_block_msg = Message::new(senderg, latest_msgs, genesis_block.clone());
         // (sg, w=1.0)   gen
         // (s0, w=1.0)
@@ -676,7 +676,7 @@ mod tests {
 
         // block dag
         let proto_b0 = Block::from(ProtoBlock::new(None));
-        let latest_msgs = Justification::new();
+        let latest_msgs = Justification::empty();
         let m0 = Message::new(senders[0], latest_msgs, proto_b0.clone());
 
         let proto_b1 = Block::new(Some(proto_b0.clone()));

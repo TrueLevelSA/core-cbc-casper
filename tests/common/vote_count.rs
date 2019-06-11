@@ -96,7 +96,7 @@ impl VoteCount {
     /// Creates a new empty vote message, issued by the sender
     /// with no justification
     pub fn create_vote_msg(sender: u32, vote: bool) -> message::Message<Self, u32> {
-        let justification = Justification::new();
+        let justification = Justification::empty();
         let estimate = match vote {
             true => VoteCount { yes: 1, no: 0 },
             false => VoteCount { yes: 0, no: 1 },
@@ -145,7 +145,7 @@ impl VoteCount {
             })
         }
 
-        let j = latest_msgs.iter().fold(Justification::new(), |mut acc, m| {
+        let j = latest_msgs.iter().fold(Justification::empty(), |mut acc, m| {
             acc.insert(m.clone());
             acc
         });
