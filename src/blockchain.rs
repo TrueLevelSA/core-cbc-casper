@@ -450,7 +450,8 @@ mod tests {
     use crate::sender;
 
     #[test]
-    fn example_usage() {
+    fn partial_view() {
+        // Test cases where not all validators see all messages.
         let (sender0, sender1, sender2, sender3, sender4) = (0, 1, 2, 3, 4);
         let (weight0, weight1, weight2, weight3, weight4) = (1.0, 1.0, 2.0, 1.0, 1.1);
         let senders_weights = SendersWeight::new(
@@ -474,23 +475,15 @@ mod tests {
             HashSet::new(), // equivocators
         );
 
-        // msg dag
-        // (s0, w=1.0)   gen            m5
-        // (s1, w=1.0)    |\--m1---\    |
-        // (s2, w=2.0)    \---m2--\|  --|
-        // (s3, w=1.0)    |    \---m3---|
-        // (s4, w=1.1)    \---m4
-
-        // blockchain gen <--m2 <--m3
-        // (s0, w=1.0)   gen            b5
-        // (s1, w=1.0)    |\--b1
-        // (s2, w=2.0)    \---b2
-        // (s3, w=1.0)    |     \---b3
-
-        // block dag
         let genesis_block = Block::from(ProtoBlock::new(None));
         let latest_msgs = Justification::new();
         let genesis_block_msg = Message::new(sender0, latest_msgs, genesis_block.clone(), None);
+        // (s0, w=1.0)   gen
+        // (s1, w=1.0)
+        // (s2, w=2.0)
+        // (s3, w=1.0)
+        // (s4, w=1.1)
+
         assert_eq!(
             &Block::from(&genesis_block_msg),
             &genesis_block,
@@ -498,10 +491,25 @@ mod tests {
         );
 
         let (m1, _) = Message::from_msgs(sender1, vec![&genesis_block_msg], &sender_state).unwrap();
+        // (s0, w=1.0)   gen
+        // (s1, w=1.0)     \--m1
+        // (s2, w=2.0)
+        // (s3, w=1.0)
+        // (s4, w=1.1)
 
         let (m2, _) = Message::from_msgs(sender2, vec![&genesis_block_msg], &sender_state).unwrap();
+        // (s0, w=1.0)   gen
+        // (s1, w=1.0)    |\--m1
+        // (s2, w=2.0)    \---m2
+        // (s3, w=1.0)
+        // (s4, w=1.1)
 
         let (m3, _) = Message::from_msgs(sender3, vec![&m1, &m2], &sender_state).unwrap();
+        // (s0, w=1.0)   gen
+        // (s1, w=1.0)    |\--m1
+        // (s2, w=2.0)    \---m2
+        // (s3, w=1.0)         \---m3
+        // (s4, w=1.1)
 
         assert_eq!(
             m3.estimate(),
@@ -510,27 +518,39 @@ mod tests {
         );
 
         let (m4, _) = Message::from_msgs(sender4, vec![&m1], &sender_state).unwrap();
+        // (s0, w=1.0)   gen
+        // (s1, w=1.0)    |\--m1-------\
+        // (s2, w=2.0)    \---m2       |
+        // (s3, w=1.0)         \---m3  |
+        // (s4, w=1.1)                 m4
 
         assert_eq!(
             m4.estimate(),
             &Block::new(Some(Block::from(&m1))),
-            "should build on top of m1 as as thats the only msg it saw"
+            "should build on top of m1 as thats the only msg it saw"
         );
 
         let (m5, _) = Message::from_msgs(sender0, vec![&m3, &m2], &sender_state).unwrap();
+        // (s0, w=1.0)   gen               m5
+        // (s1, w=1.0)    |\--m1-------\   |
+        // (s2, w=2.0)    \---m2       |   |
+        // (s3, w=1.0)         \---m3--|---/
+        // (s4, w=1.1)                 m4
 
         assert_eq!(
             m5.estimate(),
             &Block::new(Some(Block::from(&m3))),
-            "should build on top of "
+            "should build on top of m3"
         );
 
         let block = Block::from(&m3);
-        assert_eq!(block, Block::new(Some(Block::from(&m2))),);
+        assert_eq!(block, Block::new(Some(Block::from(&m2))));
     }
 
     #[test]
-    fn test2() {
+    fn full_view() {
+        // Test a case where the last validator see all messages and build on top of the heaviest
+        // one.
         let (senderg, sender0, sender1, sender2, sender3, sender4, sender5) = (0, 1, 2, 3, 4, 5, 6);
         let (weightg, weight0, weight1, weight2, weight3, weight4, weight5) =
             (1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.0);
@@ -559,25 +579,74 @@ mod tests {
             HashSet::new(), // equivocators
         );
 
-        // block dag
         let genesis_block = Block::from(ProtoBlock::new(None));
         let latest_msgs = Justification::new();
         let genesis_block_msg = Message::new(senderg, latest_msgs, genesis_block.clone(), None);
+        // (sg, w=1.0)   gen
+        // (s0, w=1.0)
+        // (s1, w=1.0)
+        // (s2, w=1.0)
+        // (s3, w=1.0)
+        // (s4, w=1.1)
+        // (s5, w=1.0)
 
         let (m0, sender_state) =
             Message::from_msgs(sender0, vec![&genesis_block_msg], &sender_state).unwrap();
+        // (sg, w=1.0)   gen
+        // (s0, w=1.0)     \--m0
+        // (s1, w=1.0)
+        // (s2, w=1.0)
+        // (s3, w=1.0)
+        // (s4, w=1.1)
+        // (s5, w=1.0)
 
         let (m1, sender_state) = Message::from_msgs(sender1, vec![&m0], &sender_state).unwrap();
+        // (sg, w=1.0)   gen
+        // (s0, w=1.0)     \--m0
+        // (s1, w=1.0)         \--m1
+        // (s2, w=1.0)
+        // (s3, w=1.0)
+        // (s4, w=1.1)
+        // (s5, w=1.0)
 
         let (m2, sender_state) =
             Message::from_msgs(sender2, vec![&genesis_block_msg], &sender_state).unwrap();
+        // FIXME: sender_state is shared and makes sender2 build on top of sender1 (m1)
+        // (sg, w=1.0)   gen
+        // (s0, w=1.0)    |\--m0
+        // (s1, w=1.0)    |    \--m1
+        // (s2, w=1.0)    \-----------m2
+        // (s3, w=1.0)
+        // (s4, w=1.1)
+        // (s5, w=1.0)
 
         let (m3, sender_state) = Message::from_msgs(sender3, vec![&m2], &sender_state).unwrap();
+        // (sg, w=1.0)   gen
+        // (s0, w=1.0)    |\--m0
+        // (s1, w=1.0)    |    \--m1
+        // (s2, w=1.0)    \-----------m2
+        // (s3, w=1.0)                 \--m3
+        // (s4, w=1.1)
+        // (s5, w=1.0)
 
         let (m4, sender_state) = Message::from_msgs(sender4, vec![&m2], &sender_state).unwrap();
+        // (sg, w=1.0)   gen
+        // (s0, w=1.0)    |\--m0
+        // (s1, w=1.0)    |    \--m1
+        // (s2, w=1.0)    \-----------m2
+        // (s3, w=1.0)                |\--m3
+        // (s4, w=1.1)                \-------m4
+        // (s5, w=1.0)
 
         let (m5, _) =
             Message::from_msgs(sender5, vec![&m0, &m1, &m2, &m3, &m4], &sender_state).unwrap();
+        // (sg, w=1.0)   gen
+        // (s0, w=1.0)    |\--m0
+        // (s1, w=1.0)    |    \--m1
+        // (s2, w=1.0)    \-----------m2
+        // (s3, w=1.0)                |\--m3
+        // (s4, w=1.1)                \-------m4
+        // (s5, w=1.0)                         \--m5
 
         assert_eq!(
             m5.estimate(),
