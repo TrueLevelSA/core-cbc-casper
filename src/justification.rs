@@ -185,56 +185,6 @@ impl<M: message::Trait> Debug for Justification<M> {
     }
 }
 
-/// Set of latest honest messages for each validator.
-pub struct LatestMsgsHonest<M: message::Trait>(HashSet<M>);
-
-impl<M: message::Trait> LatestMsgsHonest<M> {
-    /// Create an empty latest honest messages set.
-    fn empty() -> Self {
-        LatestMsgsHonest(HashSet::new())
-    }
-
-    /// Insert message to the set.
-    fn insert(&mut self, msg: M) -> bool {
-        self.0.insert(msg)
-    }
-
-    /// Filters the latest messages to retreive the latest honest messages and remove equivocators.
-    pub fn from_latest_msgs(
-        latest_msgs: &LatestMsgs<M>,
-        equivocators: &HashSet<M::Sender>,
-    ) -> Self {
-        latest_msgs
-            .iter()
-            .filter_map(|(sender, msgs)| {
-                if equivocators.contains(sender) || msgs.len() != 1 {
-                    None
-                } else {
-                    msgs.iter().next()
-                }
-            })
-            .fold(LatestMsgsHonest::empty(), |mut acc, msg| {
-                acc.insert(msg.clone());
-                acc
-            })
-    }
-
-    pub fn iter(&self) -> std::collections::hash_set::Iter<M> {
-        self.0.iter()
-    }
-
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    pub fn mk_estimate(
-        &self,
-        senders_weights: &SendersWeight<<M as message::Trait>::Sender>,
-    ) -> Result<M::Estimate, &'static str> {
-        M::Estimate::mk_estimate(&self, senders_weights)
-    }
-}
-
 /// Mapping between senders and their latests messages. Latest messages from a sender are all
 /// their messages that are not in the dependency of another of their messages.
 #[derive(Eq, PartialEq, Clone, Default, Debug)]
@@ -332,7 +282,7 @@ impl<M: message::Trait> LatestMsgs<M> {
 }
 
 impl<'z, M: message::Trait> From<&'z Justification<M>> for LatestMsgs<M> {
-    /// Extract the latest messages from a justification
+    /// Extract the latest messages of each validator from a justification.
     fn from(j: &Justification<M>) -> Self {
         let mut latest_msgs: LatestMsgs<M> = LatestMsgs::empty();
         let mut queue: VecDeque<M> = j.iter().cloned().collect();
@@ -344,5 +294,60 @@ impl<'z, M: message::Trait> From<&'z Justification<M>> for LatestMsgs<M> {
             }
         }
         latest_msgs
+    }
+}
+
+/// Set of latest honest messages for each validator.
+pub struct LatestMsgsHonest<M: message::Trait>(HashSet<M>);
+
+impl<M: message::Trait> LatestMsgsHonest<M> {
+    /// Create an empty latest honest messages set.
+    fn empty() -> Self {
+        LatestMsgsHonest(HashSet::new())
+    }
+
+    /// Insert message to the set.
+    fn insert(&mut self, msg: M) -> bool {
+        self.0.insert(msg)
+    }
+
+    /// Remove messages of a validator.
+    pub fn remove(&mut self, validator: &M::Sender) {
+        self.0.retain(|msg| msg.sender() != validator);
+    }
+
+    /// Filters the latest messages to retreive the latest honest messages and remove equivocators.
+    pub fn from_latest_msgs(
+        latest_msgs: &LatestMsgs<M>,
+        equivocators: &HashSet<M::Sender>,
+    ) -> Self {
+        latest_msgs
+            .iter()
+            .filter_map(|(sender, msgs)| {
+                if equivocators.contains(sender) || msgs.len() != 1 {
+                    None
+                } else {
+                    msgs.iter().next()
+                }
+            })
+            .fold(LatestMsgsHonest::empty(), |mut acc, msg| {
+                acc.insert(msg.clone());
+                acc
+            })
+    }
+
+    pub fn iter(&self) -> std::collections::hash_set::Iter<M> {
+        self.0.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn mk_estimate(
+        &self,
+        senders_weights: &SendersWeight<<M as message::Trait>::Sender>,
+    ) -> Result<M::Estimate, &'static str> {
+        M::Estimate::mk_estimate(&self, senders_weights)
     }
 }
