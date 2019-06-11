@@ -537,11 +537,7 @@ where
 
             validators.iter().for_each(|validator| {
                 let mut j = Justification::new();
-                let m = Message::new(
-                    *validator,
-                    j.clone(),
-                    votes[*validator as usize].clone(),
-                );
+                let m = Message::new(*validator, j.clone(), votes[*validator as usize].clone());
                 j.insert(m.clone());
                 state.insert(
                     *validator,

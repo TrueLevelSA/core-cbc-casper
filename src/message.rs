@@ -301,11 +301,7 @@ where
         &self.0.justification
     }
 
-    fn new(
-        sender: S,
-        justification: Justification<Self>,
-        estimate: E,
-    ) -> Self {
+    fn new(sender: S, justification: Justification<Self>, estimate: E) -> Self {
         let proto = ProtoMsg {
             sender,
             justification,
