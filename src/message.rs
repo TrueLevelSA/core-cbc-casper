@@ -47,9 +47,9 @@ use std::sync::{Arc, RwLock};
 
 use rayon::prelude::*;
 
+use crate::estimator::Estimate;
 use crate::justification::{Justification, LatestMsgsHonest};
 use crate::sender;
-use crate::traits::Estimate;
 use crate::util::hash::Hash;
 use crate::util::id::Id;
 

@@ -34,10 +34,10 @@ use rand::seq::SliceRandom;
 use rand::thread_rng;
 
 use casper::blockchain::{self, Block};
+use casper::estimator::Estimate;
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use casper::message::{self, Message, Trait};
 use casper::sender;
-use casper::traits::Estimate;
 use casper::util::weight::SendersWeight;
 
 mod common;

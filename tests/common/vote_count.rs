@@ -23,11 +23,11 @@ use std::ops::Add;
 #[cfg(feature = "integration_test")]
 use proptest::prelude::*;
 
+use casper::estimator::Estimate;
 use casper::justification::{Justification, LatestMsgsHonest};
 use casper::message::{self, Trait};
 #[cfg(feature = "integration_test")]
 use casper::sender;
-use casper::traits::Estimate;
 use casper::util::weight::{SendersWeight, Zero};
 
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]

@@ -23,13 +23,13 @@ use crate::justification::LatestMsgsHonest;
 use crate::message;
 use crate::util::weight::SendersWeight;
 
-/// Describes an estimate, or a value of the consensus at a certain time
+/// Describes an estimate, or a value of the consensus at a certain time. Implementing this trait
+/// allows to produce an estimate given the set of latest messages and the set of validators and
+/// their weights.
 pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {
     type M: message::Trait<Estimate = Self>;
 
-    /// Choses an estimate from a set of latest messages
-    /// The finalized_msg value can be used in order not to recursively
-    /// go back to the genesis
+    /// Choses an estimate from a set of latest messages.
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         senders_weights: &SendersWeight<<<Self as Estimate>::M as message::Trait>::Sender>,

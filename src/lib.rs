@@ -109,6 +109,7 @@ extern crate serde_derive;
 
 /// Implementation of basic types for a casper based blockchain consensus mechanism.
 pub mod blockchain;
+pub mod estimator;
 /// Justifications are supposed to “justify” the proposed values. Justifications of messages are
 /// sets of messages that validators has seen and acknowledged while generating messages.
 pub mod justification;
@@ -117,7 +118,6 @@ pub mod justification;
 pub mod message;
 /// Senders are the consensus forming peers nodes in the network are called validators.
 pub mod sender;
-pub mod traits;
 /// Utility module for various types and components.
 pub mod util;
 
