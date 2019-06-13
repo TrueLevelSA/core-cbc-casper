@@ -40,7 +40,7 @@ use rayon::iter::IntoParallelRefIterator;
 use crate::estimator::Estimate;
 use crate::message;
 use crate::sender;
-use crate::util::weight::{SendersWeight, WeightUnit, Zero};
+use crate::util::weight::{WeightUnit, Zero};
 
 /// Struct that holds the set of the `message::Trait` that justify the current message. Works like
 /// a `vec`.
@@ -91,7 +91,7 @@ impl<M: message::Trait> Justification<M> {
     pub fn mk_estimate(
         &self,
         equivocators: &HashSet<M::Sender>,
-        senders_weights: &SendersWeight<<M as message::Trait>::Sender>,
+        senders_weights: &sender::Weights<<M as message::Trait>::Sender>,
     ) -> Result<M::Estimate, &'static str> {
         let latest_msgs = LatestMsgs::from(self);
         let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(&latest_msgs, equivocators);
@@ -346,7 +346,7 @@ impl<M: message::Trait> LatestMsgsHonest<M> {
 
     pub fn mk_estimate(
         &self,
-        senders_weights: &SendersWeight<<M as message::Trait>::Sender>,
+        senders_weights: &sender::Weights<<M as message::Trait>::Sender>,
     ) -> Result<M::Estimate, &'static str> {
         M::Estimate::mk_estimate(&self, senders_weights)
     }

@@ -27,14 +27,13 @@ use casper::estimator::Estimate;
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use casper::message::Trait;
 use casper::sender;
-use casper::util::weight::SendersWeight;
 
 #[test]
 fn equal_weight() {
     let senders: Vec<u32> = (0..4).collect();
     let weights = [1.0, 1.0, 1.0, 1.0];
 
-    let senders_weights = SendersWeight::new(
+    let senders_weights = sender::Weights::new(
         senders
             .iter()
             .cloned()
@@ -95,7 +94,7 @@ fn uneven_weights_1() {
     let senders: Vec<u32> = (0..4).collect();
     let weights = [4.0, 1.0, 1.0, 1.0];
 
-    let senders_weights = SendersWeight::new(
+    let senders_weights = sender::Weights::new(
         senders
             .iter()
             .cloned()
@@ -156,7 +155,7 @@ fn uneven_weights_4() {
     let senders: Vec<u32> = (0..4).collect();
     let weights = [1.0, 1.0, 1.0, 4.0];
 
-    let senders_weights = SendersWeight::new(
+    let senders_weights = sender::Weights::new(
         senders
             .iter()
             .cloned()

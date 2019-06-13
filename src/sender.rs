@@ -59,13 +59,14 @@
 //! Source: [Casper CBC, Simplified!](https://medium.com/@aditya.asgaonkar/casper-cbc-simplified-2370922f9aa6),
 //! by Aditya Asgaonkar.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::sync::{Arc, LockResult, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::justification::LatestMsgs;
 use crate::message;
-use crate::util::weight::{SendersWeight, WeightUnit, Zero};
+use crate::util::weight::{WeightUnit, Zero};
 
 /// All casper actors that send messages, aka validators, have to implement the sender trait
 pub trait Trait: Hash + Clone + Ord + Eq + Send + Sync + Debug + serde::Serialize {}
@@ -88,7 +89,7 @@ pub struct State<M: message::Trait> {
     /// fault tolerance threshold
     pub(crate) thr: WeightUnit,
     /// current validator set, mapped to their respective weights
-    pub(crate) senders_weights: SendersWeight<M::Sender>,
+    pub(crate) senders_weights: Weights<M::Sender>,
     /// this sender's latest message
     pub(crate) own_latest_msg: Option<M>,
     pub(crate) latest_msgs: LatestMsgs<M>,
@@ -97,7 +98,7 @@ pub struct State<M: message::Trait> {
 
 impl<M: message::Trait> State<M> {
     pub fn new(
-        senders_weights: SendersWeight<M::Sender>,
+        senders_weights: Weights<M::Sender>,
         state_fault_weight: WeightUnit,
         own_latest_msg: Option<M>,
         latest_msgs: LatestMsgs<M>,
@@ -116,7 +117,7 @@ impl<M: message::Trait> State<M> {
 
     pub fn from_state(
         sender_state: State<M>,
-        senders_weights: Option<SendersWeight<M::Sender>>,
+        senders_weights: Option<Weights<M::Sender>>,
         state_fault_weight: Option<WeightUnit>,
         own_latest_msg: Option<Option<M>>,
         latest_msgs: Option<LatestMsgs<M>>,
@@ -137,7 +138,7 @@ impl<M: message::Trait> State<M> {
         &self.equivocators
     }
 
-    pub fn senders_weights(&self) -> &SendersWeight<M::Sender> {
+    pub fn senders_weights(&self) -> &Weights<M::Sender> {
         &self.senders_weights
     }
 
@@ -184,5 +185,140 @@ impl<M: message::Trait> State<M> {
             .map(|(m, _)| m)
             .cloned()
             .collect()
+    }
+}
+
+// NOTE: RwLock locks only before writing, while Mutex locks to both read and write
+#[derive(Clone, Default, Debug)]
+pub struct Weights<S: self::Trait>(Arc<RwLock<HashMap<S, WeightUnit>>>);
+
+impl<S: self::Trait> Weights<S> {
+    /// creates a new Weights from a HashMap
+    pub fn new(senders_weight: HashMap<S, WeightUnit>) -> Self {
+        Weights(Arc::new(RwLock::new(senders_weight)))
+    }
+
+    /// same as RwLock read() function
+    /// basically locks the Rwlock with read access
+    /// insert and senders?
+    fn read(&self) -> LockResult<RwLockReadGuard<HashMap<S, WeightUnit>>> {
+        self.0.read()
+    }
+
+    /// same as RwLock write() function
+    /// basically locks the RwLock with write access
+    fn write(&self) -> LockResult<RwLockWriteGuard<HashMap<S, WeightUnit>>> {
+        self.0.write()
+    }
+
+    /// returns success of insertion. failure happens if cannot unwrap self
+    pub fn insert(&mut self, k: S, v: WeightUnit) -> bool {
+        self.write()
+            .ok()
+            .map(|mut h| {
+                h.insert(k, v);
+                true
+            })
+            .unwrap_or(false)
+    }
+
+    /// picks senders with positive weights
+    pub fn senders(&self) -> Result<HashSet<S>, &'static str> {
+        self.read()
+            .map_err(|_| "Can't unwrap Weights")
+            .map(|senders_weight| {
+                senders_weight
+                    .iter()
+                    .filter_map(|(sender, &weight)| {
+                        if weight > WeightUnit::ZERO {
+                            Some(sender.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            })
+    }
+
+    /// Gets the weight of the sender
+    /// Returns an Error in case there is a reading error
+    /// or the sender does not exist
+    pub fn weight(&self, sender: &S) -> Result<WeightUnit, &'static str> {
+        self.read()
+            .map_err(|_| "Can't unwrap Weights")
+            .and_then(|weights| match weights.get(sender) {
+                Some(weight) => Ok(weight.clone()),
+                None => Err("Could not find sender"),
+            })
+    }
+
+    /// returns the total weight of all the senders
+    pub fn sum_weight_senders(&self, senders: &HashSet<S>) -> WeightUnit {
+        senders.iter().fold(WeightUnit::ZERO, |acc, sender| {
+            acc + self.weight(sender).unwrap_or(::std::f64::NAN)
+        })
+    }
+
+    pub fn sum_all_weights(&self) -> WeightUnit {
+        if let Ok(senders) = self.senders() {
+            self.sum_weight_senders(&senders)
+        } else {
+            ::std::f64::NAN
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::sender::Weights;
+
+    #[test]
+    fn senders() {
+        let weights = Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+        assert_eq!(
+            Weights::senders(&weights).unwrap(),
+            [0, 1, 2].iter().cloned().collect(),
+            "should include senders with valid, positive weight"
+        );
+
+        let weights =
+            Weights::new([(0, 0.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+        assert_eq!(
+            Weights::senders(&weights).unwrap(),
+            [1, 2].iter().cloned().collect(),
+            "should exclude senders with 0 weight"
+        );
+
+        let weights =
+            Weights::new([(0, 1.0), (1, -1.0), (2, 1.0)].iter().cloned().collect());
+        assert_eq!(
+            Weights::senders(&weights).unwrap(),
+            [0, 2].iter().cloned().collect(),
+            "should exclude senders with negative weight"
+        );
+
+        let weights = Weights::new(
+            [(0, ::std::f64::NAN), (1, 1.0), (2, 1.0)]
+                .iter()
+                .cloned()
+                .collect(),
+        );
+        assert_eq!(
+            Weights::senders(&weights).unwrap(),
+            [1, 2].iter().cloned().collect(),
+            "should exclude senders with NAN weight"
+        );
+
+        let weights = Weights::new(
+            [(0, ::std::f64::INFINITY), (1, 1.0), (2, 1.0)]
+                .iter()
+                .cloned()
+                .collect(),
+        );
+        assert_eq!(
+            Weights::senders(&weights).unwrap(),
+            [0, 1, 2].iter().cloned().collect(),
+            "should include senders with INFINITY weight"
+        );
     }
 }

@@ -26,7 +26,6 @@ use std::collections::HashSet;
 use casper::justification::{Justification, LatestMsgs};
 use casper::message::{Message, Trait};
 use casper::sender;
-use casper::util::weight::SendersWeight;
 
 #[test]
 fn msg_equality() {
@@ -41,7 +40,7 @@ fn msg_equality() {
     assert!(v0 != v1, "v0 and v1 should NOT be equal");
 
     let senders_weights =
-        SendersWeight::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+        sender::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
 
     let sender_state = sender::State::new(
         senders_weights,
@@ -81,7 +80,7 @@ fn msg_depends() {
     let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
 
     let senders_weights =
-        SendersWeight::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+        sender::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
 
     let sender_state = sender::State::new(
         senders_weights,
@@ -136,7 +135,7 @@ fn msg_equivocates() {
     let v1 = &VoteCount::create_vote_msg(1, true);
 
     let senders_weights =
-        SendersWeight::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+        sender::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
     let sender_state = sender::State::new(
         senders_weights,
         0.0,
@@ -172,7 +171,7 @@ fn msg_equivocates() {
 // fn set_as_final() {
 //     let sender0 = 0;
 //     let sender1 = 1;
-//     let senders_weights = SendersWeight::new(
+//     let senders_weights = sender::Weights::new(
 //         [(sender0, 1.0), (sender1, 1.0)].iter().cloned().collect(),
 //     );
 //     let sender_state = sender::State::new(
