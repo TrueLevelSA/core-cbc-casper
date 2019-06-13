@@ -39,7 +39,6 @@ use casper::estimator::Estimate;
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use casper::message::{self, Message, Trait};
 use casper::sender;
-use casper::util::weight::SendersWeight;
 
 mod common;
 use common::binary::BoolWrapper;
@@ -528,7 +527,7 @@ where
 
             let weights: Vec<f64> = iter::repeat(1.0).take(votes.len() as usize).collect();
 
-            let senders_weights = SendersWeight::new(
+            let senders_weights = sender::Weights::new(
                 validators
                     .iter()
                     .cloned()
@@ -825,7 +824,7 @@ proptest! {
         let senders: Vec<u32> = (0..nodes as u32).collect();
         let weights: Vec<f64> =
             iter::repeat(1.0).take(nodes as usize).collect();
-        let senders_weights = SendersWeight::new(
+        let senders_weights = sender::Weights::new(
             senders
                 .iter()
                 .cloned()

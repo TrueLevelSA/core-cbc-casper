@@ -32,7 +32,7 @@ use crate::message::{self, Trait as MTrait};
 use crate::sender;
 use crate::util::hash::Hash;
 use crate::util::id::Id;
-use crate::util::weight::{SendersWeight, WeightUnit, Zero};
+use crate::util::weight::{WeightUnit, Zero};
 
 /// Casper message (`message::Message`) for a `Block` send by a validator `S: sender::Trait`
 pub type Message<S> = message::Message<Block<S> /*Estimate*/, S /*Sender*/>;
@@ -113,7 +113,7 @@ impl<S: sender::Trait> Estimate for Block<S> {
 
     fn mk_estimate(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        senders_weights: &SendersWeight<<<Self as Estimate>::M as message::Trait>::Sender>,
+        senders_weights: &sender::Weights<<<Self as Estimate>::M as message::Trait>::Sender>,
     ) -> Result<Self, &'static str> {
         let prevblock = Block::ghost(latest_msgs, senders_weights)?;
         Ok(Block::from(ProtoBlock::new(Some(prevblock))))
@@ -159,7 +159,7 @@ impl<S: sender::Trait> Block<S> {
         latest_msgs_honest: &LatestMsgsHonest<Message<S>>,
         equivocators: &HashSet<<Message<S> as message::Trait>::Sender>,
         safety_oracle_threshold: WeightUnit,
-        weights: &SendersWeight<S>,
+        weights: &sender::Weights<S>,
     ) -> HashSet<BTreeSet<<Message<S> as message::Trait>::Sender>> {
         fn latest_in_justification<S: sender::Trait>(
             j: &Justification<Message<S>>,
@@ -354,7 +354,7 @@ impl<S: sender::Trait> Block<S> {
     fn pick_heaviest(
         blocks: &HashSet<Block<S>>,
         visited: &HashMap<Block<S>, HashSet<Block<S>>>,
-        weights: &SendersWeight<S>,
+        weights: &sender::Weights<S>,
         latest_blocks: &HashMap<Block<S>, S>,
         b_in_lms_senders: Rc<RwLock<HashMap<Block<S>, HashSet<S>>>>,
     ) -> Option<(Option<Self>, WeightUnit, HashSet<Self>)> {
@@ -424,7 +424,7 @@ impl<S: sender::Trait> Block<S> {
 
     pub fn ghost(
         latest_msgs: &LatestMsgsHonest<Message<S>>,
-        senders_weights: &SendersWeight<<Message<S> as message::Trait>::Sender>,
+        senders_weights: &sender::Weights<<Message<S> as message::Trait>::Sender>,
     ) -> Result<Self, &'static str> {
         let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_msgs);
         let b_in_lms_senders = Rc::new(RwLock::new(HashMap::<Block<S>, HashSet<S>>::new()));
@@ -446,7 +446,7 @@ mod tests {
     use std::iter;
     use std::iter::FromIterator;
 
-    use crate::blockchain::{Block, Message, ProtoBlock, SendersWeight};
+    use crate::blockchain::{Block, Message, ProtoBlock};
     use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest};
     use crate::message::Trait;
     use crate::sender;
@@ -456,7 +456,7 @@ mod tests {
         // Test cases where not all validators see all messages.
         let (sender0, sender1, sender2, sender3, sender4) = (0, 1, 2, 3, 4);
         let (weight0, weight1, weight2, weight3, weight4) = (1.0, 1.0, 2.0, 1.0, 1.1);
-        let senders_weights = SendersWeight::new(
+        let senders_weights = sender::Weights::new(
             [
                 (sender0, weight0),
                 (sender1, weight1),
@@ -557,7 +557,7 @@ mod tests {
         let (weightg, weight0, weight1, weight2, weight3, weight4, weight5) =
             (1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.0);
 
-        let senders_weights = SendersWeight::new(
+        let senders_weights = sender::Weights::new(
             [
                 (senderg, weightg),
                 (sender0, weight0),
@@ -659,7 +659,7 @@ mod tests {
         let senders: Vec<u32> = (0..nodes).collect();
         let weights: Vec<f64> = iter::repeat(1.0).take(nodes as usize).collect();
 
-        let senders_weights = SendersWeight::new(
+        let senders_weights = sender::Weights::new(
             senders
                 .iter()
                 .cloned()
