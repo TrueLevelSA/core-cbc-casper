@@ -46,20 +46,17 @@ pub type BinaryMsg = message::Message<BoolWrapper /*Estimate*/, Validator /*Send
 impl Estimate for BoolWrapper {
     type M = BinaryMsg;
 
-    /// weighted count of the votes contained in the latest messages
-    fn mk_estimate(
-        latest_msgs: &LatestMsgsHonest<Self::M>,
-        senders_weights: &sender::Weights<<<Self as Estimate>::M as message::Trait>::Sender>,
-        // _data: Option<<Self as Data>::Data>,
+    /// Weighted count of the votes contained in the latest messages.
+    fn mk_estimate<U: WeightUnit>(
+        latest_msgs: &LatestMsgsHonest<BinaryMsg>,
+        senders_weights: &sender::Weights<Validator, U>,
     ) -> Result<Self, &'static str> {
         // loop over all the latest messages
         let (true_w, false_w) = latest_msgs.iter().fold(
-            (WeightUnit::ZERO, WeightUnit::ZERO),
+            (<U as Zero<U>>::ZERO, <U as Zero<U>>::ZERO),
             |(true_w, false_w), msg| {
                 // get the weight for the sender
-                let sender_weight = senders_weights
-                    .weight(msg.sender())
-                    .unwrap_or(WeightUnit::ZERO);
+                let sender_weight = senders_weights.weight(msg.sender()).unwrap_or(U::NAN);
 
                 // add the weight to the right accumulator
                 if msg.estimate().0.clone() {

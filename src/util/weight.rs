@@ -16,22 +16,46 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::ops::{Add, AddAssign, Mul, Sub, SubAssign};
+
 /// Define how to compare the trait type to zero
 pub trait Zero<T: PartialEq> {
     const ZERO: T;
 
-    /// returns whether or not the value is equal to zero
+    /// Returns whether or not the value is equal to zero.
     fn is_zero(val: &T) -> bool {
         val == &Self::ZERO
     }
 }
 
-pub type WeightUnit = f64;
+pub trait WeightUnit
+where
+    Self: Zero<Self>
+        + Add<Output = Self>
+        + AddAssign
+        + Sub<Output = Self>
+        + SubAssign
+        + Mul<Output = Self>
+        + Default
+        + Sized
+        + PartialEq
+        + PartialOrd
+        + Copy,
+{
+    const NAN: Self;
+    const INFINITY: Self;
+}
 
-impl Zero<WeightUnit> for WeightUnit {
+// Implement WeightUnit for f64
+impl Zero<f64> for f64 {
     const ZERO: Self = 0.0f64;
 
     fn is_zero(val: &Self) -> bool {
         val > &-::std::f64::EPSILON && val < &::std::f64::EPSILON
     }
+}
+
+impl WeightUnit for f64 {
+    const NAN: Self = ::std::f64::NAN;
+    const INFINITY: Self = ::std::f64::INFINITY;
 }

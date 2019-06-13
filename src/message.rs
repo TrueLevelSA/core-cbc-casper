@@ -43,21 +43,22 @@
 
 use std::collections::HashSet;
 use std::fmt::Debug;
+use std::hash;
 use std::sync::{Arc, RwLock};
 
 use rayon::prelude::*;
+use serde::Serialize;
 
 use crate::estimator::Estimate;
 use crate::justification::{Justification, LatestMsgsHonest};
 use crate::sender;
 use crate::util::hash::Hash;
 use crate::util::id::Id;
+use crate::util::weight::WeightUnit;
 
 /// Abstraction of a Casper message, contain a value (`Estimate`) that will be sent over the
 /// network by validators (`sender::Trait`) and used as `Justification` for a more recent messages.
-pub trait Trait:
-    std::hash::Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Serialize
-{
+pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize {
     /// Defines the validator type that generated this message
     type Sender: sender::Trait;
 
@@ -82,11 +83,11 @@ pub trait Trait:
     ) -> Self;
 
     /// Create a message from newly received messages.
-    fn from_msgs(
+    fn from_msgs<U: WeightUnit>(
         sender: Self::Sender,
         mut new_msgs: Vec<&Self>,
-        sender_state: &sender::State<Self>,
-    ) -> Result<(Self, sender::State<Self>), &'static str> {
+        sender_state: &sender::State<Self, U>,
+    ) -> Result<(Self, sender::State<Self, U>), &'static str> {
         // dedup by putting msgs into a hashset
         let new_msgs: HashSet<_> = new_msgs.drain(..).collect();
         let new_msgs_len = new_msgs.len();
@@ -208,7 +209,7 @@ where
     type ID = Hash;
 }
 
-impl<E, S> serde::Serialize for ProtoMsg<E, S>
+impl<E, S> Serialize for ProtoMsg<E, S>
 where
     E: Estimate<M = Message<E, S>>,
     S: sender::Trait,
@@ -273,7 +274,7 @@ where
     }
 }
 
-impl<E, S> serde::Serialize for Message<E, S>
+impl<E, S> Serialize for Message<E, S>
 where
     E: Estimate<M = Self>,
     S: sender::Trait,

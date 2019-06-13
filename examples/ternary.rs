@@ -24,6 +24,7 @@ use casper::estimator::Estimate;
 use casper::justification::LatestMsgsHonest;
 use casper::message;
 use casper::sender;
+use casper::util::weight::{WeightUnit, Zero};
 
 type Validator = u32;
 
@@ -36,7 +37,7 @@ pub enum Value {
     Two = 2,
 }
 
-impl From<((Value, f64), (Value, f64), (Value, f64))> for Value {
+impl<U: WeightUnit> From<((Value, U), (Value, U), (Value, U))> for Value {
     /// If equality between two or tree values exists, last value is
     /// prefered, then second value, and first value
     ///
@@ -44,7 +45,7 @@ impl From<((Value, f64), (Value, f64), (Value, f64))> for Value {
     /// v2: w2 >= w1, w2 > w3
     /// v3: w3 >= w1, w3 >= w1
     ///
-    fn from(val: ((Value, f64), (Value, f64), (Value, f64))) -> Self {
+    fn from(val: ((Value, U), (Value, U), (Value, U))) -> Self {
         let ((v1, w1), (v2, w2), (v3, w3)) = val;
         let mut max = v3;
         let mut w = w3;
@@ -62,16 +63,20 @@ impl From<((Value, f64), (Value, f64), (Value, f64))> for Value {
 impl Estimate for Value {
     type M = Message;
 
-    fn mk_estimate(
+    fn mk_estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Message>,
-        senders_weights: &sender::Weights<Validator>,
+        senders_weights: &sender::Weights<Validator, U>,
     ) -> Result<Self, &'static str> {
         use message::Trait;
         let res: Self = latest_msgs
             .iter()
             .map(|msg| (msg.estimate(), senders_weights.weight(msg.sender())))
             .fold(
-                ((Value::Zero, 0f64), (Value::One, 0f64), (Value::Two, 0f64)),
+                (
+                    (Value::Zero, <U as Zero<U>>::ZERO),
+                    (Value::One, <U as Zero<U>>::ZERO),
+                    (Value::Two, <U as Zero<U>>::ZERO),
+                ),
                 |acc, t| match t {
                     (Value::Zero, Ok(weight)) => (((acc.0).0, (acc.0).1 + weight), acc.1, acc.2),
                     (Value::One, Ok(weight)) => (acc.0, ((acc.1).0, (acc.1).1 + weight), acc.2),

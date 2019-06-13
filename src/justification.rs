@@ -55,7 +55,10 @@ impl<M: message::Trait> Justification<M> {
 
     /// Creates a new justification instance from a vector of `message::Trait` and a
     /// `sender::State` and return the justification and an updated state.
-    pub fn from_msgs(messages: Vec<M>, state: &sender::State<M>) -> (Self, sender::State<M>) {
+    pub fn from_msgs<U: WeightUnit>(
+        messages: Vec<M>,
+        state: &sender::State<M, U>,
+    ) -> (Self, sender::State<M, U>) {
         let mut justification = Justification::empty();
         let messages: HashSet<_> = messages.iter().collect();
         let (_, state) = justification.faulty_inserts(messages, state);
@@ -88,10 +91,10 @@ impl<M: message::Trait> Justification<M> {
     }
 
     /// Run the estimator on the justification given the set of equivocators and senders' weights.
-    pub fn mk_estimate(
+    pub fn mk_estimate<U: WeightUnit>(
         &self,
         equivocators: &HashSet<M::Sender>,
-        senders_weights: &sender::Weights<<M as message::Trait>::Sender>,
+        senders_weights: &sender::Weights<<M as message::Trait>::Sender, U>,
     ) -> Result<M::Estimate, &'static str> {
         let latest_msgs = LatestMsgs::from(self);
         let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(&latest_msgs, equivocators);
@@ -101,11 +104,11 @@ impl<M: message::Trait> Justification<M> {
     /// Insert messages to the justification, accepting up to the threshold faults by weight.
     /// Returns true if at least one message of the set gets successfully included in the
     /// justification.
-    pub fn faulty_inserts(
+    pub fn faulty_inserts<U: WeightUnit>(
         &mut self,
         msgs: HashSet<&M>,
-        state: &sender::State<M>,
-    ) -> (bool, sender::State<M>) {
+        state: &sender::State<M, U>,
+    ) -> (bool, sender::State<M, U>) {
         let msgs = state.sort_by_faultweight(msgs);
         // do the actual insertions to the state
         msgs.iter()
@@ -117,15 +120,16 @@ impl<M: message::Trait> Justification<M> {
 
     /// This function makes no assumption on how to treat the equivocator. it adds the msg to the
     /// justification only if it will not cross the fault tolerance threshold.
-    pub fn faulty_insert(&mut self, msg: &M, state: &sender::State<M>) -> (bool, sender::State<M>) {
+    pub fn faulty_insert<U: WeightUnit>(
+        &mut self,
+        msg: &M,
+        state: &sender::State<M, U>,
+    ) -> (bool, sender::State<M, U>) {
         let mut state = state.clone();
         let is_equivocation = state.latest_msgs.equivocate(msg);
 
         let sender = msg.sender();
-        let sender_weight = state
-            .senders_weights
-            .weight(sender)
-            .unwrap_or(::std::f64::INFINITY);
+        let sender_weight = state.senders_weights.weight(sender).unwrap_or(U::INFINITY);
 
         let already_in_equivocators = state.equivocators.contains(sender);
 
@@ -160,18 +164,18 @@ impl<M: message::Trait> Justification<M> {
     /// This function sets the weight of the equivocator to zero right away (returned in
     /// `sender::State`) and add his message to the state, since now his equivocation doesnt count
     /// to the state fault weight anymore
-    pub fn faulty_insert_with_slash(
+    pub fn faulty_insert_with_slash<U: WeightUnit>(
         &mut self,
         msg: &M,
-        mut state: sender::State<M>,
-    ) -> (bool, sender::State<M>) {
+        mut state: sender::State<M, U>,
+    ) -> (bool, sender::State<M, U>) {
         let is_equivocation = state.latest_msgs.equivocate(msg);
         if is_equivocation {
             let sender = msg.sender();
             state.equivocators.insert(sender.clone());
             state
                 .senders_weights
-                .insert(sender.clone(), WeightUnit::ZERO);
+                .insert(sender.clone(), <U as Zero<U>>::ZERO);
         }
         state.latest_msgs.update(msg);
         let success = self.insert(msg.clone());
@@ -344,9 +348,9 @@ impl<M: message::Trait> LatestMsgsHonest<M> {
         self.0.len()
     }
 
-    pub fn mk_estimate(
+    pub fn mk_estimate<U: WeightUnit>(
         &self,
-        senders_weights: &sender::Weights<<M as message::Trait>::Sender>,
+        senders_weights: &sender::Weights<<M as message::Trait>::Sender, U>,
     ) -> Result<M::Estimate, &'static str> {
         M::Estimate::mk_estimate(&self, senders_weights)
     }

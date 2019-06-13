@@ -27,7 +27,7 @@ use casper::estimator::Estimate;
 use casper::justification::{Justification, LatestMsgsHonest};
 use casper::message::{self, Trait};
 use casper::sender;
-use casper::util::weight::Zero;
+use casper::util::weight::{WeightUnit, Zero};
 
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]
 pub struct VoteCount {
@@ -169,9 +169,9 @@ impl Estimate for VoteCount {
     // mk_estimate, as it takes an Option
     // type Data = Self;
 
-    fn mk_estimate(
+    fn mk_estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        _weights: &sender::Weights<Voter>, // all voters have same weight
+        _weights: &sender::Weights<Voter, U>, // all voters have same weight
     ) -> Result<Self, &'static str> {
         // the estimates are actually the original votes of each of the voters /
         // validators
