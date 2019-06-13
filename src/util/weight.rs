@@ -17,7 +17,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::ops::{Add, AddAssign, Mul, Sub, SubAssign};
+use std::cmp::Ordering;
+use std::fmt::{self, Display};
+use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 /// Define how to compare the trait type to zero
 pub trait Zero<T: PartialEq> {
@@ -29,6 +31,47 @@ pub trait Zero<T: PartialEq> {
     }
 }
 
+macro_rules! impl_zero {
+    ( $x:ty, $z:expr ) => {
+        impl Zero<$x> for $x {
+            const ZERO: Self = $z;
+
+            fn is_zero(val: &Self) -> bool {
+                *val == $z
+            }
+        }
+    }
+}
+
+impl_zero!(u8, 0u8);
+impl_zero!(u16, 0u16);
+impl_zero!(u32, 0u32);
+impl_zero!(u64, 0u64);
+impl_zero!(i8, 0i8);
+impl_zero!(i16, 0i16);
+impl_zero!(i32, 0i32);
+impl_zero!(i64, 0i64);
+
+macro_rules! impl_weight_float {
+    ( $x:ident, $z:expr ) => {
+        impl Zero<$x> for $x {
+            const ZERO: Self = $z;
+
+            fn is_zero(val: &Self) -> bool {
+                val > &-::std::$x::EPSILON && val < &::std::$x::EPSILON
+            }
+        }
+
+        impl WeightUnit for $x {
+            const NAN: Self = ::std::$x::NAN;
+            const INFINITY: Self = ::std::$x::INFINITY;
+        }
+    }
+}
+
+impl_weight_float!(f32, 0f32);
+impl_weight_float!(f64, 0f64);
+
 pub trait WeightUnit
 where
     Self: Zero<Self>
@@ -36,27 +79,291 @@ where
         + AddAssign
         + Sub<Output = Self>
         + SubAssign
-        + Mul<Output = Self>
-        + Default
         + Sized
         + PartialEq
         + PartialOrd
         + Copy,
 {
+    /// Represent not a number
     const NAN: Self;
+    /// Points to infinity
     const INFINITY: Self;
 }
 
-// Implement WeightUnit for f64
-impl Zero<f64> for f64 {
-    const ZERO: Self = 0.0f64;
+// Generic implement of weight with any units that can be added and substracted. This wraps the
+// unit in a system with an infinity point and a "not a number" point used in the algorithmes.
+#[derive(Clone, Copy)]
+pub enum Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    Unit(T),
+    Infinity,
+    NaN,
+}
+
+impl<T> Zero<Weight<T>> for Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    const ZERO: Self = Weight::Unit(<T as Zero<T>>::ZERO);
 
     fn is_zero(val: &Self) -> bool {
-        val > &-::std::f64::EPSILON && val < &::std::f64::EPSILON
+        use Weight::*;
+
+        match val {
+            Unit(u) => *u == <T as Zero<T>>::ZERO,
+            _ => false,
+        }
     }
 }
 
-impl WeightUnit for f64 {
-    const NAN: Self = ::std::f64::NAN;
-    const INFINITY: Self = ::std::f64::INFINITY;
+impl<T> PartialEq for Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    fn eq(&self, other: &Self) -> bool {
+        use Weight::*;
+
+        match self {
+            Unit(lhs) => match other {
+                Unit(rhs) => lhs == rhs,
+                _ => false,
+            },
+            Infinity => match other {
+                // Inf equal Inf
+                Infinity => true,
+                // not equal to weight or NaN
+                _ => false,
+            },
+            // NaN never equal to something
+            NaN => false,
+        }
+    }
+}
+
+impl<T> PartialOrd for Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        use Weight::*;
+
+        match self {
+            Unit(lhs) => match other {
+                Unit(rhs) => lhs.partial_cmp(rhs),
+                // number always smaller than infinity
+                Infinity => Some(Ordering::Less),
+                // NaN is not comparable
+                NaN => None,
+            },
+            Infinity => match other {
+                Unit(_) => Some(Ordering::Greater),
+                // Inf is equal to Inf
+                Infinity => Some(Ordering::Equal),
+                // NaN is not comparable
+                NaN => None,
+            },
+            // NaN is not comparable
+            NaN => None,
+        }
+    }
+}
+
+impl<T> Add for Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        use Weight::*;
+
+        match self {
+            Unit(lhs) => match other {
+                Unit(rhs) => Unit(lhs + rhs),
+                Infinity => Infinity,
+                NaN => NaN,
+            },
+            Infinity => match other {
+                // NaN is always NaN
+                NaN => NaN,
+                // not NaN + Infinity is always Infinity
+                _ => Infinity,
+            },
+            NaN => NaN,
+        }
+    }
+}
+
+impl<T> AddAssign for Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    fn add_assign(&mut self, other: Self) {
+        *self = *self + other;
+    }
+}
+
+impl<T> Sub for Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        use Weight::*;
+
+        match self {
+            Unit(lhs) => match other {
+                Unit(rhs) => Unit(lhs - rhs),
+                Infinity => Infinity,
+                NaN => NaN,
+            },
+            Infinity => match other {
+                // NaN is always NaN
+                NaN => NaN,
+                // Infinity - Infinity is not a number
+                Infinity => NaN,
+                // Infinity - x is still infinity
+                Unit(_) => Infinity,
+            },
+            NaN => NaN,
+        }
+    }
+}
+
+impl<T> SubAssign for Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    fn sub_assign(&mut self, other: Self) {
+        *self = *self - other;
+    }
+}
+
+impl<T> Display for Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use Weight::*;
+        match self {
+            Unit(int) => write!(f, "{}", int),
+            Infinity => write!(f, "inf"),
+            NaN => write!(f, "NaN"),
+        }
+    }
+}
+
+impl<T> fmt::Debug for Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self)
+    }
+}
+
+impl<T> WeightUnit for Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    const NAN: Self = Weight::NaN;
+    const INFINITY: Self = Weight::Infinity;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Weight::{self, *};
+
+    // NaN is converted into string because NaN != NaN and then failed to pass
+    // the tests.
+
+    #[test]
+    fn addition() {
+        assert_eq!(Unit(2), Unit(1) + Unit(1));
+        assert_eq!(Infinity, Unit(1) + Infinity);
+        assert_eq!(Weight::<u32>::NaN.to_string(), (Unit(1) + NaN).to_string());
+        assert_eq!(
+            Weight::<u32>::NaN.to_string(),
+            (Weight::<u32>::NaN + Weight::<u32>::NaN).to_string()
+        );
+        assert_eq!(Infinity, Infinity + Unit(1));
+        assert_eq!(
+            Weight::<u32>::NaN.to_string(),
+            (Infinity + Weight::<u32>::NaN).to_string()
+        );
+        assert_eq!(Weight::<u32>::Infinity, Infinity + Infinity);
+    }
+
+    #[test]
+    fn substraction() {
+        assert_eq!(Unit(0), Unit(1) - Unit(1));
+        assert_eq!(Infinity, Unit(1) - Infinity);
+        assert_eq!(Weight::<u32>::NaN.to_string(), (Unit(1) - NaN).to_string());
+        assert_eq!(
+            Weight::<u32>::NaN.to_string(),
+            (Weight::<u32>::NaN - Weight::<u32>::NaN).to_string()
+        );
+        assert_eq!(Infinity, Infinity - Unit(1));
+        assert_eq!(
+            Weight::<u32>::NaN.to_string(),
+            (Infinity - Weight::<u32>::NaN).to_string()
+        );
+        assert_eq!(
+            Weight::<u32>::NaN.to_string(),
+            (Infinity - Weight::<u32>::Infinity).to_string()
+        );
+    }
+
+    #[test]
+    fn equality() {
+        assert_eq!(true, Unit(1) == Unit(1));
+        assert_eq!(false, Unit(1) == Infinity);
+        assert_eq!(false, Unit(1) == NaN);
+        assert_eq!(false, Weight::<u32>::NaN == Weight::<u32>::NaN);
+        assert_eq!(false, Infinity == Weight::<u32>::NaN);
+        assert_eq!(true, Infinity == Weight::<u32>::Infinity);
+    }
+
+    #[test]
+    fn greater() {
+        assert_eq!(false, Unit(1) > Unit(1));
+        assert_eq!(true, Unit(1) >= Unit(1));
+        assert_eq!(false, Unit(1) > Weight::<u32>::Infinity);
+        assert_eq!(false, Unit(1) >= Weight::<u32>::Infinity);
+        assert_eq!(false, Unit(1) > Weight::<u32>::NaN);
+        assert_eq!(false, Unit(1) >= Weight::<u32>::NaN);
+        assert_eq!(false, Weight::<u32>::NaN > Weight::<u32>::NaN);
+        assert_eq!(false, Weight::<u32>::NaN >= Weight::<u32>::NaN);
+        assert_eq!(false, Weight::<u32>::Infinity > Weight::<u32>::NaN);
+        assert_eq!(false, Weight::<u32>::Infinity >= Weight::<u32>::NaN);
+        assert_eq!(true, Weight::<u32>::Infinity > Unit(1));
+        assert_eq!(true, Weight::<u32>::Infinity >= Unit(1));
+        assert_eq!(false, Weight::<u32>::Infinity > Weight::<u32>::Infinity);
+        assert_eq!(true, Weight::<u32>::Infinity >= Weight::<u32>::Infinity);
+    }
+
+    #[test]
+    fn smaller() {
+        assert_eq!(true, Unit(1) <= Unit(1));
+        assert_eq!(false, Unit(1) < Unit(1));
+        assert_eq!(true, Unit(1) <= Weight::<u32>::Infinity);
+        assert_eq!(true, Unit(1) < Weight::<u32>::Infinity);
+        assert_eq!(false, Unit(1) <= Weight::<u32>::NaN);
+        assert_eq!(false, Unit(1) < Weight::<u32>::NaN);
+        assert_eq!(false, Weight::<u32>::NaN <= Weight::<u32>::NaN);
+        assert_eq!(false, Weight::<u32>::NaN < Weight::<u32>::NaN);
+        assert_eq!(false, Weight::<u32>::NaN <= Weight::<u32>::Infinity);
+        assert_eq!(false, Weight::<u32>::NaN < Weight::<u32>::Infinity);
+        assert_eq!(false, Weight::<u32>::NaN <= Unit(1));
+        assert_eq!(false, Weight::<u32>::NaN < Unit(1));
+        assert_eq!(false, Weight::<u32>::Infinity <= Weight::<u32>::NaN);
+        assert_eq!(false, Weight::<u32>::Infinity < Weight::<u32>::NaN);
+        assert_eq!(true, Weight::<u32>::Infinity <= Weight::<u32>::Infinity);
+        assert_eq!(false, Weight::<u32>::Infinity < Weight::<u32>::Infinity);
+        assert_eq!(false, Weight::<u32>::Infinity <= Unit(1));
+        assert_eq!(false, Weight::<u32>::Infinity < Unit(1));
+    }
 }
