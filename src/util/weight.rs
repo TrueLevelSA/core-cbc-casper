@@ -39,7 +39,7 @@ macro_rules! impl_zero {
                 *val == $z
             }
         }
-    }
+    };
 }
 
 impl_zero!(u8, 0u8);
@@ -65,7 +65,7 @@ macro_rules! impl_weight_float {
             const NAN: Self = ::std::$x::NAN;
             const INFINITY: Self = ::std::$x::INFINITY;
         }
-    }
+    };
 }
 
 impl_weight_float!(f32, 0f32);
