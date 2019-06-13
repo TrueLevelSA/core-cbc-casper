@@ -263,6 +263,8 @@ where
                     .collect(),
             );
 
+            println!("{:?}", validators.len());
+
             validators.iter().for_each(|validator| {
                 let mut j = Justification::new();
                 let m = Message::new(
@@ -354,12 +356,12 @@ fn blockchain() {
 
     let mut runner = TestRunner::new(config);
 
-    for i in 0..100 {
+    for i in 0..1 {
         runner
             .run(
                 &chain(
                     arbitrary_blockchain(),
-                    6,
+                    15,
                     arbitrary_in_set,
                     some_receivers,
                     safety_oracle,

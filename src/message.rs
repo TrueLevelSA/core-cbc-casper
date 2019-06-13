@@ -85,9 +85,19 @@ pub trait CasperMsg: Hash + Clone + Eq + Sync + Send + Debug + Id + serde::Seria
             #[cfg(feature = "integration_test")]
             flame::end("mk_estimate");
 
+            // #[cfg(feature = "integration_test")]
+            // flame::span_of("message_creation", || estimate.map(|e| (Self::new(sender, justification, e, None), sender_state)));
+            // #[cfg(not(feature = "integration_test"))]
+            // estimate.map(|e| (Self::new(sender, justification, e, None), sender_state))
+            // if cfg!(feature = "integration_test") {
+            // #[cfg(feature = "integration_test")]
             flame::span_of("message_creation", || {
                 estimate.map(|e| (Self::new(sender, justification, e, None), sender_state))
             })
+            // } else {
+            // #[cfg(not(feature = "integration_test"))]
+            // estimate.map(|e| (Self::new(sender, justification, e, None), sender_state))
+            // }
         }
     }
 

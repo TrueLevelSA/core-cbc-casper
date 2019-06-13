@@ -354,6 +354,7 @@ impl<S: Sender> Block<S> {
     }
 
     /// find heaviest block
+    // #[flame]
     fn pick_heaviest(
         blocks: &HashSet<Block<S>>,
         visited: &HashMap<Block<S>, HashSet<Block<S>>>,

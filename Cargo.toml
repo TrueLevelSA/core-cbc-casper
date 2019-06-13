@@ -13,8 +13,12 @@ blake2 = "0.7"
 itertools = "0.7.8"
 proptest = { version = "0.9.1", optional = true }
 rand = { version = "0.6.5", optional = true }
+# flame = { version = "0.2.2", optional = true }
+# flamer = { version = "0.3", optional = true }
 flame = "0.2.2"
 flamer = "0.3"
 
 [features]
 integration_test = ["proptest", "rand"]
+# integration_test = ["proptest", "rand", "flame", "flamer"]
+# flame_it = ["flame", "flamer"]

@@ -185,10 +185,11 @@ impl<M: CasperMsg> LatestMsgsHonest<M> {
         latest_msgs: &LatestMsgs<M>,
         equivocators: &HashSet<M::Sender>,
     ) -> Self {
+        flame::span_of("from_latest_msgs", ||
         latest_msgs
             .iter()
             .filter_map(|(sender, msgs)| {
-                if equivocators.contains(sender) || msgs.len() != 1 {
+                if msgs.len() != 1 {
                     None
                 } else {
                     msgs.iter().next()
@@ -198,6 +199,7 @@ impl<M: CasperMsg> LatestMsgsHonest<M> {
                 acc.insert(msg.clone());
                 acc
             })
+        )
     }
 
     pub fn iter(&self) -> std::collections::hash_set::Iter<M> {
