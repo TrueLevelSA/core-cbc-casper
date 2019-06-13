@@ -25,8 +25,8 @@ extern crate casper;
 extern crate itertools;
 extern crate serde;
 
-use casper::traits::Id;
 use casper::util::hash::Hash;
+use casper::util::id::Id;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 struct Example {
@@ -34,7 +34,7 @@ struct Example {
     int: i64,
 }
 
-impl casper::traits::Id for Example {
+impl Id for Example {
     type ID = Hash;
 }
 

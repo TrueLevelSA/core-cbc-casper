@@ -28,8 +28,9 @@ use serde_derive::Serialize;
 use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use crate::message::{self, Trait as MTrait};
 use crate::sender;
-use crate::traits::{Estimate, Id, Zero};
+use crate::traits::{Estimate, Zero};
 use crate::util::hash::Hash;
+use crate::util::id::Id;
 use crate::util::weight::{SendersWeight, WeightUnit};
 
 /// Casper message (`message::Message`) for a `Block` send by a validator `S: sender::Trait`

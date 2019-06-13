@@ -49,8 +49,9 @@ use rayon::prelude::*;
 
 use crate::justification::{Justification, LatestMsgsHonest};
 use crate::sender;
-use crate::traits::{Estimate, Id};
+use crate::traits::Estimate;
 use crate::util::hash::Hash;
+use crate::util::id::Id;
 
 /// Abstraction of a Casper message, contain a value (`Estimate`) that will be sent over the
 /// network by validators (`sender::Trait`) and used as `Justification` for a more recent messages.
