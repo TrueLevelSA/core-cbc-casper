@@ -111,9 +111,9 @@ impl<'z, S: sender::Trait> From<&'z Message<S>> for Block<S> {
 impl<S: sender::Trait> Estimate for Block<S> {
     type M = Message<S>;
 
-    fn mk_estimate(
+    fn mk_estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        senders_weights: &sender::Weights<<<Self as Estimate>::M as message::Trait>::Sender>,
+        senders_weights: &sender::Weights<<<Self as Estimate>::M as message::Trait>::Sender, U>,
     ) -> Result<Self, &'static str> {
         let prevblock = Block::ghost(latest_msgs, senders_weights)?;
         Ok(Block::from(ProtoBlock::new(Some(prevblock))))
@@ -154,12 +154,12 @@ impl<S: sender::Trait> Block<S> {
                 .unwrap_or(false)
     }
 
-    pub fn safety_oracles(
+    pub fn safety_oracles<U: WeightUnit>(
         block: Block<S>,
         latest_msgs_honest: &LatestMsgsHonest<Message<S>>,
         equivocators: &HashSet<<Message<S> as message::Trait>::Sender>,
-        safety_oracle_threshold: WeightUnit,
-        weights: &sender::Weights<S>,
+        safety_oracle_threshold: U,
+        weights: &sender::Weights<S, U>,
     ) -> HashSet<BTreeSet<<Message<S> as message::Trait>::Sender>> {
         fn latest_in_justification<S: sender::Trait>(
             j: &Justification<Message<S>>,
@@ -247,8 +247,9 @@ impl<S: sender::Trait> Block<S> {
         mx_clqs
             .into_iter()
             .filter(|x| {
-                x.iter().fold(WeightUnit::ZERO, |acc, sender| {
-                    acc + weights.weight(sender).unwrap_or(::std::f64::NAN)
+                x.iter().fold(<U as Zero<U>>::ZERO, |acc, sender| {
+                    // FIXME: U::default() or <U ...>::Zero? or U::NAN
+                    acc + weights.weight(sender).unwrap_or(U::NAN)
                 }) > safety_oracle_threshold
             })
             .collect()
@@ -351,20 +352,20 @@ impl<S: sender::Trait> Block<S> {
     }
 
     /// Find heaviest block.
-    fn pick_heaviest(
+    fn pick_heaviest<U: WeightUnit>(
         blocks: &HashSet<Block<S>>,
         visited: &HashMap<Block<S>, HashSet<Block<S>>>,
-        weights: &sender::Weights<S>,
+        weights: &sender::Weights<S, U>,
         latest_blocks: &HashMap<Block<S>, S>,
         b_in_lms_senders: Rc<RwLock<HashMap<Block<S>, HashSet<S>>>>,
-    ) -> Option<(Option<Self>, WeightUnit, HashSet<Self>)> {
-        let init = Some((None, WeightUnit::ZERO, HashSet::new()));
+    ) -> Option<(Option<Self>, U, HashSet<Self>)> {
+        let init = Some((None, <U as Zero<U>>::ZERO, HashSet::new()));
         let heaviest_child = match blocks.len() {
             // only one choice, no need to compute anything
             l if l == 1 => blocks.iter().next().cloned().and_then(|block| {
                 visited
                     .get(&block)
-                    .map(|children| (Some(block), WeightUnit::ZERO, children.clone()))
+                    .map(|children| (Some(block), <U as Zero<U>>::ZERO, children.clone()))
             }),
             // fork, need to find best block
             l if l > 1 => blocks.iter().fold(init, |best, block| {
@@ -422,9 +423,9 @@ impl<S: sender::Trait> Block<S> {
         })
     }
 
-    pub fn ghost(
+    pub fn ghost<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Message<S>>,
-        senders_weights: &sender::Weights<<Message<S> as message::Trait>::Sender>,
+        senders_weights: &sender::Weights<<Message<S> as message::Trait>::Sender, U>,
     ) -> Result<Self, &'static str> {
         let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_msgs);
         let b_in_lms_senders = Rc::new(RwLock::new(HashMap::<Block<S>, HashSet<S>>::new()));

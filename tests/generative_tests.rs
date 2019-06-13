@@ -39,6 +39,7 @@ use casper::estimator::Estimate;
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use casper::message::{self, Message, Trait};
 use casper::sender;
+use casper::util::weight::WeightUnit;
 
 mod common;
 use common::binary::BoolWrapper;
@@ -55,12 +56,13 @@ use tools::ChainData;
 
 /// create a message for each sender in the senders_recipients_data vector
 /// messages are added to theirs senders state
-fn create_messages<'z, M>(
-    state: &'z mut HashMap<M::Sender, sender::State<M>>,
+fn create_messages<'z, M, U>(
+    state: &'z mut HashMap<M::Sender, sender::State<M, U>>,
     senders_recipients_data: Vec<(M::Sender, HashSet<M::Sender>)>,
 ) -> Vec<(M, M::Sender, HashSet<M::Sender>)>
 where
     M: message::Trait,
+    U: WeightUnit,
 {
     senders_recipients_data
         // into_iter because we dont want to clone datas at the end
@@ -113,7 +115,7 @@ where
 /// send messages to the recipients they're meant to be sent to
 /// state of the recipients are updated accordingly
 fn add_messages<M>(
-    state: &mut HashMap<M::Sender, sender::State<M>>,
+    state: &mut HashMap<M::Sender, sender::State<M, f64>>,
     messages_senders_recipients_datas: Vec<(M, M::Sender, HashSet<M::Sender>)>,
 ) -> Result<(), &'static str>
 where
@@ -285,9 +287,9 @@ fn create_receiver_strategy(
 }
 
 fn message_events<M>(
-    state: HashMap<M::Sender, sender::State<M>>,
+    state: HashMap<M::Sender, sender::State<M, f64>>,
     sender_receiver_strategy: BoxedStrategy<HashMap<M::Sender, HashSet<M::Sender>>>,
-) -> BoxedStrategy<Result<HashMap<M::Sender, sender::State<M>>, &'static str>>
+) -> BoxedStrategy<Result<HashMap<M::Sender, sender::State<M, f64>>, &'static str>>
 where
     M: 'static + message::Trait,
 {
@@ -311,7 +313,7 @@ where
 }
 
 fn full_consensus<M>(
-    state: &HashMap<M::Sender, sender::State<M>>,
+    state: &HashMap<M::Sender, sender::State<M, f64>>,
     _height_of_oracle: &u32,
     _vec_data: &mut Vec<ChainData>,
     _chain_id: u32,
@@ -333,7 +335,7 @@ where
 
 /// Returns true when at least one validator picks a block at the specified height
 fn run_until_height(
-    state: &HashMap<u32, sender::State<blockchain::Message<u32>>>,
+    state: &HashMap<u32, sender::State<blockchain::Message<u32>, f64>>,
     height: &u32,
     _vec_data: &mut Vec<ChainData>,
     _chain_id: u32,
@@ -351,7 +353,7 @@ fn run_until_height(
 /// return true if some safety oracle is detected at max_heaight_of_oracle
 /// the threshold for the safety oracle is set to half of the sum of the senders weights
 fn get_data_from_state(
-    sender_state: &sender::State<blockchain::Message<u32>>,
+    sender_state: &sender::State<blockchain::Message<u32>, f64>,
     max_height_of_oracle: &u32,
     data: &mut ChainData,
 ) -> (bool) {
@@ -405,7 +407,7 @@ fn get_data_from_state(
 }
 
 fn safety_oracle(
-    state: &HashMap<u32, sender::State<blockchain::Message<u32>>>,
+    state: &HashMap<u32, sender::State<blockchain::Message<u32>, f64>>,
     _height_of_oracle: &u32,
     _vec_data: &mut Vec<ChainData>,
     _chain_id: u32,
@@ -433,7 +435,7 @@ fn safety_oracle(
 /// adds a new data to vec_data for each new message that is sent
 /// uses received_msgs to take note of which validator received which messages
 fn safety_oracle_at_height(
-    state: &HashMap<u32, sender::State<blockchain::Message<u32>>>,
+    state: &HashMap<u32, sender::State<blockchain::Message<u32>, f64>>,
     height_of_oracle: &u32,
     vec_data: &mut Vec<ChainData>,
     chain_id: u32,
@@ -461,7 +463,7 @@ fn safety_oracle_at_height(
 }
 
 fn clique_collection(
-    state: HashMap<u32, sender::State<blockchain::Message<u32>>>,
+    state: HashMap<u32, sender::State<blockchain::Message<u32>, f64>>,
 ) -> Vec<Vec<Vec<u32>>> {
     state
         .iter()
@@ -496,13 +498,13 @@ fn chain<E: 'static, F: 'static, H: 'static>(
     consensus_satisfied: H,
     consensus_satisfied_value: u32,
     chain_id: u32,
-) -> BoxedStrategy<Vec<Result<HashMap<u32, sender::State<Message<E, u32>>>, &'static str>>>
+) -> BoxedStrategy<Vec<Result<HashMap<u32, sender::State<Message<E, u32>, f64>>, &'static str>>>
 where
     E: Estimate<M = Message<E, u32>> + From<u32>,
     F: Fn(&mut Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
     //G: Fn(&Vec<u32>, BoxedStrategy<HashSet<u32>>) -> BoxedStrategy<HashMap<u32, HashSet<u32>>>,
     H: Fn(
-        &HashMap<u32, sender::State<Message<E, u32>>>,
+        &HashMap<u32, sender::State<Message<E, u32>, f64>>,
         &u32,
         &mut Vec<ChainData>,
         u32,

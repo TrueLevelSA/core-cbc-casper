@@ -54,9 +54,9 @@ pub struct Tx;
 impl Estimate for IntegerWrapper {
     type M = IntegerMsg;
 
-    fn mk_estimate(
-        latest_msgs: &LatestMsgsHonest<Self::M>,
-        senders_weights: &sender::Weights<<<Self as Estimate>::M as message::Trait>::Sender>,
+    fn mk_estimate<U: WeightUnit>(
+        latest_msgs: &LatestMsgsHonest<IntegerMsg>,
+        senders_weights: &sender::Weights<Validator, U>,
     ) -> Result<Self, &'static str> {
         let mut msgs_sorted_by_estimate = Vec::from_iter(latest_msgs.iter().fold(
             HashSet::new(),
@@ -71,24 +71,22 @@ impl Estimate for IntegerWrapper {
         // in the set
         let total_weight = msgs_sorted_by_estimate
             .iter()
-            .fold(WeightUnit::ZERO, |acc, x| {
-                acc + senders_weights
-                    .weight(x.sender())
-                    .unwrap_or(WeightUnit::ZERO)
+            .fold(<U as Zero<U>>::ZERO, |acc, x| {
+                acc + senders_weights.weight(x.sender()).unwrap_or(U::NAN)
             });
 
-        let mut running_weight = 0.0;
+        let mut running_weight = <U as Zero<U>>::ZERO;
         let mut msg_iter = msgs_sorted_by_estimate.iter();
         let mut current_msg: Result<&&IntegerMsg, &str> = Err("no msg");
 
         // since the messages are ordered according to their estimates,
         // whichever estimate is found after iterating over half of the total weight
         // is the consensus
-        while running_weight / total_weight < 0.5 {
+        while running_weight + running_weight < total_weight {
             current_msg = msg_iter.next().ok_or("no next msg");
             running_weight += current_msg
                 .and_then(|m| senders_weights.weight(m.sender()))
-                .unwrap_or(WeightUnit::ZERO)
+                .unwrap_or(U::NAN)
         }
 
         // return said estimate
