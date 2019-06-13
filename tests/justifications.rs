@@ -40,7 +40,7 @@ fn faulty_inserts_sorted() {
     let v2 = &VoteCount::create_vote_msg(2, true);
     let v2_prime = &VoteCount::create_vote_msg(2, false);
 
-    let mut latest_msgs = LatestMsgs::new();
+    let mut latest_msgs = LatestMsgs::empty();
     latest_msgs.update(v0);
     latest_msgs.update(v1);
     latest_msgs.update(v2);
@@ -53,7 +53,7 @@ fn faulty_inserts_sorted() {
         3.0,
         HashSet::new(),
     );
-    let mut j = Justification::new();
+    let mut j = Justification::empty();
     let sorted_msgs = sender_state
         .sort_by_faultweight(vec![v2_prime, v1_prime, v0_prime].iter().cloned().collect());
     let (_, sender_state) =
@@ -76,13 +76,13 @@ fn faulty_inserts() {
     let v0 = &VoteCount::create_vote_msg(0, false);
     let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
     let v1 = &VoteCount::create_vote_msg(1, true);
-    let mut j0 = Justification::new();
+    let mut j0 = Justification::empty();
 
     let sender_state = sender::State::new(
         senders_weights.clone(),
         0.0,
         None,
-        LatestMsgs::new(),
+        LatestMsgs::empty(),
         0.0,
         HashSet::new(),
     );
@@ -93,7 +93,7 @@ fn faulty_inserts() {
     let (m0, _weights) = &message::Message::from_msgs(0, vec![v0], &sender_state).unwrap();
 
     // let m0 = &message::Message::new(0, justification, estimate);
-    let mut j1 = Justification::new();
+    let mut j1 = Justification::empty();
     let (success, sender_state) =
         j1.faulty_inserts(vec![v1].iter().cloned().collect(), &sender_state);
     assert!(success);
@@ -214,7 +214,7 @@ fn faulty_inserts() {
             senders_weights.clone(),
             1.0,
             None,
-            LatestMsgs::new(),
+            LatestMsgs::empty(),
             2.0,
             HashSet::new(),
         ),

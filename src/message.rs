@@ -91,7 +91,7 @@ pub trait Trait:
         let new_msgs_len = new_msgs.len();
 
         // update latest_msgs in sender_state with new_msgs
-        let mut justification = Justification::new();
+        let mut justification = Justification::empty();
         let (success, sender_state) = justification.faulty_inserts(new_msgs, &sender_state);
 
         if !success && new_msgs_len > 0 {
@@ -139,7 +139,8 @@ pub trait Trait:
     }
 
     /// Checks whether self depends on rhs or not. Returns true if rhs is somewhere in the
-    /// justification of self.
+    /// justification of self. This check is heavy and work well only with messages where the
+    /// dependency is found on the surface, which what it was designed for.
     fn depends(&self, rhs: &Self) -> bool {
         // although the recursion ends supposedly only at genesis message, the
         // trick is the following: it short-circuits while descending on the

@@ -47,19 +47,19 @@ fn msg_equality() {
         senders_weights,
         0.0,
         None,
-        LatestMsgs::new(),
+        LatestMsgs::empty(),
         0.0,
         HashSet::new(),
     );
 
-    let mut j0 = Justification::new();
+    let mut j0 = Justification::empty();
     let (success, _) = j0.faulty_inserts(vec![v0].iter().cloned().collect(), &sender_state);
     assert!(success);
 
     let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state).unwrap();
     // let m0 = &Message::new(0, justification, estimate);
 
-    let mut j1 = Justification::new();
+    let mut j1 = Justification::empty();
 
     let (success, _) = j1.faulty_inserts(vec![v0].iter().cloned().collect(), &sender_state);
     assert!(success);
@@ -87,12 +87,12 @@ fn msg_depends() {
         senders_weights,
         0.0,
         None,
-        LatestMsgs::new(),
+        LatestMsgs::empty(),
         0.0,
         HashSet::new(),
     );
 
-    let mut j0 = Justification::new();
+    let mut j0 = Justification::empty();
     let (success, _) = j0.faulty_inserts(vec![v0].iter().cloned().collect(), &sender_state);
     assert!(success);
 
@@ -109,13 +109,13 @@ fn msg_depends() {
     assert!(!m0.depends(v0_prime), "m0 depends on v0 directly");
     assert!(m0.depends(v0), "m0 depends on v0 directly");
 
-    let mut j0 = Justification::new();
+    let mut j0 = Justification::empty();
     let (success, _) = j0.faulty_inserts([v0].iter().cloned().collect(), &sender_state);
     assert!(success);
 
     let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state).unwrap();
 
-    let mut j1 = Justification::new();
+    let mut j1 = Justification::empty();
     let (success, _) = j1.faulty_inserts([v0].iter().cloned().collect(), &sender_state);
     assert!(success);
 
@@ -141,12 +141,12 @@ fn msg_equivocates() {
         senders_weights,
         0.0,
         None,
-        LatestMsgs::new(),
+        LatestMsgs::empty(),
         0.0,
         HashSet::new(),
     );
 
-    let mut j0 = Justification::new();
+    let mut j0 = Justification::empty();
     let (success, _) = j0.faulty_inserts(vec![v0].iter().cloned().collect(), &sender_state);
     assert!(success);
 
@@ -179,7 +179,7 @@ fn msg_equivocates() {
 //         senders_weights.clone(),
 //         0.0,
 //         None,
-//         LatestMsgs::new(),
+//         LatestMsgs::empty(),
 //         0.0,
 //         HashSet::new(),
 //     );

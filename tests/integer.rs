@@ -46,7 +46,7 @@ fn equal_weight() {
         senders_weights.clone(),
         0.0, // state fault weight
         None,
-        LatestMsgs::new(),
+        LatestMsgs::empty(),
         1.0,            // subjective fault weight threshold
         HashSet::new(), // equivocators
     );
@@ -54,7 +54,7 @@ fn equal_weight() {
     assert_eq!(
         IntegerWrapper::mk_estimate(
             &LatestMsgsHonest::from_latest_msgs(
-                &LatestMsgs::from(&Justification::new()),
+                &LatestMsgs::from(&Justification::empty()),
                 sender_state.equivocators()
             ),
             &senders_weights,
@@ -62,9 +62,9 @@ fn equal_weight() {
         Err("no msg")
     );
 
-    let m0 = IntegerMsg::new(senders[0], Justification::new(), IntegerWrapper(1));
-    let m1 = IntegerMsg::new(senders[1], Justification::new(), IntegerWrapper(2));
-    let m2 = IntegerMsg::new(senders[2], Justification::new(), IntegerWrapper(3));
+    let m0 = IntegerMsg::new(senders[0], Justification::empty(), IntegerWrapper(1));
+    let m1 = IntegerMsg::new(senders[1], Justification::empty(), IntegerWrapper(2));
+    let m2 = IntegerMsg::new(senders[2], Justification::empty(), IntegerWrapper(3));
     let (m3, _) = IntegerMsg::from_msgs(senders[0], vec![&m0, &m1], &sender_state).unwrap();
 
     let (mut j0, _) = Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
@@ -107,7 +107,7 @@ fn uneven_weights_1() {
         senders_weights.clone(),
         0.0, // state fault weight
         None,
-        LatestMsgs::new(),
+        LatestMsgs::empty(),
         1.0,            // subjective fault weight threshold
         HashSet::new(), // equivocators
     );
@@ -115,7 +115,7 @@ fn uneven_weights_1() {
     assert_eq!(
         IntegerWrapper::mk_estimate(
             &LatestMsgsHonest::from_latest_msgs(
-                &LatestMsgs::from(&Justification::new()),
+                &LatestMsgs::from(&Justification::empty()),
                 sender_state.equivocators()
             ),
             &senders_weights,
@@ -123,9 +123,9 @@ fn uneven_weights_1() {
         Err("no msg")
     );
 
-    let m0 = IntegerMsg::new(senders[0], Justification::new(), IntegerWrapper(1));
-    let m1 = IntegerMsg::new(senders[1], Justification::new(), IntegerWrapper(2));
-    let m2 = IntegerMsg::new(senders[2], Justification::new(), IntegerWrapper(3));
+    let m0 = IntegerMsg::new(senders[0], Justification::empty(), IntegerWrapper(1));
+    let m1 = IntegerMsg::new(senders[1], Justification::empty(), IntegerWrapper(2));
+    let m2 = IntegerMsg::new(senders[2], Justification::empty(), IntegerWrapper(3));
     let (m3, _) = IntegerMsg::from_msgs(senders[0], vec![&m0, &m1], &sender_state).unwrap();
 
     let (mut j0, _) = Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
@@ -168,7 +168,7 @@ fn uneven_weights_4() {
         senders_weights.clone(),
         0.0, // state fault weight
         None,
-        LatestMsgs::new(),
+        LatestMsgs::empty(),
         1.0,            // subjective fault weight threshold
         HashSet::new(), // equivocators
     );
@@ -176,7 +176,7 @@ fn uneven_weights_4() {
     assert_eq!(
         IntegerWrapper::mk_estimate(
             &LatestMsgsHonest::from_latest_msgs(
-                &LatestMsgs::from(&Justification::new()),
+                &LatestMsgs::from(&Justification::empty()),
                 sender_state.equivocators()
             ),
             &senders_weights,
@@ -184,10 +184,10 @@ fn uneven_weights_4() {
         Err("no msg")
     );
 
-    let m0 = IntegerMsg::new(senders[0], Justification::new(), IntegerWrapper(1));
-    let m1 = IntegerMsg::new(senders[1], Justification::new(), IntegerWrapper(2));
-    let m2 = IntegerMsg::new(senders[2], Justification::new(), IntegerWrapper(3));
-    let m3 = IntegerMsg::new(senders[3], Justification::new(), IntegerWrapper(4));
+    let m0 = IntegerMsg::new(senders[0], Justification::empty(), IntegerWrapper(1));
+    let m1 = IntegerMsg::new(senders[1], Justification::empty(), IntegerWrapper(2));
+    let m2 = IntegerMsg::new(senders[2], Justification::empty(), IntegerWrapper(3));
+    let m3 = IntegerMsg::new(senders[3], Justification::empty(), IntegerWrapper(4));
 
     let (m4, _) =
         IntegerMsg::from_msgs(senders[3], vec![&m0, &m1, &m2, &m3], &sender_state).unwrap();

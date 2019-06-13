@@ -536,7 +536,7 @@ where
             );
 
             validators.iter().for_each(|validator| {
-                let mut j = Justification::new();
+                let mut j = Justification::empty();
                 let m = Message::new(*validator, j.clone(), votes[*validator as usize].clone());
                 j.insert(m.clone());
                 state.insert(
@@ -835,7 +835,7 @@ proptest! {
             senders_weights.clone(),
             0.0,
             None,
-            LatestMsgs::new(),
+            LatestMsgs::empty(),
             0.0,
             HashSet::new(),
         );
@@ -861,7 +861,7 @@ proptest! {
             senders_weights,
             0.0,
             None,
-            LatestMsgs::new(),
+            LatestMsgs::empty(),
             equivocators.len() as f64,
             HashSet::new(),
         );
