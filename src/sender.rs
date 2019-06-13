@@ -220,7 +220,7 @@ impl<S: self::Trait, U: WeightUnit> Weights<S, U> {
             .unwrap_or(false)
     }
 
-    /// Picks senders with positive weights.
+    /// Picks senders with positive weights striclty greather than zero.
     pub fn senders(&self) -> Result<HashSet<S>, &'static str> {
         self.read()
             .map_err(|_| "Can't unwrap Weights")
