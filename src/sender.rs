@@ -65,8 +65,7 @@ use std::hash::Hash;
 
 use crate::justification::LatestMsgs;
 use crate::message;
-use crate::traits::Zero;
-use crate::util::weight::{SendersWeight, WeightUnit};
+use crate::util::weight::{SendersWeight, WeightUnit, Zero};
 
 /// All casper actors that send messages, aka validators, have to implement the sender trait
 pub trait Trait: Hash + Clone + Ord + Eq + Send + Sync + Debug + serde::Serialize {}

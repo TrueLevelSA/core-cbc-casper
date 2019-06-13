@@ -27,8 +27,8 @@ use casper::justification::{Justification, LatestMsgsHonest};
 use casper::message::{self, Trait};
 #[cfg(feature = "integration_test")]
 use casper::sender;
-use casper::traits::{Estimate, Zero};
-use casper::util::weight::SendersWeight;
+use casper::traits::Estimate;
+use casper::util::weight::{SendersWeight, Zero};
 
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]
 pub struct VoteCount {

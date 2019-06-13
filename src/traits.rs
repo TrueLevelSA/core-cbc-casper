@@ -35,13 +35,3 @@ pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {
         senders_weights: &SendersWeight<<<Self as Estimate>::M as message::Trait>::Sender>,
     ) -> Result<Self, &'static str>;
 }
-
-/// Define how to compare the trait type to zero
-pub trait Zero<T: PartialEq> {
-    const ZERO: T;
-
-    /// returns whether or not the value is equal to zero
-    fn is_zero(val: &T) -> bool {
-        val == &Self::ZERO
-    }
-}
