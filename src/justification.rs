@@ -37,10 +37,10 @@ use std::fmt::{Debug, Formatter};
 
 use rayon::iter::IntoParallelRefIterator;
 
+use crate::estimator::Estimate;
 use crate::message;
 use crate::sender;
-use crate::traits::{Estimate, Zero};
-use crate::util::weight::{SendersWeight, WeightUnit};
+use crate::util::weight::{SendersWeight, WeightUnit, Zero};
 
 /// Struct that holds the set of the `message::Trait` that justify the current message. Works like
 /// a `vec`.

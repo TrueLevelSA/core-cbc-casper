@@ -25,12 +25,13 @@ use std::sync::{Arc, RwLock};
 
 use serde_derive::Serialize;
 
+use crate::estimator::Estimate;
 use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use crate::message::{self, Trait as MTrait};
 use crate::sender;
-use crate::traits::{Estimate, Id, Zero};
 use crate::util::hash::Hash;
-use crate::util::weight::{SendersWeight, WeightUnit};
+use crate::util::id::Id;
+use crate::util::weight::{SendersWeight, WeightUnit, Zero};
 
 /// Casper message (`message::Message`) for a `Block` send by a validator `S: sender::Trait`
 pub type Message<S> = message::Message<Block<S> /*Estimate*/, S /*Sender*/>;

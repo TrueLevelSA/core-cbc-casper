@@ -20,7 +20,16 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, LockResult, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::sender;
-use crate::traits::Zero;
+
+/// Define how to compare the trait type to zero
+pub trait Zero<T: PartialEq> {
+    const ZERO: T;
+
+    /// returns whether or not the value is equal to zero
+    fn is_zero(val: &T) -> bool {
+        val == &Self::ZERO
+    }
+}
 
 pub type WeightUnit = f64;
 

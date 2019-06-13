@@ -17,4 +17,5 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub mod hash;
+pub mod id;
 pub mod weight;

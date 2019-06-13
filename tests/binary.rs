@@ -23,10 +23,10 @@ use common::binary::*;
 
 use std::collections::HashSet;
 
+use casper::estimator::Estimate;
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use casper::message::Trait;
 use casper::sender;
-use casper::traits::Estimate;
 use casper::util::weight::SendersWeight;
 
 #[test]

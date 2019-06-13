@@ -16,12 +16,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use casper::estimator::Estimate;
 use casper::justification::LatestMsgsHonest;
 use casper::message::{self, Trait};
 #[cfg(feature = "integration_test")]
 use casper::sender;
-use casper::traits::{Estimate, Zero};
-use casper::util::weight::{SendersWeight, WeightUnit};
+use casper::util::weight::{SendersWeight, WeightUnit, Zero};
 
 type Validator = u32;
 

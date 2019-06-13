@@ -20,9 +20,9 @@ extern crate casper;
 
 use std::convert::From;
 
+use casper::estimator::Estimate;
 use casper::justification::LatestMsgsHonest;
 use casper::message;
-use casper::traits::Estimate;
 use casper::util::weight::SendersWeight;
 
 type Validator = u32;
