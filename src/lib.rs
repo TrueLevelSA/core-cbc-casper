@@ -1,7 +1,8 @@
 // Core CBC Rust Library
-// Copyright (C) 2018  pZ4 <pz4@protonmail.ch>,
-//                     Lederstrumpf,
-//                     h4sh3d <h4sh3d@truelevel.io>
+// Copyright (C) 2018  Coordination Technology Ltd.
+// Authors: pZ4 <pz4@protonmail.ch>,
+//          Lederstrumpf,
+//          h4sh3d <h4sh3d@truelevel.io>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
