@@ -100,6 +100,8 @@ extern crate proptest;
 #[cfg(feature = "integration_test")]
 extern crate rand;
 extern crate rayon;
+extern crate flame;
+#[macro_use] extern crate flamer;
 
 extern crate bincode;
 extern crate blake2;

@@ -20,10 +20,12 @@
 extern crate casper;
 extern crate proptest;
 extern crate rand;
+extern crate flame;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::iter;
 use std::iter::FromIterator;
+use std::fs::File;
 
 use proptest::prelude::*;
 
@@ -686,6 +688,9 @@ fn blockchain() {
                 },
             )
             .unwrap();
+
+        // Dump the report to disk
+        flame::dump_html(&mut File::create(format!("flame-graph-{}.html", chain_id)).unwrap()).unwrap();
     }
 }
 

@@ -239,37 +239,50 @@ impl<M: message::Trait> LatestMsgs<M> {
     /// Update the data structure by adding a new message. Return true if the new message is a
     /// valid latest message, i.e. the first message of a sender or a message that is not in the
     /// justification of the existing latest messages.
+    #[flame]
     pub fn update(&mut self, new_msg: &M) -> bool {
-        let sender = new_msg.sender();
-        if let Some(latest_msgs_from_sender) = self.get(sender).cloned() {
-            latest_msgs_from_sender
-                .iter()
-                .filter(|&old_msg| new_msg != old_msg)
-                .fold(false, |acc, old_msg| {
-                    let new_independent_from_old = !new_msg.depends(old_msg);
-                    // equivocation, old and new do not depend on each other
-                    if new_independent_from_old && !old_msg.depends(new_msg) {
-                        self.get_mut(sender)
-                            .map(|msgs| msgs.insert(new_msg.clone()))
-                            .unwrap_or(false)
-                            || acc
-                    }
-                    // new actually older than old
-                    else if new_independent_from_old {
-                        false || acc
-                    }
-                    // new newer than old
-                    else {
-                        self.get_mut(sender)
-                            .map(|msgs| msgs.remove(old_msg) && msgs.insert(new_msg.clone()))
-                            .unwrap_or(false)
-                            || acc
-                    }
-                })
+        let sender = flame::span_of("create sender", || new_msg.sender());
+        let msg = flame::span_of("get msg", || self.get(sender).cloned());
+        if let Some(latest_msgs_from_sender) = msg {
+
+            flame::span_of("folding", ||
+                latest_msgs_from_sender
+                    .iter()
+                    .filter(|&old_msg| new_msg != old_msg)
+                    .fold(false, |acc, old_msg| {
+
+                        let new_independent_from_old = flame::span_of("new not depend", || !new_msg.depends(old_msg));
+                        let old_independent_from_new = flame::span_of("old not depend", || !old_msg.depends(new_msg));
+
+                        // equivocation, old and new do not depend on each other
+                        if new_independent_from_old && old_independent_from_new {
+                            flame::span_of("check 1", ||
+                                flame::span_of("map insert", ||
+                                    self.get_mut(sender)
+                                        .map(|msgs| msgs.insert(new_msg.clone()))
+                                        .unwrap_or(false))
+                                || acc)
+                        }
+                        // new actually older than old
+                        else if new_independent_from_old {
+                            flame::span_of("check 2", || false || acc)
+                        }
+                        // new newer than old
+                        else {
+                            flame::span_of("check 3", ||
+                                flame::span_of("map remove insert", ||
+                                    self.get_mut(sender)
+                                        .map(|msgs| msgs.remove(old_msg) && msgs.insert(new_msg.clone()))
+                                        .unwrap_or(false))
+                                || acc)
+                        }
+                    }))
         } else {
-            // no message found for this sender, so new_msg is the latest
-            self.insert(sender.clone(), [new_msg.clone()].iter().cloned().collect());
-            true
+            flame::span_of("insert", || {
+                // no message found for this sender, so new_msg is the latest
+                self.insert(sender.clone(), [new_msg.clone()].iter().cloned().collect());
+                true
+            })
         }
     }
 
@@ -283,9 +296,15 @@ impl<M: message::Trait> LatestMsgs<M> {
 
 impl<'z, M: message::Trait> From<&'z Justification<M>> for LatestMsgs<M> {
     /// Extract the latest messages of each validator from a justification.
+    #[flame]
     fn from(j: &Justification<M>) -> Self {
+        flame::start("LM::empty");
         let mut latest_msgs: LatestMsgs<M> = LatestMsgs::empty();
+        flame::end("LM::empty");
+        flame::start("J::clone");
         let mut queue: VecDeque<M> = j.iter().cloned().collect();
+        flame::end("J::clone");
+        flame::start("Queue::loop");
         while let Some(msg) = queue.pop_front() {
             if latest_msgs.update(&msg) {
                 msg.justification()
@@ -293,6 +312,7 @@ impl<'z, M: message::Trait> From<&'z Justification<M>> for LatestMsgs<M> {
                     .for_each(|m| queue.push_back(m.clone()));
             }
         }
+        flame::end("Queue::loop");
         latest_msgs
     }
 }
