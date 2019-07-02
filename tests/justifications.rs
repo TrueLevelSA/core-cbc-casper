@@ -27,12 +27,11 @@ use std::collections::HashSet;
 use casper::justification::{Justification, LatestMsgs};
 use casper::message::{self, Trait};
 use casper::sender;
-use casper::util::weight::SendersWeight;
 
 #[test]
 fn faulty_inserts_sorted() {
     let senders_weights =
-        SendersWeight::new([(0, 1.0), (1, 2.0), (2, 3.0)].iter().cloned().collect());
+        sender::Weights::new([(0, 1.0), (1, 2.0), (2, 3.0)].iter().cloned().collect());
 
     let v0 = &VoteCount::create_vote_msg(0, false);
     let v0_prime = &VoteCount::create_vote_msg(0, true);
@@ -73,7 +72,7 @@ fn faulty_inserts_sorted() {
 #[test]
 fn faulty_inserts() {
     let senders_weights =
-        SendersWeight::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+        sender::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
     let v0 = &VoteCount::create_vote_msg(0, false);
     let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
     let v1 = &VoteCount::create_vote_msg(1, true);
@@ -190,7 +189,7 @@ fn faulty_inserts() {
         "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the thr doesnt get crossed for the set"
     );
 
-    let senders_weights = SendersWeight::new([].iter().cloned().collect());
+    let senders_weights = sender::Weights::new([].iter().cloned().collect());
     // bug found
     let (success, _) = j1.clone().faulty_insert(
         v0_prime,

@@ -17,164 +17,353 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, LockResult, RwLock, RwLockReadGuard, RwLockWriteGuard};
-
-use crate::sender;
+use std::cmp::Ordering;
+use std::fmt::{self, Display};
+use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 /// Define how to compare the trait type to zero
 pub trait Zero<T: PartialEq> {
     const ZERO: T;
 
-    /// returns whether or not the value is equal to zero
+    /// Returns whether or not the value is equal to zero.
     fn is_zero(val: &T) -> bool {
         val == &Self::ZERO
     }
 }
 
-pub type WeightUnit = f64;
+macro_rules! impl_zero {
+    ( $x:ty, $z:expr ) => {
+        impl Zero<$x> for $x {
+            const ZERO: Self = $z;
 
-impl Zero<WeightUnit> for WeightUnit {
-    const ZERO: Self = 0.0f64;
-
-    fn is_zero(val: &Self) -> bool {
-        val > &-::std::f64::EPSILON && val < &::std::f64::EPSILON
-    }
+            fn is_zero(val: &Self) -> bool {
+                *val == $z
+            }
+        }
+    };
 }
 
-// RwLock locks only before writing, while Mutex locks to both read and write
+impl_zero!(u8, 0u8);
+impl_zero!(u16, 0u16);
+impl_zero!(u32, 0u32);
+impl_zero!(u64, 0u64);
+impl_zero!(i8, 0i8);
+impl_zero!(i16, 0i16);
+impl_zero!(i32, 0i32);
+impl_zero!(i64, 0i64);
 
-#[derive(Clone, Default, Debug)]
-pub struct SendersWeight<S: sender::Trait>(Arc<RwLock<HashMap<S, WeightUnit>>>);
+macro_rules! impl_weight_float {
+    ( $x:ident, $z:expr ) => {
+        impl Zero<$x> for $x {
+            const ZERO: Self = $z;
 
-impl<S: sender::Trait> SendersWeight<S> {
-    /// creates a new SendersWeight from a HashMap
-    pub fn new(senders_weight: HashMap<S, WeightUnit>) -> Self {
-        SendersWeight(Arc::new(RwLock::new(senders_weight)))
-    }
+            fn is_zero(val: &Self) -> bool {
+                val > &-::std::$x::EPSILON && val < &::std::$x::EPSILON
+            }
+        }
 
-    /// same as RwLock read() function
-    /// basically locks the Rwlock with read access
-    /// insert and senders?
-    fn read(&self) -> LockResult<RwLockReadGuard<HashMap<S, WeightUnit>>> {
-        self.0.read()
-    }
+        impl WeightUnit for $x {
+            const NAN: Self = ::std::$x::NAN;
+            const INFINITY: Self = ::std::$x::INFINITY;
+        }
+    };
+}
 
-    /// same as RwLock write() function
-    /// basically locks the RwLock with write access
-    fn write(&self) -> LockResult<RwLockWriteGuard<HashMap<S, WeightUnit>>> {
-        self.0.write()
-    }
+impl_weight_float!(f32, 0f32);
+impl_weight_float!(f64, 0f64);
 
-    /// returns success of insertion. failure happens if cannot unwrap self
-    pub fn insert(&mut self, k: S, v: WeightUnit) -> bool {
-        self.write()
-            .ok()
-            .map(|mut h| {
-                h.insert(k, v);
-                true
-            })
-            .unwrap_or(false)
-    }
+pub trait WeightUnit
+where
+    Self: Zero<Self>
+        + Add<Output = Self>
+        + AddAssign
+        + Sub<Output = Self>
+        + SubAssign
+        + Sized
+        + PartialEq
+        + PartialOrd
+        + Copy,
+{
+    /// Represent not a number
+    const NAN: Self;
+    /// Points to infinity
+    const INFINITY: Self;
+}
 
-    /// picks senders with positive weights
-    pub fn senders(&self) -> Result<HashSet<S>, &'static str> {
-        self.read()
-            .map_err(|_| "Can't unwrap SendersWeight")
-            .map(|senders_weight| {
-                senders_weight
-                    .iter()
-                    .filter_map(|(sender, &weight)| {
-                        if weight > WeightUnit::ZERO {
-                            Some(sender.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect()
-            })
-    }
+// Generic implement of weight with any units that can be added and substracted. This wraps the
+// unit in a system with an infinity point and a "not a number" point used in the algorithmes.
+#[derive(Clone, Copy)]
+pub enum Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    Unit(T),
+    Infinity,
+    NaN,
+}
 
-    /// Gets the weight of the sender
-    /// Returns an Error in case there is a reading error
-    /// or the sender does not exist
-    pub fn weight(&self, sender: &S) -> Result<WeightUnit, &'static str> {
-        self.read()
-            .map_err(|_| "Can't unwrap SendersWeight")
-            .and_then(|weights| match weights.get(sender) {
-                Some(weight) => Ok(weight.clone()),
-                None => Err("Could not find sender"),
-            })
-    }
+impl<T> Zero<Weight<T>> for Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    const ZERO: Self = Weight::Unit(<T as Zero<T>>::ZERO);
 
-    /// returns the total weight of all the senders
-    pub fn sum_weight_senders(&self, senders: &HashSet<S>) -> WeightUnit {
-        senders.iter().fold(WeightUnit::ZERO, |acc, sender| {
-            acc + self.weight(sender).unwrap_or(::std::f64::NAN)
-        })
-    }
+    fn is_zero(val: &Self) -> bool {
+        use Weight::*;
 
-    pub fn sum_all_weights(&self) -> WeightUnit {
-        if let Ok(senders) = self.senders() {
-            self.sum_weight_senders(&senders)
-        } else {
-            ::std::f64::NAN
+        match val {
+            Unit(u) => *u == <T as Zero<T>>::ZERO,
+            _ => false,
         }
     }
 }
 
+impl<T> PartialEq for Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    fn eq(&self, other: &Self) -> bool {
+        use Weight::*;
+
+        match self {
+            Unit(lhs) => match other {
+                Unit(rhs) => lhs == rhs,
+                _ => false,
+            },
+            Infinity => match other {
+                // Inf equal Inf
+                Infinity => true,
+                // not equal to weight or NaN
+                _ => false,
+            },
+            // NaN never equal to something
+            NaN => false,
+        }
+    }
+}
+
+impl<T> PartialOrd for Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        use Weight::*;
+
+        match self {
+            Unit(lhs) => match other {
+                Unit(rhs) => lhs.partial_cmp(rhs),
+                // number always smaller than infinity
+                Infinity => Some(Ordering::Less),
+                // NaN is not comparable
+                NaN => None,
+            },
+            Infinity => match other {
+                Unit(_) => Some(Ordering::Greater),
+                // Inf is equal to Inf
+                Infinity => Some(Ordering::Equal),
+                // NaN is not comparable
+                NaN => None,
+            },
+            // NaN is not comparable
+            NaN => None,
+        }
+    }
+}
+
+impl<T> Add for Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        use Weight::*;
+
+        match self {
+            Unit(lhs) => match other {
+                Unit(rhs) => Unit(lhs + rhs),
+                Infinity => Infinity,
+                NaN => NaN,
+            },
+            Infinity => match other {
+                // NaN is always NaN
+                NaN => NaN,
+                // not NaN + Infinity is always Infinity
+                _ => Infinity,
+            },
+            NaN => NaN,
+        }
+    }
+}
+
+impl<T> AddAssign for Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    fn add_assign(&mut self, other: Self) {
+        *self = *self + other;
+    }
+}
+
+impl<T> Sub for Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        use Weight::*;
+
+        match self {
+            Unit(lhs) => match other {
+                Unit(rhs) => Unit(lhs - rhs),
+                Infinity => Infinity,
+                NaN => NaN,
+            },
+            Infinity => match other {
+                // NaN is always NaN
+                NaN => NaN,
+                // Infinity - Infinity is not a number
+                Infinity => NaN,
+                // Infinity - x is still infinity
+                Unit(_) => Infinity,
+            },
+            NaN => NaN,
+        }
+    }
+}
+
+impl<T> SubAssign for Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    fn sub_assign(&mut self, other: Self) {
+        *self = *self - other;
+    }
+}
+
+impl<T> Display for Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use Weight::*;
+        match self {
+            Unit(int) => write!(f, "{}", int),
+            Infinity => write!(f, "inf"),
+            NaN => write!(f, "NaN"),
+        }
+    }
+}
+
+impl<T> fmt::Debug for Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self)
+    }
+}
+
+impl<T> WeightUnit for Weight<T>
+where
+    T: Zero<T> + Add<Output = T> + Sub<Output = T> + PartialEq + PartialOrd + Copy + Display,
+{
+    const NAN: Self = Weight::NaN;
+    const INFINITY: Self = Weight::Infinity;
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::Weight::{self, *};
+
+    // NaN is converted into string because NaN != NaN and then failed to pass
+    // the tests.
 
     #[test]
-    fn senders() {
-        let senders_weights =
-            SendersWeight::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+    fn addition() {
+        assert_eq!(Unit(2), Unit(1) + Unit(1));
+        assert_eq!(Infinity, Unit(1) + Infinity);
+        assert_eq!(Weight::<u32>::NaN.to_string(), (Unit(1) + NaN).to_string());
         assert_eq!(
-            SendersWeight::senders(&senders_weights).unwrap(),
-            [0, 1, 2].iter().cloned().collect(),
-            "should include senders with valid, positive weight"
+            Weight::<u32>::NaN.to_string(),
+            (Weight::<u32>::NaN + Weight::<u32>::NaN).to_string()
         );
+        assert_eq!(Infinity, Infinity + Unit(1));
+        assert_eq!(
+            Weight::<u32>::NaN.to_string(),
+            (Infinity + Weight::<u32>::NaN).to_string()
+        );
+        assert_eq!(Weight::<u32>::Infinity, Infinity + Infinity);
+    }
 
-        let senders_weights =
-            SendersWeight::new([(0, 0.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+    #[test]
+    fn substraction() {
+        assert_eq!(Unit(0), Unit(1) - Unit(1));
+        assert_eq!(Infinity, Unit(1) - Infinity);
+        assert_eq!(Weight::<u32>::NaN.to_string(), (Unit(1) - NaN).to_string());
         assert_eq!(
-            SendersWeight::senders(&senders_weights).unwrap(),
-            [1, 2].iter().cloned().collect(),
-            "should exclude senders with 0 weight"
+            Weight::<u32>::NaN.to_string(),
+            (Weight::<u32>::NaN - Weight::<u32>::NaN).to_string()
         );
+        assert_eq!(Infinity, Infinity - Unit(1));
+        assert_eq!(
+            Weight::<u32>::NaN.to_string(),
+            (Infinity - Weight::<u32>::NaN).to_string()
+        );
+        assert_eq!(
+            Weight::<u32>::NaN.to_string(),
+            (Infinity - Weight::<u32>::Infinity).to_string()
+        );
+    }
 
-        let senders_weights =
-            SendersWeight::new([(0, 1.0), (1, -1.0), (2, 1.0)].iter().cloned().collect());
-        assert_eq!(
-            SendersWeight::senders(&senders_weights).unwrap(),
-            [0, 2].iter().cloned().collect(),
-            "should exclude senders with negative weight"
-        );
+    #[test]
+    fn equality() {
+        assert_eq!(true, Unit(1) == Unit(1));
+        assert_eq!(false, Unit(1) == Infinity);
+        assert_eq!(false, Unit(1) == NaN);
+        assert_eq!(false, Weight::<u32>::NaN == Weight::<u32>::NaN);
+        assert_eq!(false, Infinity == Weight::<u32>::NaN);
+        assert_eq!(true, Infinity == Weight::<u32>::Infinity);
+    }
 
-        let senders_weights = SendersWeight::new(
-            [(0, ::std::f64::NAN), (1, 1.0), (2, 1.0)]
-                .iter()
-                .cloned()
-                .collect(),
-        );
-        assert_eq!(
-            SendersWeight::senders(&senders_weights).unwrap(),
-            [1, 2].iter().cloned().collect(),
-            "should exclude senders with NAN weight"
-        );
+    #[test]
+    fn greater() {
+        assert_eq!(false, Unit(1) > Unit(1));
+        assert_eq!(true, Unit(1) >= Unit(1));
+        assert_eq!(false, Unit(1) > Weight::<u32>::Infinity);
+        assert_eq!(false, Unit(1) >= Weight::<u32>::Infinity);
+        assert_eq!(false, Unit(1) > Weight::<u32>::NaN);
+        assert_eq!(false, Unit(1) >= Weight::<u32>::NaN);
+        assert_eq!(false, Weight::<u32>::NaN > Weight::<u32>::NaN);
+        assert_eq!(false, Weight::<u32>::NaN >= Weight::<u32>::NaN);
+        assert_eq!(false, Weight::<u32>::Infinity > Weight::<u32>::NaN);
+        assert_eq!(false, Weight::<u32>::Infinity >= Weight::<u32>::NaN);
+        assert_eq!(true, Weight::<u32>::Infinity > Unit(1));
+        assert_eq!(true, Weight::<u32>::Infinity >= Unit(1));
+        assert_eq!(false, Weight::<u32>::Infinity > Weight::<u32>::Infinity);
+        assert_eq!(true, Weight::<u32>::Infinity >= Weight::<u32>::Infinity);
+    }
 
-        let senders_weights = SendersWeight::new(
-            [(0, ::std::f64::INFINITY), (1, 1.0), (2, 1.0)]
-                .iter()
-                .cloned()
-                .collect(),
-        );
-        assert_eq!(
-            SendersWeight::senders(&senders_weights).unwrap(),
-            [0, 1, 2].iter().cloned().collect(),
-            "should include senders with INFINITY weight"
-        );
+    #[test]
+    fn smaller() {
+        assert_eq!(true, Unit(1) <= Unit(1));
+        assert_eq!(false, Unit(1) < Unit(1));
+        assert_eq!(true, Unit(1) <= Weight::<u32>::Infinity);
+        assert_eq!(true, Unit(1) < Weight::<u32>::Infinity);
+        assert_eq!(false, Unit(1) <= Weight::<u32>::NaN);
+        assert_eq!(false, Unit(1) < Weight::<u32>::NaN);
+        assert_eq!(false, Weight::<u32>::NaN <= Weight::<u32>::NaN);
+        assert_eq!(false, Weight::<u32>::NaN < Weight::<u32>::NaN);
+        assert_eq!(false, Weight::<u32>::NaN <= Weight::<u32>::Infinity);
+        assert_eq!(false, Weight::<u32>::NaN < Weight::<u32>::Infinity);
+        assert_eq!(false, Weight::<u32>::NaN <= Unit(1));
+        assert_eq!(false, Weight::<u32>::NaN < Unit(1));
+        assert_eq!(false, Weight::<u32>::Infinity <= Weight::<u32>::NaN);
+        assert_eq!(false, Weight::<u32>::Infinity < Weight::<u32>::NaN);
+        assert_eq!(true, Weight::<u32>::Infinity <= Weight::<u32>::Infinity);
+        assert_eq!(false, Weight::<u32>::Infinity < Weight::<u32>::Infinity);
+        assert_eq!(false, Weight::<u32>::Infinity <= Unit(1));
+        assert_eq!(false, Weight::<u32>::Infinity < Unit(1));
     }
 }
