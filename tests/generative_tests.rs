@@ -330,7 +330,6 @@ fn get_data_from_state(
     (is_consensus_satisfied)
 }
 
-
 /// returns true if at least a safety oracle for a block at height_of_oracle
 /// adds a new data to vec_data for each new message that is sent
 /// uses received_msgs to take note of which validator received which messages
