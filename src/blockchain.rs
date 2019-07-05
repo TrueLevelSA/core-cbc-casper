@@ -58,7 +58,7 @@ pub struct Block<S: sender::Trait>(Arc<ProtoBlock<S>>);
 
 #[cfg(feature = "integration_test")]
 impl<S: sender::Trait + Into<S>> From<S> for Block<S> {
-    fn from(sender: S) -> Self {
+    fn from(_sender: S) -> Self {
         Block::from(ProtoBlock::new(None))
     }
 }

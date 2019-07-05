@@ -159,50 +159,12 @@ where
     result
 }
 
-/// sender strategy that selects all the senders
-fn max_overhead(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
-    Just(val.iter().cloned().collect()).boxed()
-}
-
 /// sender strategy that selects one validator at each step, in a round robin manner
 fn round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
     let v = val.pop().unwrap();
     val.insert(0, v);
     let mut hashset = HashSet::new();
     hashset.insert(v);
-    Just(hashset).boxed()
-}
-
-/// sender strategy that selects two validators in a weaved round robin manner
-/// senders in a single step are selected in such a way that they are at a maximal distance between
-/// each other
-/// for example, if we have validators [1,2,3,4,5,6], selected validators will be:
-/// (1, 4), (2, 5), (3, 6), and further equivalent permutations
-fn double_round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
-    let v = val.pop().unwrap();
-    val.insert(0, v);
-    let mut hashset = HashSet::new();
-    hashset.insert(v);
-    let offset = val.len() / 2;
-    hashset.insert(val[offset]);
-    Just(hashset).boxed()
-}
-
-/// sender strategy that selects three validators in a weaved round robin manner
-/// senders in a single step are selected in such a way that they are at a maximal distance between
-/// each other
-/// for example, if we have validators [1,2,3,4,5,6], selected validators will be:
-/// (1, 3, 5), (2, 4, 6), and further equivalent permutations
-fn triple_round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
-    let v = val.pop().unwrap();
-    val.insert(0, v);
-    let mut hashset = HashSet::new();
-    hashset.insert(v);
-    let offset = val.len() / 3;
-    hashset.insert(val[offset]);
-
-    let offset = (offset * 2) % val.len();
-    hashset.insert(val[offset]);
     Just(hashset).boxed()
 }
 
@@ -228,34 +190,10 @@ fn some_receivers(_sender: &u32, possible_senders: &Vec<u32>, rng: &mut TestRng)
     // FIXME: this is constant time, however the number of receivers is not uniform as we always
     // pick from the same vec of senders and put them in a hashset, there are some collisons
     for _ in 0..n {
-        receivers.insert(*rng.choose(possible_senders).unwrap());
+        receivers.insert(possible_senders.choose(rng).unwrap().clone());
     }
 
     receivers
-}
-
-/// receiver strategy that picks half the receiver set at random
-/// if |receiver set| is odd, then either |r_s|/2 or |r_s|/2 + 1 receivers are picked
-fn half_receivers(_sender: &u32, possible_senders: &Vec<u32>, rng: &mut TestRng) -> HashSet<u32> {
-    let n = possible_senders.len() / 2;
-    let n = if n <= 0 {
-        1
-    } else {
-        // if we have an odd number of validators, we either pick len/2 or len/2 +1
-        if n * 2 != possible_senders.len() {
-            let offset = rng.gen_range(0, 2);
-            n + offset
-        } else {
-            n
-        }
-    };
-    let mut v_senders = possible_senders.clone();
-    let mut hashset = HashSet::new();
-    for i in 0..n {
-        let index = rng.gen_range(0, v_senders.len());
-        hashset.insert(v_senders.remove(index));
-    }
-    hashset
 }
 
 /// receiver strategy that picks all the receivers
@@ -334,20 +272,6 @@ where
 }
 
 /// Returns true when at least one validator picks a block at the specified height
-fn run_until_height(
-    state: &HashMap<u32, sender::State<blockchain::Message<u32>, f64>>,
-    height: &u32,
-    _vec_data: &mut Vec<ChainData>,
-    _chain_id: u32,
-) -> bool {
-    let v: Vec<bool> = tools::heights_from_state(state)
-        .iter()
-        .map(|v| v >= height)
-        .collect();
-
-    v.contains(&true)
-}
-
 /// performs safety oracle search and adds information to the data parameter
 /// info added: consensus_height and longest_chain
 /// return true if some safety oracle is detected at max_heaight_of_oracle
@@ -406,30 +330,6 @@ fn get_data_from_state(
     (is_consensus_satisfied)
 }
 
-fn safety_oracle(
-    state: &HashMap<u32, sender::State<blockchain::Message<u32>, f64>>,
-    _height_of_oracle: &u32,
-    _vec_data: &mut Vec<ChainData>,
-    _chain_id: u32,
-) -> bool {
-    let safety_oracle_detected: HashSet<bool> = state
-        .iter()
-        .map(|(_, sender_state)| {
-            let latest_honest_msgs =
-                LatestMsgsHonest::from_latest_msgs(sender_state.latests_msgs(), &HashSet::new());
-            let genesis_block = Block::new(None);
-            let safety_threshold = (sender_state.senders_weights().sum_all_weights()) / 2.0;
-            Block::safety_oracles(
-                genesis_block,
-                &latest_honest_msgs,
-                &HashSet::new(),
-                safety_threshold,
-                sender_state.senders_weights(),
-            ) != HashSet::new()
-        })
-        .collect();
-    safety_oracle_detected.contains(&true)
-}
 
 /// returns true if at least a safety oracle for a block at height_of_oracle
 /// adds a new data to vec_data for each new message that is sent
