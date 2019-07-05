@@ -271,7 +271,6 @@ where
     m.len() == 1
 }
 
-/// Returns true when at least one validator picks a block at the specified height
 /// performs safety oracle search and adds information to the data parameter
 /// info added: consensus_height and longest_chain
 /// return true if some safety oracle is detected at max_heaight_of_oracle
