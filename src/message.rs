@@ -50,7 +50,7 @@ use std::sync::{Arc, RwLock};
 use rayon::prelude::*;
 use serde::Serialize;
 
-use crate::estimator::Estimate;
+use crate::estimator::Estimator;
 use crate::justification::{Justification, LatestMsgsHonest};
 use crate::sender;
 use crate::util::hash::Hash;
@@ -65,7 +65,7 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
 
     /// Defines the estimate type, or value, contained in that message
     /// The estimate type must be compatible with `message::Trait`
-    type Estimate: Estimate<M = Self>;
+    type Estimate: Estimator<M = Self>;
 
     /// Returns the validator, or sender, who sent this message
     fn sender(&self) -> &Self::Sender;
@@ -194,7 +194,7 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
 #[derive(Clone, Default, Eq, PartialEq)]
 struct ProtoMsg<E, S>
 where
-    E: Estimate<M = Message<E, S>>,
+    E: Estimator<M = Message<E, S>>,
     S: sender::Trait,
 {
     estimate: E,
@@ -204,7 +204,7 @@ where
 
 impl<E, S> Id for ProtoMsg<E, S>
 where
-    E: Estimate<M = Message<E, S>>,
+    E: Estimator<M = Message<E, S>>,
     S: sender::Trait,
 {
     type ID = Hash;
@@ -212,7 +212,7 @@ where
 
 impl<E, S> Serialize for ProtoMsg<E, S>
 where
-    E: Estimate<M = Message<E, S>>,
+    E: Estimator<M = Message<E, S>>,
     S: sender::Trait,
 {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
@@ -259,12 +259,12 @@ where
 #[derive(Eq, Clone, Default)]
 pub struct Message<E, S>(Arc<ProtoMsg<E, S>>, Hash)
 where
-    E: Estimate<M = Message<E, S>>,
+    E: Estimator<M = Message<E, S>>,
     S: sender::Trait;
 
 impl<E, S> Id for Message<E, S>
 where
-    E: Estimate<M = Self>,
+    E: Estimator<M = Self>,
     S: sender::Trait,
 {
     type ID = Hash;
@@ -277,7 +277,7 @@ where
 
 impl<E, S> Serialize for Message<E, S>
 where
-    E: Estimate<M = Self>,
+    E: Estimator<M = Self>,
     S: sender::Trait,
 {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
@@ -287,7 +287,7 @@ where
 
 impl<E, S> self::Trait for Message<E, S>
 where
-    E: Estimate<M = Self>,
+    E: Estimator<M = Self>,
     S: sender::Trait,
 {
     type Estimate = E;
@@ -319,7 +319,7 @@ where
 
 impl<E, S> std::hash::Hash for Message<E, S>
 where
-    E: Estimate<M = Self>,
+    E: Estimator<M = Self>,
     S: sender::Trait,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -329,7 +329,7 @@ where
 
 impl<E, S> PartialEq for Message<E, S>
 where
-    E: Estimate<M = Self>,
+    E: Estimator<M = Self>,
     S: sender::Trait,
 {
     fn eq(&self, rhs: &Self) -> bool {
@@ -339,7 +339,7 @@ where
 
 impl<E, S> Debug for Message<E, S>
 where
-    E: Estimate<M = Self>,
+    E: Estimator<M = Self>,
     S: sender::Trait,
 {
     // Note: format used for rendering illustrative gifs from generative tests; modify with care

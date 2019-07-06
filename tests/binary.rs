@@ -24,7 +24,7 @@ use common::binary::*;
 
 use std::collections::HashSet;
 
-use casper::estimator::Estimate;
+use casper::estimator::Estimator;
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use casper::message::Trait;
 use casper::sender;
@@ -57,7 +57,7 @@ fn equal_weight() {
     let (m3, _) = BinaryMsg::from_msgs(senders[0], vec![&m0, &m1], &sender_state).unwrap();
 
     assert_eq!(
-        BoolWrapper::mk_estimate(
+        BoolWrapper::estimate(
             &LatestMsgsHonest::from_latest_msgs(
                 &LatestMsgs::from(&Justification::empty()),
                 sender_state.equivocators()

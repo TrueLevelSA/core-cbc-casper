@@ -35,7 +35,7 @@ use rand::seq::SliceRandom;
 use rand::thread_rng;
 
 use casper::blockchain::{self, Block};
-use casper::estimator::Estimate;
+use casper::estimator::Estimator;
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use casper::message::{self, Message, Trait};
 use casper::sender;
@@ -500,7 +500,7 @@ fn chain<E: 'static, F: 'static, H: 'static>(
     chain_id: u32,
 ) -> BoxedStrategy<Vec<Result<HashMap<u32, sender::State<Message<E, u32>, f64>>, &'static str>>>
 where
-    E: Estimate<M = Message<E, u32>> + From<u32>,
+    E: Estimator<M = Message<E, u32>> + From<u32>,
     F: Fn(&mut Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
     //G: Fn(&Vec<u32>, BoxedStrategy<HashSet<u32>>) -> BoxedStrategy<HashMap<u32, HashSet<u32>>>,
     H: Fn(

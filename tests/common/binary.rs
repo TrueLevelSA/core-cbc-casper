@@ -17,7 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use casper::estimator::Estimate;
+use casper::estimator::Estimator;
 use casper::justification::LatestMsgsHonest;
 use casper::message::{self, Trait};
 use casper::sender;
@@ -44,11 +44,11 @@ impl<S: sender::Trait> From<S> for BoolWrapper {
 
 pub type BinaryMsg = message::Message<BoolWrapper /*Estimate*/, Validator /*Sender*/>;
 
-impl Estimate for BoolWrapper {
+impl Estimator for BoolWrapper {
     type M = BinaryMsg;
 
     /// Weighted count of the votes contained in the latest messages.
-    fn mk_estimate<U: WeightUnit>(
+    fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<BinaryMsg>,
         senders_weights: &sender::Weights<Validator, U>,
     ) -> Result<Self, &'static str> {

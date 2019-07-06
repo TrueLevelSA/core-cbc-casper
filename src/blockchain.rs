@@ -26,7 +26,7 @@ use std::sync::{Arc, RwLock};
 
 use serde_derive::Serialize;
 
-use crate::estimator::Estimate;
+use crate::estimator::Estimator;
 use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use crate::message::{self, Trait as MTrait};
 use crate::sender;
@@ -108,12 +108,12 @@ impl<'z, S: sender::Trait> From<&'z Message<S>> for Block<S> {
     }
 }
 
-impl<S: sender::Trait> Estimate for Block<S> {
+impl<S: sender::Trait> Estimator for Block<S> {
     type M = Message<S>;
 
-    fn mk_estimate<U: WeightUnit>(
+    fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        senders_weights: &sender::Weights<<<Self as Estimate>::M as message::Trait>::Sender, U>,
+        senders_weights: &sender::Weights<<<Self as Estimator>::M as message::Trait>::Sender, U>,
     ) -> Result<Self, &'static str> {
         let prevblock = Block::ghost(latest_msgs, senders_weights)?;
         Ok(Block::from(ProtoBlock::new(Some(prevblock))))

@@ -21,7 +21,7 @@ extern crate casper;
 
 use std::convert::From;
 
-use casper::estimator::Estimate;
+use casper::estimator::Estimator;
 use casper::justification::LatestMsgsHonest;
 use casper::message;
 use casper::sender;
@@ -61,10 +61,10 @@ impl<U: WeightUnit> From<((Value, U), (Value, U), (Value, U))> for Value {
     }
 }
 
-impl Estimate for Value {
+impl Estimator for Value {
     type M = Message;
 
-    fn mk_estimate<U: WeightUnit>(
+    fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Message>,
         senders_weights: &sender::Weights<Validator, U>,
     ) -> Result<Self, &'static str> {

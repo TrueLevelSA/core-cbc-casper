@@ -24,7 +24,7 @@ use std::ops::Add;
 #[cfg(feature = "integration_test")]
 use proptest::prelude::*;
 
-use casper::estimator::Estimate;
+use casper::estimator::Estimator;
 use casper::justification::{Justification, LatestMsgsHonest};
 use casper::message::{self, Trait};
 use casper::sender;
@@ -161,7 +161,7 @@ pub type VoteMsg = message::Message<VoteCount, Voter>;
 
 //impl Sender for Voter {}
 
-impl Estimate for VoteCount {
+impl Estimator for VoteCount {
     // the estimator just counts votes, which in this case are the unjustified
     // msgs
     type M = VoteMsg;
@@ -170,7 +170,7 @@ impl Estimate for VoteCount {
     // mk_estimate, as it takes an Option
     // type Data = Self;
 
-    fn mk_estimate<U: WeightUnit>(
+    fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         _weights: &sender::Weights<Voter, U>, // all voters have same weight
     ) -> Result<Self, &'static str> {
