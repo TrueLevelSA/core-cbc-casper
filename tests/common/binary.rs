@@ -42,7 +42,7 @@ impl<S: sender::Trait> From<S> for BoolWrapper {
     }
 }
 
-pub type BinaryMsg = message::Message<BoolWrapper /*Estimate*/, Validator /*Sender*/>;
+pub type BinaryMsg = message::Message<BoolWrapper /*Estimator*/, Validator /*Sender*/>;
 
 impl Estimator for BoolWrapper {
     type M = BinaryMsg;

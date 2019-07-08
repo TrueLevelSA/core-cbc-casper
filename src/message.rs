@@ -57,7 +57,7 @@ use crate::util::hash::Hash;
 use crate::util::id::Id;
 use crate::util::weight::WeightUnit;
 
-/// Abstraction of a Casper message, contain a value (`Estimate`) that will be sent over the
+/// Abstraction of a Casper message, contain a value (`Estimator`) that will be sent over the
 /// network by validators (`sender::Trait`) and used as `Justification` for a more recent messages.
 pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize {
     /// Defines the validator type that generated this message
@@ -227,7 +227,7 @@ where
     }
 }
 
-/// Concrete Casper message implementing `message::Trait` containing a value as `Estimate`, a
+/// Concrete Casper message implementing `message::Trait` containing a value as `Estimator`, a
 /// validator as `sender::Trait`, and a justification as `Justification`.
 ///
 /// # Example
@@ -247,14 +247,14 @@ where
 ///     Two = 2,
 /// };
 ///
-/// // Implement Estimate for Value...
+/// // Implement Estimator for Value...
 ///
 /// type Validator = u64;
 ///
 /// type Message = message::Message<Value, Validator>;
 /// ```
 ///
-/// `Value` must implement `Estimate` to be valid for a `message::Message` and to produce
+/// `Value` must implement `Estimator` to be valid for a `message::Message` and to produce
 /// estimates.
 #[derive(Eq, Clone, Default)]
 pub struct Message<E, S>(Arc<ProtoMsg<E, S>>, Hash)

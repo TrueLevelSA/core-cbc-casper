@@ -19,9 +19,9 @@
 
 //! ## Validators
 //!
-//! Validators produce and recieve messages (`message::Trait`) from other validators in the
+//! Validators produce and receive messages (`message::Trait`) from other validators in the
 //! network. When a validator want to produce a message he needs to collect his justification
-//! (`Justification`) and run an estimator (`Estimate`) to get a value. See [§ Estimator
+//! (`Justification`) and run an estimator (`Estimator`) to get a value. See [§ Estimator
 //! Function](../justification/index.html#estimator-function) in § Justification.
 //!
 //! ## Consensus Rules

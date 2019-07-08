@@ -40,9 +40,9 @@
 //!
 //! To benefit from the CBC Casper safety proofs this library builds upon, developers have to
 //! implement `message::Trait`. This trait in turn requires implementing other traits in this
-//! library, such as the `sender::Trait` for validators, and the `Estimate` trait for the estimate.
+//! library, such as the `sender::Trait` for validators, and the `Estimator` trait for the estimate.
 //!
-//! One generic type implements the `message::Trait`, namely `message::Message<Estimate,
+//! One generic type implements the `message::Trait`, namely `message::Message<Estimator,
 //! sender::Trait>`, and can be used to helps getting to a compliant `message::Trait` concrete type
 //! implementation easily.
 //!
@@ -64,7 +64,7 @@
 //! ## Example
 //!
 //! We present an example of naive consensus protocol: a ternary consensus that uses the generic
-//! type `message::Message<Estimate, sender::Trait>` implementation to generate the protocol.
+//! type `message::Message<Estimator, sender::Trait>` implementation to generate the protocol.
 //!
 //! ## Known limitations
 //!

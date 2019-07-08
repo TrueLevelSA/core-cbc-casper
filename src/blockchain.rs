@@ -35,7 +35,7 @@ use crate::util::id::Id;
 use crate::util::weight::{WeightUnit, Zero};
 
 /// Casper message (`message::Message`) for a `Block` send by a validator `S: sender::Trait`
-pub type Message<S> = message::Message<Block<S> /*Estimate*/, S /*Sender*/>;
+pub type Message<S> = message::Message<Block<S> /*Estimator*/, S /*Sender*/>;
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize)]
 struct ProtoBlock<S: sender::Trait> {
@@ -132,7 +132,7 @@ impl<S: sender::Trait> Block<S> {
     /// Create a new block from a prevblock message and an incomplete block.
     pub fn from_prevblock_msg(
         prevblock_msg: Option<Message<S>>,
-        // a incomplete_block is a block with a None prevblock (ie, Estimate) AND is not a
+        // a incomplete_block is a block with a None prevblock (ie, Estimator) AND is not a
         // genesis_block
         incomplete_block: Block<S>,
     ) -> Self {
