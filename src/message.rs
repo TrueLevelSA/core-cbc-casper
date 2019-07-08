@@ -65,13 +65,13 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
 
     /// Defines the estimate type, or value, contained in that message
     /// The estimate type must be compatible with `message::Trait`
-    type Estimate: Estimator<M = Self>;
+    type Estimator: Estimator<M = Self>;
 
     /// Returns the validator, or sender, who sent this message
     fn sender(&self) -> &Self::Sender;
 
     /// Returns the estimate, or value, of this message
-    fn estimate(&self) -> &Self::Estimate;
+    fn estimate(&self) -> &Self::Estimator;
 
     /// Returns the justification of this message
     fn justification<'z>(&'z self) -> &'z Justification<Self>;
@@ -80,7 +80,7 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
     fn new(
         sender: Self::Sender,
         justification: Justification<Self>,
-        estimate: Self::Estimate,
+        estimate: Self::Estimator,
     ) -> Self;
 
     /// Create a message from newly received messages.
@@ -290,14 +290,14 @@ where
     E: Estimator<M = Self>,
     S: sender::Trait,
 {
-    type Estimate = E;
+    type Estimator = E;
     type Sender = S;
 
     fn sender(&self) -> &Self::Sender {
         &self.0.sender
     }
 
-    fn estimate(&self) -> &Self::Estimate {
+    fn estimate(&self) -> &Self::Estimator {
         &self.0.estimate
     }
 
