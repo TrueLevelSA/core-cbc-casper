@@ -45,7 +45,8 @@ impl<S: sender::Trait> From<S> for IntegerWrapper {
     }
 }
 
-pub type IntegerMsg = message::Message<IntegerWrapper /*Estimator*/, Validator /*Sender*/>;
+pub type IntegerMsg =
+    message::Message<IntegerWrapper /*Estimator*/, Validator /*Sender*/>;
 
 #[derive(Clone, Eq, Debug, Ord, PartialOrd, PartialEq, Hash)]
 pub struct Tx;

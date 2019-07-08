@@ -29,7 +29,7 @@ use crate::util::weight::WeightUnit;
 /// allows to produce an estimate given the set of latest messages and the set of validators and
 /// their weights.
 pub trait Estimator: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {
-    type M: message::Trait<Estimator= Self>;
+    type M: message::Trait<Estimator = Self>;
 
     /// Choses an estimate from a set of latest messages.
     fn estimate<U: WeightUnit>(
