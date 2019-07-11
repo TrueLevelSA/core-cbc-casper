@@ -26,7 +26,7 @@ use std::sync::{Arc, RwLock};
 
 use serde_derive::Serialize;
 
-use crate::estimator::Estimate;
+use crate::estimator::Estimator;
 use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use crate::message::{self, Trait as MTrait};
 use crate::sender;
@@ -35,7 +35,7 @@ use crate::util::id::Id;
 use crate::util::weight::{WeightUnit, Zero};
 
 /// Casper message (`message::Message`) for a `Block` send by a validator `S: sender::Trait`
-pub type Message<S> = message::Message<Block<S> /*Estimate*/, S /*Sender*/>;
+pub type Message<S> = message::Message<Block<S> /*Estimator*/, S /*Sender*/>;
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize)]
 struct ProtoBlock<S: sender::Trait> {
@@ -108,12 +108,12 @@ impl<'z, S: sender::Trait> From<&'z Message<S>> for Block<S> {
     }
 }
 
-impl<S: sender::Trait> Estimate for Block<S> {
+impl<S: sender::Trait> Estimator for Block<S> {
     type M = Message<S>;
 
-    fn mk_estimate<U: WeightUnit>(
+    fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        senders_weights: &sender::Weights<<<Self as Estimate>::M as message::Trait>::Sender, U>,
+        senders_weights: &sender::Weights<<<Self as Estimator>::M as message::Trait>::Sender, U>,
     ) -> Result<Self, &'static str> {
         let prevblock = Block::ghost(latest_msgs, senders_weights)?;
         Ok(Block::from(ProtoBlock::new(Some(prevblock))))
@@ -132,7 +132,7 @@ impl<S: sender::Trait> Block<S> {
     /// Create a new block from a prevblock message and an incomplete block.
     pub fn from_prevblock_msg(
         prevblock_msg: Option<Message<S>>,
-        // a incomplete_block is a block with a None prevblock (ie, Estimate) AND is not a
+        // a incomplete_block is a block with a None prevblock (ie, Estimator) AND is not a
         // genesis_block
         incomplete_block: Block<S>,
     ) -> Self {

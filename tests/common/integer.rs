@@ -20,7 +20,7 @@
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
-use casper::estimator::Estimate;
+use casper::estimator::Estimator;
 use casper::justification::LatestMsgsHonest;
 use casper::message::{self, Trait};
 use casper::sender;
@@ -45,16 +45,17 @@ impl<S: sender::Trait> From<S> for IntegerWrapper {
     }
 }
 
-pub type IntegerMsg = message::Message<IntegerWrapper /*Estimate*/, Validator /*Sender*/>;
+pub type IntegerMsg =
+    message::Message<IntegerWrapper /*Estimator*/, Validator /*Sender*/>;
 
 #[derive(Clone, Eq, Debug, Ord, PartialOrd, PartialEq, Hash)]
 pub struct Tx;
 
 /// the goal here is to find the weighted median of all the values
-impl Estimate for IntegerWrapper {
+impl Estimator for IntegerWrapper {
     type M = IntegerMsg;
 
-    fn mk_estimate<U: WeightUnit>(
+    fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<IntegerMsg>,
         senders_weights: &sender::Weights<Validator, U>,
     ) -> Result<Self, &'static str> {

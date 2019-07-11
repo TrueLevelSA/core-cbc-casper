@@ -28,12 +28,12 @@ use crate::util::weight::WeightUnit;
 /// Describes an estimate, or a value of the consensus at a certain time. Implementing this trait
 /// allows to produce an estimate given the set of latest messages and the set of validators and
 /// their weights.
-pub trait Estimate: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {
-    type M: message::Trait<Estimate = Self>;
+pub trait Estimator: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {
+    type M: message::Trait<Estimator = Self>;
 
     /// Choses an estimate from a set of latest messages.
-    fn mk_estimate<U: WeightUnit>(
+    fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        senders_weights: &sender::Weights<<<Self as Estimate>::M as message::Trait>::Sender, U>,
+        senders_weights: &sender::Weights<<<Self as Estimator>::M as message::Trait>::Sender, U>,
     ) -> Result<Self, &'static str>;
 }

@@ -26,10 +26,10 @@ comparing with efficient implementations.
 To benefit from the CBC Casper safety proofs this library builds upon,
 developers have to implement `message::Trait`. This trait in turn requires
 implementing other traits in this library, such as the `sender::Trait` trait for
-validators, and the `Estimate` trait for the estimate.
+validators, and the `Estimator` trait for the estimate.
 
 One generic type implements the `message::Trait`, namely
-`message::Message<Estimate, sender::Trait>`, and can be used to helps getting to
+`message::Message<Estimator, sender::Trait>`, and can be used to helps getting to
 a compliant `message::Trait` concrete type implementation easily.
 
 We also present a basic blockchain implementation heavily under developement.
@@ -51,7 +51,7 @@ casper = { git = "https://github.com/TrueLevelSA/cbc-casper-msg" }
 ## Example
 
 We present an example of naive consensus protocol: a ternary consensus that uses
-the generic type `message::Message<Estimate, sender::Trait>` implementation to
+the generic type `message::Message<Estimator, sender::Trait>` implementation to
 generate the protocol.
 
 ## Known limitations

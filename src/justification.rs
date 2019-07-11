@@ -38,7 +38,7 @@ use std::fmt::{Debug, Formatter};
 
 use rayon::iter::IntoParallelRefIterator;
 
-use crate::estimator::Estimate;
+use crate::estimator::Estimator;
 use crate::message;
 use crate::sender;
 use crate::util::weight::{WeightUnit, Zero};
@@ -96,10 +96,10 @@ impl<M: message::Trait> Justification<M> {
         &self,
         equivocators: &HashSet<M::Sender>,
         senders_weights: &sender::Weights<<M as message::Trait>::Sender, U>,
-    ) -> Result<M::Estimate, &'static str> {
+    ) -> Result<M::Estimator, &'static str> {
         let latest_msgs = LatestMsgs::from(self);
         let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(&latest_msgs, equivocators);
-        M::Estimate::mk_estimate(&latest_msgs_honest, senders_weights)
+        M::Estimator::estimate(&latest_msgs_honest, senders_weights)
     }
 
     /// Insert messages to the justification, accepting up to the threshold faults by weight.
@@ -352,7 +352,7 @@ impl<M: message::Trait> LatestMsgsHonest<M> {
     pub fn mk_estimate<U: WeightUnit>(
         &self,
         senders_weights: &sender::Weights<<M as message::Trait>::Sender, U>,
-    ) -> Result<M::Estimate, &'static str> {
-        M::Estimate::mk_estimate(&self, senders_weights)
+    ) -> Result<M::Estimator, &'static str> {
+        M::Estimator::estimate(&self, senders_weights)
     }
 }

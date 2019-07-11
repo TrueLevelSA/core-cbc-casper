@@ -24,7 +24,7 @@ use common::integer::*;
 
 use std::collections::HashSet;
 
-use casper::estimator::Estimate;
+use casper::estimator::Estimator;
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use casper::message::Trait;
 use casper::sender;
@@ -52,7 +52,7 @@ fn equal_weight() {
     );
 
     assert_eq!(
-        IntegerWrapper::mk_estimate(
+        IntegerWrapper::estimate(
             &LatestMsgsHonest::from_latest_msgs(
                 &LatestMsgs::from(&Justification::empty()),
                 sender_state.equivocators()
@@ -113,7 +113,7 @@ fn uneven_weights_1() {
     );
 
     assert_eq!(
-        IntegerWrapper::mk_estimate(
+        IntegerWrapper::estimate(
             &LatestMsgsHonest::from_latest_msgs(
                 &LatestMsgs::from(&Justification::empty()),
                 sender_state.equivocators()
@@ -174,7 +174,7 @@ fn uneven_weights_4() {
     );
 
     assert_eq!(
-        IntegerWrapper::mk_estimate(
+        IntegerWrapper::estimate(
             &LatestMsgsHonest::from_latest_msgs(
                 &LatestMsgs::from(&Justification::empty()),
                 sender_state.equivocators()
