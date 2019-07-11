@@ -214,7 +214,7 @@ fn arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
 /// sender strategy that picks some number of validators in the set at random, in a uniform manner
 fn parallel_arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
     let validators = val.clone();
-    prop::sample::select((1..validators.len()).collect::<Vec<usize>>())
+    prop::sample::select((1..=validators.len()).collect::<Vec<usize>>())
         .prop_flat_map(move |val_count| {
             prop::collection::hash_set(prop::sample::select(validators.clone()), val_count)
         })
@@ -753,7 +753,7 @@ proptest! {
 }
 
 proptest! {
-    #![proptest_config(Config::with_cases(1))]
+    #![proptest_config(Config::with_cases(100))]
     #[test]
     fn parallel_arbitrary_messenger_vote_count(ref chain in chain(VoteCount::arbitrary(), 8, parallel_arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
         // total messages until unilateral consensus
