@@ -19,7 +19,8 @@
 
 extern crate casper;
 
-mod common;
+// Explicitly allowing dead code here because of https://gitlab.com/TrueLevel/casper/core-cbc/issues/43
+#[allow(dead_code)] mod common;
 use common::integer::*;
 
 use std::collections::HashSet;
