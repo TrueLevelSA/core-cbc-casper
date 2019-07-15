@@ -197,7 +197,7 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
                 if !self.equivocators.contains(sender) && self.latest_msgs.equivocate(msg) {
                     self.senders_weights.weight(sender).map(|w| (msg, w)).ok()
                 } else {
-                    Some((msg, <U as Zero<U>>::ZERO))
+                    Some((msg, Some(<U as Zero<U>>::ZERO)))
                 }
             })
             .collect();
@@ -276,7 +276,7 @@ impl<S: self::Trait, U: WeightUnit> Weights<S, U> {
     /// Returns the total weight of all the given senders.
     pub fn sum_weight_senders(&self, senders: &HashSet<S>) -> U {
         senders.iter().fold(<U as Zero<U>>::ZERO, |acc, sender| {
-            acc + self.weight(sender).unwrap_or(U::NAN)
+            acc + self.weight(sender).unwrap_or(None).unwrap_or(U::NAN)
         })
     }
 

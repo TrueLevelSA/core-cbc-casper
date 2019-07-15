@@ -130,7 +130,11 @@ impl<M: message::Trait> Justification<M> {
         let is_equivocation = state.latest_msgs.equivocate(msg);
 
         let sender = msg.sender();
-        let sender_weight = state.senders_weights.weight(sender).unwrap_or(U::INFINITY);
+        let sender_weight = state
+            .senders_weights
+            .weight(sender)
+            .unwrap_or(None)
+            .unwrap_or(U::INFINITY);
 
         let already_in_equivocators = state.equivocators.contains(sender);
 
