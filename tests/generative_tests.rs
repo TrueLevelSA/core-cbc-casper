@@ -753,7 +753,7 @@ proptest! {
 }
 
 proptest! {
-    #![proptest_config(Config::with_cases(100))]
+    #![proptest_config(Config::with_cases(1))]
     #[test]
     fn parallel_arbitrary_messenger_vote_count(ref chain in chain(VoteCount::arbitrary(), 8, parallel_arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
         // total messages until unilateral consensus
