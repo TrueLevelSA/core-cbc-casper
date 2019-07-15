@@ -42,7 +42,8 @@ use casper::sender;
 use casper::util::weight::WeightUnit;
 
 // Explicitly allowing dead code here because of https://gitlab.com/TrueLevel/casper/core-cbc/issues/43
-#[allow(dead_code)] mod common;
+#[allow(dead_code)]
+mod common;
 use common::binary::BoolWrapper;
 use common::integer::IntegerWrapper;
 use common::vote_count::VoteCount;
