@@ -249,7 +249,7 @@ impl<S: sender::Trait> Block<S> {
             .filter(|x| {
                 x.iter().fold(<U as Zero<U>>::ZERO, |acc, sender| {
                     // FIXME: U::default() or <U ...>::Zero? or U::NAN
-                    acc + weights.weight(sender).unwrap_or(U::NAN)
+                    acc + weights.weight(sender).unwrap_or(None).unwrap_or(U::NAN)
                 }) > safety_oracle_threshold
             })
             .collect()

@@ -63,7 +63,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::sync::{Arc, LockResult, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{Arc, LockResult, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::justification::LatestMsgs;
 use crate::message;
@@ -170,7 +170,7 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
                 if !self.equivocators.contains(sender) && self.latest_msgs.equivocate(msg) {
                     self.senders_weights.weight(sender).map(|w| (msg, w)).ok()
                 } else {
-                    Some((msg, <U as Zero<U>>::ZERO))
+                    Some((msg, Some(<U as Zero<U>>::ZERO)))
                 }
             })
             .collect();
@@ -222,9 +222,8 @@ impl<S: self::Trait, U: WeightUnit> Weights<S, U> {
     }
 
     /// Picks senders with positive weights striclty greather than zero.
-    pub fn senders(&self) -> Result<HashSet<S>, &'static str> {
+    pub fn senders(&self) -> Result<HashSet<S>, PoisonError<RwLockReadGuard<HashMap<S, U>>>> {
         self.read()
-            .map_err(|_| "Can't unwrap Weights")
             .map(|senders_weight| {
                 senders_weight
                     .iter()
@@ -241,19 +240,18 @@ impl<S: self::Trait, U: WeightUnit> Weights<S, U> {
 
     /// Gets the weight of the sender. Returns an error in case there is a
     /// reading error or the sender does not exist.
-    pub fn weight(&self, sender: &S) -> Result<U, &'static str> {
+    pub fn weight(
+        &self,
+        sender: &S,
+    ) -> Result<Option<U>, PoisonError<RwLockReadGuard<HashMap<S, U>>>> {
         self.read()
-            .map_err(|_| "Can't unwrap Weights")
-            .and_then(|weights| match weights.get(sender) {
-                Some(weight) => Ok(weight.clone()),
-                None => Err("Could not find sender"),
-            })
+            .map(|weights| weights.get(sender).map(Clone::clone))
     }
 
     /// Returns the total weight of all the given senders.
     pub fn sum_weight_senders(&self, senders: &HashSet<S>) -> U {
         senders.iter().fold(<U as Zero<U>>::ZERO, |acc, sender| {
-            acc + self.weight(sender).unwrap_or(U::NAN)
+            acc + self.weight(sender).unwrap_or(None).unwrap_or(U::NAN)
         })
     }
 
