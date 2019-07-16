@@ -17,7 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fmt;
 
 use casper::blockchain::{Block, Message};
@@ -66,34 +66,6 @@ impl ChainData {
             nb_messages,
         }
     }
-}
-
-/// returns a vector of heights
-/// each height is the height of the block that is selected by ghost
-/// (applied to latest honest messages in each view)
-pub fn heights_from_state(state: &HashMap<u32, sender::State<Message<u32>, f64>>) -> Vec<u32> {
-    state
-        .iter()
-        .map(|(_, sender_state)| (sender_state.latests_msgs(), sender_state.senders_weights()))
-        .map(|(latest_msgs, senders_weights)| {
-            let latest_messages_honest =
-                LatestMsgsHonest::from_latest_msgs(latest_msgs, &HashSet::new());
-            Block::ghost(&latest_messages_honest, senders_weights)
-        })
-        .map(|block| {
-            fn reduce(b: &Block<u32>, i: u32) -> u32 {
-                match b.prevblock() {
-                    Some(_msg) => reduce(&_msg, i + 1),
-                    None => i,
-                }
-            }
-            let height_this_message = match block {
-                Ok(b) => reduce(&b, 1),
-                _ => 0,
-            };
-            height_this_message
-        })
-        .collect()
 }
 
 /// returns the height of the GHOST-selected chain
