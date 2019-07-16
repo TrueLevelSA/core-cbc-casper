@@ -178,7 +178,7 @@ fn arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
 /// sender strategy that picks some number of validators in the set at random, in a uniform manner
 fn parallel_arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
     let validators = val.clone();
-    prop::sample::select((1..validators.len()).collect::<Vec<usize>>())
+    prop::sample::select((1..=validators.len()).collect::<Vec<usize>>())
         .prop_flat_map(move |val_count| {
             prop::collection::hash_set(prop::sample::select(validators.clone()), val_count)
         })
