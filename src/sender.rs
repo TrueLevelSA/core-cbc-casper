@@ -213,7 +213,6 @@ impl<S: self::Trait, U: WeightUnit> Weights<S, U> {
     /// lock to write data.
     pub fn insert(&mut self, k: S, v: U) -> bool {
         self.write()
-            .ok()
             .map(|mut h| {
                 h.insert(k, v);
                 true
@@ -223,19 +222,18 @@ impl<S: self::Trait, U: WeightUnit> Weights<S, U> {
 
     /// Picks senders with positive weights striclty greather than zero.
     pub fn senders(&self) -> Result<HashSet<S>, PoisonError<RwLockReadGuard<HashMap<S, U>>>> {
-        self.read()
-            .map(|senders_weight| {
-                senders_weight
-                    .iter()
-                    .filter_map(|(sender, &weight)| {
-                        if weight > <U as Zero<U>>::ZERO {
-                            Some(sender.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect()
-            })
+        self.read().map(|senders_weight| {
+            senders_weight
+                .iter()
+                .filter_map(|(sender, &weight)| {
+                    if weight > <U as Zero<U>>::ZERO {
+                        Some(sender.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        })
     }
 
     /// Gets the weight of the sender. Returns an error in case there is a
