@@ -53,25 +53,25 @@ fn msg_equality() {
     );
 
     let mut j0 = Justification::empty();
-    let (success, _) = j0.faulty_inserts(vec![v0].iter().cloned().collect(), &sender_state);
+    let success = j0.faulty_inserts(&vec![v0].iter().cloned().collect(), &mut sender_state.clone());
     assert!(success);
 
-    let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state).unwrap();
+    let m0 = &Message::from_msgs(0, vec![v0], &mut sender_state.clone()).unwrap();
     // let m0 = &Message::new(0, justification, estimate);
 
     let mut j1 = Justification::empty();
 
-    let (success, _) = j1.faulty_inserts(vec![v0].iter().cloned().collect(), &sender_state);
+    let success = j1.faulty_inserts(&vec![v0].iter().cloned().collect(), &mut sender_state.clone());
     assert!(success);
 
-    let (success, _) = j1.faulty_inserts(vec![m0].iter().cloned().collect(), &sender_state);
+    let success = j1.faulty_inserts(&vec![m0].iter().cloned().collect(), &mut sender_state.clone());
     assert!(success);
 
-    let (msg1, _) = Message::from_msgs(0, vec![v0], &sender_state).unwrap();
-    let (msg2, _) = Message::from_msgs(0, vec![v0], &sender_state).unwrap();
+    let msg1 = Message::from_msgs(0, vec![v0], &mut sender_state.clone()).unwrap();
+    let msg2 = Message::from_msgs(0, vec![v0], &mut sender_state.clone()).unwrap();
     assert!(msg1 == msg2, "messages should be equal");
 
-    let (msg3, _) = Message::from_msgs(0, vec![v0, m0], &sender_state).unwrap();
+    let msg3 = Message::from_msgs(0, vec![v0, m0], &mut sender_state.clone()).unwrap();
     assert!(msg1 != msg3, "msg1 should be different than msg3");
 }
 
@@ -93,10 +93,10 @@ fn msg_depends() {
     );
 
     let mut j0 = Justification::empty();
-    let (success, _) = j0.faulty_inserts(vec![v0].iter().cloned().collect(), &sender_state);
+    let success = j0.faulty_inserts(&vec![v0].iter().cloned().collect(), &mut sender_state.clone());
     assert!(success);
 
-    let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state).unwrap();
+    let m0 = &Message::from_msgs(0, vec![v0], &mut sender_state.clone()).unwrap();
 
     assert!(
         !v0.depends(v0_prime),
@@ -110,19 +110,19 @@ fn msg_depends() {
     assert!(m0.depends(v0), "m0 depends on v0 directly");
 
     let mut j0 = Justification::empty();
-    let (success, _) = j0.faulty_inserts([v0].iter().cloned().collect(), &sender_state);
+    let success = j0.faulty_inserts(&[v0].iter().cloned().collect(), &mut sender_state.clone());
     assert!(success);
 
-    let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state).unwrap();
+    let m0 = &Message::from_msgs(0, vec![v0], &mut sender_state.clone()).unwrap();
 
     let mut j1 = Justification::empty();
-    let (success, _) = j1.faulty_inserts([v0].iter().cloned().collect(), &sender_state);
+    let success = j1.faulty_inserts(&[v0].iter().cloned().collect(), &mut sender_state.clone());
     assert!(success);
 
-    let (success, _) = j1.faulty_inserts([m0].iter().cloned().collect(), &sender_state);
+    let success = j1.faulty_inserts(&[m0].iter().cloned().collect(), &mut sender_state.clone());
     assert!(success);
 
-    let (m1, _) = &Message::from_msgs(0, vec![v0, m0], &sender_state).unwrap();
+    let m1 = &Message::from_msgs(0, vec![v0, m0], &mut sender_state.clone()).unwrap();
 
     assert!(m1.depends(m0), "m1 DOES depent on m0");
     assert!(!m0.depends(m1), "but m0 does NOT depend on m1");
@@ -147,12 +147,12 @@ fn msg_equivocates() {
     );
 
     let mut j0 = Justification::empty();
-    let (success, _) = j0.faulty_inserts(vec![v0].iter().cloned().collect(), &sender_state);
+    let success = j0.faulty_inserts(&vec![v0].iter().cloned().collect(), &mut sender_state.clone());
     assert!(success);
 
-    let (m0, _) = &Message::from_msgs(0, vec![v0], &sender_state).unwrap();
+    let m0 = &Message::from_msgs(0, vec![v0], &mut sender_state.clone()).unwrap();
 
-    let (m1, _) = &Message::from_msgs(1, vec![v0], &sender_state).unwrap();
+    let m1 = &Message::from_msgs(1, vec![v0], &mut sender_state.clone()).unwrap();
     assert!(!v0.equivocates(v0), "should be all good");
     assert!(!v1.equivocates(m0), "should be all good");
     assert!(!m0.equivocates(v1), "should be all good");
