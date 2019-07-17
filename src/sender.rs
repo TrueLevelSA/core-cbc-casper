@@ -97,6 +97,33 @@ pub struct State<M: message::Trait, U: WeightUnit> {
     pub(crate) equivocators: HashSet<M::Sender>,
 }
 
+pub enum Error<'rwlock, T> {
+    WriteLockError(PoisonError<RwLockWriteGuard<'rwlock, T>>),
+    ReadLockError(PoisonError<RwLockReadGuard<'rwlock, T>>),
+    NotFound,
+}
+
+impl<'rwlock, T> std::error::Error for Error<'rwlock, T> {}
+impl<'rwlock, T> std::fmt::Display for Error<'rwlock, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::NotFound => writeln!(f, "Sender weight not found"),
+            Error::WriteLockError(p_err) => std::fmt::Display::fmt(p_err, f),
+            Error::ReadLockError(p_err) => std::fmt::Display::fmt(p_err, f),
+        }
+    }
+}
+
+impl<'rwlock, T> std::fmt::Debug for Error<'rwlock, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Error::NotFound => writeln!(f, "Sender weight not found"),
+            Error::WriteLockError(p_err) => std::fmt::Display::fmt(p_err, f),
+            Error::ReadLockError(p_err) => std::fmt::Display::fmt(p_err, f),
+        }
+    }
+}
+
 impl<M: message::Trait, U: WeightUnit> State<M, U> {
     pub fn new(
         senders_weights: Weights<M::Sender, U>,
@@ -170,7 +197,7 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
                 if !self.equivocators.contains(sender) && self.latest_msgs.equivocate(msg) {
                     self.senders_weights.weight(sender).map(|w| (msg, w)).ok()
                 } else {
-                    Some((msg, Some(<U as Zero<U>>::ZERO)))
+                    Some((msg, <U as Zero<U>>::ZERO))
                 }
             })
             .collect();
@@ -211,45 +238,45 @@ impl<S: self::Trait, U: WeightUnit> Weights<S, U> {
 
     /// Returns success of insertion. Failure happens if we cannot acquire the
     /// lock to write data.
-    pub fn insert(&mut self, k: S, v: U) -> bool {
+    pub fn insert(&mut self, k: S, v: U) -> Result<bool, Error<HashMap<S, U>>> {
         self.write()
+            .map_err(|err| Error::WriteLockError(err))
             .map(|mut h| {
                 h.insert(k, v);
                 true
             })
-            .unwrap_or(false)
     }
 
     /// Picks senders with positive weights striclty greather than zero.
-    pub fn senders(&self) -> Result<HashSet<S>, PoisonError<RwLockReadGuard<HashMap<S, U>>>> {
-        self.read().map(|senders_weight| {
-            senders_weight
-                .iter()
-                .filter_map(|(sender, &weight)| {
-                    if weight > <U as Zero<U>>::ZERO {
-                        Some(sender.clone())
-                    } else {
-                        None
-                    }
-                })
-                .collect()
-        })
+    pub fn senders(&self) -> Result<HashSet<S>, Error<HashMap<S, U>>> {
+        self.read()
+            .map_err(|err| Error::ReadLockError(err))
+            .map(|senders_weight| {
+                senders_weight
+                    .iter()
+                    .filter_map(|(sender, &weight)| {
+                        if weight > <U as Zero<U>>::ZERO {
+                            Some(sender.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            })
     }
 
     /// Gets the weight of the sender. Returns an error in case there is a
     /// reading error or the sender does not exist.
-    pub fn weight(
-        &self,
-        sender: &S,
-    ) -> Result<Option<U>, PoisonError<RwLockReadGuard<HashMap<S, U>>>> {
+    pub fn weight(&self, sender: &S) -> Result<U, Error<HashMap<S, U>>> {
         self.read()
-            .map(|weights| weights.get(sender).map(Clone::clone))
+            .map_err(|err| Error::ReadLockError(err))
+            .and_then(|weights| weights.get(sender).map(Clone::clone).ok_or(Error::NotFound))
     }
 
     /// Returns the total weight of all the given senders.
     pub fn sum_weight_senders(&self, senders: &HashSet<S>) -> U {
         senders.iter().fold(<U as Zero<U>>::ZERO, |acc, sender| {
-            acc + self.weight(sender).unwrap_or(None).unwrap_or(U::NAN)
+            acc + self.weight(sender).unwrap_or(U::NAN)
         })
     }
 
