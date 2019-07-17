@@ -58,12 +58,12 @@ impl<M: message::Trait> Justification<M> {
     /// `sender::State` and return the justification and an updated state.
     pub fn from_msgs<U: WeightUnit>(
         messages: Vec<M>,
-        state: &sender::State<M, U>,
-    ) -> (Self, sender::State<M, U>) {
+        state: &mut sender::State<M, U>,
+    ) -> Self {
         let mut justification = Justification::empty();
         let messages: HashSet<_> = messages.iter().collect();
-        let (_, state) = justification.faulty_inserts(messages, state);
-        (justification, state)
+        justification.faulty_inserts(&messages, state);
+        justification
     }
 
     pub fn iter(&self) -> std::slice::Iter<M> {
@@ -107,15 +107,15 @@ impl<M: message::Trait> Justification<M> {
     /// justification.
     pub fn faulty_inserts<U: WeightUnit>(
         &mut self,
-        msgs: HashSet<&M>,
-        state: &sender::State<M, U>,
-    ) -> (bool, sender::State<M, U>) {
+        msgs: &HashSet<&M>,
+        state: &mut sender::State<M, U>,
+    ) -> bool {
         let msgs = state.sort_by_faultweight(msgs);
         // do the actual insertions to the state
         msgs.iter()
-            .fold((false, state.clone()), |(success, state), &msg| {
-                let (success_prime, sender_state_prime) = self.faulty_insert(msg, &state);
-                (success || success_prime, sender_state_prime)
+            .fold(false, |success, &msg| {
+                let success_prime = self.faulty_insert(msg, state);
+                success || success_prime
             })
     }
 
@@ -124,9 +124,8 @@ impl<M: message::Trait> Justification<M> {
     pub fn faulty_insert<U: WeightUnit>(
         &mut self,
         msg: &M,
-        state: &sender::State<M, U>,
-    ) -> (bool, sender::State<M, U>) {
-        let mut state = state.clone();
+        state: &mut sender::State<M, U>,
+    ) -> bool {
         let is_equivocation = state.latest_msgs.equivocate(msg);
 
         let sender = msg.sender();
@@ -142,7 +141,7 @@ impl<M: message::Trait> Justification<M> {
                 if success {
                     state.latest_msgs.update(msg);
                 }
-                (success, state)
+                success
             }
             // in the other case, we have to check that the threshold is not reached
             (true, false) => {
@@ -154,9 +153,9 @@ impl<M: message::Trait> Justification<M> {
                             state.state_fault_weight += sender_weight;
                         }
                     }
-                    (success, state)
+                    success
                 } else {
-                    (false, state)
+                    false
                 }
             }
         }
@@ -174,6 +173,7 @@ impl<M: message::Trait> Justification<M> {
         if is_equivocation {
             let sender = msg.sender();
             state.equivocators.insert(sender.clone());
+            // TODO: Ignoring Result here, should the Result surface to user?
             state
                 .senders_weights
                 .insert(sender.clone(), <U as Zero<U>>::ZERO);
