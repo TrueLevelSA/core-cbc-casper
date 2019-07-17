@@ -188,7 +188,7 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
 
     /// get msgs and fault weight overhead and equivocators overhead sorted
     /// by fault weight overhead against the current sender_state
-    pub fn sort_by_faultweight<'z>(&self, msgs: HashSet<&'z M>) -> Vec<&'z M> {
+    pub fn sort_by_faultweight<'z>(&self, msgs: &HashSet<&'z M>) -> Vec<&'z M> {
         let mut msgs_sorted_by_faultw: Vec<_> = msgs
             .iter()
             .filter_map(|&msg| {
