@@ -191,8 +191,12 @@ fn uneven_weights_4() {
     let m2 = IntegerMsg::new(senders[2], Justification::empty(), IntegerWrapper(3));
     let m3 = IntegerMsg::new(senders[3], Justification::empty(), IntegerWrapper(4));
 
-    let m4 =
-        IntegerMsg::from_msgs(senders[3], vec![&m0, &m1, &m2, &m3], &mut sender_state.clone()).unwrap();
+    let m4 = IntegerMsg::from_msgs(
+        senders[3],
+        vec![&m0, &m1, &m2, &m3],
+        &mut sender_state.clone(),
+    )
+    .unwrap();
 
     let mut j0 = Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut sender_state.clone());
     assert_eq!(

@@ -56,11 +56,9 @@ fn faulty_inserts_sorted() {
     let mut j = Justification::empty();
     let sorted_msgs = sender_state
         .sort_by_faultweight(&vec![v2_prime, v1_prime, v0_prime].iter().cloned().collect());
-    sorted_msgs
-        .iter()
-        .for_each(|&m| {
-            j.faulty_insert(m, &mut sender_state);
-        });
+    sorted_msgs.iter().for_each(|&m| {
+        j.faulty_insert(m, &mut sender_state);
+    });
     assert!(j.contains(v0_prime));
     assert!(j.contains(v1_prime));
     assert!(!j.contains(v2_prime));
@@ -92,12 +90,10 @@ fn faulty_inserts() {
 
     // let m0 = &message::Message::new(0, justification, estimate);
     let mut j1 = Justification::empty();
-    let success =
-        j1.faulty_inserts(&vec![v1].iter().cloned().collect(), &mut sender_state);
+    let success = j1.faulty_inserts(&vec![v1].iter().cloned().collect(), &mut sender_state);
     assert!(success);
 
-    let success =
-        j1.faulty_inserts(&vec![m0].iter().cloned().collect(), &mut sender_state);
+    let success = j1.faulty_inserts(&vec![m0].iter().cloned().collect(), &mut sender_state);
     assert!(success);
 
     let success = j1.faulty_insert(v0_prime, &mut sender_state);
@@ -107,87 +103,72 @@ fn faulty_inserts() {
     );
 
     let mut state = sender::State::from_state(
-            sender_state.clone(),
-            None,
-            None,
-            None,
-            None,
-            Some(1.0),
-            None,
-        );
-    let success = j1.clone().faulty_insert(
-        v0_prime,
-        &mut state,
+        sender_state.clone(),
+        None,
+        None,
+        None,
+        None,
+        Some(1.0),
+        None,
     );
+    let success = j1.clone().faulty_insert(v0_prime, &mut state);
     assert!(success,
         "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set"
     );
 
     let mut sender_state2 = sender::State::from_state(
-            sender_state.clone(),
-            None,
-            None,
-            None,
-            None,
-            Some(1.0),
-            None,
-        );
-    j1.clone().faulty_insert(
-        v0_prime,
-        &mut sender_state2,
+        sender_state.clone(),
+        None,
+        None,
+        None,
+        None,
+        Some(1.0),
+        None,
     );
+    j1.clone().faulty_insert(v0_prime, &mut sender_state2);
     assert_eq!(
         sender_state2.fault_weight(), 1.0,
         "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set, and thus the state_fault_weight should be incremented to 1.0"
     );
 
     let mut state = sender::State::from_state(
-            sender_state.clone(),
-            None,
-            Some(0.1),
-            None,
-            None,
-            Some(1.0),
-            None,
-        );
-    let success = j1.clone().faulty_insert(
-        v0_prime,
-        &mut state,
+        sender_state.clone(),
+        None,
+        Some(0.1),
+        None,
+        None,
+        Some(1.0),
+        None,
     );
+    let success = j1.clone().faulty_insert(v0_prime, &mut state);
     assert!(!success,
         "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as the fault threshold gets crossed for the set"
     );
 
     let mut sender_state2 = sender::State::from_state(
-            sender_state.clone(),
-            None,
-            Some(0.1),
-            None,
-            None,
-            Some(1.0),
-            None,
-        );
-    j1.clone().faulty_insert(
-        v0_prime,
-        &mut sender_state2,
+        sender_state.clone(),
+        None,
+        Some(0.1),
+        None,
+        None,
+        Some(1.0),
+        None,
     );
+    j1.clone().faulty_insert(v0_prime, &mut sender_state2);
     assert_eq!(sender_state2.fault_weight(), 0.1,
         "$v0_prime$ conflicts with $v0$ through $m0$, and we should NOT accept this fault as the fault threshold gets crossed for the set, and thus the state_fault_weight should not be incremented"
     );
 
     let mut state = sender::State::from_state(
-            sender_state.clone(),
-            None,
-            Some(1.0),
-            None,
-            None,
-            Some(2.0),
-            None,
-        );
-    let success = j1.clone().faulty_insert(
-        v0_prime,
-        &mut state,
+        sender_state.clone(),
+        None,
+        Some(1.0),
+        None,
+        None,
+        Some(2.0),
+        None,
     );
+    let success = j1.clone().faulty_insert(v0_prime, &mut state);
     assert!(success,
         "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the thr doesnt get crossed for the set"
     );
@@ -195,35 +176,29 @@ fn faulty_inserts() {
     let senders_weights = sender::Weights::new([].iter().cloned().collect());
     // bug found
     let mut state = sender::State::from_state(
-            sender_state.clone(),
-            Some(senders_weights.clone()),
-            Some(1.0),
-            None,
-            None,
-            Some(2.0),
-            None,
-        );
-    let success = j1.clone().faulty_insert(
-        v0_prime,
-        &mut state,
+        sender_state.clone(),
+        Some(senders_weights.clone()),
+        Some(1.0),
+        None,
+        None,
+        Some(2.0),
+        None,
     );
+    let success = j1.clone().faulty_insert(v0_prime, &mut state);
     assert!(
         !success,
         "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we can't know the weight of the sender, which could be Infinity"
     );
 
     let mut sender_state = sender::State::new(
-            senders_weights.clone(),
-            1.0,
-            None,
-            LatestMsgs::empty(),
-            2.0,
-            HashSet::new(),
-        );
-    j1.clone().faulty_insert(
-        v0_prime,
-        &mut sender_state
+        senders_weights.clone(),
+        1.0,
+        None,
+        LatestMsgs::empty(),
+        2.0,
+        HashSet::new(),
     );
+    j1.clone().faulty_insert(v0_prime, &mut sender_state);
     assert_eq!(
             sender_state.fault_weight(),
         1.0,

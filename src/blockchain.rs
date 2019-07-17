@@ -638,7 +638,8 @@ mod tests {
         // (s4, w=1.1)                \-------m4
         // (s5, w=1.0)
 
-        let m5 = Message::from_msgs(sender5, vec![&m0, &m1, &m2, &m3, &m4], &mut state.clone()).unwrap();
+        let m5 =
+            Message::from_msgs(sender5, vec![&m0, &m1, &m2, &m3, &m4], &mut state.clone()).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1

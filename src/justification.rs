@@ -56,10 +56,7 @@ impl<M: message::Trait> Justification<M> {
 
     /// Creates a new justification instance from a vector of `message::Trait` and a
     /// `sender::State` and return the justification and an updated state.
-    pub fn from_msgs<U: WeightUnit>(
-        messages: Vec<M>,
-        state: &mut sender::State<M, U>,
-    ) -> Self {
+    pub fn from_msgs<U: WeightUnit>(messages: Vec<M>, state: &mut sender::State<M, U>) -> Self {
         let mut justification = Justification::empty();
         let messages: HashSet<_> = messages.iter().collect();
         justification.faulty_inserts(&messages, state);
@@ -112,11 +109,10 @@ impl<M: message::Trait> Justification<M> {
     ) -> bool {
         let msgs = state.sort_by_faultweight(msgs);
         // do the actual insertions to the state
-        msgs.iter()
-            .fold(false, |success, &msg| {
-                let success_prime = self.faulty_insert(msg, state);
-                success || success_prime
-            })
+        msgs.iter().fold(false, |success, &msg| {
+            let success_prime = self.faulty_insert(msg, state);
+            success || success_prime
+        })
     }
 
     /// This function makes no assumption on how to treat the equivocator. it adds the msg to the

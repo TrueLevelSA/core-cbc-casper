@@ -132,7 +132,8 @@ fn vote_swaying() {
     );
 
     // assume sender 0 has seen messages from sender 1 and sender 2 and reveals this in a published message
-    let m5 = BinaryMsg::from_msgs(senders[0], vec![&m0, &m1, &m2], &mut sender_state.clone()).unwrap();
+    let m5 =
+        BinaryMsg::from_msgs(senders[0], vec![&m0, &m1, &m2], &mut sender_state.clone()).unwrap();
 
     j0.faulty_insert(&m5, &mut sender_state.clone());
     // sender 0 now "votes" in the other direction and sways the result: true
