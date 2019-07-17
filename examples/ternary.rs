@@ -79,15 +79,9 @@ impl Estimator for Value {
                     (Value::Two, <U as Zero<U>>::ZERO),
                 ),
                 |acc, t| match t {
-                    (Value::Zero, Ok(Some(weight))) => {
-                        (((acc.0).0, (acc.0).1 + weight), acc.1, acc.2)
-                    }
-                    (Value::One, Ok(Some(weight))) => {
-                        (acc.0, ((acc.1).0, (acc.1).1 + weight), acc.2)
-                    }
-                    (Value::Two, Ok(Some(weight))) => {
-                        (acc.0, acc.1, ((acc.2).0, (acc.2).1 + weight))
-                    }
+                    (Value::Zero, Ok(weight)) => (((acc.0).0, (acc.0).1 + weight), acc.1, acc.2),
+                    (Value::One, Ok(weight)) => (acc.0, ((acc.1).0, (acc.1).1 + weight), acc.2),
+                    (Value::Two, Ok(weight)) => (acc.0, acc.1, ((acc.2).0, (acc.2).1 + weight)),
                     _ => acc, // No weight for the given validator, do nothing
                 },
             )

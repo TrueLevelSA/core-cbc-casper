@@ -73,10 +73,7 @@ impl Estimator for IntegerWrapper {
         let total_weight = msgs_sorted_by_estimate
             .iter()
             .fold(<U as Zero<U>>::ZERO, |acc, x| {
-                acc + senders_weights
-                    .weight(x.sender())
-                    .unwrap_or(None)
-                    .unwrap_or(U::NAN)
+                acc + senders_weights.weight(x.sender()).unwrap_or(U::NAN)
             });
 
         let mut running_weight = <U as Zero<U>>::ZERO;
