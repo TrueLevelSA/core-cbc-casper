@@ -86,7 +86,11 @@ impl Estimator for IntegerWrapper {
         while running_weight + running_weight < total_weight {
             current_msg = msg_iter.next().ok_or("no next msg");
             running_weight += current_msg
-                .and_then(|m| senders_weights.weight(m.sender()))
+                .and_then(|m| {
+                    senders_weights
+                        .weight(m.sender())
+                        .map_err(|_| "Can't unwrap weight")
+                })
                 .unwrap_or(U::NAN)
         }
 
