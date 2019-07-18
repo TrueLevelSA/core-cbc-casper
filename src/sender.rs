@@ -63,7 +63,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::sync::{Arc, LockResult, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{Arc, LockResult, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::justification::LatestMsgs;
 use crate::message;
@@ -95,6 +95,33 @@ pub struct State<M: message::Trait, U: WeightUnit> {
     pub(crate) own_latest_msg: Option<M>,
     pub(crate) latest_msgs: LatestMsgs<M>,
     pub(crate) equivocators: HashSet<M::Sender>,
+}
+
+pub enum Error<'rwlock, T> {
+    WriteLockError(PoisonError<RwLockWriteGuard<'rwlock, T>>),
+    ReadLockError(PoisonError<RwLockReadGuard<'rwlock, T>>),
+    NotFound,
+}
+
+impl<'rwlock, T> std::error::Error for Error<'rwlock, T> {}
+impl<'rwlock, T> std::fmt::Display for Error<'rwlock, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::NotFound => writeln!(f, "Sender weight not found"),
+            Error::WriteLockError(p_err) => std::fmt::Display::fmt(p_err, f),
+            Error::ReadLockError(p_err) => std::fmt::Display::fmt(p_err, f),
+        }
+    }
+}
+
+impl<'rwlock, T> std::fmt::Debug for Error<'rwlock, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Error::NotFound => writeln!(f, "Sender weight not found"),
+            Error::WriteLockError(p_err) => std::fmt::Display::fmt(p_err, f),
+            Error::ReadLockError(p_err) => std::fmt::Display::fmt(p_err, f),
+        }
+    }
 }
 
 impl<M: message::Trait, U: WeightUnit> State<M, U> {
@@ -211,20 +238,19 @@ impl<S: self::Trait, U: WeightUnit> Weights<S, U> {
 
     /// Returns success of insertion. Failure happens if we cannot acquire the
     /// lock to write data.
-    pub fn insert(&mut self, k: S, v: U) -> bool {
+    pub fn insert(&mut self, k: S, v: U) -> Result<bool, Error<HashMap<S, U>>> {
         self.write()
-            .ok()
+            .map_err(|err| Error::WriteLockError(err))
             .map(|mut h| {
                 h.insert(k, v);
                 true
             })
-            .unwrap_or(false)
     }
 
     /// Picks senders with positive weights striclty greather than zero.
-    pub fn senders(&self) -> Result<HashSet<S>, &'static str> {
+    pub fn senders(&self) -> Result<HashSet<S>, Error<HashMap<S, U>>> {
         self.read()
-            .map_err(|_| "Can't unwrap Weights")
+            .map_err(|err| Error::ReadLockError(err))
             .map(|senders_weight| {
                 senders_weight
                     .iter()
@@ -241,13 +267,10 @@ impl<S: self::Trait, U: WeightUnit> Weights<S, U> {
 
     /// Gets the weight of the sender. Returns an error in case there is a
     /// reading error or the sender does not exist.
-    pub fn weight(&self, sender: &S) -> Result<U, &'static str> {
+    pub fn weight(&self, sender: &S) -> Result<U, Error<HashMap<S, U>>> {
         self.read()
-            .map_err(|_| "Can't unwrap Weights")
-            .and_then(|weights| match weights.get(sender) {
-                Some(weight) => Ok(weight.clone()),
-                None => Err("Could not find sender"),
-            })
+            .map_err(|err| Error::ReadLockError(err))
+            .and_then(|weights| weights.get(sender).map(Clone::clone).ok_or(Error::NotFound))
     }
 
     /// Returns the total weight of all the given senders.
