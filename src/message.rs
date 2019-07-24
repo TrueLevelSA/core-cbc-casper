@@ -95,7 +95,9 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
 
         // update latest_msgs in sender_state with new_msgs
         let mut justification = Justification::empty();
-        let failure = justification.faulty_inserts(&new_msgs, sender_state).is_empty();
+        let failure = justification
+            .faulty_inserts(&new_msgs, sender_state)
+            .is_empty();
 
         if failure && new_msgs_len > 0 {
             Err("None of the messages could be added to the state!")

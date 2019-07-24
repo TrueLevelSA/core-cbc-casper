@@ -109,9 +109,9 @@ impl<M: message::Trait> Justification<M> {
     ) -> HashSet<&'a M> {
         let msgs = state.sort_by_faultweight(msgs);
         // do the actual insertions to the state
-        msgs.into_iter().filter(|msg| {
-            self.faulty_insert(msg, state)
-        }).collect()
+        msgs.into_iter()
+            .filter(|msg| self.faulty_insert(msg, state))
+            .collect()
     }
 
     /// This function makes no assumption on how to treat the equivocator. it adds the msg to the
