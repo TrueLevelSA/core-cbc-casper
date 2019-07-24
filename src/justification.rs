@@ -102,17 +102,16 @@ impl<M: message::Trait> Justification<M> {
     /// Insert messages to the justification, accepting up to the threshold faults by weight.
     /// Returns true if at least one message of the set gets successfully included in the
     /// justification.
-    pub fn faulty_inserts<U: WeightUnit>(
+    pub fn faulty_inserts<'a, U: WeightUnit>(
         &mut self,
-        msgs: &HashSet<&M>,
+        msgs: &HashSet<&'a M>,
         state: &mut sender::State<M, U>,
-    ) -> bool {
+    ) -> HashSet<&'a M> {
         let msgs = state.sort_by_faultweight(msgs);
         // do the actual insertions to the state
-        msgs.iter().fold(false, |success, &msg| {
-            let success_prime = self.faulty_insert(msg, state);
-            success || success_prime
-        })
+        msgs.into_iter().filter(|msg| {
+            self.faulty_insert(msg, state)
+        }).collect()
     }
 
     /// This function makes no assumption on how to treat the equivocator. it adds the msg to the
