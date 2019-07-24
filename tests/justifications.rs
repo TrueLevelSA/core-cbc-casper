@@ -83,18 +83,24 @@ fn faulty_inserts() {
         HashSet::new(),
     );
 
-    let success = j0.faulty_inserts(&[v0].iter().cloned().collect(), &mut sender_state);
-    assert!(success);
+    let failure = j0
+        .faulty_inserts(&[v0].iter().cloned().collect(), &mut sender_state)
+        .is_empty();
+    assert_eq!(failure, false);
 
     let m0 = &message::Message::from_msgs(0, vec![v0], &mut sender_state.clone()).unwrap();
 
     // let m0 = &message::Message::new(0, justification, estimate);
     let mut j1 = Justification::empty();
-    let success = j1.faulty_inserts(&vec![v1].iter().cloned().collect(), &mut sender_state);
-    assert!(success);
+    let failure = j1
+        .faulty_inserts(&vec![v1].iter().cloned().collect(), &mut sender_state)
+        .is_empty();
+    assert_eq!(failure, false);
 
-    let success = j1.faulty_inserts(&vec![m0].iter().cloned().collect(), &mut sender_state);
-    assert!(success);
+    let failure = j1
+        .faulty_inserts(&vec![m0].iter().cloned().collect(), &mut sender_state)
+        .is_empty();
+    assert_eq!(failure, false);
 
     let success = j1.faulty_insert(v0_prime, &mut sender_state);
     assert!(
