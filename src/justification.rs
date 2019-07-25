@@ -54,8 +54,8 @@ impl<M: message::Trait> Justification<M> {
         Justification(Vec::new())
     }
 
-    /// Creates a new justification instance from a vector of `message::Trait` and a
-    /// `sender::State` and return the justification and an updated state.
+    /// Creates and return a new justification instance from a vector of `message::Trait` and
+    /// mutate the given `sender::State` with the updated state
     pub fn from_msgs<U: WeightUnit>(messages: Vec<M>, state: &mut sender::State<M, U>) -> Self {
         let mut justification = Justification::empty();
         let messages: HashSet<_> = messages.iter().collect();
@@ -100,8 +100,7 @@ impl<M: message::Trait> Justification<M> {
     }
 
     /// Insert messages to the justification, accepting up to the threshold faults by weight.
-    /// Returns true if at least one message of the set gets successfully included in the
-    /// justification.
+    /// Returns a HashSet of messages that got successfully included in the justification.
     pub fn faulty_inserts<'a, U: WeightUnit>(
         &mut self,
         msgs: &HashSet<&'a M>,

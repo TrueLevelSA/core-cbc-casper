@@ -97,6 +97,13 @@ pub struct State<M: message::Trait, U: WeightUnit> {
     pub(crate) equivocators: HashSet<M::Sender>,
 }
 
+/// Error returned from the [`insert`], [`senders`] and [`weight`] function
+/// on a [`Weights`]
+///
+/// [`insert`]: struct.Weights.html#method.insert
+/// [`senders`]: struct.Weights.html#method.senders
+/// [`weight`]: struct.Weights.html#method.weight
+/// [`Weights`]: struct.Weights.html
 pub enum Error<'rwlock, T> {
     WriteLockError(PoisonError<RwLockWriteGuard<'rwlock, T>>),
     ReadLockError(PoisonError<RwLockReadGuard<'rwlock, T>>),
@@ -248,6 +255,7 @@ impl<S: self::Trait, U: WeightUnit> Weights<S, U> {
     }
 
     /// Picks senders with positive weights striclty greather than zero.
+    /// Failure happens if we cannot acquire the lock to read data
     pub fn senders(&self) -> Result<HashSet<S>, Error<HashMap<S, U>>> {
         self.read()
             .map_err(|err| Error::ReadLockError(err))
