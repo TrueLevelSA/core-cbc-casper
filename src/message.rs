@@ -84,23 +84,21 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
     ) -> Self;
 
     /// Create a message from newly received messages.
-    fn from_msgs<U: WeightUnit>(
+    fn from_msgs<'a, U: WeightUnit>(
         sender: Self::Sender,
-        mut new_msgs: Vec<&Self>,
+        mut new_msgs: Vec<&'a Self>,
         sender_state: &mut sender::State<Self, U>,
-    ) -> Result<Self, &'static str> {
+    ) -> Result<(Option<Self>, HashSet<&'a Self>), <Self::Estimator as Estimator>::Error> {
         // dedup by putting msgs into a hashset
         let new_msgs: HashSet<_> = new_msgs.drain(..).collect();
         let new_msgs_len = new_msgs.len();
 
         // update latest_msgs in sender_state with new_msgs
         let mut justification = Justification::empty();
-        let failure = justification
-            .faulty_inserts(&new_msgs, sender_state)
-            .is_empty();
+        let inserted_msgs = justification.faulty_inserts(&new_msgs, sender_state);
 
-        if failure && new_msgs_len > 0 {
-            Err("None of the messages could be added to the state!")
+        if inserted_msgs.is_empty() && new_msgs_len > 0 {
+            Ok((None, inserted_msgs))
         } else {
             let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(
                 sender_state.latests_msgs(),
@@ -108,7 +106,7 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
             );
 
             let estimate = latest_msgs_honest.mk_estimate(&sender_state.senders_weights());
-            estimate.map(|e| Self::new(sender, justification, e))
+            estimate.map(|e| (Some(Self::new(sender, justification, e)), inserted_msgs))
         }
     }
 
