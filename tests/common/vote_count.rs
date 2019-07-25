@@ -161,10 +161,28 @@ pub type VoteMsg = message::Message<VoteCount, Voter>;
 
 //impl Sender for Voter {}
 
+#[derive(Debug)]
+pub struct Error(&'static str);
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl std::convert::From<&'static str> for Error {
+    fn from(e: &'static str) -> Self {
+        Error(e)
+    }
+}
+
 impl Estimator for VoteCount {
     // the estimator just counts votes, which in this case are the unjustified
     // msgs
     type M = VoteMsg;
+    type Error = Error;
 
     // Data could be anything, as it will not be used, will just pass None to
     // mk_estimate, as it takes an Option
@@ -173,7 +191,7 @@ impl Estimator for VoteCount {
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         _weights: &sender::Weights<Voter, U>, // all voters have same weight
-    ) -> Result<Self, &'static str> {
+    ) -> Result<Self, Self::Error> {
         // the estimates are actually the original votes of each of the voters /
         // validators
 

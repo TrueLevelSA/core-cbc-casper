@@ -51,14 +51,32 @@ pub type IntegerMsg =
 #[derive(Clone, Eq, Debug, Ord, PartialOrd, PartialEq, Hash)]
 pub struct Tx;
 
+#[derive(Debug, PartialEq)]
+pub struct Error(&'static str);
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl std::convert::From<&'static str> for Error {
+    fn from(e: &'static str) -> Self {
+        Error(e)
+    }
+}
+
 /// the goal here is to find the weighted median of all the values
 impl Estimator for IntegerWrapper {
     type M = IntegerMsg;
+    type Error = Error;
 
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<IntegerMsg>,
         senders_weights: &sender::Weights<Validator, U>,
-    ) -> Result<Self, &'static str> {
+    ) -> Result<Self, Self::Error> {
         let mut msgs_sorted_by_estimate = Vec::from_iter(latest_msgs.iter().fold(
             HashSet::new(),
             |mut latest, latest_from_validator| {
@@ -95,6 +113,8 @@ impl Estimator for IntegerWrapper {
         }
 
         // return said estimate
-        current_msg.map(|m| m.estimate().clone())
+        current_msg
+            .map(|m| m.estimate().clone())
+            .map_err(From::from)
     }
 }

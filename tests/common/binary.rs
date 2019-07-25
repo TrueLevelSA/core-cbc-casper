@@ -44,14 +44,32 @@ impl<S: sender::Trait> From<S> for BoolWrapper {
 
 pub type BinaryMsg = message::Message<BoolWrapper /*Estimator*/, Validator /*Sender*/>;
 
+#[derive(Debug)]
+pub struct Error(&'static str);
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl std::convert::From<&'static str> for Error {
+    fn from(e: &'static str) -> Self {
+        Error(e)
+    }
+}
+
 impl Estimator for BoolWrapper {
     type M = BinaryMsg;
+    type Error = Error;
 
     /// Weighted count of the votes contained in the latest messages.
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<BinaryMsg>,
         senders_weights: &sender::Weights<Validator, U>,
-    ) -> Result<Self, &'static str> {
+    ) -> Result<Self, Self::Error> {
         // loop over all the latest messages
         let (true_w, false_w) = latest_msgs.iter().fold(
             (<U as Zero<U>>::ZERO, <U as Zero<U>>::ZERO),

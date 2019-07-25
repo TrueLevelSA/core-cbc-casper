@@ -61,13 +61,31 @@ impl<U: WeightUnit> From<((Value, U), (Value, U), (Value, U))> for Value {
     }
 }
 
+#[derive(Debug)]
+pub struct Error(&'static str);
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl std::convert::From<&'static str> for Error {
+    fn from(e: &'static str) -> Self {
+        Error(e)
+    }
+}
+
 impl Estimator for Value {
     type M = Message;
+    type Error = Error;
 
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Message>,
         senders_weights: &sender::Weights<Validator, U>,
-    ) -> Result<Self, &'static str> {
+    ) -> Result<Self, Self::Error> {
         use message::Trait;
         let res: Self = latest_msgs
             .iter()
@@ -125,11 +143,16 @@ fn main() {
     let msg2 = Message::new(2, Justification::empty(), Value::Two);
     let msg3 = Message::new(3, Justification::empty(), Value::Zero);
     let msg4 = Message::new(4, Justification::empty(), Value::One);
-    let msg5 = Message::from_msgs(1, vec![&msg1, &msg2], &mut weights).unwrap();
-    let msg6 = Message::from_msgs(3, vec![&msg3, &msg4], &mut weights).unwrap();
-    let msg7 = Message::from_msgs(2, vec![&msg2, &msg5, &msg6], &mut weights).unwrap();
-    let msg8 = Message::from_msgs(3, vec![&msg7, &msg6], &mut weights).unwrap();
-    let msg9 = Message::from_msgs(4, vec![&msg4, &msg6], &mut weights).unwrap();
+    let (msg5, _) = Message::from_msgs(1, vec![&msg1, &msg2], &mut weights).unwrap();
+    let msg5 = msg5.unwrap();
+    let (msg6, _) = Message::from_msgs(3, vec![&msg3, &msg4], &mut weights).unwrap();
+    let msg6 = msg6.unwrap();
+    let (msg7, _) = Message::from_msgs(2, vec![&msg2, &msg5, &msg6], &mut weights).unwrap();
+    let msg7 = msg7.unwrap();
+    let (msg8, _) = Message::from_msgs(3, vec![&msg7, &msg6], &mut weights).unwrap();
+    let msg8 = msg8.unwrap();
+    let (msg9, _) = Message::from_msgs(4, vec![&msg4, &msg6], &mut weights).unwrap();
+    let msg9 = msg9.unwrap();
 
     assert_eq!(msg5.estimate(), &Value::Two);
     assert_eq!(msg6.estimate(), &Value::Zero);

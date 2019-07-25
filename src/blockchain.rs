@@ -505,21 +505,26 @@ mod tests {
             "genesis block with None as prevblock"
         );
 
-        let m1 = Message::from_msgs(sender1, vec![&genesis_block_msg], &mut state.clone()).unwrap();
+        let (m1, _) =
+            Message::from_msgs(sender1, vec![&genesis_block_msg], &mut state.clone()).unwrap();
+        let m1 = m1.unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)     \--m1
         // (s2, w=2.0)
         // (s3, w=1.0)
         // (s4, w=1.1)
 
-        let m2 = Message::from_msgs(sender2, vec![&genesis_block_msg], &mut state.clone()).unwrap();
+        let (m2, _) =
+            Message::from_msgs(sender2, vec![&genesis_block_msg], &mut state.clone()).unwrap();
+        let m2 = m2.unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)    |\--m1
         // (s2, w=2.0)    \---m2
         // (s3, w=1.0)
         // (s4, w=1.1)
 
-        let m3 = Message::from_msgs(sender3, vec![&m1, &m2], &mut state.clone()).unwrap();
+        let (m3, _) = Message::from_msgs(sender3, vec![&m1, &m2], &mut state.clone()).unwrap();
+        let m3 = m3.unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)    |\--m1
         // (s2, w=2.0)    \---m2
@@ -532,7 +537,8 @@ mod tests {
             "should build on top of m2 as sender2 has more weight"
         );
 
-        let m4 = Message::from_msgs(sender4, vec![&m1], &mut state.clone()).unwrap();
+        let (m4, _) = Message::from_msgs(sender4, vec![&m1], &mut state.clone()).unwrap();
+        let m4 = m4.unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)    |\--m1-------\
         // (s2, w=2.0)    \---m2       |
@@ -545,7 +551,8 @@ mod tests {
             "should build on top of m1 as thats the only msg it saw"
         );
 
-        let m5 = Message::from_msgs(sender0, vec![&m3, &m2], &mut state.clone()).unwrap();
+        let (m5, _) = Message::from_msgs(sender0, vec![&m3, &m2], &mut state.clone()).unwrap();
+        let m5 = m5.unwrap();
         // (s0, w=1.0)   gen               m5
         // (s1, w=1.0)    |\--m1-------\   |
         // (s2, w=2.0)    \---m2       |   |
@@ -585,7 +592,7 @@ mod tests {
             .collect(),
         );
 
-        let mut state = sender::State::new(
+        let state = sender::State::new(
             senders_weights.clone(),
             0.0,  // state fault weight
             None, // latest messages
@@ -605,7 +612,9 @@ mod tests {
         // (s4, w=1.1)
         // (s5, w=1.0)
 
-        let m0 = Message::from_msgs(sender0, vec![&genesis_block_msg], &mut state.clone()).unwrap();
+        let (m0, _) =
+            Message::from_msgs(sender0, vec![&genesis_block_msg], &mut state.clone()).unwrap();
+        let m0 = m0.unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)     \--m0
         // (s1, w=1.0)
@@ -614,7 +623,8 @@ mod tests {
         // (s4, w=1.1)
         // (s5, w=1.0)
 
-        let m1 = Message::from_msgs(sender1, vec![&m0], &mut state.clone()).unwrap();
+        let (m1, _) = Message::from_msgs(sender1, vec![&m0], &mut state.clone()).unwrap();
+        let m1 = m1.unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)     \--m0
         // (s1, w=1.0)         \--m1
@@ -623,7 +633,9 @@ mod tests {
         // (s4, w=1.1)
         // (s5, w=1.0)
 
-        let m2 = Message::from_msgs(sender2, vec![&genesis_block_msg], &mut state.clone()).unwrap();
+        let (m2, _) =
+            Message::from_msgs(sender2, vec![&genesis_block_msg], &mut state.clone()).unwrap();
+        let m2 = m2.unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -632,7 +644,8 @@ mod tests {
         // (s4, w=1.1)
         // (s5, w=1.0)
 
-        let m3 = Message::from_msgs(sender3, vec![&m2], &mut state.clone()).unwrap();
+        let (m3, _) = Message::from_msgs(sender3, vec![&m2], &mut state.clone()).unwrap();
+        let m3 = m3.unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -641,7 +654,8 @@ mod tests {
         // (s4, w=1.1)
         // (s5, w=1.0)
 
-        let m4 = Message::from_msgs(sender4, vec![&m2], &mut state.clone()).unwrap();
+        let (m4, _) = Message::from_msgs(sender4, vec![&m2], &mut state.clone()).unwrap();
+        let m4 = m4.unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -650,8 +664,9 @@ mod tests {
         // (s4, w=1.1)                \-------m4
         // (s5, w=1.0)
 
-        let m5 =
+        let (m5, _) =
             Message::from_msgs(sender5, vec![&m0, &m1, &m2, &m3, &m4], &mut state.clone()).unwrap();
+        let m5 = m5.unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -696,10 +711,12 @@ mod tests {
         let m0 = Message::new(senders[0], latest_msgs, proto_b0.clone());
 
         let proto_b1 = Block::new(Some(proto_b0.clone()));
-        let m1 = Message::from_msgs(senders[1], vec![&m0], &mut state).unwrap();
+        let (m1, _) = Message::from_msgs(senders[1], vec![&m0], &mut state).unwrap();
+        let m1 = m1.unwrap();
 
         let proto_b2 = Block::new(Some(proto_b1.clone()));
-        let m2 = Message::from_msgs(senders[0], vec![&m1], &mut state).unwrap();
+        let (m2, _) = Message::from_msgs(senders[0], vec![&m1], &mut state).unwrap();
+        let m2 = m2.unwrap();
 
         // no clique yet, since senders[1] has not seen senders[0] seeing senders[1] having
         // proto_b0 in the chain
@@ -714,7 +731,8 @@ mod tests {
             HashSet::new()
         );
 
-        let m3 = Message::from_msgs(senders[1], vec![&m2], &mut state).unwrap();
+        let (m3, _) = Message::from_msgs(senders[1], vec![&m2], &mut state).unwrap();
+        let m3 = m3.unwrap();
 
         // clique, since both senders have seen each other having proto_b0 in the chain
         assert_eq!(
@@ -728,9 +746,11 @@ mod tests {
             HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1]])])
         );
 
-        let m4 = Message::from_msgs(senders[2], vec![&m3], &mut state).unwrap();
+        let (m4, _) = Message::from_msgs(senders[2], vec![&m3], &mut state).unwrap();
+        let m4 = m4.unwrap();
 
-        let m5 = Message::from_msgs(senders[1], vec![&m4], &mut state).unwrap();
+        let (m5, _) = Message::from_msgs(senders[1], vec![&m4], &mut state).unwrap();
+        let m5 = m5.unwrap();
 
         // no second clique yet, since senders[2] has not seen senders[1] seeing senders[2] having
         // proto_b0.clone() in the chain
@@ -745,7 +765,8 @@ mod tests {
             HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1]])])
         );
 
-        let m6 = Message::from_msgs(senders[2], vec![&m5], &mut state).unwrap();
+        let (m6, _) = Message::from_msgs(senders[2], vec![&m5], &mut state).unwrap();
+        let m6 = m6.unwrap();
 
         // have two cliques on proto_b0 now
         assert_eq!(
@@ -787,9 +808,11 @@ mod tests {
             HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[1], senders[2]])])
         );
 
-        let m7 = Message::from_msgs(senders[0], vec![&m6], &mut state).unwrap();
+        let (m7, _) = Message::from_msgs(senders[0], vec![&m6], &mut state).unwrap();
+        let m7 = m7.unwrap();
 
-        let m8 = Message::from_msgs(senders[2], vec![&m7], &mut state).unwrap();
+        let (m8, _) = Message::from_msgs(senders[2], vec![&m7], &mut state).unwrap();
+        let m8 = m8.unwrap();
 
         let _ = Message::from_msgs(senders[0], vec![&m8], &mut state).unwrap();
 

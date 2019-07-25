@@ -61,13 +61,15 @@ fn equal_weight() {
             ),
             &senders_weights,
         ),
-        Err("no msg")
+        Err("no msg".into())
     );
 
     let m0 = IntegerMsg::new(senders[0], Justification::empty(), IntegerWrapper(1));
     let m1 = IntegerMsg::new(senders[1], Justification::empty(), IntegerWrapper(2));
     let m2 = IntegerMsg::new(senders[2], Justification::empty(), IntegerWrapper(3));
-    let m3 = IntegerMsg::from_msgs(senders[0], vec![&m0, &m1], &mut sender_state.clone()).unwrap();
+    let (m3, _) =
+        IntegerMsg::from_msgs(senders[0], vec![&m0, &m1], &mut sender_state.clone()).unwrap();
+    let m3 = m3.unwrap();
 
     let mut j0 = Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut sender_state.clone());
     assert_eq!(
@@ -122,13 +124,15 @@ fn uneven_weights_1() {
             ),
             &senders_weights,
         ),
-        Err("no msg")
+        Err("no msg".into())
     );
 
     let m0 = IntegerMsg::new(senders[0], Justification::empty(), IntegerWrapper(1));
     let m1 = IntegerMsg::new(senders[1], Justification::empty(), IntegerWrapper(2));
     let m2 = IntegerMsg::new(senders[2], Justification::empty(), IntegerWrapper(3));
-    let m3 = IntegerMsg::from_msgs(senders[0], vec![&m0, &m1], &mut sender_state.clone()).unwrap();
+    let (m3, _) =
+        IntegerMsg::from_msgs(senders[0], vec![&m0, &m1], &mut sender_state.clone()).unwrap();
+    let m3 = m3.unwrap();
 
     let mut j0 = Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut sender_state.clone());
     assert_eq!(
@@ -183,7 +187,7 @@ fn uneven_weights_4() {
             ),
             &senders_weights,
         ),
-        Err("no msg")
+        Err("no msg".into())
     );
 
     let m0 = IntegerMsg::new(senders[0], Justification::empty(), IntegerWrapper(1));
@@ -191,12 +195,13 @@ fn uneven_weights_4() {
     let m2 = IntegerMsg::new(senders[2], Justification::empty(), IntegerWrapper(3));
     let m3 = IntegerMsg::new(senders[3], Justification::empty(), IntegerWrapper(4));
 
-    let m4 = IntegerMsg::from_msgs(
+    let (m4, _) = IntegerMsg::from_msgs(
         senders[3],
         vec![&m0, &m1, &m2, &m3],
         &mut sender_state.clone(),
     )
     .unwrap();
+    let m4 = m4.unwrap();
 
     let mut j0 = Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut sender_state.clone());
     assert_eq!(
