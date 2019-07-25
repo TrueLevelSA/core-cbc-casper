@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::error::Error;
 use std::fmt::Debug;
 use std::hash::Hash;
 
@@ -30,10 +31,11 @@ use crate::util::weight::WeightUnit;
 /// their weights.
 pub trait Estimator: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {
     type M: message::Trait<Estimator = Self>;
+    type Error: Error;
 
     /// Choses an estimate from a set of latest messages.
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         senders_weights: &sender::Weights<<<Self as Estimator>::M as message::Trait>::Sender, U>,
-    ) -> Result<Self, &'static str>;
+    ) -> Result<Self, Self::Error>;
 }

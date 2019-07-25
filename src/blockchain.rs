@@ -108,13 +108,25 @@ impl<'z, S: sender::Trait> From<&'z Message<S>> for Block<S> {
     }
 }
 
+#[derive(Debug)]
+pub struct Error;
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "Failed to get prevblock using ghost")
+    }
+}
+
+impl std::error::Error for Error {}
+
 impl<S: sender::Trait> Estimator for Block<S> {
     type M = Message<S>;
+    type Error = Error;
 
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Self::M>,
         senders_weights: &sender::Weights<<<Self as Estimator>::M as message::Trait>::Sender, U>,
-    ) -> Result<Self, &'static str> {
+    ) -> Result<Self, Self::Error> {
         let prevblock = Block::ghost(latest_msgs, senders_weights)?;
         Ok(Block::from(ProtoBlock::new(Some(prevblock))))
     }
@@ -426,7 +438,7 @@ impl<S: sender::Trait> Block<S> {
     pub fn ghost<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Message<S>>,
         senders_weights: &sender::Weights<<Message<S> as message::Trait>::Sender, U>,
-    ) -> Result<Self, &'static str> {
+    ) -> Result<Self, Error> {
         let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_msgs);
         let b_in_lms_senders = Rc::new(RwLock::new(HashMap::<Block<S>, HashSet<S>>::new()));
         Block::pick_heaviest(
@@ -437,7 +449,7 @@ impl<S: sender::Trait> Block<S> {
             b_in_lms_senders,
         )
         .and_then(|(opt_block, ..)| opt_block)
-        .ok_or_else(|| "Failed to get prevblock using ghost.")
+        .ok_or(Error)
     }
 }
 

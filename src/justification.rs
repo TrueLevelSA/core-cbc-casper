@@ -93,7 +93,7 @@ impl<M: message::Trait> Justification<M> {
         &self,
         equivocators: &HashSet<M::Sender>,
         senders_weights: &sender::Weights<<M as message::Trait>::Sender, U>,
-    ) -> Result<M::Estimator, &'static str> {
+    ) -> Result<M::Estimator, <M::Estimator as Estimator>::Error> {
         let latest_msgs = LatestMsgs::from(self);
         let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(&latest_msgs, equivocators);
         M::Estimator::estimate(&latest_msgs_honest, senders_weights)
@@ -345,7 +345,7 @@ impl<M: message::Trait> LatestMsgsHonest<M> {
     pub fn mk_estimate<U: WeightUnit>(
         &self,
         senders_weights: &sender::Weights<<M as message::Trait>::Sender, U>,
-    ) -> Result<M::Estimator, &'static str> {
+    ) -> Result<M::Estimator, <M::Estimator as Estimator>::Error> {
         M::Estimator::estimate(&self, senders_weights)
     }
 }
