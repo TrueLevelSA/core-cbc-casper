@@ -158,23 +158,22 @@ impl<M: message::Trait> Justification<M> {
     /// This function sets the weight of the equivocator to zero right away (returned in
     /// `sender::State`) and add his message to the state, since now his equivocation doesnt count
     /// to the state fault weight anymore
-    pub fn faulty_insert_with_slash<U: WeightUnit>(
+    pub fn faulty_insert_with_slash<'a, U: WeightUnit>(
         &mut self,
         msg: &M,
-        mut state: sender::State<M, U>,
-    ) -> (bool, sender::State<M, U>) {
+        state: &'a mut sender::State<M, U>,
+    ) -> Result<bool, sender::Error<'a, HashMap<<M as message::Trait>::Sender, U>>> {
         let is_equivocation = state.latest_msgs.equivocate(msg);
         if is_equivocation {
             let sender = msg.sender();
             state.equivocators.insert(sender.clone());
-            // TODO: Ignoring Result here, should the Result surface to user?
             state
                 .senders_weights
-                .insert(sender.clone(), <U as Zero<U>>::ZERO);
+                .insert(sender.clone(), <U as Zero<U>>::ZERO)?;
         }
         state.latest_msgs.update(msg);
         let success = self.insert(msg.clone());
-        (success, state)
+        Ok(success)
     }
 }
 
