@@ -573,7 +573,7 @@ mod tests {
             .collect(),
         );
 
-        let mut state = sender::State::new(
+        let state = sender::State::new(
             senders_weights.clone(),
             0.0,  // state fault weight
             None, // latest messages
