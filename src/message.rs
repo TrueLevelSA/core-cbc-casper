@@ -87,17 +87,19 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
     fn from_msgs<U: WeightUnit>(
         sender: Self::Sender,
         mut new_msgs: Vec<&Self>,
-        sender_state: &sender::State<Self, U>,
-    ) -> Result<(Self, sender::State<Self, U>), &'static str> {
+        sender_state: &mut sender::State<Self, U>,
+    ) -> Result<Self, &'static str> {
         // dedup by putting msgs into a hashset
         let new_msgs: HashSet<_> = new_msgs.drain(..).collect();
         let new_msgs_len = new_msgs.len();
 
         // update latest_msgs in sender_state with new_msgs
         let mut justification = Justification::empty();
-        let (success, sender_state) = justification.faulty_inserts(new_msgs, &sender_state);
+        let failure = justification
+            .faulty_inserts(&new_msgs, sender_state)
+            .is_empty();
 
-        if !success && new_msgs_len > 0 {
+        if failure && new_msgs_len > 0 {
             Err("None of the messages could be added to the state!")
         } else {
             let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(
@@ -106,7 +108,7 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
             );
 
             let estimate = latest_msgs_honest.mk_estimate(&sender_state.senders_weights());
-            estimate.map(|e| (Self::new(sender, justification, e), sender_state))
+            estimate.map(|e| Self::new(sender, justification, e))
         }
     }
 

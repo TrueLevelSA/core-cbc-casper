@@ -54,16 +54,13 @@ impl<M: message::Trait> Justification<M> {
         Justification(Vec::new())
     }
 
-    /// Creates a new justification instance from a vector of `message::Trait` and a
-    /// `sender::State` and return the justification and an updated state.
-    pub fn from_msgs<U: WeightUnit>(
-        messages: Vec<M>,
-        state: &sender::State<M, U>,
-    ) -> (Self, sender::State<M, U>) {
+    /// Creates and return a new justification instance from a vector of `message::Trait` and
+    /// mutate the given `sender::State` with the updated state
+    pub fn from_msgs<U: WeightUnit>(messages: Vec<M>, state: &mut sender::State<M, U>) -> Self {
         let mut justification = Justification::empty();
         let messages: HashSet<_> = messages.iter().collect();
-        let (_, state) = justification.faulty_inserts(messages, state);
-        (justification, state)
+        justification.faulty_inserts(&messages, state);
+        justification
     }
 
     pub fn iter(&self) -> std::slice::Iter<M> {
@@ -103,20 +100,17 @@ impl<M: message::Trait> Justification<M> {
     }
 
     /// Insert messages to the justification, accepting up to the threshold faults by weight.
-    /// Returns true if at least one message of the set gets successfully included in the
-    /// justification.
-    pub fn faulty_inserts<U: WeightUnit>(
+    /// Returns a HashSet of messages that got successfully included in the justification.
+    pub fn faulty_inserts<'a, U: WeightUnit>(
         &mut self,
-        msgs: HashSet<&M>,
-        state: &sender::State<M, U>,
-    ) -> (bool, sender::State<M, U>) {
+        msgs: &HashSet<&'a M>,
+        state: &mut sender::State<M, U>,
+    ) -> HashSet<&'a M> {
         let msgs = state.sort_by_faultweight(msgs);
         // do the actual insertions to the state
-        msgs.iter()
-            .fold((false, state.clone()), |(success, state), &msg| {
-                let (success_prime, sender_state_prime) = self.faulty_insert(msg, &state);
-                (success || success_prime, sender_state_prime)
-            })
+        msgs.into_iter()
+            .filter(|msg| self.faulty_insert(msg, state))
+            .collect()
     }
 
     /// This function makes no assumption on how to treat the equivocator. it adds the msg to the
@@ -124,9 +118,8 @@ impl<M: message::Trait> Justification<M> {
     pub fn faulty_insert<U: WeightUnit>(
         &mut self,
         msg: &M,
-        state: &sender::State<M, U>,
-    ) -> (bool, sender::State<M, U>) {
-        let mut state = state.clone();
+        state: &mut sender::State<M, U>,
+    ) -> bool {
         let is_equivocation = state.latest_msgs.equivocate(msg);
 
         let sender = msg.sender();
@@ -142,7 +135,7 @@ impl<M: message::Trait> Justification<M> {
                 if success {
                     state.latest_msgs.update(msg);
                 }
-                (success, state)
+                success
             }
             // in the other case, we have to check that the threshold is not reached
             (true, false) => {
@@ -154,9 +147,9 @@ impl<M: message::Trait> Justification<M> {
                             state.state_fault_weight += sender_weight;
                         }
                     }
-                    (success, state)
+                    success
                 } else {
-                    (false, state)
+                    false
                 }
             }
         }
@@ -165,22 +158,22 @@ impl<M: message::Trait> Justification<M> {
     /// This function sets the weight of the equivocator to zero right away (returned in
     /// `sender::State`) and add his message to the state, since now his equivocation doesnt count
     /// to the state fault weight anymore
-    pub fn faulty_insert_with_slash<U: WeightUnit>(
+    pub fn faulty_insert_with_slash<'a, U: WeightUnit>(
         &mut self,
         msg: &M,
-        mut state: sender::State<M, U>,
-    ) -> (bool, sender::State<M, U>) {
+        state: &'a mut sender::State<M, U>,
+    ) -> Result<bool, sender::Error<'a, HashMap<<M as message::Trait>::Sender, U>>> {
         let is_equivocation = state.latest_msgs.equivocate(msg);
         if is_equivocation {
             let sender = msg.sender();
             state.equivocators.insert(sender.clone());
             state
                 .senders_weights
-                .insert(sender.clone(), <U as Zero<U>>::ZERO);
+                .insert(sender.clone(), <U as Zero<U>>::ZERO)?;
         }
         state.latest_msgs.update(msg);
         let success = self.insert(msg.clone());
-        (success, state)
+        Ok(success)
     }
 }
 

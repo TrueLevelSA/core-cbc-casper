@@ -56,7 +56,7 @@ fn equal_weight() {
     let m0 = BinaryMsg::new(senders[0], Justification::empty(), BoolWrapper(false));
     let m1 = BinaryMsg::new(senders[1], Justification::empty(), BoolWrapper(true));
     let m2 = BinaryMsg::new(senders[2], Justification::empty(), BoolWrapper(false));
-    let (m3, _) = BinaryMsg::from_msgs(senders[0], vec![&m0, &m1], &sender_state).unwrap();
+    let m3 = BinaryMsg::from_msgs(senders[0], vec![&m0, &m1], &mut sender_state.clone()).unwrap();
 
     assert_eq!(
         BoolWrapper::estimate(
@@ -69,21 +69,21 @@ fn equal_weight() {
         .unwrap(),
         BoolWrapper(true)
     );
-    let (mut j0, _) = Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
+    let mut j0 = Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut sender_state.clone());
     // s0 and s1 vote. since tie-breaker is `true`, get `true`
     assert_eq!(
         j0.mk_estimate(sender_state.equivocators(), &senders_weights)
             .unwrap(),
         BoolWrapper(true)
     );
-    j0.faulty_insert(&m2, &sender_state);
+    j0.faulty_insert(&m2, &mut sender_state.clone());
     // `false` now has weight 2.0, while true has weight `1.0`
     assert_eq!(
         j0.mk_estimate(sender_state.equivocators(), &senders_weights)
             .unwrap(),
         BoolWrapper(false)
     );
-    j0.faulty_insert(&m3, &sender_state);
+    j0.faulty_insert(&m3, &mut sender_state.clone());
     assert_eq!(
         j0.mk_estimate(sender_state.equivocators(), &senders_weights)
             .unwrap(),
@@ -119,9 +119,9 @@ fn vote_swaying() {
     let m3 = BinaryMsg::new(senders[3], Justification::empty(), BoolWrapper(false));
     let m4 = BinaryMsg::new(senders[4], Justification::empty(), BoolWrapper(false));
 
-    let (mut j0, _) = Justification::from_msgs(
+    let mut j0 = Justification::from_msgs(
         vec![m0.clone(), m1.clone(), m2.clone(), m3.clone(), m4.clone()],
-        &sender_state,
+        &mut sender_state.clone(),
     );
 
     // honest result of vote: false
@@ -132,9 +132,10 @@ fn vote_swaying() {
     );
 
     // assume sender 0 has seen messages from sender 1 and sender 2 and reveals this in a published message
-    let (m5, _) = BinaryMsg::from_msgs(senders[0], vec![&m0, &m1, &m2], &sender_state).unwrap();
+    let m5 =
+        BinaryMsg::from_msgs(senders[0], vec![&m0, &m1, &m2], &mut sender_state.clone()).unwrap();
 
-    j0.faulty_insert(&m5, &sender_state);
+    j0.faulty_insert(&m5, &mut sender_state.clone());
     // sender 0 now "votes" in the other direction and sways the result: true
     assert_eq!(
         j0.mk_estimate(sender_state.equivocators(), &senders_weights)

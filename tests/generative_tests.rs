@@ -95,10 +95,11 @@ where
                 None => latest,
             };
 
-            let (m, sender_state) = M::from_msgs(
+            let mut sender_state = state[&sender].clone();
+            let m = M::from_msgs(
                 sender.clone(),
                 latest_delta.iter().collect(),
-                &state[&sender],
+                &mut sender_state,
             )
             .unwrap();
 
@@ -127,7 +128,7 @@ where
         .map(|(m, sender, recipients)|{
         recipients.into_iter().map(|recipient| {
 
-            let sender_state_reconstructed = sender::State::new(
+            let mut sender_state_reconstructed = sender::State::new(
                 state[&recipient].senders_weights().clone(),
                 0.0,
                 Some(m.clone()),
@@ -139,10 +140,9 @@ where
                 != M::from_msgs(
                     sender.clone(),
                     m.justification().iter().collect(),
-                    &sender_state_reconstructed,
+                    &mut sender_state_reconstructed,
                 )
                 .unwrap()
-                .0
                 .estimate()
             {
                 return Err("Recipient must be able to reproduce the estimate from its justification and the justification only.");
@@ -745,16 +745,16 @@ proptest! {
         // here, only take one equivocation
         let single_equivocation: Vec<_> = messages[..nodes+1].iter().map(|message| message).collect();
         let equivocator = messages[nodes].sender();
-        let (m0, _) =
-            &Message::from_msgs(0, single_equivocation.clone(), &sender_state)
+        let m0 =
+            &Message::from_msgs(0, single_equivocation.clone(), &mut sender_state.clone())
             .unwrap();
         let equivocations: Vec<_> = single_equivocation.iter().filter(|message| message.equivocates(&m0)).collect();
         assert!(if *equivocator == 0 {equivocations.len() == 1} else {equivocations.len() == 0}, "should detect sender 0 equivocating if sender 0 equivocates");
         // the following commented test should fail
         // assert_eq!(equivocations.len(), 1, "should detect sender 0 equivocating if sender 0 equivocates");
 
-        let (m0, _) =
-            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &sender_state)
+        let m0 =
+            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &mut sender_state.clone())
             .unwrap();
         let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
         assert_eq!(equivocations.len(), 1, "should detect sender 0 equivocating if sender 0 equivocates");
@@ -767,8 +767,8 @@ proptest! {
             equivocators.len() as f64,
             HashSet::new(),
         );
-        let (m0, _) =
-            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &sender_state)
+        let m0 =
+            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &mut sender_state.clone())
             .unwrap();
         let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
         assert_eq!(equivocations.len(), 0, "equivocation absorbed in threshold");

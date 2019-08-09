@@ -67,23 +67,23 @@ fn equal_weight() {
     let m0 = IntegerMsg::new(senders[0], Justification::empty(), IntegerWrapper(1));
     let m1 = IntegerMsg::new(senders[1], Justification::empty(), IntegerWrapper(2));
     let m2 = IntegerMsg::new(senders[2], Justification::empty(), IntegerWrapper(3));
-    let (m3, _) = IntegerMsg::from_msgs(senders[0], vec![&m0, &m1], &sender_state).unwrap();
+    let m3 = IntegerMsg::from_msgs(senders[0], vec![&m0, &m1], &mut sender_state.clone()).unwrap();
 
-    let (mut j0, _) = Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
+    let mut j0 = Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut sender_state.clone());
     assert_eq!(
         j0.mk_estimate(sender_state.equivocators(), &senders_weights)
             .unwrap(),
         IntegerWrapper(1)
     );
 
-    j0.faulty_insert(&m2, &sender_state);
+    j0.faulty_insert(&m2, &mut sender_state.clone());
     assert_eq!(
         j0.mk_estimate(sender_state.equivocators(), &senders_weights)
             .unwrap(),
         IntegerWrapper(2)
     );
 
-    j0.faulty_insert(&m3, &sender_state);
+    j0.faulty_insert(&m3, &mut sender_state.clone());
     assert_eq!(
         j0.mk_estimate(sender_state.equivocators(), &senders_weights)
             .unwrap(),
@@ -128,23 +128,23 @@ fn uneven_weights_1() {
     let m0 = IntegerMsg::new(senders[0], Justification::empty(), IntegerWrapper(1));
     let m1 = IntegerMsg::new(senders[1], Justification::empty(), IntegerWrapper(2));
     let m2 = IntegerMsg::new(senders[2], Justification::empty(), IntegerWrapper(3));
-    let (m3, _) = IntegerMsg::from_msgs(senders[0], vec![&m0, &m1], &sender_state).unwrap();
+    let m3 = IntegerMsg::from_msgs(senders[0], vec![&m0, &m1], &mut sender_state.clone()).unwrap();
 
-    let (mut j0, _) = Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
+    let mut j0 = Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut sender_state.clone());
     assert_eq!(
         j0.mk_estimate(sender_state.equivocators(), &senders_weights)
             .unwrap(),
         IntegerWrapper(1)
     );
 
-    j0.faulty_insert(&m2, &sender_state);
+    j0.faulty_insert(&m2, &mut sender_state.clone());
     assert_eq!(
         j0.mk_estimate(sender_state.equivocators(), &senders_weights)
             .unwrap(),
         IntegerWrapper(1)
     );
 
-    j0.faulty_insert(&m3, &sender_state);
+    j0.faulty_insert(&m3, &mut sender_state.clone());
     assert_eq!(
         j0.mk_estimate(sender_state.equivocators(), &senders_weights)
             .unwrap(),
@@ -191,31 +191,35 @@ fn uneven_weights_4() {
     let m2 = IntegerMsg::new(senders[2], Justification::empty(), IntegerWrapper(3));
     let m3 = IntegerMsg::new(senders[3], Justification::empty(), IntegerWrapper(4));
 
-    let (m4, _) =
-        IntegerMsg::from_msgs(senders[3], vec![&m0, &m1, &m2, &m3], &sender_state).unwrap();
+    let m4 = IntegerMsg::from_msgs(
+        senders[3],
+        vec![&m0, &m1, &m2, &m3],
+        &mut sender_state.clone(),
+    )
+    .unwrap();
 
-    let (mut j0, _) = Justification::from_msgs(vec![m0.clone(), m1.clone()], &sender_state);
+    let mut j0 = Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut sender_state.clone());
     assert_eq!(
         j0.mk_estimate(sender_state.equivocators(), &senders_weights)
             .unwrap(),
         IntegerWrapper(1)
     );
 
-    j0.faulty_insert(&m2, &sender_state);
+    j0.faulty_insert(&m2, &mut sender_state.clone());
     assert_eq!(
         j0.mk_estimate(sender_state.equivocators(), &senders_weights)
             .unwrap(),
         IntegerWrapper(2)
     );
 
-    j0.faulty_insert(&m3, &sender_state);
+    j0.faulty_insert(&m3, &mut sender_state.clone());
     assert_eq!(
         j0.mk_estimate(sender_state.equivocators(), &senders_weights)
             .unwrap(),
         IntegerWrapper(4)
     );
 
-    j0.faulty_insert(&m4, &sender_state);
+    j0.faulty_insert(&m4, &mut sender_state.clone());
     assert_eq!(
         j0.mk_estimate(sender_state.equivocators(), &senders_weights)
             .unwrap(),
