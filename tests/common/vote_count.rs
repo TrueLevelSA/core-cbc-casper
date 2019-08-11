@@ -102,7 +102,7 @@ impl VoteCount {
             false => VoteCount { yes: 0, no: 1 },
         };
 
-        message::Message::new(sender, justification, estimate)
+        message::Message::new(sender, justification, estimate, HashSet::new())
     }
 
     fn get_vote_msgs(
@@ -122,6 +122,7 @@ impl VoteCount {
                                 m.sender().clone(),
                                 m.justification().clone(),
                                 VoteCount::toggle_vote(&estimate),
+                                HashSet::new(),
                             );
                             // search for the equivocation of the current latest_msgs
                             match acc_prime.get(&equivocation) {

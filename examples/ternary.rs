@@ -139,20 +139,15 @@ fn main() {
     // 3: (0)  (0)       (0)
     // 4: (1)  (0)
 
-    let msg1 = Message::new(1, Justification::empty(), Value::One);
-    let msg2 = Message::new(2, Justification::empty(), Value::Two);
-    let msg3 = Message::new(3, Justification::empty(), Value::Zero);
-    let msg4 = Message::new(4, Justification::empty(), Value::One);
-    let (msg5, _) = Message::from_msgs(1, vec![&msg1, &msg2], &mut weights).unwrap();
-    let msg5 = msg5.unwrap();
-    let (msg6, _) = Message::from_msgs(3, vec![&msg3, &msg4], &mut weights).unwrap();
-    let msg6 = msg6.unwrap();
-    let (msg7, _) = Message::from_msgs(2, vec![&msg2, &msg5, &msg6], &mut weights).unwrap();
-    let msg7 = msg7.unwrap();
-    let (msg8, _) = Message::from_msgs(3, vec![&msg7, &msg6], &mut weights).unwrap();
-    let msg8 = msg8.unwrap();
-    let (msg9, _) = Message::from_msgs(4, vec![&msg4, &msg6], &mut weights).unwrap();
-    let msg9 = msg9.unwrap();
+    let msg1 = Message::new(1, Justification::empty(), Value::One, HashSet::new());
+    let msg2 = Message::new(2, Justification::empty(), Value::Two, HashSet::new());
+    let msg3 = Message::new(3, Justification::empty(), Value::Zero, HashSet::new());
+    let msg4 = Message::new(4, Justification::empty(), Value::One, HashSet::new());
+    let msg5 = Message::from_msgs(1, vec![&msg1, &msg2], &mut weights).unwrap();
+    let msg6 = Message::from_msgs(3, vec![&msg3, &msg4], &mut weights).unwrap();
+    let msg7 = Message::from_msgs(2, vec![&msg2, &msg5, &msg6], &mut weights).unwrap();
+    let msg8 = Message::from_msgs(3, vec![&msg7, &msg6], &mut weights).unwrap();
+    let msg9 = Message::from_msgs(4, vec![&msg4, &msg6], &mut weights).unwrap();
 
     assert_eq!(msg5.estimate(), &Value::Two);
     assert_eq!(msg6.estimate(), &Value::Zero);

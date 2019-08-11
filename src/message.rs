@@ -57,6 +57,23 @@ use crate::util::hash::Hash;
 use crate::util::id::Id;
 use crate::util::weight::WeightUnit;
 
+#[derive(Debug)]
+pub enum Error<E: std::error::Error> {
+    Estimator(E),
+    NoNewMessage,
+}
+
+impl<E: std::error::Error> std::fmt::Display for Error<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Error::Estimator(err) => std::fmt::Display::fmt(&err, f),
+            Error::NoNewMessage => writeln!(f, "No message could be added to the state"),
+        }
+    }
+}
+
+impl<E: std::error::Error> std::error::Error for Error<E> {}
+
 /// Abstraction of a Casper message, contain a value (`Estimator`) that will be sent over the
 /// network by validators (`sender::Trait`) and used as `Justification` for a more recent messages.
 pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize {
@@ -81,14 +98,15 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
         sender: Self::Sender,
         justification: Justification<Self>,
         estimate: Self::Estimator,
+        inserted_msgs: HashSet<&Self>,
     ) -> Self;
 
     /// Create a message from newly received messages.
-    fn from_msgs<'a, U: WeightUnit>(
+    fn from_msgs<U: WeightUnit>(
         sender: Self::Sender,
-        mut new_msgs: Vec<&'a Self>,
+        mut new_msgs: Vec<&Self>,
         sender_state: &mut sender::State<Self, U>,
-    ) -> Result<(Option<Self>, HashSet<&'a Self>), <Self::Estimator as Estimator>::Error> {
+    ) -> Result<Self, Error<<Self::Estimator as Estimator>::Error>> {
         // dedup by putting msgs into a hashset
         let new_msgs: HashSet<_> = new_msgs.drain(..).collect();
         let new_msgs_len = new_msgs.len();
@@ -98,7 +116,7 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
         let inserted_msgs = justification.faulty_inserts(&new_msgs, sender_state);
 
         if inserted_msgs.is_empty() && new_msgs_len > 0 {
-            Ok((None, inserted_msgs))
+            Err(Error::NoNewMessage)
         } else {
             let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(
                 sender_state.latests_msgs(),
@@ -106,7 +124,9 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
             );
 
             let estimate = latest_msgs_honest.mk_estimate(&sender_state.senders_weights());
-            estimate.map(|e| (Some(Self::new(sender, justification, e)), inserted_msgs))
+            estimate
+                .map(|e| Self::new(sender, justification, e, inserted_msgs))
+                .map_err(|e| Error::Estimator(e))
         }
     }
 
@@ -305,7 +325,12 @@ where
         &self.0.justification
     }
 
-    fn new(sender: S, justification: Justification<Self>, estimate: E) -> Self {
+    fn new(
+        sender: S,
+        justification: Justification<Self>,
+        estimate: E,
+        _inserted_msgs: HashSet<&Self>,
+    ) -> Self {
         let proto = ProtoMsg {
             sender,
             justification,

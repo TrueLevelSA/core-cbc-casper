@@ -88,8 +88,7 @@ fn faulty_inserts() {
         .is_empty();
     assert_eq!(failure, false);
 
-    let (m0, _) = message::Message::from_msgs(0, vec![v0], &mut sender_state.clone()).unwrap();
-    let m0 = &m0.unwrap();
+    let m0 = message::Message::from_msgs(0, vec![v0], &mut sender_state.clone()).unwrap();
 
     // let m0 = &message::Message::new(0, justification, estimate);
     let mut j1 = Justification::empty();
@@ -99,7 +98,7 @@ fn faulty_inserts() {
     assert_eq!(failure, false);
 
     let failure = j1
-        .faulty_inserts(&vec![m0].iter().cloned().collect(), &mut sender_state)
+        .faulty_inserts(&vec![&m0].iter().cloned().collect(), &mut sender_state)
         .is_empty();
     assert_eq!(failure, false);
 

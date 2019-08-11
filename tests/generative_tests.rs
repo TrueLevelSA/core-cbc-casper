@@ -101,8 +101,6 @@ where
                 latest_delta.iter().collect(),
                 &mut sender_state,
             )
-            .unwrap()
-            .0
             .unwrap();
 
             state.insert(sender.clone(), sender_state);
@@ -144,8 +142,6 @@ where
                     m.justification().iter().collect(),
                     &mut sender_state_reconstructed,
                 )
-                .unwrap()
-                .0
                 .unwrap()
                 .estimate()
             {
@@ -445,7 +441,12 @@ where
 
             validators.iter().for_each(|validator| {
                 let mut j = Justification::empty();
-                let m = Message::new(*validator, j.clone(), votes[*validator as usize].clone());
+                let m = Message::new(
+                    *validator,
+                    j.clone(),
+                    votes[*validator as usize].clone(),
+                    HashSet::new(),
+                );
                 j.insert(m.clone());
                 state.insert(
                     *validator,
@@ -753,8 +754,6 @@ proptest! {
         let equivocator = messages[nodes].sender();
         let m0 =
             &Message::from_msgs(0, single_equivocation.clone(), &mut sender_state.clone())
-            .unwrap()
-            .0
             .unwrap();
         let equivocations: Vec<_> = single_equivocation.iter().filter(|message| message.equivocates(&m0)).collect();
         assert!(if *equivocator == 0 {equivocations.len() == 1} else {equivocations.len() == 0}, "should detect sender 0 equivocating if sender 0 equivocates");
@@ -763,8 +762,6 @@ proptest! {
 
         let m0 =
             &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &mut sender_state.clone())
-            .unwrap()
-            .0
             .unwrap();
         let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
         assert_eq!(equivocations.len(), 1, "should detect sender 0 equivocating if sender 0 equivocates");
@@ -777,10 +774,9 @@ proptest! {
             equivocators.len() as f64,
             HashSet::new(),
         );
-        let (m0, _) =
-            Message::from_msgs(0, messages.iter().map(|message| message).collect(), &mut sender_state.clone())
+        let m0 =
+            &Message::from_msgs(0, messages.iter().map(|message| message).collect(), &mut sender_state.clone())
             .unwrap();
-        let m0 = &m0.unwrap();
         let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
         assert_eq!(equivocations.len(), 0, "equivocation absorbed in threshold");
     }
