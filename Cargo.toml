@@ -28,3 +28,10 @@ default-features = false
 
 [features]
 integration_test = ["proptest", "rand"]
+
+[dev-dependencies]
+criterion = "0.2"
+
+[[bench]]
+name = "block"
+harness = false
