@@ -139,10 +139,10 @@ fn main() {
     // 3: (0)  (0)       (0)
     // 4: (1)  (0)
 
-    let msg1 = Message::new(1, Justification::empty(), Value::One, HashSet::new());
-    let msg2 = Message::new(2, Justification::empty(), Value::Two, HashSet::new());
-    let msg3 = Message::new(3, Justification::empty(), Value::Zero, HashSet::new());
-    let msg4 = Message::new(4, Justification::empty(), Value::One, HashSet::new());
+    let msg1 = Message::new(1, Justification::empty(), Value::One);
+    let msg2 = Message::new(2, Justification::empty(), Value::Two);
+    let msg3 = Message::new(3, Justification::empty(), Value::Zero);
+    let msg4 = Message::new(4, Justification::empty(), Value::One);
     let msg5 = Message::from_msgs(1, vec![&msg1, &msg2], &mut weights).unwrap();
     let msg6 = Message::from_msgs(3, vec![&msg3, &msg4], &mut weights).unwrap();
     let msg7 = Message::from_msgs(2, vec![&msg2, &msg5, &msg6], &mut weights).unwrap();

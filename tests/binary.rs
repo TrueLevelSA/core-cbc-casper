@@ -53,24 +53,9 @@ fn equal_weight() {
         HashSet::new(), // equivocators
     );
 
-    let m0 = BinaryMsg::new(
-        senders[0],
-        Justification::empty(),
-        BoolWrapper(false),
-        HashSet::new(),
-    );
-    let m1 = BinaryMsg::new(
-        senders[1],
-        Justification::empty(),
-        BoolWrapper(true),
-        HashSet::new(),
-    );
-    let m2 = BinaryMsg::new(
-        senders[2],
-        Justification::empty(),
-        BoolWrapper(false),
-        HashSet::new(),
-    );
+    let m0 = BinaryMsg::new(senders[0], Justification::empty(), BoolWrapper(false));
+    let m1 = BinaryMsg::new(senders[1], Justification::empty(), BoolWrapper(true));
+    let m2 = BinaryMsg::new(senders[2], Justification::empty(), BoolWrapper(false));
     let m3 = BinaryMsg::from_msgs(senders[0], vec![&m0, &m1], &mut sender_state.clone()).unwrap();
 
     assert_eq!(
@@ -128,36 +113,11 @@ fn vote_swaying() {
         HashSet::new(), // equivocators
     );
 
-    let m0 = BinaryMsg::new(
-        senders[0],
-        Justification::empty(),
-        BoolWrapper(false),
-        HashSet::new(),
-    );
-    let m1 = BinaryMsg::new(
-        senders[1],
-        Justification::empty(),
-        BoolWrapper(true),
-        HashSet::new(),
-    );
-    let m2 = BinaryMsg::new(
-        senders[2],
-        Justification::empty(),
-        BoolWrapper(true),
-        HashSet::new(),
-    );
-    let m3 = BinaryMsg::new(
-        senders[3],
-        Justification::empty(),
-        BoolWrapper(false),
-        HashSet::new(),
-    );
-    let m4 = BinaryMsg::new(
-        senders[4],
-        Justification::empty(),
-        BoolWrapper(false),
-        HashSet::new(),
-    );
+    let m0 = BinaryMsg::new(senders[0], Justification::empty(), BoolWrapper(false));
+    let m1 = BinaryMsg::new(senders[1], Justification::empty(), BoolWrapper(true));
+    let m2 = BinaryMsg::new(senders[2], Justification::empty(), BoolWrapper(true));
+    let m3 = BinaryMsg::new(senders[3], Justification::empty(), BoolWrapper(false));
+    let m4 = BinaryMsg::new(senders[4], Justification::empty(), BoolWrapper(false));
 
     let mut j0 = Justification::from_msgs(
         vec![m0.clone(), m1.clone(), m2.clone(), m3.clone(), m4.clone()],

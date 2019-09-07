@@ -64,24 +64,9 @@ fn equal_weight() {
         Err("no msg".into())
     );
 
-    let m0 = IntegerMsg::new(
-        senders[0],
-        Justification::empty(),
-        IntegerWrapper(1),
-        HashSet::new(),
-    );
-    let m1 = IntegerMsg::new(
-        senders[1],
-        Justification::empty(),
-        IntegerWrapper(2),
-        HashSet::new(),
-    );
-    let m2 = IntegerMsg::new(
-        senders[2],
-        Justification::empty(),
-        IntegerWrapper(3),
-        HashSet::new(),
-    );
+    let m0 = IntegerMsg::new(senders[0], Justification::empty(), IntegerWrapper(1));
+    let m1 = IntegerMsg::new(senders[1], Justification::empty(), IntegerWrapper(2));
+    let m2 = IntegerMsg::new(senders[2], Justification::empty(), IntegerWrapper(3));
     let m3 = IntegerMsg::from_msgs(senders[0], vec![&m0, &m1], &mut sender_state.clone()).unwrap();
 
     let mut j0 = Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut sender_state.clone());
@@ -140,24 +125,9 @@ fn uneven_weights_1() {
         Err("no msg".into())
     );
 
-    let m0 = IntegerMsg::new(
-        senders[0],
-        Justification::empty(),
-        IntegerWrapper(1),
-        HashSet::new(),
-    );
-    let m1 = IntegerMsg::new(
-        senders[1],
-        Justification::empty(),
-        IntegerWrapper(2),
-        HashSet::new(),
-    );
-    let m2 = IntegerMsg::new(
-        senders[2],
-        Justification::empty(),
-        IntegerWrapper(3),
-        HashSet::new(),
-    );
+    let m0 = IntegerMsg::new(senders[0], Justification::empty(), IntegerWrapper(1));
+    let m1 = IntegerMsg::new(senders[1], Justification::empty(), IntegerWrapper(2));
+    let m2 = IntegerMsg::new(senders[2], Justification::empty(), IntegerWrapper(3));
     let m3 = IntegerMsg::from_msgs(senders[0], vec![&m0, &m1], &mut sender_state.clone()).unwrap();
 
     let mut j0 = Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut sender_state.clone());
@@ -216,30 +186,10 @@ fn uneven_weights_4() {
         Err("no msg".into())
     );
 
-    let m0 = IntegerMsg::new(
-        senders[0],
-        Justification::empty(),
-        IntegerWrapper(1),
-        HashSet::new(),
-    );
-    let m1 = IntegerMsg::new(
-        senders[1],
-        Justification::empty(),
-        IntegerWrapper(2),
-        HashSet::new(),
-    );
-    let m2 = IntegerMsg::new(
-        senders[2],
-        Justification::empty(),
-        IntegerWrapper(3),
-        HashSet::new(),
-    );
-    let m3 = IntegerMsg::new(
-        senders[3],
-        Justification::empty(),
-        IntegerWrapper(4),
-        HashSet::new(),
-    );
+    let m0 = IntegerMsg::new(senders[0], Justification::empty(), IntegerWrapper(1));
+    let m1 = IntegerMsg::new(senders[1], Justification::empty(), IntegerWrapper(2));
+    let m2 = IntegerMsg::new(senders[2], Justification::empty(), IntegerWrapper(3));
+    let m3 = IntegerMsg::new(senders[3], Justification::empty(), IntegerWrapper(4));
 
     let m4 = IntegerMsg::from_msgs(
         senders[3],

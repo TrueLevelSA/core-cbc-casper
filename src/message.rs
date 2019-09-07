@@ -98,7 +98,6 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
         sender: Self::Sender,
         justification: Justification<Self>,
         estimate: Self::Estimator,
-        inserted_msgs: HashSet<&Self>,
     ) -> Self;
 
     /// Create a message from newly received messages.
@@ -125,7 +124,7 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
 
             let estimate = latest_msgs_honest.mk_estimate(&sender_state.senders_weights());
             estimate
-                .map(|e| Self::new(sender, justification, e, inserted_msgs))
+                .map(|e| Self::new(sender, justification, e))
                 .map_err(|e| Error::Estimator(e))
         }
     }
@@ -325,12 +324,7 @@ where
         &self.0.justification
     }
 
-    fn new(
-        sender: S,
-        justification: Justification<Self>,
-        estimate: E,
-        _inserted_msgs: HashSet<&Self>,
-    ) -> Self {
+    fn new(sender: S, justification: Justification<Self>, estimate: E) -> Self {
         let proto = ProtoMsg {
             sender,
             justification,
