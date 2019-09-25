@@ -73,6 +73,16 @@ cargo test --test generative_tests --features "integration_test"
 
 To run the other tests simply use `cargo test`.
 
+## Benchmarking
+
+We use the crate `criterion` for benchmarking. The library provides statistical
+insight into performance regression and improvement, and optionally depends on
+`gnuplot` to plot detailed graphs of benchmarks results. To run the benchmark, use:
+
+```
+cargo bench
+```
+
 ## Contributing
 
 At this point the development of this library is only internal. If you want to
