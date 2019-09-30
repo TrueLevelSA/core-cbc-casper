@@ -83,6 +83,20 @@ insight into performance regression and improvement, and optionally depends on
 cargo bench
 ```
 
+### Artefacts
+The plots and saved data are stored under `target/criterion/$BENCHMARK_NAME/`.
+
+The `new` folder contains the statistics for the last benchmarking run, while the `base` folder
+contains those for the last run on the `base` baseline (see [Command-Line
+Options](./command_line_options.md#baselines) for more information on baselines). The plots are in
+the `report` folder. Criterion.rs only keeps historical data for the last run. The `report/both`
+folder contains plots which show both runs on one plot, while the `report/change` folder contains
+plots showing the differences between the last two runs. This example shows the plots produced by
+the default `bench_function` benchmark method. Other methods may produce additional charts, which
+will be detailed in their respective pages.
+
+For further reading, reference [Plots & Graphs](https://bheisler.github.io/criterion.rs/book/user_guide/plots_and_graphs.html)
+
 ## Contributing
 
 At this point the development of this library is only internal. If you want to
