@@ -48,7 +48,7 @@
 //!     Byzantine failure which we call equivocation. We refer to the violation of this rule as
 //!     faults.
 //!
-//! When a node (`sender::Trait`) equivocates, it is basically executing multiple separate
+//! When a node (`validator::Trait`) equivocates, it is basically executing multiple separate
 //! instances of the protocol, and may attempt to show messages from a single instance of these
 //! executions to separate peers in the network. To clarify what separate instances of the protocol
 //! are: consider a validator who violates consensus *rule 2* by generating messages **A** and
@@ -299,7 +299,7 @@ impl<S: self::Trait, U: WeightUnit> Weights<S, U> {
 
 #[cfg(test)]
 mod tests {
-    use crate::sender::Weights;
+    use crate::validator::Weights;
 
     #[test]
     fn include_positive_weight() {

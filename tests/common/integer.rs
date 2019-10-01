@@ -23,7 +23,7 @@ use std::iter::FromIterator;
 use casper::estimator::Estimator;
 use casper::justification::LatestMsgsHonest;
 use casper::message::{self, Trait};
-use casper::sender;
+use casper::validator;
 use casper::util::weight::{WeightUnit, Zero};
 
 type Validator = u32;
@@ -39,7 +39,7 @@ impl IntegerWrapper {
 }
 
 #[cfg(feature = "integration_test")]
-impl<S: sender::Trait> From<S> for IntegerWrapper {
+impl<S: validator::Trait> From<S> for IntegerWrapper {
     fn from(_sender: S) -> Self {
         IntegerWrapper::new(u32::default())
     }
@@ -75,7 +75,7 @@ impl Estimator for IntegerWrapper {
 
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<IntegerMsg>,
-        senders_weights: &sender::Weights<Validator, U>,
+        senders_weights: &validator::Weights<Validator, U>,
     ) -> Result<Self, Self::Error> {
         let mut msgs_sorted_by_estimate = Vec::from_iter(latest_msgs.iter().fold(
             HashSet::new(),

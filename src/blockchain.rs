@@ -28,21 +28,21 @@ use serde_derive::Serialize;
 use crate::estimator::Estimator;
 use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use crate::message::{self, Trait};
-use crate::sender;
+use crate::validator;
 use crate::util::hash::Hash;
 use crate::util::id::Id;
 use crate::util::weight::{WeightUnit, Zero};
 
-/// Casper message (`message::Message`) for a `Block` send by a validator `S: sender::Trait`
+/// Casper message (`message::Message`) for a `Block` send by a validator `S: validator::Trait`
 pub type Message<S> = message::Message<Block<S> /*Estimator*/, S /*Sender*/>;
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize)]
-struct ProtoBlock<S: sender::Trait> {
+struct ProtoBlock<S: validator::Trait> {
     prevblock: Option<Block<S>>,
     sender_type: PhantomData<S>,
 }
 
-impl<S: sender::Trait> ProtoBlock<S> {
+impl<S: validator::Trait> ProtoBlock<S> {
     pub fn new(prevblock: Option<Block<S>>) -> ProtoBlock<S> {
         ProtoBlock {
             prevblock,
@@ -53,16 +53,16 @@ impl<S: sender::Trait> ProtoBlock<S> {
 
 /// Simplest structure of a block with a `prevblock` pointer for runing Casper on a blockchain.
 #[derive(Clone, Eq)]
-pub struct Block<S: sender::Trait>(Arc<ProtoBlock<S>>);
+pub struct Block<S: validator::Trait>(Arc<ProtoBlock<S>>);
 
 #[cfg(feature = "integration_test")]
-impl<S: sender::Trait + Into<S>> From<S> for Block<S> {
+impl<S: validator::Trait + Into<S>> From<S> for Block<S> {
     fn from(_sender: S) -> Self {
         Block::from(ProtoBlock::new(None))
     }
 }
 
-impl<S: sender::Trait> std::fmt::Debug for Block<S> {
+impl<S: validator::Trait> std::fmt::Debug for Block<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -76,7 +76,7 @@ impl<S: sender::Trait> std::fmt::Debug for Block<S> {
     }
 }
 
-impl<S: sender::Trait> serde::Serialize for Block<S> {
+impl<S: validator::Trait> serde::Serialize for Block<S> {
     fn serialize<T: serde::Serializer>(&self, rhs: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
         let mut msg = rhs.serialize_struct("Block", 1)?;
@@ -85,29 +85,29 @@ impl<S: sender::Trait> serde::Serialize for Block<S> {
     }
 }
 
-impl<S: sender::Trait> Id for Block<S> {
+impl<S: validator::Trait> Id for Block<S> {
     type ID = Hash;
 }
 
-impl<S: sender::Trait> std::hash::Hash for Block<S> {
+impl<S: validator::Trait> std::hash::Hash for Block<S> {
     fn hash<H: std::hash::Hasher>(&self, hasher: &mut H) {
         self.0.hash(hasher);
     }
 }
 
-impl<S: sender::Trait> PartialEq for Block<S> {
+impl<S: validator::Trait> PartialEq for Block<S> {
     fn eq(&self, rhs: &Self) -> bool {
         Arc::ptr_eq(self.arc(), rhs.arc()) || self.getid() == rhs.getid()
     }
 }
 
-impl<S: sender::Trait> From<ProtoBlock<S>> for Block<S> {
+impl<S: validator::Trait> From<ProtoBlock<S>> for Block<S> {
     fn from(protoblock: ProtoBlock<S>) -> Self {
         Block(Arc::new(protoblock))
     }
 }
 
-impl<'z, S: sender::Trait> From<&'z Message<S>> for Block<S> {
+impl<'z, S: validator::Trait> From<&'z Message<S>> for Block<S> {
     fn from(msg: &Message<S>) -> Self {
         msg.estimate().clone()
     }
@@ -124,13 +124,13 @@ impl std::fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-impl<S: sender::Trait> Estimator for Block<S> {
+impl<S: validator::Trait> Estimator for Block<S> {
     type M = Message<S>;
     type Error = Error;
 
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        senders_weights: &sender::Weights<S, U>,
+        senders_weights: &validator::Weights<S, U>,
     ) -> Result<Self, Self::Error> {
         let prevblock = Block::ghost(latest_msgs, senders_weights)?;
         Ok(Block::from(ProtoBlock::new(Some(prevblock))))
@@ -139,9 +139,9 @@ impl<S: sender::Trait> Estimator for Block<S> {
 
 type BlocksChildrenMap<S> = HashMap<Block<S>, HashSet<Block<S>>>;
 type GenesisBlocks<S> = HashSet<Block<S>>;
-type BlocksSendersMap<S> = HashMap<Block<S>, S>;
+type BlocksValidatorsMap<S> = HashMap<Block<S>, S>;
 
-impl<S: sender::Trait> Block<S> {
+impl<S: validator::Trait> Block<S> {
     pub fn new(prevblock: Option<Block<S>>) -> Self {
         Block::from(ProtoBlock::new(prevblock))
     }
@@ -179,9 +179,9 @@ impl<S: sender::Trait> Block<S> {
         latest_msgs_honest: &LatestMsgsHonest<Message<S>>,
         equivocators: &HashSet<S>,
         safety_oracle_threshold: U,
-        weights: &sender::Weights<S, U>,
+        weights: &validator::Weights<S, U>,
     ) -> HashSet<BTreeSet<S>> {
-        fn latest_in_justification<S: sender::Trait>(
+        fn latest_in_justification<S: validator::Trait>(
             j: &Justification<Message<S>>,
             equivocators: &HashSet<S>,
         ) -> HashMap<S, Message<S>> {
@@ -230,7 +230,7 @@ impl<S: sender::Trait> Block<S> {
             })
             .collect();
 
-        fn bron_kerbosch<S: sender::Trait>(
+        fn bron_kerbosch<S: validator::Trait>(
             r: HashSet<&S>,
             p: HashSet<&S>,
             x: HashSet<&S>,
@@ -286,7 +286,7 @@ impl<S: sender::Trait> Block<S> {
     /// * a HashMap mapping blocks to their senders.
     pub fn parse_blockchains(
         latest_msgs: &LatestMsgsHonest<Message<S>>,
-    ) -> (BlocksChildrenMap<S>, GenesisBlocks<S>, BlocksSendersMap<S>) {
+    ) -> (BlocksChildrenMap<S>, GenesisBlocks<S>, BlocksValidatorsMap<S>) {
         let latest_blocks: HashMap<Block<S>, S> = latest_msgs
             .iter()
             .map(|msg| (Block::from(msg), msg.sender().clone()))
@@ -366,7 +366,7 @@ impl<S: sender::Trait> Block<S> {
     fn pick_heaviest<U: WeightUnit>(
         blocks: &HashSet<Block<S>>,
         visited: &HashMap<Block<S>, HashSet<Block<S>>>,
-        weights: &sender::Weights<S, U>,
+        weights: &validator::Weights<S, U>,
         latest_blocks: &HashMap<Block<S>, S>,
         b_in_lms_senders: &mut HashMap<Block<S>, HashSet<S>>,
     ) -> Option<(Option<Self>, U, HashSet<Self>)> {
@@ -432,7 +432,7 @@ impl<S: sender::Trait> Block<S> {
 
     pub fn ghost<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Message<S>>,
-        senders_weights: &sender::Weights<S, U>,
+        senders_weights: &validator::Weights<S, U>,
     ) -> Result<Self, Error> {
         let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_msgs);
 
@@ -459,14 +459,14 @@ mod tests {
     use crate::blockchain::{Block, Message, ProtoBlock};
     use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest};
     use crate::message::Trait;
-    use crate::sender;
+    use crate::validator;
 
     #[test]
     fn partial_view() {
         // Test cases where not all validators see all messages.
         let (sender0, sender1, sender2, sender3, sender4) = (0, 1, 2, 3, 4);
         let (weight0, weight1, weight2, weight3, weight4) = (1.0, 1.0, 2.0, 1.0, 1.1);
-        let senders_weights = sender::Weights::new(
+        let senders_weights = validator::Weights::new(
             [
                 (sender0, weight0),
                 (sender1, weight1),
@@ -478,7 +478,7 @@ mod tests {
             .cloned()
             .collect(),
         );
-        let state = sender::State::new(
+        let state = validator::State::new(
             senders_weights.clone(),
             0.0,  // state fault weight
             None, // latest messages
@@ -567,7 +567,7 @@ mod tests {
         let (weightg, weight0, weight1, weight2, weight3, weight4, weight5) =
             (1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.0);
 
-        let senders_weights = sender::Weights::new(
+        let senders_weights = validator::Weights::new(
             [
                 (senderg, weightg),
                 (sender0, weight0),
@@ -582,7 +582,7 @@ mod tests {
             .collect(),
         );
 
-        let state = sender::State::new(
+        let state = validator::State::new(
             senders_weights.clone(),
             0.0,  // state fault weight
             None, // latest messages
@@ -670,7 +670,7 @@ mod tests {
         let senders: Vec<u32> = (0..nodes).collect();
         let weights: Vec<f64> = iter::repeat(1.0).take(nodes as usize).collect();
 
-        let senders_weights = sender::Weights::new(
+        let senders_weights = validator::Weights::new(
             senders
                 .iter()
                 .cloned()
@@ -678,7 +678,7 @@ mod tests {
                 .collect(),
         );
 
-        let mut state = sender::State::new(
+        let mut state = validator::State::new(
             senders_weights.clone(),
             0.0,  // state fault weight
             None, // latest messages

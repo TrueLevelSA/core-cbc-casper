@@ -40,7 +40,7 @@ use rayon::iter::IntoParallelRefIterator;
 
 use crate::estimator::Estimator;
 use crate::message;
-use crate::sender;
+use crate::validator;
 use crate::util::weight::{WeightUnit, Zero};
 
 /// Struct that holds the set of the `message::Trait` that justify the current message. Works like
@@ -55,8 +55,8 @@ impl<M: message::Trait> Justification<M> {
     }
 
     /// Creates and return a new justification instance from a vector of `message::Trait` and
-    /// mutate the given `sender::State` with the updated state
-    pub fn from_msgs<U: WeightUnit>(messages: Vec<M>, state: &mut sender::State<M, U>) -> Self {
+    /// mutate the given `validator::State` with the updated state
+    pub fn from_msgs<U: WeightUnit>(messages: Vec<M>, state: &mut validator::State<M, U>) -> Self {
         let mut justification = Justification::empty();
         let messages: HashSet<_> = messages.iter().collect();
         justification.faulty_inserts(&messages, state);
@@ -96,7 +96,7 @@ impl<M: message::Trait> Justification<M> {
     pub fn mk_estimate<U: WeightUnit>(
         &self,
         equivocators: &HashSet<M::Sender>,
-        senders_weights: &sender::Weights<<M as message::Trait>::Sender, U>,
+        senders_weights: &validator::Weights<<M as message::Trait>::Sender, U>,
     ) -> Result<M::Estimator, <M::Estimator as Estimator>::Error> {
         let latest_msgs = LatestMsgs::from(self);
         let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(&latest_msgs, equivocators);
@@ -108,7 +108,7 @@ impl<M: message::Trait> Justification<M> {
     pub fn faulty_inserts<'a, U: WeightUnit>(
         &mut self,
         msgs: &HashSet<&'a M>,
-        state: &mut sender::State<M, U>,
+        state: &mut validator::State<M, U>,
     ) -> HashSet<&'a M> {
         let msgs = state.sort_by_faultweight(msgs);
         // do the actual insertions to the state
@@ -122,7 +122,7 @@ impl<M: message::Trait> Justification<M> {
     pub fn faulty_insert<U: WeightUnit>(
         &mut self,
         msg: &M,
-        state: &mut sender::State<M, U>,
+        state: &mut validator::State<M, U>,
     ) -> bool {
         let is_equivocation = state.latest_msgs.equivocate(msg);
 
@@ -160,13 +160,13 @@ impl<M: message::Trait> Justification<M> {
     }
 
     /// This function sets the weight of the equivocator to zero right away (returned in
-    /// `sender::State`) and add his message to the state, since now his equivocation doesnt count
+    /// `validator::State`) and add his message to the state, since now his equivocation doesnt count
     /// to the state fault weight anymore
     pub fn faulty_insert_with_slash<'a, U: WeightUnit>(
         &mut self,
         msg: &M,
-        state: &'a mut sender::State<M, U>,
-    ) -> Result<bool, sender::Error<'a, HashMap<<M as message::Trait>::Sender, U>>> {
+        state: &'a mut validator::State<M, U>,
+    ) -> Result<bool, validator::Error<'a, HashMap<<M as message::Trait>::Sender, U>>> {
         let is_equivocation = state.latest_msgs.equivocate(msg);
         if is_equivocation {
             let sender = msg.sender();
@@ -356,7 +356,7 @@ impl<M: message::Trait> LatestMsgsHonest<M> {
 
     pub fn mk_estimate<U: WeightUnit>(
         &self,
-        senders_weights: &sender::Weights<<M as message::Trait>::Sender, U>,
+        senders_weights: &validator::Weights<<M as message::Trait>::Sender, U>,
     ) -> Result<M::Estimator, <M::Estimator as Estimator>::Error> {
         M::Estimator::estimate(&self, senders_weights)
     }

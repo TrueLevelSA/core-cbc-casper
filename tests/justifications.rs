@@ -26,7 +26,7 @@ use std::collections::HashSet;
 
 use casper::justification::{Justification, LatestMsgs};
 use casper::message::{self, Trait};
-use casper::sender;
+use casper::validator;
 
 macro_rules! float_eq {
     ($lhs:expr, $rhs:expr) => {{
@@ -49,7 +49,7 @@ macro_rules! float_eq {
 #[test]
 fn faulty_inserts_sorted() {
     let senders_weights =
-        sender::Weights::new([(0, 1.0), (1, 2.0), (2, 3.0)].iter().cloned().collect());
+        validator::Weights::new([(0, 1.0), (1, 2.0), (2, 3.0)].iter().cloned().collect());
 
     let v0 = &VoteCount::create_vote_msg(0, false);
     let v0_prime = &VoteCount::create_vote_msg(0, true);
@@ -63,7 +63,7 @@ fn faulty_inserts_sorted() {
     latest_msgs.update(v1);
     latest_msgs.update(v2);
 
-    let mut sender_state = sender::State::new(
+    let mut sender_state = validator::State::new(
         senders_weights.clone(),
         0.0,
         None,
@@ -86,13 +86,13 @@ fn faulty_inserts_sorted() {
 #[test]
 fn faulty_inserts() {
     let senders_weights =
-        sender::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+        validator::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
     let v0 = &VoteCount::create_vote_msg(0, false);
     let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
     let v1 = &VoteCount::create_vote_msg(1, true);
     let mut j0 = Justification::empty();
 
-    let mut sender_state = sender::State::new(
+    let mut sender_state = validator::State::new(
         senders_weights.clone(),
         0.0,
         None,
@@ -126,7 +126,7 @@ fn faulty_inserts() {
         "$v0_prime$ should conflict with $v0$ through $m0$, and we should reject as our fault tolerance thr is zero"
     );
 
-    let mut state = sender::State::from_state(
+    let mut state = validator::State::from_state(
         sender_state.clone(),
         None,
         None,
@@ -140,7 +140,7 @@ fn faulty_inserts() {
         "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set"
     );
 
-    let mut sender_state2 = sender::State::from_state(
+    let mut sender_state2 = validator::State::from_state(
         sender_state.clone(),
         None,
         None,
@@ -155,7 +155,7 @@ fn faulty_inserts() {
         "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set, and thus the state_fault_weight should be incremented to 1.0"
     );
 
-    let mut state = sender::State::from_state(
+    let mut state = validator::State::from_state(
         sender_state.clone(),
         None,
         Some(0.1),
@@ -169,7 +169,7 @@ fn faulty_inserts() {
         "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as the fault threshold gets crossed for the set"
     );
 
-    let mut sender_state2 = sender::State::from_state(
+    let mut sender_state2 = validator::State::from_state(
         sender_state.clone(),
         None,
         Some(0.1),
@@ -183,7 +183,7 @@ fn faulty_inserts() {
         "$v0_prime$ conflicts with $v0$ through $m0$, and we should NOT accept this fault as the fault threshold gets crossed for the set, and thus the state_fault_weight should not be incremented"
     );
 
-    let mut state = sender::State::from_state(
+    let mut state = validator::State::from_state(
         sender_state.clone(),
         None,
         Some(1.0),
@@ -197,9 +197,9 @@ fn faulty_inserts() {
         "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the thr doesnt get crossed for the set"
     );
 
-    let senders_weights = sender::Weights::new([].iter().cloned().collect());
+    let senders_weights = validator::Weights::new([].iter().cloned().collect());
     // bug found
-    let mut state = sender::State::from_state(
+    let mut state = validator::State::from_state(
         sender_state.clone(),
         Some(senders_weights.clone()),
         Some(1.0),
@@ -214,7 +214,7 @@ fn faulty_inserts() {
         "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we can't know the weight of the sender, which could be Infinity"
     );
 
-    let mut sender_state = sender::State::new(
+    let mut sender_state = validator::State::new(
         senders_weights.clone(),
         1.0,
         None,

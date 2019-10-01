@@ -27,7 +27,7 @@ use proptest::prelude::*;
 use casper::estimator::Estimator;
 use casper::justification::{Justification, LatestMsgsHonest};
 use casper::message::{self, Trait};
-use casper::sender;
+use casper::validator;
 use casper::util::weight::{WeightUnit, Zero};
 
 #[derive(Clone, Copy, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]
@@ -37,7 +37,7 @@ pub struct VoteCount {
 }
 
 #[cfg(feature = "integration_test")]
-impl<S: sender::Trait> From<S> for VoteCount {
+impl<S: validator::Trait> From<S> for VoteCount {
     fn from(_sender: S) -> Self {
         VoteCount::default()
     }
@@ -193,7 +193,7 @@ impl Estimator for VoteCount {
 
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        _weights: &sender::Weights<Voter, U>, // all voters have same weight
+        _weights: &validator::Weights<Voter, U>, // all voters have same weight
     ) -> Result<Self, Self::Error> {
         // the estimates are actually the original votes of each of the voters /
         // validators

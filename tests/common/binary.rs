@@ -20,7 +20,7 @@
 use casper::estimator::Estimator;
 use casper::justification::LatestMsgsHonest;
 use casper::message::{self, Trait};
-use casper::sender;
+use casper::validator;
 use casper::util::weight::{WeightUnit, Zero};
 
 type Validator = u32;
@@ -36,7 +36,7 @@ impl BoolWrapper {
 }
 
 #[cfg(feature = "integration_test")]
-impl<S: sender::Trait> From<S> for BoolWrapper {
+impl<S: validator::Trait> From<S> for BoolWrapper {
     fn from(_sender: S) -> Self {
         BoolWrapper::new(bool::default())
     }
@@ -68,7 +68,7 @@ impl Estimator for BoolWrapper {
     /// Weighted count of the votes contained in the latest messages.
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<BinaryMsg>,
-        senders_weights: &sender::Weights<Validator, U>,
+        senders_weights: &validator::Weights<Validator, U>,
     ) -> Result<Self, Self::Error> {
         // loop over all the latest messages
         let (true_w, false_w) = latest_msgs.iter().fold(

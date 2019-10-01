@@ -52,7 +52,7 @@ use serde::Serialize;
 
 use crate::estimator::Estimator;
 use crate::justification::{Justification, LatestMsgsHonest};
-use crate::sender;
+use crate::validator;
 use crate::util::hash::Hash;
 use crate::util::id::Id;
 use crate::util::weight::WeightUnit;
@@ -75,10 +75,10 @@ impl<E: std::error::Error> std::fmt::Display for Error<E> {
 impl<E: std::error::Error> std::error::Error for Error<E> {}
 
 /// Abstraction of a Casper message, contain a value (`Estimator`) that will be sent over the
-/// network by validators (`sender::Trait`) and used as `Justification` for a more recent messages.
+/// network by validators (`validator::Trait`) and used as `Justification` for a more recent messages.
 pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize {
     /// Defines the validator type that generated this message
-    type Sender: sender::Trait;
+    type Sender: validator::Trait;
 
     /// Defines the estimate type, or value, contained in that message
     /// The estimate type must be compatible with `message::Trait`
@@ -104,7 +104,7 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
     fn from_msgs<U: WeightUnit>(
         sender: Self::Sender,
         mut new_msgs: Vec<&Self>,
-        sender_state: &mut sender::State<Self, U>,
+        sender_state: &mut validator::State<Self, U>,
     ) -> Result<Self, Error<<Self::Estimator as Estimator>::Error>> {
         // dedup by putting msgs into a hashset
         let new_msgs: HashSet<_> = new_msgs.drain(..).collect();
@@ -209,7 +209,7 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
 struct ProtoMsg<E, S>
 where
     E: Estimator<M = Message<E, S>>,
-    S: sender::Trait,
+    S: validator::Trait,
 {
     estimate: E,
     sender: S,
@@ -219,7 +219,7 @@ where
 impl<E, S> Id for ProtoMsg<E, S>
 where
     E: Estimator<M = Message<E, S>>,
-    S: sender::Trait,
+    S: validator::Trait,
 {
     type ID = Hash;
 }
@@ -227,7 +227,7 @@ where
 impl<E, S> Serialize for ProtoMsg<E, S>
 where
     E: Estimator<M = Message<E, S>>,
-    S: sender::Trait,
+    S: validator::Trait,
 {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
@@ -242,7 +242,7 @@ where
 }
 
 /// Concrete Casper message implementing `message::Trait` containing a value as `Estimator`, a
-/// validator as `sender::Trait`, and a justification as `Justification`.
+/// validator as `validator::Trait`, and a justification as `Justification`.
 ///
 /// # Example
 ///
@@ -274,12 +274,12 @@ where
 pub struct Message<E, S>(Arc<ProtoMsg<E, S>>, Hash)
 where
     E: Estimator<M = Message<E, S>>,
-    S: sender::Trait;
+    S: validator::Trait;
 
 impl<E, S> Id for Message<E, S>
 where
     E: Estimator<M = Self>,
-    S: sender::Trait,
+    S: validator::Trait,
 {
     type ID = Hash;
 
@@ -292,7 +292,7 @@ where
 impl<E, S> Serialize for Message<E, S>
 where
     E: Estimator<M = Self>,
-    S: sender::Trait,
+    S: validator::Trait,
 {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
         serde::Serialize::serialize(&self.0, serializer)
@@ -302,7 +302,7 @@ where
 impl<E, S> self::Trait for Message<E, S>
 where
     E: Estimator<M = Self>,
-    S: sender::Trait,
+    S: validator::Trait,
 {
     type Estimator = E;
     type Sender = S;
@@ -334,7 +334,7 @@ where
 impl<E, S> std::hash::Hash for Message<E, S>
 where
     E: Estimator<M = Self>,
-    S: sender::Trait,
+    S: validator::Trait,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.getid().hash(state)
@@ -344,7 +344,7 @@ where
 impl<E, S> PartialEq for Message<E, S>
 where
     E: Estimator<M = Self>,
-    S: sender::Trait,
+    S: validator::Trait,
 {
     fn eq(&self, rhs: &Self) -> bool {
         Arc::ptr_eq(&self.0, &rhs.0) || self.getid() == rhs.getid() // should make this line unnecessary
@@ -354,7 +354,7 @@ where
 impl<E, S> Debug for Message<E, S>
 where
     E: Estimator<M = Self>,
-    S: sender::Trait,
+    S: validator::Trait,
 {
     // Note: format used for rendering illustrative gifs from generative tests; modify with care
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

@@ -29,14 +29,14 @@ use std::collections::HashSet;
 use casper::estimator::Estimator;
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use casper::message::Trait;
-use casper::sender;
+use casper::validator;
 
 #[test]
 fn equal_weight() {
     let senders: Vec<u32> = (0..4).collect();
     let weights = [1.0, 1.0, 1.0, 1.0];
 
-    let senders_weights = sender::Weights::new(
+    let senders_weights = validator::Weights::new(
         senders
             .iter()
             .cloned()
@@ -44,7 +44,7 @@ fn equal_weight() {
             .collect(),
     );
 
-    let sender_state = sender::State::new(
+    let sender_state = validator::State::new(
         senders_weights.clone(),
         0.0, // state fault weight
         None,
@@ -97,7 +97,7 @@ fn uneven_weights_1() {
     let senders: Vec<u32> = (0..4).collect();
     let weights = [4.0, 1.0, 1.0, 1.0];
 
-    let senders_weights = sender::Weights::new(
+    let senders_weights = validator::Weights::new(
         senders
             .iter()
             .cloned()
@@ -105,7 +105,7 @@ fn uneven_weights_1() {
             .collect(),
     );
 
-    let sender_state = sender::State::new(
+    let sender_state = validator::State::new(
         senders_weights.clone(),
         0.0, // state fault weight
         None,
@@ -158,7 +158,7 @@ fn uneven_weights_4() {
     let senders: Vec<u32> = (0..4).collect();
     let weights = [1.0, 1.0, 1.0, 4.0];
 
-    let senders_weights = sender::Weights::new(
+    let senders_weights = validator::Weights::new(
         senders
             .iter()
             .cloned()
@@ -166,7 +166,7 @@ fn uneven_weights_4() {
             .collect(),
     );
 
-    let sender_state = sender::State::new(
+    let sender_state = validator::State::new(
         senders_weights.clone(),
         0.0, // state fault weight
         None,

@@ -24,7 +24,7 @@ use std::convert::From;
 use casper::estimator::Estimator;
 use casper::justification::LatestMsgsHonest;
 use casper::message;
-use casper::sender;
+use casper::validator;
 use casper::util::weight::{WeightUnit, Zero};
 
 type Validator = u32;
@@ -84,7 +84,7 @@ impl Estimator for Value {
 
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Message>,
-        senders_weights: &sender::Weights<Validator, U>,
+        senders_weights: &validator::Weights<Validator, U>,
     ) -> Result<Self, Self::Error> {
         use message::Trait;
         let res: Self = latest_msgs
@@ -117,7 +117,7 @@ fn main() {
     let senders: Vec<u32> = (1..=4).collect();
     let weights = [0.6, 1.0, 2.0, 1.3];
 
-    let senders_weights = sender::Weights::new(
+    let senders_weights = validator::Weights::new(
         senders
             .iter()
             .cloned()
@@ -125,7 +125,7 @@ fn main() {
             .collect(),
     );
 
-    let mut weights = sender::State::new(
+    let mut weights = validator::State::new(
         senders_weights.clone(),
         0.0, // state fault weight
         None,

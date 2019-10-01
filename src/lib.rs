@@ -40,10 +40,10 @@
 //!
 //! To benefit from the CBC Casper safety proofs this library builds upon, developers have to
 //! implement `message::Trait`. This trait in turn requires implementing other traits in this
-//! library, such as the `sender::Trait` for validators, and the `Estimator` trait for the estimate.
+//! library, such as the `validator::Trait` for validators, and the `Estimator` trait for the estimate.
 //!
 //! One generic type implements the `message::Trait`, namely `message::Message<Estimator,
-//! sender::Trait>`, and can be used to helps getting to a compliant `message::Trait` concrete type
+//! validator::Trait>`, and can be used to helps getting to a compliant `message::Trait` concrete type
 //! implementation easily.
 //!
 //! We also present a basic blockchain implementation heavily under developement.  You can also
@@ -64,7 +64,7 @@
 //! ## Example
 //!
 //! We present an example of naive consensus protocol: a ternary consensus that uses the generic
-//! type `message::Message<Estimator, sender::Trait>` implementation to generate the protocol.
+//! type `message::Message<Estimator, validator::Trait>` implementation to generate the protocol.
 //!
 //! ## Known limitations
 //!
@@ -118,10 +118,10 @@ pub mod justification;
 /// consensus.
 pub mod message;
 /// Senders are the consensus forming peers nodes in the network are called validators.
-pub mod sender;
+pub mod validator;
 /// Utility module for various types and components.
 pub mod util;
 
 pub use blockchain::{Block, Message};
 pub use justification::Justification;
-pub use sender::State;
+pub use validator::State;
