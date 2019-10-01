@@ -39,14 +39,14 @@ pub type Message<V> = message::Message<Block<V> /*Estimator*/, V /*Validator*/>;
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize)]
 struct ProtoBlock<V: validator::Trait> {
     prevblock: Option<Block<V>>,
-    sender_type: PhantomData<V>,
+    validator_type: PhantomData<V>,
 }
 
 impl<V: validator::Trait> ProtoBlock<V> {
     pub fn new(prevblock: Option<Block<V>>) -> ProtoBlock<V> {
         ProtoBlock {
             prevblock,
-            sender_type: PhantomData,
+            validator_type: PhantomData,
         }
     }
 }
