@@ -206,28 +206,28 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
 
 // Mathematical definition of a casper message with (value, validator, justification)
 #[derive(Clone, Eq, PartialEq)]
-struct ProtoMsg<E, S>
+struct ProtoMsg<E, V>
 where
-    E: Estimator<M = Message<E, S>>,
-    S: validator::Trait,
+    E: Estimator<M = Message<E, V>>,
+    V: validator::Trait,
 {
     estimate: E,
-    sender: S,
-    justification: Justification<Message<E, S>>,
+    sender: V,
+    justification: Justification<Message<E, V>>,
 }
 
-impl<E, S> Id for ProtoMsg<E, S>
+impl<E, V> Id for ProtoMsg<E, V>
 where
-    E: Estimator<M = Message<E, S>>,
-    S: validator::Trait,
+    E: Estimator<M = Message<E, V>>,
+    V: validator::Trait,
 {
     type ID = Hash;
 }
 
-impl<E, S> Serialize for ProtoMsg<E, S>
+impl<E, V> Serialize for ProtoMsg<E, V>
 where
-    E: Estimator<M = Message<E, S>>,
-    S: validator::Trait,
+    E: Estimator<M = Message<E, V>>,
+    V: validator::Trait,
 {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
@@ -271,15 +271,15 @@ where
 /// `Value` must implement `Estimator` to be valid for a `message::Message` and to produce
 /// estimates.
 #[derive(Eq, Clone)]
-pub struct Message<E, S>(Arc<ProtoMsg<E, S>>, Hash)
+pub struct Message<E, V>(Arc<ProtoMsg<E, V>>, Hash)
 where
-    E: Estimator<M = Message<E, S>>,
-    S: validator::Trait;
+    E: Estimator<M = Message<E, V>>,
+    V: validator::Trait;
 
-impl<E, S> Id for Message<E, S>
+impl<E, V> Id for Message<E, V>
 where
     E: Estimator<M = Self>,
-    S: validator::Trait,
+    V: validator::Trait,
 {
     type ID = Hash;
 
@@ -289,23 +289,23 @@ where
     }
 }
 
-impl<E, S> Serialize for Message<E, S>
+impl<E, V> Serialize for Message<E, V>
 where
     E: Estimator<M = Self>,
-    S: validator::Trait,
+    V: validator::Trait,
 {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
         serde::Serialize::serialize(&self.0, serializer)
     }
 }
 
-impl<E, S> self::Trait for Message<E, S>
+impl<E, V> self::Trait for Message<E, V>
 where
     E: Estimator<M = Self>,
-    S: validator::Trait,
+    V: validator::Trait,
 {
     type Estimator = E;
-    type Sender = S;
+    type Sender = V;
 
     fn sender(&self) -> &Self::Sender {
         &self.0.sender
@@ -319,7 +319,7 @@ where
         &self.0.justification
     }
 
-    fn new(sender: S, justification: Justification<Self>, estimate: E) -> Self {
+    fn new(sender: V, justification: Justification<Self>, estimate: E) -> Self {
         let proto = ProtoMsg {
             sender,
             justification,
@@ -331,30 +331,30 @@ where
     }
 }
 
-impl<E, S> std::hash::Hash for Message<E, S>
+impl<E, V> std::hash::Hash for Message<E, V>
 where
     E: Estimator<M = Self>,
-    S: validator::Trait,
+    V: validator::Trait,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.getid().hash(state)
     }
 }
 
-impl<E, S> PartialEq for Message<E, S>
+impl<E, V> PartialEq for Message<E, V>
 where
     E: Estimator<M = Self>,
-    S: validator::Trait,
+    V: validator::Trait,
 {
     fn eq(&self, rhs: &Self) -> bool {
         Arc::ptr_eq(&self.0, &rhs.0) || self.getid() == rhs.getid() // should make this line unnecessary
     }
 }
 
-impl<E, S> Debug for Message<E, S>
+impl<E, V> Debug for Message<E, V>
 where
     E: Estimator<M = Self>,
-    S: validator::Trait,
+    V: validator::Trait,
 {
     // Note: format used for rendering illustrative gifs from generative tests; modify with care
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

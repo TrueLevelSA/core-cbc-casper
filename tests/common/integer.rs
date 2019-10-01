@@ -39,8 +39,8 @@ impl IntegerWrapper {
 }
 
 #[cfg(feature = "integration_test")]
-impl<S: validator::Trait> From<S> for IntegerWrapper {
-    fn from(_sender: S) -> Self {
+impl<V: validator::Trait> From<V> for IntegerWrapper {
+    fn from(_sender: V) -> Self {
         IntegerWrapper::new(u32::default())
     }
 }

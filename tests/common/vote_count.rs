@@ -37,8 +37,8 @@ pub struct VoteCount {
 }
 
 #[cfg(feature = "integration_test")]
-impl<S: validator::Trait> From<S> for VoteCount {
-    fn from(_sender: S) -> Self {
+impl<V: validator::Trait> From<V> for VoteCount {
+    fn from(_sender: V) -> Self {
         VoteCount::default()
     }
 }

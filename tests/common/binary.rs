@@ -36,8 +36,8 @@ impl BoolWrapper {
 }
 
 #[cfg(feature = "integration_test")]
-impl<S: validator::Trait> From<S> for BoolWrapper {
-    fn from(_sender: S) -> Self {
+impl<V: validator::Trait> From<V> for BoolWrapper {
+    fn from(_sender: V) -> Self {
         BoolWrapper::new(bool::default())
     }
 }

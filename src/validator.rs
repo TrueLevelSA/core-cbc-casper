@@ -226,27 +226,27 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
 
 // Note: RwLock locks only before writing, while Mutex locks to both read and write
 #[derive(Clone, Debug)]
-pub struct Weights<S: self::Trait, U: WeightUnit>(Arc<RwLock<HashMap<S, U>>>);
+pub struct Weights<V: self::Trait, U: WeightUnit>(Arc<RwLock<HashMap<V, U>>>);
 
-impl<S: self::Trait, U: WeightUnit> Weights<S, U> {
+impl<V: self::Trait, U: WeightUnit> Weights<V, U> {
     /// Creates a new weight set from a HashMap of senders to unit.
-    pub fn new(weights: HashMap<S, U>) -> Self {
+    pub fn new(weights: HashMap<V, U>) -> Self {
         Weights(Arc::new(RwLock::new(weights)))
     }
 
     /// Same as RwLock read function. Locks the Rwlock with read access.
-    fn read(&self) -> LockResult<RwLockReadGuard<HashMap<S, U>>> {
+    fn read(&self) -> LockResult<RwLockReadGuard<HashMap<V, U>>> {
         self.0.read()
     }
 
     /// Same as RwLock write function. Locks the RwLock with write access.
-    fn write(&self) -> LockResult<RwLockWriteGuard<HashMap<S, U>>> {
+    fn write(&self) -> LockResult<RwLockWriteGuard<HashMap<V, U>>> {
         self.0.write()
     }
 
     /// Returns success of insertion. Failure happens if we cannot acquire the
     /// lock to write data.
-    pub fn insert(&mut self, k: S, v: U) -> Result<bool, Error<HashMap<S, U>>> {
+    pub fn insert(&mut self, k: V, v: U) -> Result<bool, Error<HashMap<V, U>>> {
         self.write().map_err(Error::WriteLockError).map(|mut h| {
             h.insert(k, v);
             true
@@ -255,7 +255,7 @@ impl<S: self::Trait, U: WeightUnit> Weights<S, U> {
 
     /// Picks senders with positive weights striclty greather than zero.
     /// Failure happens if we cannot acquire the lock to read data
-    pub fn senders(&self) -> Result<HashSet<S>, Error<HashMap<S, U>>> {
+    pub fn senders(&self) -> Result<HashSet<V>, Error<HashMap<V, U>>> {
         self.read()
             .map_err(Error::ReadLockError)
             .map(|senders_weight| {
@@ -274,14 +274,14 @@ impl<S: self::Trait, U: WeightUnit> Weights<S, U> {
 
     /// Gets the weight of the sender. Returns an error in case there is a
     /// reading error or the sender does not exist.
-    pub fn weight(&self, sender: &S) -> Result<U, Error<HashMap<S, U>>> {
+    pub fn weight(&self, sender: &V) -> Result<U, Error<HashMap<V, U>>> {
         self.read()
             .map_err(Error::ReadLockError)
             .and_then(|weights| weights.get(sender).map(Clone::clone).ok_or(Error::NotFound))
     }
 
     /// Returns the total weight of all the given senders.
-    pub fn sum_weight_senders(&self, senders: &HashSet<S>) -> U {
+    pub fn sum_weight_senders(&self, senders: &HashSet<V>) -> U {
         senders.iter().fold(<U as Zero<U>>::ZERO, |acc, sender| {
             acc + self.weight(sender).unwrap_or(U::NAN)
         })
