@@ -27,7 +27,7 @@ use serde_derive::Serialize;
 
 use crate::estimator::Estimator;
 use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest};
-use crate::message::{self, Trait as MTrait};
+use crate::message::{self, Trait};
 use crate::sender;
 use crate::util::hash::Hash;
 use crate::util::id::Id;
