@@ -255,7 +255,7 @@ impl<V: self::Trait, U: WeightUnit> Weights<V, U> {
 
     /// Picks senders with positive weights striclty greather than zero.
     /// Failure happens if we cannot acquire the lock to read data
-    pub fn senders(&self) -> Result<HashSet<V>, Error<HashMap<V, U>>> {
+    pub fn validators(&self) -> Result<HashSet<V>, Error<HashMap<V, U>>> {
         self.read()
             .map_err(Error::ReadLockError)
             .map(|senders_weight| {
@@ -289,7 +289,7 @@ impl<V: self::Trait, U: WeightUnit> Weights<V, U> {
 
     /// Returns the total weight of all the senders in the weights.
     pub fn sum_all_weights(&self) -> U {
-        if let Ok(senders) = self.senders() {
+        if let Ok(senders) = self.validators() {
             self.sum_weight_senders(&senders)
         } else {
             U::NAN
@@ -305,7 +305,7 @@ mod tests {
     fn include_positive_weight() {
         let weights = Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
         assert_eq!(
-            Weights::senders(&weights).unwrap(),
+            Weights::validators(&weights).unwrap(),
             [0, 1, 2].iter().cloned().collect(),
             "should include senders with valid, positive weight"
         );
@@ -315,7 +315,7 @@ mod tests {
     fn exclude_zero_weighted_validators() {
         let weights = Weights::new([(0, 0.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
         assert_eq!(
-            Weights::senders(&weights).unwrap(),
+            Weights::validators(&weights).unwrap(),
             [1, 2].iter().cloned().collect(),
             "should exclude senders with 0 weight"
         );
@@ -325,7 +325,7 @@ mod tests {
     fn exclude_negative_weights() {
         let weights = Weights::new([(0, 1.0), (1, -1.0), (2, 1.0)].iter().cloned().collect());
         assert_eq!(
-            Weights::senders(&weights).unwrap(),
+            Weights::validators(&weights).unwrap(),
             [0, 2].iter().cloned().collect(),
             "should exclude senders with negative weight"
         );
@@ -340,7 +340,7 @@ mod tests {
                 .collect(),
         );
         assert_eq!(
-            Weights::senders(&weights).unwrap(),
+            Weights::validators(&weights).unwrap(),
             [1, 2].iter().cloned().collect(),
             "should exclude senders with NAN weight"
         );
@@ -355,7 +355,7 @@ mod tests {
                 .collect(),
         );
         assert_eq!(
-            Weights::senders(&weights).unwrap(),
+            Weights::validators(&weights).unwrap(),
             [0, 1, 2].iter().cloned().collect(),
             "should include senders with INFINITY weight"
         );
