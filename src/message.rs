@@ -52,10 +52,10 @@ use serde::Serialize;
 
 use crate::estimator::Estimator;
 use crate::justification::{Justification, LatestMsgsHonest};
-use crate::validator;
 use crate::util::hash::Hash;
 use crate::util::id::Id;
 use crate::util::weight::WeightUnit;
+use crate::validator;
 
 #[derive(Debug)]
 pub enum Error<E: std::error::Error> {
@@ -104,25 +104,25 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
     fn from_msgs<U: WeightUnit>(
         sender: Self::Sender,
         mut new_msgs: Vec<&Self>,
-        sender_state: &mut validator::State<Self, U>,
+        validator_state: &mut validator::State<Self, U>,
     ) -> Result<Self, Error<<Self::Estimator as Estimator>::Error>> {
         // dedup by putting msgs into a hashset
         let new_msgs: HashSet<_> = new_msgs.drain(..).collect();
         let new_msgs_len = new_msgs.len();
 
-        // update latest_msgs in sender_state with new_msgs
+        // update latest_msgs in validator_state with new_msgs
         let mut justification = Justification::empty();
-        let inserted_msgs = justification.faulty_inserts(&new_msgs, sender_state);
+        let inserted_msgs = justification.faulty_inserts(&new_msgs, validator_state);
 
         if inserted_msgs.is_empty() && new_msgs_len > 0 {
             Err(Error::NoNewMessage)
         } else {
             let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(
-                sender_state.latests_msgs(),
-                sender_state.equivocators(),
+                validator_state.latests_msgs(),
+                validator_state.equivocators(),
             );
 
-            let estimate = latest_msgs_honest.mk_estimate(&sender_state.senders_weights());
+            let estimate = latest_msgs_honest.mk_estimate(&validator_state.validators_weights());
             estimate
                 .map(|e| Self::new(sender, justification, e))
                 .map_err(Error::Estimator)

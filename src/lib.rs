@@ -117,10 +117,10 @@ pub mod justification;
 /// Messages are generated and passed around by validators in the effort of trying to reach
 /// consensus.
 pub mod message;
-/// The consensus forming peers nodes in the network are called validators.
-pub mod validator;
 /// Utility module for various types and components.
 pub mod util;
+/// The consensus forming peers nodes in the network are called validators.
+pub mod validator;
 
 pub use blockchain::{Block, Message};
 pub use justification::Justification;

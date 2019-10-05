@@ -69,7 +69,7 @@ use crate::justification::LatestMsgs;
 use crate::message;
 use crate::util::weight::{WeightUnit, Zero};
 
-/// All casper actors that send messages, aka validators, have to implement the sender trait
+/// All casper actors that send messages, aka validators, have to implement the validator trait
 pub trait Trait: Hash + Clone + Ord + Eq + Send + Sync + Debug + serde::Serialize {}
 
 // Default implementations
@@ -81,7 +81,7 @@ impl Trait for i8 {}
 impl Trait for i32 {}
 impl Trait for i64 {}
 
-/// Inner state of a sender. Sender's state implement `message::Trait` allowing senders to produce
+/// Inner state of a validator. Validator's state implement `message::Trait` allowing validators to produce
 /// messages based on their latest view of the network.
 #[derive(Debug, Clone)]
 pub struct State<M: message::Trait, U: WeightUnit> {
@@ -90,18 +90,18 @@ pub struct State<M: message::Trait, U: WeightUnit> {
     /// fault tolerance threshold
     pub(crate) thr: U,
     /// current validator set, mapped to their respective weights
-    pub(crate) senders_weights: Weights<M::Sender, U>,
-    /// this sender's latest message
+    pub(crate) validators_weights: Weights<M::Sender, U>,
+    /// this validator's latest message
     pub(crate) own_latest_msg: Option<M>,
     pub(crate) latest_msgs: LatestMsgs<M>,
     pub(crate) equivocators: HashSet<M::Sender>,
 }
 
-/// Error returned from the [`insert`], [`senders`] and [`weight`] function
+/// Error returned from the [`insert`], [`validators`] and [`weight`] function
 /// on a [`Weights`]
 ///
 /// [`insert`]: struct.Weights.html#method.insert
-/// [`senders`]: struct.Weights.html#method.senders
+/// [`validators`]: struct.Weights.html#method.validators
 /// [`weight`]: struct.Weights.html#method.weight
 /// [`Weights`]: struct.Weights.html
 pub enum Error<'rwlock, T> {
@@ -115,7 +115,7 @@ impl<'rwlock, T> std::error::Error for Error<'rwlock, T> {}
 impl<'rwlock, T> std::fmt::Display for Error<'rwlock, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::NotFound => writeln!(f, "Sender weight not found"),
+            Error::NotFound => writeln!(f, "Validator weight not found"),
             Error::WriteLockError(p_err) => std::fmt::Display::fmt(p_err, f),
             Error::ReadLockError(p_err) => std::fmt::Display::fmt(p_err, f),
         }
@@ -125,7 +125,7 @@ impl<'rwlock, T> std::fmt::Display for Error<'rwlock, T> {
 impl<'rwlock, T> std::fmt::Debug for Error<'rwlock, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Error::NotFound => writeln!(f, "Sender weight not found"),
+            Error::NotFound => writeln!(f, "Validator weight not found"),
             Error::WriteLockError(p_err) => std::fmt::Display::fmt(p_err, f),
             Error::ReadLockError(p_err) => std::fmt::Display::fmt(p_err, f),
         }
@@ -134,7 +134,7 @@ impl<'rwlock, T> std::fmt::Debug for Error<'rwlock, T> {
 
 impl<M: message::Trait, U: WeightUnit> State<M, U> {
     pub fn new(
-        senders_weights: Weights<M::Sender, U>,
+        validators_weights: Weights<M::Sender, U>,
         state_fault_weight: U,
         own_latest_msg: Option<M>,
         latest_msgs: LatestMsgs<M>,
@@ -142,7 +142,7 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
         equivocators: HashSet<M::Sender>,
     ) -> Self {
         State {
-            senders_weights,
+            validators_weights,
             equivocators,
             state_fault_weight,
             thr,
@@ -152,8 +152,8 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
     }
 
     pub fn from_state(
-        sender_state: Self,
-        senders_weights: Option<Weights<M::Sender, U>>,
+        validator_state: Self,
+        validators_weights: Option<Weights<M::Sender, U>>,
         state_fault_weight: Option<U>,
         own_latest_msg: Option<M>,
         latest_msgs: Option<LatestMsgs<M>>,
@@ -161,12 +161,12 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
         equivocators: Option<HashSet<M::Sender>>,
     ) -> Self {
         State {
-            senders_weights: senders_weights.unwrap_or(sender_state.senders_weights),
-            state_fault_weight: state_fault_weight.unwrap_or(sender_state.state_fault_weight),
-            own_latest_msg: own_latest_msg.or(sender_state.own_latest_msg),
-            latest_msgs: latest_msgs.unwrap_or(sender_state.latest_msgs),
-            thr: thr.unwrap_or(sender_state.thr),
-            equivocators: equivocators.unwrap_or(sender_state.equivocators),
+            validators_weights: validators_weights.unwrap_or(validator_state.validators_weights),
+            state_fault_weight: state_fault_weight.unwrap_or(validator_state.state_fault_weight),
+            own_latest_msg: own_latest_msg.or(validator_state.own_latest_msg),
+            latest_msgs: latest_msgs.unwrap_or(validator_state.latest_msgs),
+            thr: thr.unwrap_or(validator_state.thr),
+            equivocators: equivocators.unwrap_or(validator_state.equivocators),
         }
     }
 
@@ -174,8 +174,8 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
         &self.equivocators
     }
 
-    pub fn senders_weights(&self) -> &Weights<M::Sender, U> {
-        &self.senders_weights
+    pub fn validators_weights(&self) -> &Weights<M::Sender, U> {
+        &self.validators_weights
     }
 
     pub fn own_latest_msg(&self) -> &Option<M> {
@@ -195,7 +195,7 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
     }
 
     /// get msgs and fault weight overhead and equivocators overhead sorted
-    /// by fault weight overhead against the current sender_state
+    /// by fault weight overhead against the current validator_state
     pub fn sort_by_faultweight<'z>(&self, msgs: &HashSet<&'z M>) -> Vec<&'z M> {
         let mut msgs_sorted_by_faultw: Vec<_> = msgs
             .iter()
@@ -203,7 +203,10 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
                 // equivocations in relation to state
                 let sender = msg.sender();
                 if !self.equivocators.contains(sender) && self.latest_msgs.equivocate(msg) {
-                    self.senders_weights.weight(sender).map(|w| (msg, w)).ok()
+                    self.validators_weights
+                        .weight(sender)
+                        .map(|w| (msg, w))
+                        .ok()
                 } else {
                     Some((msg, <U as Zero<U>>::ZERO))
                 }
@@ -229,7 +232,7 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
 pub struct Weights<V: self::Trait, U: WeightUnit>(Arc<RwLock<HashMap<V, U>>>);
 
 impl<V: self::Trait, U: WeightUnit> Weights<V, U> {
-    /// Creates a new weight set from a HashMap of senders to unit.
+    /// Creates a new weight set from a HashMap of validators to unit.
     pub fn new(weights: HashMap<V, U>) -> Self {
         Weights(Arc::new(RwLock::new(weights)))
     }
@@ -253,17 +256,17 @@ impl<V: self::Trait, U: WeightUnit> Weights<V, U> {
         })
     }
 
-    /// Picks senders with positive weights striclty greather than zero.
+    /// Picks validators with positive weights striclty greather than zero.
     /// Failure happens if we cannot acquire the lock to read data
     pub fn validators(&self) -> Result<HashSet<V>, Error<HashMap<V, U>>> {
         self.read()
             .map_err(Error::ReadLockError)
-            .map(|senders_weight| {
-                senders_weight
+            .map(|validators_weight| {
+                validators_weight
                     .iter()
-                    .filter_map(|(sender, &weight)| {
+                    .filter_map(|(validator, &weight)| {
                         if weight > <U as Zero<U>>::ZERO {
-                            Some(sender.clone())
+                            Some(validator.clone())
                         } else {
                             None
                         }
@@ -272,25 +275,32 @@ impl<V: self::Trait, U: WeightUnit> Weights<V, U> {
             })
     }
 
-    /// Gets the weight of the sender. Returns an error in case there is a
-    /// reading error or the sender does not exist.
-    pub fn weight(&self, sender: &V) -> Result<U, Error<HashMap<V, U>>> {
+    /// Gets the weight of the validator. Returns an error in case there is a
+    /// reading error or the validator does not exist.
+    pub fn weight(&self, validator: &V) -> Result<U, Error<HashMap<V, U>>> {
         self.read()
             .map_err(Error::ReadLockError)
-            .and_then(|weights| weights.get(sender).map(Clone::clone).ok_or(Error::NotFound))
+            .and_then(|weights| {
+                weights
+                    .get(validator)
+                    .map(Clone::clone)
+                    .ok_or(Error::NotFound)
+            })
     }
 
-    /// Returns the total weight of all the given senders.
-    pub fn sum_weight_senders(&self, senders: &HashSet<V>) -> U {
-        senders.iter().fold(<U as Zero<U>>::ZERO, |acc, sender| {
-            acc + self.weight(sender).unwrap_or(U::NAN)
-        })
+    /// Returns the total weight of all the given validators.
+    pub fn sum_weight_validators(&self, validators: &HashSet<V>) -> U {
+        validators
+            .iter()
+            .fold(<U as Zero<U>>::ZERO, |acc, validator| {
+                acc + self.weight(validator).unwrap_or(U::NAN)
+            })
     }
 
-    /// Returns the total weight of all the senders in the weights.
+    /// Returns the total weight of all the validators in the weights.
     pub fn sum_all_weights(&self) -> U {
-        if let Ok(senders) = self.validators() {
-            self.sum_weight_senders(&senders)
+        if let Ok(validators) = self.validators() {
+            self.sum_weight_validators(&validators)
         } else {
             U::NAN
         }
@@ -307,7 +317,7 @@ mod tests {
         assert_eq!(
             Weights::validators(&weights).unwrap(),
             [0, 1, 2].iter().cloned().collect(),
-            "should include senders with valid, positive weight"
+            "should include validators with valid, positive weight"
         );
     }
 
@@ -317,7 +327,7 @@ mod tests {
         assert_eq!(
             Weights::validators(&weights).unwrap(),
             [1, 2].iter().cloned().collect(),
-            "should exclude senders with 0 weight"
+            "should exclude validators with 0 weight"
         );
     }
 
@@ -327,7 +337,7 @@ mod tests {
         assert_eq!(
             Weights::validators(&weights).unwrap(),
             [0, 2].iter().cloned().collect(),
-            "should exclude senders with negative weight"
+            "should exclude validators with negative weight"
         );
     }
 
@@ -342,7 +352,7 @@ mod tests {
         assert_eq!(
             Weights::validators(&weights).unwrap(),
             [1, 2].iter().cloned().collect(),
-            "should exclude senders with NAN weight"
+            "should exclude validators with NAN weight"
         );
     }
 
@@ -357,7 +367,7 @@ mod tests {
         assert_eq!(
             Weights::validators(&weights).unwrap(),
             [0, 1, 2].iter().cloned().collect(),
-            "should include senders with INFINITY weight"
+            "should include validators with INFINITY weight"
         );
     }
 }

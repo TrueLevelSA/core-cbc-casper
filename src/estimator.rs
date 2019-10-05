@@ -23,8 +23,8 @@ use std::hash::Hash;
 
 use crate::justification::LatestMsgsHonest;
 use crate::message;
-use crate::validator;
 use crate::util::weight::WeightUnit;
+use crate::validator;
 
 /// Describes an estimate, or a value of the consensus at a certain time. Implementing this trait
 /// allows to produce an estimate given the set of latest messages and the set of validators and
@@ -36,6 +36,9 @@ pub trait Estimator: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize 
     /// Choses an estimate from a set of latest messages.
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        senders_weights: &validator::Weights<<<Self as Estimator>::M as message::Trait>::Sender, U>,
+        validators_weights: &validator::Weights<
+            <<Self as Estimator>::M as message::Trait>::Sender,
+            U,
+        >,
     ) -> Result<Self, Self::Error>;
 }

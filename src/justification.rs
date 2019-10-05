@@ -40,8 +40,8 @@ use rayon::iter::IntoParallelRefIterator;
 
 use crate::estimator::Estimator;
 use crate::message;
-use crate::validator;
 use crate::util::weight::{WeightUnit, Zero};
+use crate::validator;
 
 /// Struct that holds the set of the `message::Trait` that justify the current message. Works like
 /// a `vec`.
@@ -92,15 +92,15 @@ impl<M: message::Trait> Justification<M> {
         }
     }
 
-    /// Run the estimator on the justification given the set of equivocators and senders' weights.
+    /// Run the estimator on the justification given the set of equivocators and validators' weights.
     pub fn mk_estimate<U: WeightUnit>(
         &self,
         equivocators: &HashSet<M::Sender>,
-        senders_weights: &validator::Weights<<M as message::Trait>::Sender, U>,
+        validators_weights: &validator::Weights<<M as message::Trait>::Sender, U>,
     ) -> Result<M::Estimator, <M::Estimator as Estimator>::Error> {
         let latest_msgs = LatestMsgs::from(self);
         let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(&latest_msgs, equivocators);
-        M::Estimator::estimate(&latest_msgs_honest, senders_weights)
+        M::Estimator::estimate(&latest_msgs_honest, validators_weights)
     }
 
     /// Insert messages to the justification, accepting up to the threshold faults by weight.
@@ -127,7 +127,10 @@ impl<M: message::Trait> Justification<M> {
         let is_equivocation = state.latest_msgs.equivocate(msg);
 
         let sender = msg.sender();
-        let sender_weight = state.senders_weights.weight(sender).unwrap_or(U::INFINITY);
+        let validator_weight = state
+            .validators_weights
+            .weight(sender)
+            .unwrap_or(U::INFINITY);
 
         let already_in_equivocators = state.equivocators.contains(sender);
 
@@ -143,12 +146,12 @@ impl<M: message::Trait> Justification<M> {
             }
             // in the other case, we have to check that the threshold is not reached
             (true, false) => {
-                if sender_weight + state.state_fault_weight <= state.thr {
+                if validator_weight + state.state_fault_weight <= state.thr {
                     let success = self.insert(msg.clone());
                     if success {
                         state.latest_msgs.update(msg);
                         if state.equivocators.insert(sender.clone()) {
-                            state.state_fault_weight += sender_weight;
+                            state.state_fault_weight += validator_weight;
                         }
                     }
                     success
@@ -172,7 +175,7 @@ impl<M: message::Trait> Justification<M> {
             let sender = msg.sender();
             state.equivocators.insert(sender.clone());
             state
-                .senders_weights
+                .validators_weights
                 .insert(sender.clone(), <U as Zero<U>>::ZERO)?;
         }
         state.latest_msgs.update(msg);
@@ -187,7 +190,7 @@ impl<M: message::Trait> Debug for Justification<M> {
     }
 }
 
-/// Mapping between senders and their latests messages. Latest messages from a sender are all
+/// Mapping between validators and their latests messages. Latest messages from a validator are all
 /// their messages that are not in the dependency of another of their messages.
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct LatestMsgs<M: message::Trait>(HashMap<<M as message::Trait>::Sender, HashSet<M>>);
@@ -243,7 +246,7 @@ impl<M: message::Trait> LatestMsgs<M> {
     }
 
     /// Update the data structure by adding a new message. Return true if the new message is a
-    /// valid latest message, i.e. the first message of a sender or a message that is not in the
+    /// valid latest message, i.e. the first message of a validator or a message that is not in the
     /// justification of the existing latest messages.
     pub fn update(&mut self, new_msg: &M) -> bool {
         let sender = new_msg.sender();
@@ -273,7 +276,7 @@ impl<M: message::Trait> LatestMsgs<M> {
                     }
                 })
         } else {
-            // no message found for this sender, so new_msg is the latest
+            // no message found for this validator, so new_msg is the latest
             self.insert(sender.clone(), [new_msg.clone()].iter().cloned().collect());
             true
         }
@@ -329,8 +332,8 @@ impl<M: message::Trait> LatestMsgsHonest<M> {
     ) -> Self {
         latest_msgs
             .iter()
-            .filter_map(|(sender, msgs)| {
-                if equivocators.contains(sender) || msgs.len() != 1 {
+            .filter_map(|(validator, msgs)| {
+                if equivocators.contains(validator) || msgs.len() != 1 {
                     None
                 } else {
                     msgs.iter().next()
@@ -356,8 +359,8 @@ impl<M: message::Trait> LatestMsgsHonest<M> {
 
     pub fn mk_estimate<U: WeightUnit>(
         &self,
-        senders_weights: &validator::Weights<<M as message::Trait>::Sender, U>,
+        validators_weights: &validator::Weights<<M as message::Trait>::Sender, U>,
     ) -> Result<M::Estimator, <M::Estimator as Estimator>::Error> {
-        M::Estimator::estimate(&self, senders_weights)
+        M::Estimator::estimate(&self, validators_weights)
     }
 }

@@ -28,10 +28,10 @@ use serde_derive::Serialize;
 use crate::estimator::Estimator;
 use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use crate::message::{self, Trait};
-use crate::validator;
 use crate::util::hash::Hash;
 use crate::util::id::Id;
 use crate::util::weight::{WeightUnit, Zero};
+use crate::validator;
 
 /// Casper message (`message::Message`) for a `Block` send by a validator `V: validator::Trait`
 pub type Message<V> = message::Message<Block<V> /*Estimator*/, V /*Validator*/>;
@@ -57,7 +57,7 @@ pub struct Block<V: validator::Trait>(Arc<ProtoBlock<V>>);
 
 #[cfg(feature = "integration_test")]
 impl<V: validator::Trait + Into<V>> From<V> for Block<V> {
-    fn from(_sender: V) -> Self {
+    fn from(_validator: V) -> Self {
         Block::from(ProtoBlock::new(None))
     }
 }
@@ -130,9 +130,9 @@ impl<V: validator::Trait> Estimator for Block<V> {
 
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        senders_weights: &validator::Weights<V, U>,
+        validators_weights: &validator::Weights<V, U>,
     ) -> Result<Self, Self::Error> {
-        let prevblock = Block::ghost(latest_msgs, senders_weights)?;
+        let prevblock = Block::ghost(latest_msgs, validators_weights)?;
         Ok(Block::from(ProtoBlock::new(Some(prevblock))))
     }
 }
@@ -196,7 +196,7 @@ impl<V: validator::Trait> Block<V> {
             .filter(|&msg| block.is_member(&Block::from(msg)))
             .collect();
 
-        let latest_agreeing_in_sender_view: HashMap<V, HashMap<V, Message<V>>> =
+        let latest_agreeing_in_validator_view: HashMap<V, HashMap<V, Message<V>>> =
             latest_containing_block
                 .iter()
                 .map(|m| {
@@ -204,23 +204,23 @@ impl<V: validator::Trait> Block<V> {
                         m.sender().clone(),
                         latest_in_justification(m.justification(), equivocators)
                             .into_iter()
-                            .filter(|(_sender, msg)| block.is_member(&Block::from(msg)))
+                            .filter(|(_validator, msg)| block.is_member(&Block::from(msg)))
                             .collect(),
                     )
                 })
                 .collect();
 
-        let neighbours: HashMap<&V, HashSet<&V>> = latest_agreeing_in_sender_view
+        let neighbours: HashMap<&V, HashSet<&V>> = latest_agreeing_in_validator_view
             .iter()
-            .map(|(sender, seen_agreeing)| {
+            .map(|(validator, seen_agreeing)| {
                 (
-                    sender,
+                    validator,
                     seen_agreeing
                         .keys()
-                        .filter(|senderb| {
-                            if latest_agreeing_in_sender_view.contains_key(senderb) {
-                                latest_agreeing_in_sender_view[senderb]
-                                    .contains_key(&sender.clone())
+                        .filter(|validatorb| {
+                            if latest_agreeing_in_validator_view.contains_key(validatorb) {
+                                latest_agreeing_in_validator_view[validatorb]
+                                    .contains_key(&validator.clone())
                             } else {
                                 false
                             }
@@ -256,9 +256,11 @@ impl<V: validator::Trait> Block<V> {
             }
         }
 
-        let p = neighbours.iter().fold(HashSet::new(), |acc, (_sender, x)| {
-            acc.union(x).cloned().collect()
-        });
+        let p = neighbours
+            .iter()
+            .fold(HashSet::new(), |acc, (_validator, x)| {
+                acc.union(x).cloned().collect()
+            });
 
         let mut mx_clqs = HashSet::new();
 
@@ -267,9 +269,9 @@ impl<V: validator::Trait> Block<V> {
         mx_clqs
             .into_iter()
             .filter(|x| {
-                x.iter().fold(<U as Zero<U>>::ZERO, |acc, sender| {
+                x.iter().fold(<U as Zero<U>>::ZERO, |acc, validator| {
                     // FIXME: U::default() or <U ...>::Zero? or U::NAN
-                    acc + weights.weight(sender).unwrap_or(U::NAN)
+                    acc + weights.weight(validator).unwrap_or(U::NAN)
                 }) > safety_oracle_threshold
             })
             .collect()
@@ -286,7 +288,11 @@ impl<V: validator::Trait> Block<V> {
     /// * a HashMap mapping blocks to their senders.
     pub fn parse_blockchains(
         latest_msgs: &LatestMsgsHonest<Message<V>>,
-    ) -> (BlocksChildrenMap<V>, GenesisBlocks<V>, BlocksValidatorsMap<V>) {
+    ) -> (
+        BlocksChildrenMap<V>,
+        GenesisBlocks<V>,
+        BlocksValidatorsMap<V>,
+    ) {
         let latest_blocks: HashMap<Block<V>, V> = latest_msgs
             .iter()
             .map(|msg| (Block::from(msg), msg.sender().clone()))
@@ -341,24 +347,28 @@ impl<V: validator::Trait> Block<V> {
         block: &Block<V>,
         visited: &HashMap<Block<V>, HashSet<Block<V>>>,
         latest_blocks: &HashMap<Block<V>, V>,
-        b_in_lms_senders: &mut HashMap<Block<V>, HashSet<V>>,
+        b_in_lms_validators: &mut HashMap<Block<V>, HashSet<V>>,
     ) -> HashSet<V> {
-        let mut senders = HashSet::new();
-        // collect this sender if this block is his proposed one from his latest message
+        let mut validators = HashSet::new();
+        // collect this validator if this block is his proposed one from his latest message
         latest_blocks
             .get(block)
-            .map(|sender| senders.insert(sender.clone()));
+            .map(|validator| validators.insert(validator.clone()));
         let res = visited
             .get(block)
             .map(|children| {
-                children.iter().fold(senders.clone(), |acc, child| {
-                    let res =
-                        Self::collect_validators(child, visited, latest_blocks, b_in_lms_senders);
+                children.iter().fold(validators.clone(), |acc, child| {
+                    let res = Self::collect_validators(
+                        child,
+                        visited,
+                        latest_blocks,
+                        b_in_lms_validators,
+                    );
                     res.union(&acc).cloned().collect()
                 })
             })
-            .unwrap_or_else(|| senders);
-        b_in_lms_senders.insert(block.clone(), res.clone());
+            .unwrap_or_else(|| validators);
+        b_in_lms_validators.insert(block.clone(), res.clone());
         res
     }
 
@@ -368,7 +378,7 @@ impl<V: validator::Trait> Block<V> {
         visited: &HashMap<Block<V>, HashSet<Block<V>>>,
         weights: &validator::Weights<V, U>,
         latest_blocks: &HashMap<Block<V>, V>,
-        b_in_lms_senders: &mut HashMap<Block<V>, HashSet<V>>,
+        b_in_lms_validators: &mut HashMap<Block<V>, HashSet<V>>,
     ) -> Option<(Option<Self>, U, HashSet<Self>)> {
         let init = Some((None, <U as Zero<U>>::ZERO, HashSet::new()));
         let heaviest_child = match blocks.len() {
@@ -383,16 +393,16 @@ impl<V: validator::Trait> Block<V> {
                 let best_children =
                     best.and_then(|best| visited.get(&block).map(|children| (best, children)));
                 best_children.and_then(|((b_block, b_weight, b_children), children)| {
-                    let referred_senders = match b_in_lms_senders.get(block).cloned() {
+                    let referred_validators = match b_in_lms_validators.get(block).cloned() {
                         Some(rs) => rs,
                         None => Self::collect_validators(
                             block,
                             visited,
                             latest_blocks,
-                            b_in_lms_senders,
+                            b_in_lms_validators,
                         ),
                     };
-                    let weight = weights.sum_weight_senders(&referred_senders);
+                    let weight = weights.sum_weight_validators(&referred_validators);
                     let res = Some((Some(block.clone()), weight, children.clone()));
                     let b_res = Some((b_block.clone(), b_weight, b_children));
                     if weight > b_weight {
@@ -424,7 +434,7 @@ impl<V: validator::Trait> Block<V> {
                     visited,
                     &weights,
                     latest_blocks,
-                    b_in_lms_senders,
+                    b_in_lms_validators,
                 )
             }
         })
@@ -432,18 +442,18 @@ impl<V: validator::Trait> Block<V> {
 
     pub fn ghost<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Message<V>>,
-        senders_weights: &validator::Weights<V, U>,
+        validators_weights: &validator::Weights<V, U>,
     ) -> Result<Self, Error> {
         let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_msgs);
 
-        let mut b_in_lms_senders = HashMap::<Block<V>, HashSet<V>>::new();
+        let mut b_in_lms_validators = HashMap::<Block<V>, HashSet<V>>::new();
 
         Block::pick_heaviest(
             &genesis,
             &visited,
-            senders_weights,
+            validators_weights,
             &latest_blocks,
-            &mut b_in_lms_senders,
+            &mut b_in_lms_validators,
         )
         .and_then(|(opt_block, ..)| opt_block)
         .ok_or(Error)
@@ -464,22 +474,22 @@ mod tests {
     #[test]
     fn partial_view() {
         // Test cases where not all validators see all messages.
-        let (sender0, sender1, sender2, sender3, sender4) = (0, 1, 2, 3, 4);
+        let (validator0, validator1, validator2, validator3, validator4) = (0, 1, 2, 3, 4);
         let (weight0, weight1, weight2, weight3, weight4) = (1.0, 1.0, 2.0, 1.0, 1.1);
-        let senders_weights = validator::Weights::new(
+        let validators_weights = validator::Weights::new(
             [
-                (sender0, weight0),
-                (sender1, weight1),
-                (sender2, weight2),
-                (sender3, weight3),
-                (sender4, weight4),
+                (validator0, weight0),
+                (validator1, weight1),
+                (validator2, weight2),
+                (validator3, weight3),
+                (validator4, weight4),
             ]
             .iter()
             .cloned()
             .collect(),
         );
         let state = validator::State::new(
-            senders_weights.clone(),
+            validators_weights.clone(),
             0.0,  // state fault weight
             None, // latest messages
             LatestMsgs::empty(),
@@ -489,7 +499,7 @@ mod tests {
 
         let genesis_block = Block::from(ProtoBlock::new(None));
         let latest_msgs = Justification::empty();
-        let genesis_block_msg = Message::new(sender0, latest_msgs, genesis_block.clone());
+        let genesis_block_msg = Message::new(validator0, latest_msgs, genesis_block.clone());
         // (s0, w=1.0)   gen
         // (s1, w=1.0)
         // (s2, w=2.0)
@@ -502,21 +512,23 @@ mod tests {
             "genesis block with None as prevblock"
         );
 
-        let m1 = Message::from_msgs(sender1, vec![&genesis_block_msg], &mut state.clone()).unwrap();
+        let m1 =
+            Message::from_msgs(validator1, vec![&genesis_block_msg], &mut state.clone()).unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)     \--m1
         // (s2, w=2.0)
         // (s3, w=1.0)
         // (s4, w=1.1)
 
-        let m2 = Message::from_msgs(sender2, vec![&genesis_block_msg], &mut state.clone()).unwrap();
+        let m2 =
+            Message::from_msgs(validator2, vec![&genesis_block_msg], &mut state.clone()).unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)    |\--m1
         // (s2, w=2.0)    \---m2
         // (s3, w=1.0)
         // (s4, w=1.1)
 
-        let m3 = Message::from_msgs(sender3, vec![&m1, &m2], &mut state.clone()).unwrap();
+        let m3 = Message::from_msgs(validator3, vec![&m1, &m2], &mut state.clone()).unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)    |\--m1
         // (s2, w=2.0)    \---m2
@@ -526,10 +538,10 @@ mod tests {
         assert_eq!(
             m3.estimate(),
             &Block::new(Some(Block::from(&m2))),
-            "should build on top of m2 as sender2 has more weight"
+            "should build on top of m2 as validator2 has more weight"
         );
 
-        let m4 = Message::from_msgs(sender4, vec![&m1], &mut state.clone()).unwrap();
+        let m4 = Message::from_msgs(validator4, vec![&m1], &mut state.clone()).unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)    |\--m1-------\
         // (s2, w=2.0)    \---m2       |
@@ -542,7 +554,7 @@ mod tests {
             "should build on top of m1 as thats the only msg it saw"
         );
 
-        let m5 = Message::from_msgs(sender0, vec![&m3, &m2], &mut state.clone()).unwrap();
+        let m5 = Message::from_msgs(validator0, vec![&m3, &m2], &mut state.clone()).unwrap();
         // (s0, w=1.0)   gen               m5
         // (s1, w=1.0)    |\--m1-------\   |
         // (s2, w=2.0)    \---m2       |   |
@@ -563,19 +575,20 @@ mod tests {
     fn full_view() {
         // Test a case where the last validator see all messages and build on top of the heaviest
         // one.
-        let (senderg, sender0, sender1, sender2, sender3, sender4, sender5) = (0, 1, 2, 3, 4, 5, 6);
+        let (validatorg, validator0, validator1, validator2, validator3, validator4, validator5) =
+            (0, 1, 2, 3, 4, 5, 6);
         let (weightg, weight0, weight1, weight2, weight3, weight4, weight5) =
             (1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.0);
 
-        let senders_weights = validator::Weights::new(
+        let validators_weights = validator::Weights::new(
             [
-                (senderg, weightg),
-                (sender0, weight0),
-                (sender1, weight1),
-                (sender2, weight2),
-                (sender3, weight3),
-                (sender4, weight4),
-                (sender5, weight5),
+                (validatorg, weightg),
+                (validator0, weight0),
+                (validator1, weight1),
+                (validator2, weight2),
+                (validator3, weight3),
+                (validator4, weight4),
+                (validator5, weight5),
             ]
             .iter()
             .cloned()
@@ -583,7 +596,7 @@ mod tests {
         );
 
         let state = validator::State::new(
-            senders_weights.clone(),
+            validators_weights.clone(),
             0.0,  // state fault weight
             None, // latest messages
             LatestMsgs::empty(),
@@ -593,7 +606,7 @@ mod tests {
 
         let genesis_block = Block::from(ProtoBlock::new(None));
         let latest_msgs = Justification::empty();
-        let genesis_block_msg = Message::new(senderg, latest_msgs, genesis_block.clone());
+        let genesis_block_msg = Message::new(validatorg, latest_msgs, genesis_block.clone());
         // (sg, w=1.0)   gen
         // (s0, w=1.0)
         // (s1, w=1.0)
@@ -602,7 +615,8 @@ mod tests {
         // (s4, w=1.1)
         // (s5, w=1.0)
 
-        let m0 = Message::from_msgs(sender0, vec![&genesis_block_msg], &mut state.clone()).unwrap();
+        let m0 =
+            Message::from_msgs(validator0, vec![&genesis_block_msg], &mut state.clone()).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)     \--m0
         // (s1, w=1.0)
@@ -611,7 +625,7 @@ mod tests {
         // (s4, w=1.1)
         // (s5, w=1.0)
 
-        let m1 = Message::from_msgs(sender1, vec![&m0], &mut state.clone()).unwrap();
+        let m1 = Message::from_msgs(validator1, vec![&m0], &mut state.clone()).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)     \--m0
         // (s1, w=1.0)         \--m1
@@ -620,7 +634,8 @@ mod tests {
         // (s4, w=1.1)
         // (s5, w=1.0)
 
-        let m2 = Message::from_msgs(sender2, vec![&genesis_block_msg], &mut state.clone()).unwrap();
+        let m2 =
+            Message::from_msgs(validator2, vec![&genesis_block_msg], &mut state.clone()).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -629,7 +644,7 @@ mod tests {
         // (s4, w=1.1)
         // (s5, w=1.0)
 
-        let m3 = Message::from_msgs(sender3, vec![&m2], &mut state.clone()).unwrap();
+        let m3 = Message::from_msgs(validator3, vec![&m2], &mut state.clone()).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -638,7 +653,7 @@ mod tests {
         // (s4, w=1.1)
         // (s5, w=1.0)
 
-        let m4 = Message::from_msgs(sender4, vec![&m2], &mut state.clone()).unwrap();
+        let m4 = Message::from_msgs(validator4, vec![&m2], &mut state.clone()).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -647,8 +662,12 @@ mod tests {
         // (s4, w=1.1)                \-------m4
         // (s5, w=1.0)
 
-        let m5 =
-            Message::from_msgs(sender5, vec![&m0, &m1, &m2, &m3, &m4], &mut state.clone()).unwrap();
+        let m5 = Message::from_msgs(
+            validator5,
+            vec![&m0, &m1, &m2, &m3, &m4],
+            &mut state.clone(),
+        )
+        .unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -667,11 +686,11 @@ mod tests {
     #[test]
     fn safety_oracles() {
         let nodes = 3;
-        let senders: Vec<u32> = (0..nodes).collect();
+        let validators: Vec<u32> = (0..nodes).collect();
         let weights: Vec<f64> = iter::repeat(1.0).take(nodes as usize).collect();
 
-        let senders_weights = validator::Weights::new(
-            senders
+        let validators_weights = validator::Weights::new(
+            validators
                 .iter()
                 .cloned()
                 .zip(weights.iter().cloned())
@@ -679,7 +698,7 @@ mod tests {
         );
 
         let mut state = validator::State::new(
-            senders_weights.clone(),
+            validators_weights.clone(),
             0.0,  // state fault weight
             None, // latest messages
             LatestMsgs::empty(),
@@ -690,15 +709,15 @@ mod tests {
         // block dag
         let proto_b0 = Block::from(ProtoBlock::new(None));
         let latest_msgs = Justification::empty();
-        let m0 = Message::new(senders[0], latest_msgs, proto_b0.clone());
+        let m0 = Message::new(validators[0], latest_msgs, proto_b0.clone());
 
         let proto_b1 = Block::new(Some(proto_b0.clone()));
-        let m1 = Message::from_msgs(senders[1], vec![&m0], &mut state).unwrap();
+        let m1 = Message::from_msgs(validators[1], vec![&m0], &mut state).unwrap();
 
         let proto_b2 = Block::new(Some(proto_b1.clone()));
-        let m2 = Message::from_msgs(senders[0], vec![&m1], &mut state).unwrap();
+        let m2 = Message::from_msgs(validators[0], vec![&m1], &mut state).unwrap();
 
-        // no clique yet, since senders[1] has not seen senders[0] seeing senders[1] having
+        // no clique yet, since validators[1] has not seen validators[0] seeing validators[1] having
         // proto_b0 in the chain
         assert_eq!(
             Block::safety_oracles(
@@ -706,30 +725,33 @@ mod tests {
                 &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
                 state.equivocators(),
                 2.0,
-                &senders_weights
+                &validators_weights
             ),
             HashSet::new()
         );
 
-        let m3 = Message::from_msgs(senders[1], vec![&m2], &mut state).unwrap();
+        let m3 = Message::from_msgs(validators[1], vec![&m2], &mut state).unwrap();
 
-        // clique, since both senders have seen each other having proto_b0 in the chain
+        // clique, since both validators have seen each other having proto_b0 in the chain
         assert_eq!(
             Block::safety_oracles(
                 proto_b0.clone(),
                 &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
                 state.equivocators(),
                 1.0,
-                &senders_weights
+                &validators_weights
             ),
-            HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1]])])
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![
+                validators[0],
+                validators[1]
+            ])])
         );
 
-        let m4 = Message::from_msgs(senders[2], vec![&m3], &mut state).unwrap();
+        let m4 = Message::from_msgs(validators[2], vec![&m3], &mut state).unwrap();
 
-        let m5 = Message::from_msgs(senders[1], vec![&m4], &mut state).unwrap();
+        let m5 = Message::from_msgs(validators[1], vec![&m4], &mut state).unwrap();
 
-        // no second clique yet, since senders[2] has not seen senders[1] seeing senders[2] having
+        // no second clique yet, since validators[2] has not seen validators[1] seeing validators[2] having
         // proto_b0.clone() in the chain
         assert_eq!(
             Block::safety_oracles(
@@ -737,12 +759,15 @@ mod tests {
                 &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
                 state.equivocators(),
                 1.0,
-                &senders_weights
+                &validators_weights
             ),
-            HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[0], senders[1]])])
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![
+                validators[0],
+                validators[1]
+            ])])
         );
 
-        let m6 = Message::from_msgs(senders[2], vec![&m5], &mut state).unwrap();
+        let m6 = Message::from_msgs(validators[2], vec![&m5], &mut state).unwrap();
 
         // have two cliques on proto_b0 now
         assert_eq!(
@@ -751,11 +776,11 @@ mod tests {
                 &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
                 state.equivocators(),
                 1.0,
-                &senders_weights
+                &validators_weights
             ),
             HashSet::from_iter(vec![
-                BTreeSet::from_iter(vec![senders[0], senders[1]]),
-                BTreeSet::from_iter(vec![senders[1], senders[2]]),
+                BTreeSet::from_iter(vec![validators[0], validators[1]]),
+                BTreeSet::from_iter(vec![validators[1], validators[2]]),
             ])
         );
         // also have two cliques on proto_b1
@@ -765,11 +790,11 @@ mod tests {
                 &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
                 state.equivocators(),
                 1.0,
-                &senders_weights
+                &validators_weights
             ),
             HashSet::from_iter(vec![
-                BTreeSet::from_iter(vec![senders[0], senders[1]]),
-                BTreeSet::from_iter(vec![senders[1], senders[2]]),
+                BTreeSet::from_iter(vec![validators[0], validators[1]]),
+                BTreeSet::from_iter(vec![validators[1], validators[2]]),
             ])
         );
         // on proto_b2, only have clique {1, 2}
@@ -779,16 +804,19 @@ mod tests {
                 &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
                 state.equivocators(),
                 1.0,
-                &senders_weights
+                &validators_weights
             ),
-            HashSet::from_iter(vec![BTreeSet::from_iter(vec![senders[1], senders[2]])])
+            HashSet::from_iter(vec![BTreeSet::from_iter(vec![
+                validators[1],
+                validators[2]
+            ])])
         );
 
-        let m7 = Message::from_msgs(senders[0], vec![&m6], &mut state).unwrap();
+        let m7 = Message::from_msgs(validators[0], vec![&m6], &mut state).unwrap();
 
-        let m8 = Message::from_msgs(senders[2], vec![&m7], &mut state).unwrap();
+        let m8 = Message::from_msgs(validators[2], vec![&m7], &mut state).unwrap();
 
-        let _ = Message::from_msgs(senders[0], vec![&m8], &mut state).unwrap();
+        let _ = Message::from_msgs(validators[0], vec![&m8], &mut state).unwrap();
 
         // now entire network is clique
         assert_eq!(
@@ -797,10 +825,12 @@ mod tests {
                 &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
                 state.equivocators(),
                 1.0,
-                &senders_weights
+                &validators_weights
             ),
             HashSet::from_iter(vec![BTreeSet::from_iter(vec![
-                senders[0], senders[1], senders[2],
+                validators[0],
+                validators[1],
+                validators[2],
             ])])
         );
         assert_eq!(
@@ -809,10 +839,12 @@ mod tests {
                 &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
                 state.equivocators(),
                 1.0,
-                &senders_weights
+                &validators_weights
             ),
             HashSet::from_iter(vec![BTreeSet::from_iter(vec![
-                senders[0], senders[1], senders[2],
+                validators[0],
+                validators[1],
+                validators[2],
             ])])
         );
     }

@@ -27,8 +27,8 @@ use proptest::prelude::*;
 use casper::estimator::Estimator;
 use casper::justification::{Justification, LatestMsgsHonest};
 use casper::message::{self, Trait};
-use casper::validator;
 use casper::util::weight::{WeightUnit, Zero};
+use casper::validator;
 
 #[derive(Clone, Copy, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]
 pub struct VoteCount {

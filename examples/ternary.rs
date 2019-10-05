@@ -24,8 +24,8 @@ use std::convert::From;
 use casper::estimator::Estimator;
 use casper::justification::LatestMsgsHonest;
 use casper::message;
-use casper::validator;
 use casper::util::weight::{WeightUnit, Zero};
+use casper::validator;
 
 type Validator = u32;
 
