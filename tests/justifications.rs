@@ -273,11 +273,39 @@ fn faulty_insert_with_slash() {
     );
 
     // Sender 0 and v0 are not equivocating
-    assert_eq!(j0.faulty_insert_with_slash(v0, &mut sender_state).unwrap(), true);
+    assert_eq!(
+        j0.faulty_insert_with_slash(v0, &mut sender_state).unwrap(),
+        true
+    );
 
     // Sender 0 is not equivocating, v0_prime is equivocating
-    assert_eq!(j0.faulty_insert_with_slash(v0_prime, &mut sender_state).unwrap(), true);
+    assert_eq!(
+        j0.faulty_insert_with_slash(v0_prime, &mut sender_state)
+            .unwrap(),
+        true
+    );
 
     // Sender 0 gets slashed because of equivocation
     assert_eq!(sender_state.senders_weights().weight(&0).unwrap(), 0.0);
+}
+
+#[test]
+fn equivocate() {
+    let mut latest_msgs = LatestMsgs::empty();
+    let v0 = VoteCount::create_vote_msg(0, true);
+    let v0_equivocated = VoteCount::create_vote_msg(0, false);
+
+    assert_eq!(latest_msgs.update(&v0), true);
+    assert_eq!(latest_msgs.equivocate(&v0_equivocated), true);
+
+    let senders_weights = sender::Weights::new([(0, 1.0)].iter().cloned().collect());
+    let mut sender_state =
+        sender::State::new(senders_weights, 0.0, None, latest_msgs, 0.0, HashSet::new());
+
+    let v0_not_equivocated = message::Message::from_msgs(0, vec![&v0], &mut sender_state).unwrap();
+
+    assert_eq!(
+        sender_state.latests_msgs().equivocate(&v0_not_equivocated),
+        false
+    );
 }
