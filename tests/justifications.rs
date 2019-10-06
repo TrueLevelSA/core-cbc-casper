@@ -332,9 +332,21 @@ fn from_msgs() {
     let initial_msgs = vec![v0.clone(), v1.clone(), v2.clone()];
     let justification = Justification::from_msgs(initial_msgs.clone(), &mut sender_state.clone());
 
-    assert_eq!(justification.contains(&v0), true, "Justification should contain v0");
-    assert_eq!(justification.contains(&v1), true, "Justification should contain v1");
-    assert_eq!(justification.contains(&v2), true, "Justification should contain v2");
+    assert_eq!(
+        justification.contains(&v0),
+        true,
+        "Justification should contain v0"
+    );
+    assert_eq!(
+        justification.contains(&v1),
+        true,
+        "Justification should contain v1"
+    );
+    assert_eq!(
+        justification.contains(&v2),
+        true,
+        "Justification should contain v2"
+    );
 
     let v0_equivocated = VoteCount::create_vote_msg(0, false);
 
@@ -342,13 +354,21 @@ fn from_msgs() {
     let mut justification = Justification::from_msgs(initial_msgs.clone(), &mut new_sender_state);
     justification.faulty_insert(&v0_equivocated, &mut new_sender_state);
 
-    assert_eq!(justification.contains(&v0_equivocated), false, "Justification should not contain v0_equivocated");
+    assert_eq!(
+        justification.contains(&v0_equivocated),
+        false,
+        "Justification should not contain v0_equivocated"
+    );
 
     let mut with_duplicates = initial_msgs.clone();
     with_duplicates.push(v0.clone());
 
     let justification = Justification::from_msgs(with_duplicates, &mut sender_state.clone());
-    assert_eq!(justification.len(), 3, "Justification should deduplicate messages");
+    assert_eq!(
+        justification.len(),
+        3,
+        "Justification should deduplicate messages"
+    );
 }
 
 use proptest::prelude::*;

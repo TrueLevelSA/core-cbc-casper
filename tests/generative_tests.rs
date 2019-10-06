@@ -544,7 +544,8 @@ fn arbitrary_blockchain() -> BoxedStrategy<Block<u32>> {
     Just(genesis_block).boxed()
 }
 
-#[test] #[ignore]
+#[test]
+#[ignore]
 fn blockchain() {
     let mut config = Config::with_cases(1);
     config.source_file = Some("tests/generative_tests.rs");
