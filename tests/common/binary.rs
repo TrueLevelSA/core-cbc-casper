@@ -28,14 +28,12 @@ type Validator = u32;
 #[derive(Clone, Eq, PartialEq, Debug, Hash, serde_derive::Serialize)]
 pub struct BoolWrapper(pub bool);
 
-#[cfg(feature = "integration_test")]
 impl BoolWrapper {
     pub fn new(estimate: bool) -> Self {
         BoolWrapper(estimate)
     }
 }
 
-#[cfg(feature = "integration_test")]
 impl<S: sender::Trait> From<S> for BoolWrapper {
     fn from(_sender: S) -> Self {
         BoolWrapper::new(bool::default())

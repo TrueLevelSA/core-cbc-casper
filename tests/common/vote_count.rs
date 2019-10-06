@@ -21,7 +21,6 @@ use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::ops::Add;
 
-#[cfg(feature = "integration_test")]
 use proptest::prelude::*;
 
 use casper::estimator::Estimator;
@@ -36,7 +35,6 @@ pub struct VoteCount {
     no: u32,
 }
 
-#[cfg(feature = "integration_test")]
 impl<S: sender::Trait> From<S> for VoteCount {
     fn from(_sender: S) -> Self {
         VoteCount::default()
@@ -64,7 +62,6 @@ impl Debug for VoteCount {
 }
 
 impl VoteCount {
-    #[cfg(feature = "integration_test")]
     pub fn arbitrary() -> BoxedStrategy<Self> {
         prop::sample::select(vec![
             VoteCount { yes: 1, no: 0 },
