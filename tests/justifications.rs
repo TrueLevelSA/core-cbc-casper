@@ -19,6 +19,8 @@
 
 extern crate casper;
 
+// Explicitly allowing dead code here because of https://gitlab.com/TrueLevel/casper/core-cbc/issues/43
+#[allow(dead_code)]
 mod common;
 use common::integer::IntegerWrapper;
 use common::vote_count::VoteCount;
@@ -365,21 +367,42 @@ fn from_msgs() {
     let justification =
         Justification::from_msgs(initial_msgs.clone(), &mut validator_state.clone());
 
-    assert_eq!(justification.contains(&v0), true);
-    assert_eq!(justification.contains(&v1), true);
-    assert_eq!(justification.contains(&v2), true);
+    assert_eq!(
+        justification.contains(&v0),
+        true,
+        "Justification should contain v0"
+    );
+    assert_eq!(
+        justification.contains(&v1),
+        true,
+        "Justification should contain v1"
+    );
+    assert_eq!(
+        justification.contains(&v2),
+        true,
+        "Justification should contain v2"
+    );
 
     let v0_equivocated = VoteCount::create_vote_msg(0, false);
-    let mut with_equivocation = initial_msgs.clone();
-    with_equivocation.push(v0_equivocated.clone());
 
-    let justification = Justification::from_msgs(with_equivocation, &mut validator_state.clone());
+    let mut new_validator_state = validator_state.clone();
+    let mut justification =
+        Justification::from_msgs(initial_msgs.clone(), &mut new_validator_state);
+    justification.faulty_insert(&v0_equivocated, &mut new_validator_state);
 
-    assert_eq!(justification.contains(&v0_equivocated), false);
+    assert_eq!(
+        justification.contains(&v0_equivocated),
+        false,
+        "Justification should not contain v0_equivocated"
+    );
 
     let mut with_duplicates = initial_msgs.clone();
     with_duplicates.push(v0.clone());
 
     let justification = Justification::from_msgs(with_duplicates, &mut validator_state.clone());
-    assert_eq!(justification.len(), 3);
+    assert_eq!(
+        justification.len(),
+        3,
+        "Justification should deduplicate messages"
+    );
 }
