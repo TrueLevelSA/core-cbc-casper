@@ -272,7 +272,7 @@ impl<M: message::Trait> LatestMsgs<M> {
     }
 
     /// Checks whether the new message equivocates with latest messages.
-    pub(crate) fn equivocate(&self, msg_new: &M) -> bool {
+    pub fn equivocate(&self, msg_new: &M) -> bool {
         self.get(msg_new.sender())
             .map(|latest_msgs| latest_msgs.iter().any(|m| m.equivocates(&msg_new)))
             .unwrap_or(false)
