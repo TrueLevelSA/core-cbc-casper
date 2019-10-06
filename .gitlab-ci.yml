@@ -33,7 +33,7 @@ tests:
 generative-tests:
   stage: tests
   script:
-    - cargo test --test generative_tests --features "integration_test"
+    - cargo test -- --ignored
 
 build-doc:
   stage: tests
