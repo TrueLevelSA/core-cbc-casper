@@ -544,7 +544,7 @@ fn arbitrary_blockchain() -> BoxedStrategy<Block<u32>> {
     Just(genesis_block).boxed()
 }
 
-#[test]
+#[test] #[ignore]
 fn blockchain() {
     let mut config = Config::with_cases(1);
     config.source_file = Some("tests/generative_tests.rs");
@@ -611,7 +611,7 @@ fn blockchain() {
 
 proptest! {
     #![proptest_config(Config::with_cases(30))]
-    #[test]
+    #[test] #[ignore]
     fn round_robin_vote_count(ref chain in chain(VoteCount::arbitrary(), 5, round_robin, all_receivers, full_consensus, 0, 0)) {
         assert_eq!(chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len(),
                    if chain.len() > 0 {chain.len()} else {0},
@@ -633,7 +633,7 @@ fn integerwrapper_gen() -> BoxedStrategy<IntegerWrapper> {
 
 proptest! {
     #![proptest_config(Config::with_cases(30))]
-    #[test]
+    #[test] #[ignore]
     fn round_robin_binary(ref chain in chain(boolwrapper_gen(), 15, round_robin, all_receivers, full_consensus, 0, 0)) {
         assert!(chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len() >=
                 chain.len(),
@@ -643,7 +643,7 @@ proptest! {
 
 proptest! {
     #![proptest_config(Config::with_cases(10))]
-    #[test]
+    #[test] #[ignore]
     fn round_robin_integer(ref chain in chain(integerwrapper_gen(), 2000, round_robin, all_receivers, full_consensus, 0, 0)) {
         // total messages until unilateral consensus
         println!("{} validators -> {:?} message(s)",
@@ -659,7 +659,7 @@ proptest! {
 
 proptest! {
     #![proptest_config(Config::with_cases(1))]
-    #[test]
+    #[test] #[ignore]
     fn arbitrary_messenger_vote_count(ref chain in chain(VoteCount::arbitrary(), 8, arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
         // total messages until unilateral consensus
         println!("{} validators -> {:?} message(s)",
@@ -672,7 +672,7 @@ proptest! {
 
 proptest! {
     #![proptest_config(Config::with_cases(1))]
-    #[test]
+    #[test] #[ignore]
     fn parallel_arbitrary_messenger_vote_count(ref chain in chain(VoteCount::arbitrary(), 8, parallel_arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
         // total messages until unilateral consensus
         println!("{} validators -> {:?} message(s)",
@@ -685,7 +685,7 @@ proptest! {
 
 proptest! {
     #![proptest_config(Config::with_cases(1))]
-    #[test]
+    #[test] #[ignore]
     fn arbitrary_messenger_binary(ref chain in chain(boolwrapper_gen(), 100, arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
         // total messages until unilateral consensus
         println!("{} validators -> {:?} message(s)",
@@ -698,7 +698,7 @@ proptest! {
 
 proptest! {
     #![proptest_config(Config::with_cases(1))]
-    #[test]
+    #[test] #[ignore]
     fn arbitrary_messenger_integer(ref chain in chain(integerwrapper_gen(), 50, arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
         // total messages until unilateral consensus
         println!("{} validators -> {:?} message(s)",
@@ -737,7 +737,7 @@ prop_compose! {
 
 proptest! {
     #![proptest_config(Config::with_cases(1000))]
-    #[test]
+    #[test] #[ignore]
     fn detect_equivocation(ref vote_tuple in votes(5, 5)) {
         let (messages, equivocators, nodes) = vote_tuple;
         let nodes = nodes.clone();

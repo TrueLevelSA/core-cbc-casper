@@ -56,7 +56,6 @@ impl<S: sender::Trait> ProtoBlock<S> {
 #[derive(Clone, Eq, Hash)]
 pub struct Block<S: sender::Trait>(Arc<ProtoBlock<S>>);
 
-#[cfg(feature = "integration_test")]
 impl<S: sender::Trait + Into<S>> From<S> for Block<S> {
     fn from(_sender: S) -> Self {
         Block::from(ProtoBlock::new(None))

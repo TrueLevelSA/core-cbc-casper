@@ -63,12 +63,12 @@ implementation rather than on performance.
 
 ## Tests
 
-We use the crate `proptest` to generate properties tests. The library has a
-feature `integration_test` used by the proptest framework. To run specifically
+We use the crate `proptest` to generate properties tests. `proptest` tests can
+be potentially expensive, so they're ignored by default. To run specifically
 the `proptest` tests use:
 
 ```
-cargo test --test generative_tests --features "integration_test"
+cargo test -- --ignored
 ```
 
 To run the other tests simply use `cargo test`.
