@@ -795,3 +795,58 @@ proptest! {
         assert_eq!(equivocations.len(), 0, "equivocation absorbed in threshold");
     }
 }
+
+prop_compose! {
+    fn latest_msgs(validators: usize)
+        (equivocations in prop::collection::vec(
+                0..validators,
+                0..validators),
+        votes in prop::collection::vec(
+            VoteCount::arbitrary(),
+            validators),
+        validators in Just(validators))
+        -> (LatestMsgs<VoteCount>, HashSet<u32>) {
+        let latest_msgs = LatestMsgs::empty();
+        let equivocators = HashSet::new();
+
+        let weights: Vec<f64> =
+            std::iter::repeat(1.0).take(validators).collect();
+        let validators_weights = validator::Weights::new(
+            (0..validators)
+                .map(|s| s as u32)
+                .zip(weights.iter().cloned())
+                .collect(),
+        );
+
+        let mut validator_state = validator::State::new(
+            validators_weights,
+            0.0,
+            None,
+            latest_msgs,
+            4.0,
+            equivocators,
+        );
+
+        let mut messages = vec![];
+        for (validator, vote) in votes.iter().enumerate().take(validators) {
+            messages.push(Message::new(validator as u32, Justification::empty(), *vote));
+
+            if equivocations.contains(&validator) {
+                messages.push(Message::new(validator as u32, Justification::empty(), vote.toggled_vote()));
+            }
+        }
+
+        Justification::from_msgs(messages, &mut validator_state);
+
+        (validator_state.latests_msgs().clone(), validator_state.equivocators().clone())
+    }
+}
+
+proptest! {
+    #[test]
+    fn latest_msgs_honest_from_latest_msgs(latest_msgs in latest_msgs(10)) {
+        let (latest_msgs, equivocators) = latest_msgs;
+        let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(&latest_msgs, &equivocators);
+        assert_eq!(latest_msgs_honest.len(), latest_msgs.len() - equivocators.len(), "Latest honest messages length should be the same as latest messages minus equivocators");
+    }
+}
