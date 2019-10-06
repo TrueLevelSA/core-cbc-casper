@@ -343,3 +343,43 @@ fn equivocate() {
         false
     );
 }
+
+#[test]
+fn from_msgs() {
+    let validators_weights =
+        validator::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+    let validator_state = validator::State::new(
+        validators_weights,
+        0.0,
+        None,
+        LatestMsgs::empty(),
+        0.0,
+        HashSet::new(),
+    );
+
+    let v0 = VoteCount::create_vote_msg(0, true);
+    let v1 = VoteCount::create_vote_msg(1, true);
+    let v2 = VoteCount::create_vote_msg(2, false);
+
+    let initial_msgs = vec![v0.clone(), v1.clone(), v2.clone()];
+    let justification =
+        Justification::from_msgs(initial_msgs.clone(), &mut validator_state.clone());
+
+    assert_eq!(justification.contains(&v0), true);
+    assert_eq!(justification.contains(&v1), true);
+    assert_eq!(justification.contains(&v2), true);
+
+    let v0_equivocated = VoteCount::create_vote_msg(0, false);
+    let mut with_equivocation = initial_msgs.clone();
+    with_equivocation.push(v0_equivocated.clone());
+
+    let justification = Justification::from_msgs(with_equivocation, &mut validator_state.clone());
+
+    assert_eq!(justification.contains(&v0_equivocated), false);
+
+    let mut with_duplicates = initial_msgs.clone();
+    with_duplicates.push(v0.clone());
+
+    let justification = Justification::from_msgs(with_duplicates, &mut validator_state.clone());
+    assert_eq!(justification.len(), 3);
+}
