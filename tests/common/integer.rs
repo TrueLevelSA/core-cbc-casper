@@ -31,14 +31,12 @@ type Validator = u32;
 #[derive(Clone, Eq, Debug, Ord, PartialOrd, PartialEq, Hash, serde_derive::Serialize)]
 pub struct IntegerWrapper(pub u32);
 
-#[cfg(feature = "integration_test")]
 impl IntegerWrapper {
     pub fn new(estimate: u32) -> Self {
         IntegerWrapper(estimate)
     }
 }
 
-#[cfg(feature = "integration_test")]
 impl<V: validator::ValidatorName> From<V> for IntegerWrapper {
     fn from(_validator: V) -> Self {
         IntegerWrapper::new(u32::default())

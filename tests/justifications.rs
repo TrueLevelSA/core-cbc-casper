@@ -20,6 +20,7 @@
 extern crate casper;
 
 mod common;
+use common::integer::IntegerWrapper;
 use common::vote_count::VoteCount;
 
 use std::collections::HashSet;
@@ -227,5 +228,51 @@ fn faulty_inserts() {
         validator_state.fault_weight(),
         1.0,
         "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we can't know the weight of the validator, which could be Infinity, and thus the state_fault_weight should be unchanged"
+    );
+}
+
+#[test]
+fn faulty_insert() {
+    let validators_weights =
+        validator::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+    let v0 = &message::Message::new(0, Justification::empty(), IntegerWrapper::new(0));
+    let v0_prime = &message::Message::new(0, Justification::empty(), IntegerWrapper::new(1)); // equivocating vote
+    let mut j0 = Justification::empty();
+
+    let mut validator_state = validator::State::new(
+        validators_weights.clone(),
+        0.0,
+        None,
+        LatestMsgs::empty(),
+        2.5,
+        HashSet::new(),
+    );
+
+    // Validator 0 and v0 is not equivocating
+    assert_eq!(j0.faulty_insert(v0, &mut validator_state), true);
+
+    // Validator 0 is not equivocating, v0_prime is equivocating
+    // State fault weight (0.0) is still below threshold (2.5), so vote can be
+    // inserted
+    assert_eq!(j0.faulty_insert(v0_prime, &mut validator_state), true);
+
+    // After insert, state fault weight should be 1.0 and Validator 0 is now
+    // equivocating
+    float_eq!(validator_state.fault_weight(), 1.0);
+    assert_eq!(validator_state.equivocators().contains(&0), true);
+
+    let v0_new = &message::Message::new(0, Justification::empty(), IntegerWrapper::new(2));
+    // Validator 0 can still send new votes, as it's already a equivocator
+    // and the fault is below threshold
+    assert_eq!(j0.faulty_insert(v0_new, &mut validator_state), true);
+
+    // A new Validator sending an equivocating vote will make the fault weight go
+    // above the threshold, and stop accepting equivocating votes
+    let v1 = &message::Message::new(1, Justification::empty(), IntegerWrapper::new(0));
+    let v1_equivocating = &message::Message::new(1, Justification::empty(), IntegerWrapper::new(0));
+    assert_eq!(j0.faulty_insert(v1, &mut validator_state), true);
+    assert_eq!(
+        j0.faulty_insert(v1_equivocating, &mut validator_state),
+        false
     );
 }
