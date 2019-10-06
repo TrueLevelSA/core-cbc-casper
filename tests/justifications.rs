@@ -20,6 +20,7 @@
 extern crate casper;
 
 mod common;
+use common::integer::IntegerWrapper;
 use common::vote_count::VoteCount;
 
 use std::collections::HashSet;
@@ -119,7 +120,7 @@ fn faulty_inserts() {
     );
     let success = j1.clone().faulty_insert(v0_prime, &mut state);
     assert!(success,
-        "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set"
+            "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set"
     );
 
     let mut sender_state2 = sender::State::from_state(
@@ -148,7 +149,7 @@ fn faulty_inserts() {
     );
     let success = j1.clone().faulty_insert(v0_prime, &mut state);
     assert!(!success,
-        "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as the fault threshold gets crossed for the set"
+            "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as the fault threshold gets crossed for the set"
     );
 
     let mut sender_state2 = sender::State::from_state(
@@ -162,7 +163,7 @@ fn faulty_inserts() {
     );
     j1.clone().faulty_insert(v0_prime, &mut sender_state2);
     assert_eq!(sender_state2.fault_weight(), 0.1,
-        "$v0_prime$ conflicts with $v0$ through $m0$, and we should NOT accept this fault as the fault threshold gets crossed for the set, and thus the state_fault_weight should not be incremented"
+               "$v0_prime$ conflicts with $v0$ through $m0$, and we should NOT accept this fault as the fault threshold gets crossed for the set, and thus the state_fault_weight should not be incremented"
     );
 
     let mut state = sender::State::from_state(
@@ -176,7 +177,7 @@ fn faulty_inserts() {
     );
     let success = j1.clone().faulty_insert(v0_prime, &mut state);
     assert!(success,
-        "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the thr doesnt get crossed for the set"
+            "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the thr doesnt get crossed for the set"
     );
 
     let senders_weights = sender::Weights::new([].iter().cloned().collect());
@@ -206,8 +207,51 @@ fn faulty_inserts() {
     );
     j1.clone().faulty_insert(v0_prime, &mut sender_state);
     assert_eq!(
-            sender_state.fault_weight(),
+        sender_state.fault_weight(),
         1.0,
         "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we can't know the weight of the sender, which could be Infinity, and thus the state_fault_weight should be unchanged"
     );
+}
+
+#[test]
+fn faulty_insert() {
+    let senders_weights =
+        sender::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+    let v0 = &message::Message::new(0, Justification::empty(), IntegerWrapper::new(0));
+    let v0_prime = &message::Message::new(0, Justification::empty(), IntegerWrapper::new(1)); // equivocating vote
+    let mut j0 = Justification::empty();
+
+    let mut sender_state = sender::State::new(
+        senders_weights.clone(),
+        0.0,
+        None,
+        LatestMsgs::empty(),
+        2.5,
+        HashSet::new(),
+    );
+
+    // Sender 0 and v0 is not equivocating
+    assert_eq!(j0.faulty_insert(v0, &mut sender_state), true);
+
+    // Sender 0 is not equivocating, v0_prime is equivocating
+    // State fault weight (0.0) is still below threshold (2.5), so vote can be
+    // inserted
+    assert_eq!(j0.faulty_insert(v0_prime, &mut sender_state), true);
+
+    // After insert, state fault weight should be 1.0 and Sender 0 is now
+    // equivocating
+    assert_eq!(sender_state.fault_weight(), 1.0);
+    assert_eq!(sender_state.equivocators().contains(&0), true);
+
+    let v0_new = &message::Message::new(0, Justification::empty(), IntegerWrapper::new(2));
+    // Sender 0 can still send new votes, as it's already a equivocator
+    // and the fault is below threshold
+    assert_eq!(j0.faulty_insert(v0_new, &mut sender_state), true);
+
+    // A new Sender sending an equivocating vote will make the fault weight go
+    // above the threshold, and stop accepting equivocating votes
+    let v1 = &message::Message::new(1, Justification::empty(), IntegerWrapper::new(0));
+    let v1_equivocating = &message::Message::new(1, Justification::empty(), IntegerWrapper::new(0));
+    assert_eq!(j0.faulty_insert(v1, &mut sender_state), true);
+    assert_eq!(j0.faulty_insert(v1_equivocating, &mut sender_state), false);
 }
