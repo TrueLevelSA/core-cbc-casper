@@ -25,8 +25,8 @@ use common::vote_count::VoteCount;
 
 use std::collections::HashSet;
 
-use casper::justification::{Justification, LatestMsgs};
-use casper::message::{self, Trait};
+use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
+use casper::message::{self, Message, Trait};
 use casper::sender;
 
 #[test]
@@ -347,4 +347,61 @@ fn from_msgs() {
 
     let justification = Justification::from_msgs(with_duplicates, &mut sender_state.clone());
     assert_eq!(justification.len(), 3);
+}
+
+extern crate proptest;
+use proptest::prelude::*;
+prop_compose! {
+    fn latest_msgs(senders: usize)
+        (equivocations in prop::collection::vec(
+                0..senders,
+                0..senders),
+        votes in prop::collection::vec(
+            VoteCount::arbitrary(),
+            senders),
+        senders in Just(senders))
+        -> (LatestMsgs<Message<VoteCount, u32>>, HashSet<u32>) {
+        let latest_msgs = LatestMsgs::empty();
+        let equivocators = HashSet::new();
+
+        let weights: Vec<f64> =
+            std::iter::repeat(1.0).take(senders).collect();
+        let senders_weights = sender::Weights::new(
+            (0..senders)
+                .map(|s| s as u32)
+                .zip(weights.iter().cloned())
+                .collect(),
+        );
+
+        let mut sender_state = sender::State::new(
+            senders_weights,
+            0.0,
+            None,
+            latest_msgs,
+            4.0,
+            equivocators,
+        );
+
+        let mut messages = vec![];
+        for sender in 0..senders {
+            messages.push(Message::new(sender as u32, Justification::empty(), votes[sender].clone()));
+
+            if equivocations.contains(&sender) {
+                messages.push(Message::new(sender as u32, Justification::empty(), VoteCount::toggle_vote(&votes[sender])));
+            }
+        }
+
+        Justification::from_msgs(messages, &mut sender_state);
+
+        (sender_state.latests_msgs().clone(), sender_state.equivocators().clone())
+    }
+}
+
+proptest! {
+    #[test]
+    fn latest_msgs_honest_from_latest_msgs(latest_msgs in latest_msgs(10)) {
+        let (latest_msgs, equivocators) = latest_msgs;
+        let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(&latest_msgs, &equivocators);
+        assert_eq!(latest_msgs_honest.len(), latest_msgs.len() - equivocators.len(), "Latest honest messages length should be the same as latest messages minus equivocators");
+    }
 }

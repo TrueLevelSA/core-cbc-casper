@@ -254,7 +254,7 @@ impl<M: message::Trait> LatestMsgs<M> {
                     }
                     // new actually older than old
                     else if new_independent_from_old {
-                        false || acc
+                        acc
                     }
                     // new newer than old
                     else {
@@ -314,7 +314,8 @@ impl<M: message::Trait> LatestMsgsHonest<M> {
         self.0.retain(|msg| msg.sender() != validator);
     }
 
-    /// Filters the latest messages to retreive the latest honest messages and remove equivocators.
+    /// Filters the latest messages to retreive the latest honest messages and
+    /// remove equivocators.
     pub fn from_latest_msgs(
         latest_msgs: &LatestMsgs<M>,
         equivocators: &HashSet<M::Sender>,

@@ -81,7 +81,7 @@ impl VoteCount {
     }
 
     // used to create an equivocation vote
-    fn toggle_vote(vote: &Self) -> Self {
+    pub(crate) fn toggle_vote(vote: &Self) -> Self {
         // these two are the only allowed votes (unjustified msgs)
         match vote {
             VoteCount { yes: 1, no: 0 } => VoteCount { yes: 0, no: 1 },
