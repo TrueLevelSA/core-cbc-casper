@@ -276,3 +276,40 @@ fn faulty_insert() {
         false
     );
 }
+
+#[test]
+fn faulty_insert_with_slash() {
+    let validators_weights = validator::Weights::new([(0, 1.0)].iter().cloned().collect());
+    let v0 = &message::Message::new(0, Justification::empty(), IntegerWrapper::new(0));
+    let v0_prime = &message::Message::new(0, Justification::empty(), IntegerWrapper::new(1)); // equivocating vote
+    let mut j0 = Justification::empty();
+
+    let mut validator_state = validator::State::new(
+        validators_weights.clone(),
+        0.0,
+        None,
+        LatestMsgs::empty(),
+        0.0,
+        HashSet::new(),
+    );
+
+    // Sender 0 and v0 are not equivocating
+    assert_eq!(
+        j0.faulty_insert_with_slash(v0, &mut validator_state)
+            .unwrap(),
+        true
+    );
+
+    // Sender 0 is not equivocating, v0_prime is equivocating
+    assert_eq!(
+        j0.faulty_insert_with_slash(v0_prime, &mut validator_state)
+            .unwrap(),
+        true
+    );
+
+    // Sender 0 gets slashed because of equivocation
+    float_eq!(
+        validator_state.validators_weights().weight(&0).unwrap(),
+        0.0
+    );
+}
