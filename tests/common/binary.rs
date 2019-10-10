@@ -37,12 +37,12 @@ impl BoolWrapper {
 
 #[cfg(feature = "integration_test")]
 impl<V: validator::Trait> From<V> for BoolWrapper {
-    fn from(_sender: V) -> Self {
+    fn from(_validator: V) -> Self {
         BoolWrapper::new(bool::default())
     }
 }
 
-pub type BinaryMsg = message::Message<BoolWrapper /*Estimator*/, Validator /*Sender*/>;
+pub type BinaryMsg = message::Message<BoolWrapper /*Estimator*/, Validator /*Validator*/>;
 
 #[derive(Debug)]
 pub struct Error(&'static str);
@@ -68,20 +68,20 @@ impl Estimator for BoolWrapper {
     /// Weighted count of the votes contained in the latest messages.
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<BinaryMsg>,
-        senders_weights: &validator::Weights<Validator, U>,
+        validators_weights: &validator::Weights<Validator, U>,
     ) -> Result<Self, Self::Error> {
         // loop over all the latest messages
         let (true_w, false_w) = latest_msgs.iter().fold(
             (<U as Zero<U>>::ZERO, <U as Zero<U>>::ZERO),
             |(true_w, false_w), msg| {
-                // get the weight for the sender
-                let sender_weight = senders_weights.weight(msg.sender()).unwrap_or(U::NAN);
+                // get the weight for the validator
+                let validator_weight = validators_weights.weight(msg.sender()).unwrap_or(U::NAN);
 
                 // add the weight to the right accumulator
                 if msg.estimate().0 {
-                    (true_w + sender_weight, false_w)
+                    (true_w + validator_weight, false_w)
                 } else {
-                    (true_w, false_w + sender_weight)
+                    (true_w, false_w + validator_weight)
                 }
             },
         );

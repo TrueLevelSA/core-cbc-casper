@@ -84,12 +84,12 @@ impl Estimator for Value {
 
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Message>,
-        senders_weights: &validator::Weights<Validator, U>,
+        validators_weights: &validator::Weights<Validator, U>,
     ) -> Result<Self, Self::Error> {
         use message::Trait;
         let res: Self = latest_msgs
             .iter()
-            .map(|msg| (msg.estimate(), senders_weights.weight(msg.sender())))
+            .map(|msg| (msg.estimate(), validators_weights.weight(msg.sender())))
             .fold(
                 (
                     (Value::Zero, <U as Zero<U>>::ZERO),
@@ -114,11 +114,11 @@ fn main() {
     use casper::justification::{Justification, LatestMsgs};
     use casper::message::Trait;
 
-    let senders: Vec<u32> = (1..=4).collect();
+    let validators: Vec<u32> = (1..=4).collect();
     let weights = [0.6, 1.0, 2.0, 1.3];
 
-    let senders_weights = validator::Weights::new(
-        senders
+    let validators_weights = validator::Weights::new(
+        validators
             .iter()
             .cloned()
             .zip(weights.iter().cloned())
@@ -126,7 +126,7 @@ fn main() {
     );
 
     let mut weights = validator::State::new(
-        senders_weights.clone(),
+        validators_weights.clone(),
         0.0, // state fault weight
         None,
         LatestMsgs::empty(),

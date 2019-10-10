@@ -33,19 +33,19 @@ use casper::validator;
 
 #[test]
 fn equal_weight() {
-    let senders: Vec<u32> = (0..4).collect();
+    let validators: Vec<u32> = (0..4).collect();
     let weights = [1.0, 1.0, 1.0, 1.0];
 
-    let senders_weights = validator::Weights::new(
-        senders
+    let validators_weights = validator::Weights::new(
+        validators
             .iter()
             .cloned()
             .zip(weights.iter().cloned())
             .collect(),
     );
 
-    let sender_state = validator::State::new(
-        senders_weights.clone(),
+    let validator_state = validator::State::new(
+        validators_weights.clone(),
         0.0, // state fault weight
         None,
         LatestMsgs::empty(),
@@ -57,35 +57,37 @@ fn equal_weight() {
         IntegerWrapper::estimate(
             &LatestMsgsHonest::from_latest_msgs(
                 &LatestMsgs::from(&Justification::empty()),
-                sender_state.equivocators()
+                validator_state.equivocators()
             ),
-            &senders_weights,
+            &validators_weights,
         ),
         Err("no msg".into())
     );
 
-    let m0 = IntegerMsg::new(senders[0], Justification::empty(), IntegerWrapper(1));
-    let m1 = IntegerMsg::new(senders[1], Justification::empty(), IntegerWrapper(2));
-    let m2 = IntegerMsg::new(senders[2], Justification::empty(), IntegerWrapper(3));
-    let m3 = IntegerMsg::from_msgs(senders[0], vec![&m0, &m1], &mut sender_state.clone()).unwrap();
+    let m0 = IntegerMsg::new(validators[0], Justification::empty(), IntegerWrapper(1));
+    let m1 = IntegerMsg::new(validators[1], Justification::empty(), IntegerWrapper(2));
+    let m2 = IntegerMsg::new(validators[2], Justification::empty(), IntegerWrapper(3));
+    let m3 =
+        IntegerMsg::from_msgs(validators[0], vec![&m0, &m1], &mut validator_state.clone()).unwrap();
 
-    let mut j0 = Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut sender_state.clone());
+    let mut j0 =
+        Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(sender_state.equivocators(), &senders_weights)
+        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         IntegerWrapper(1)
     );
 
-    j0.faulty_insert(&m2, &mut sender_state.clone());
+    j0.faulty_insert(&m2, &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(sender_state.equivocators(), &senders_weights)
+        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         IntegerWrapper(2)
     );
 
-    j0.faulty_insert(&m3, &mut sender_state.clone());
+    j0.faulty_insert(&m3, &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(sender_state.equivocators(), &senders_weights)
+        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         IntegerWrapper(2)
     );
@@ -94,19 +96,19 @@ fn equal_weight() {
 /// the 1st validator has most of the weight
 #[test]
 fn uneven_weights_1() {
-    let senders: Vec<u32> = (0..4).collect();
+    let validators: Vec<u32> = (0..4).collect();
     let weights = [4.0, 1.0, 1.0, 1.0];
 
-    let senders_weights = validator::Weights::new(
-        senders
+    let validators_weights = validator::Weights::new(
+        validators
             .iter()
             .cloned()
             .zip(weights.iter().cloned())
             .collect(),
     );
 
-    let sender_state = validator::State::new(
-        senders_weights.clone(),
+    let validator_state = validator::State::new(
+        validators_weights.clone(),
         0.0, // state fault weight
         None,
         LatestMsgs::empty(),
@@ -118,35 +120,37 @@ fn uneven_weights_1() {
         IntegerWrapper::estimate(
             &LatestMsgsHonest::from_latest_msgs(
                 &LatestMsgs::from(&Justification::empty()),
-                sender_state.equivocators()
+                validator_state.equivocators()
             ),
-            &senders_weights,
+            &validators_weights,
         ),
         Err("no msg".into())
     );
 
-    let m0 = IntegerMsg::new(senders[0], Justification::empty(), IntegerWrapper(1));
-    let m1 = IntegerMsg::new(senders[1], Justification::empty(), IntegerWrapper(2));
-    let m2 = IntegerMsg::new(senders[2], Justification::empty(), IntegerWrapper(3));
-    let m3 = IntegerMsg::from_msgs(senders[0], vec![&m0, &m1], &mut sender_state.clone()).unwrap();
+    let m0 = IntegerMsg::new(validators[0], Justification::empty(), IntegerWrapper(1));
+    let m1 = IntegerMsg::new(validators[1], Justification::empty(), IntegerWrapper(2));
+    let m2 = IntegerMsg::new(validators[2], Justification::empty(), IntegerWrapper(3));
+    let m3 =
+        IntegerMsg::from_msgs(validators[0], vec![&m0, &m1], &mut validator_state.clone()).unwrap();
 
-    let mut j0 = Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut sender_state.clone());
+    let mut j0 =
+        Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(sender_state.equivocators(), &senders_weights)
+        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         IntegerWrapper(1)
     );
 
-    j0.faulty_insert(&m2, &mut sender_state.clone());
+    j0.faulty_insert(&m2, &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(sender_state.equivocators(), &senders_weights)
+        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         IntegerWrapper(1)
     );
 
-    j0.faulty_insert(&m3, &mut sender_state.clone());
+    j0.faulty_insert(&m3, &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(sender_state.equivocators(), &senders_weights)
+        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         IntegerWrapper(1)
     );
@@ -155,19 +159,19 @@ fn uneven_weights_1() {
 /// the 4th validator has most of the weight
 #[test]
 fn uneven_weights_4() {
-    let senders: Vec<u32> = (0..4).collect();
+    let validators: Vec<u32> = (0..4).collect();
     let weights = [1.0, 1.0, 1.0, 4.0];
 
-    let senders_weights = validator::Weights::new(
-        senders
+    let validators_weights = validator::Weights::new(
+        validators
             .iter()
             .cloned()
             .zip(weights.iter().cloned())
             .collect(),
     );
 
-    let sender_state = validator::State::new(
-        senders_weights.clone(),
+    let validator_state = validator::State::new(
+        validators_weights.clone(),
         0.0, // state fault weight
         None,
         LatestMsgs::empty(),
@@ -179,49 +183,50 @@ fn uneven_weights_4() {
         IntegerWrapper::estimate(
             &LatestMsgsHonest::from_latest_msgs(
                 &LatestMsgs::from(&Justification::empty()),
-                sender_state.equivocators()
+                validator_state.equivocators()
             ),
-            &senders_weights,
+            &validators_weights,
         ),
         Err("no msg".into())
     );
 
-    let m0 = IntegerMsg::new(senders[0], Justification::empty(), IntegerWrapper(1));
-    let m1 = IntegerMsg::new(senders[1], Justification::empty(), IntegerWrapper(2));
-    let m2 = IntegerMsg::new(senders[2], Justification::empty(), IntegerWrapper(3));
-    let m3 = IntegerMsg::new(senders[3], Justification::empty(), IntegerWrapper(4));
+    let m0 = IntegerMsg::new(validators[0], Justification::empty(), IntegerWrapper(1));
+    let m1 = IntegerMsg::new(validators[1], Justification::empty(), IntegerWrapper(2));
+    let m2 = IntegerMsg::new(validators[2], Justification::empty(), IntegerWrapper(3));
+    let m3 = IntegerMsg::new(validators[3], Justification::empty(), IntegerWrapper(4));
 
     let m4 = IntegerMsg::from_msgs(
-        senders[3],
+        validators[3],
         vec![&m0, &m1, &m2, &m3],
-        &mut sender_state.clone(),
+        &mut validator_state.clone(),
     )
     .unwrap();
 
-    let mut j0 = Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut sender_state.clone());
+    let mut j0 =
+        Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(sender_state.equivocators(), &senders_weights)
+        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         IntegerWrapper(1)
     );
 
-    j0.faulty_insert(&m2, &mut sender_state.clone());
+    j0.faulty_insert(&m2, &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(sender_state.equivocators(), &senders_weights)
+        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         IntegerWrapper(2)
     );
 
-    j0.faulty_insert(&m3, &mut sender_state.clone());
+    j0.faulty_insert(&m3, &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(sender_state.equivocators(), &senders_weights)
+        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         IntegerWrapper(4)
     );
 
-    j0.faulty_insert(&m4, &mut sender_state.clone());
+    j0.faulty_insert(&m4, &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(sender_state.equivocators(), &senders_weights)
+        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         IntegerWrapper(4)
     );

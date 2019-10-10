@@ -38,7 +38,7 @@ pub struct VoteCount {
 
 #[cfg(feature = "integration_test")]
 impl<V: validator::Trait> From<V> for VoteCount {
-    fn from(_sender: V) -> Self {
+    fn from(_validator: V) -> Self {
         VoteCount::default()
     }
 }
@@ -95,9 +95,9 @@ impl VoteCount {
         }
     }
 
-    /// Creates a new empty vote message, issued by the sender
+    /// Creates a new empty vote message, issued by the validator
     /// with no justification
-    pub fn create_vote_msg(sender: u32, vote: bool) -> message::Message<Self, u32> {
+    pub fn create_vote_msg(validator: u32, vote: bool) -> message::Message<Self, u32> {
         let justification = Justification::empty();
         let estimate = if vote {
             VoteCount { yes: 1, no: 0 }
@@ -105,7 +105,7 @@ impl VoteCount {
             VoteCount { yes: 0, no: 1 }
         };
 
-        message::Message::new(sender, justification, estimate)
+        message::Message::new(validator, justification, estimate)
     }
 
     fn get_vote_msgs(
@@ -162,7 +162,7 @@ impl VoteCount {
 type Voter = u32;
 pub type VoteMsg = message::Message<VoteCount, Voter>;
 
-//impl Sender for Voter {}
+//impl Validator for Voter {}
 
 #[derive(Debug)]
 pub struct Error(&'static str);

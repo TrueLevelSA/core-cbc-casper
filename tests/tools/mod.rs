@@ -22,7 +22,7 @@ use std::fmt;
 
 use casper::blockchain::{Block, Message};
 use casper::justification::LatestMsgsHonest;
-use casper::sender;
+use casper::validator;
 
 pub struct ChainData {
     pub chain_id: u32,
@@ -71,9 +71,9 @@ impl ChainData {
 /// returns the height of the GHOST-selected chain
 pub fn get_height_selected_chain(
     latest_msgs_honest: &LatestMsgsHonest<Message<u32>>,
-    sender_state: &sender::State<Message<u32>, f64>,
+    validator_state: &validator::State<Message<u32>, f64>,
 ) -> u32 {
-    let selected_block = Block::ghost(&latest_msgs_honest, sender_state.senders_weights());
+    let selected_block = Block::ghost(&latest_msgs_honest, validator_state.validators_weights());
     fn reduce(b: &Block<u32>, i: u32) -> u32 {
         match b.prevblock() {
             Some(_msg) => reduce(&_msg, i + 1),

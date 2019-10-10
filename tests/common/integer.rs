@@ -40,13 +40,13 @@ impl IntegerWrapper {
 
 #[cfg(feature = "integration_test")]
 impl<V: validator::Trait> From<V> for IntegerWrapper {
-    fn from(_sender: V) -> Self {
+    fn from(_validator: V) -> Self {
         IntegerWrapper::new(u32::default())
     }
 }
 
 pub type IntegerMsg =
-    message::Message<IntegerWrapper /*Estimator*/, Validator /*Sender*/>;
+    message::Message<IntegerWrapper /*Estimator*/, Validator /*Validator*/>;
 
 #[derive(Clone, Eq, Debug, Ord, PartialOrd, PartialEq, Hash)]
 pub struct Tx;
@@ -75,7 +75,7 @@ impl Estimator for IntegerWrapper {
 
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<IntegerMsg>,
-        senders_weights: &validator::Weights<Validator, U>,
+        validators_weights: &validator::Weights<Validator, U>,
     ) -> Result<Self, Self::Error> {
         let mut msgs_sorted_by_estimate = Vec::from_iter(latest_msgs.iter().fold(
             HashSet::new(),
@@ -86,12 +86,12 @@ impl Estimator for IntegerWrapper {
         ));
         msgs_sorted_by_estimate.sort_unstable_by(|a, b| a.estimate().cmp(&b.estimate()));
 
-        // get the total weight of the senders of the messages
+        // get the total weight of the validators of the messages
         // in the set
         let total_weight = msgs_sorted_by_estimate
             .iter()
             .fold(<U as Zero<U>>::ZERO, |acc, x| {
-                acc + senders_weights.weight(x.sender()).unwrap_or(U::NAN)
+                acc + validators_weights.weight(x.sender()).unwrap_or(U::NAN)
             });
 
         let mut running_weight = <U as Zero<U>>::ZERO;
@@ -105,7 +105,7 @@ impl Estimator for IntegerWrapper {
             current_msg = msg_iter.next().ok_or("no next msg");
             running_weight += current_msg
                 .and_then(|m| {
-                    senders_weights
+                    validators_weights
                         .weight(m.sender())
                         .map_err(|_| "Can't unwrap weight")
                 })

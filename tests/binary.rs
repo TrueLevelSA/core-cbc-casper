@@ -33,19 +33,19 @@ use casper::validator;
 
 #[test]
 fn equal_weight() {
-    let senders: Vec<u32> = (0..4).collect();
+    let validators: Vec<u32> = (0..4).collect();
     let weights = [1.0, 1.0, 1.0, 1.0];
 
-    let senders_weights = validator::Weights::new(
-        senders
+    let validators_weights = validator::Weights::new(
+        validators
             .iter()
             .cloned()
             .zip(weights.iter().cloned())
             .collect(),
     );
 
-    let sender_state = validator::State::new(
-        senders_weights.clone(),
+    let validator_state = validator::State::new(
+        validators_weights.clone(),
         0.0, // state fault weight
         None,
         LatestMsgs::empty(),
@@ -53,39 +53,41 @@ fn equal_weight() {
         HashSet::new(), // equivocators
     );
 
-    let m0 = BinaryMsg::new(senders[0], Justification::empty(), BoolWrapper(false));
-    let m1 = BinaryMsg::new(senders[1], Justification::empty(), BoolWrapper(true));
-    let m2 = BinaryMsg::new(senders[2], Justification::empty(), BoolWrapper(false));
-    let m3 = BinaryMsg::from_msgs(senders[0], vec![&m0, &m1], &mut sender_state.clone()).unwrap();
+    let m0 = BinaryMsg::new(validators[0], Justification::empty(), BoolWrapper(false));
+    let m1 = BinaryMsg::new(validators[1], Justification::empty(), BoolWrapper(true));
+    let m2 = BinaryMsg::new(validators[2], Justification::empty(), BoolWrapper(false));
+    let m3 =
+        BinaryMsg::from_msgs(validators[0], vec![&m0, &m1], &mut validator_state.clone()).unwrap();
 
     assert_eq!(
         BoolWrapper::estimate(
             &LatestMsgsHonest::from_latest_msgs(
                 &LatestMsgs::from(&Justification::empty()),
-                sender_state.equivocators()
+                validator_state.equivocators()
             ),
-            &senders_weights,
+            &validators_weights,
         )
         .unwrap(),
         BoolWrapper(true)
     );
-    let mut j0 = Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut sender_state.clone());
+    let mut j0 =
+        Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut validator_state.clone());
     // s0 and s1 vote. since tie-breaker is `true`, get `true`
     assert_eq!(
-        j0.mk_estimate(sender_state.equivocators(), &senders_weights)
+        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         BoolWrapper(true)
     );
-    j0.faulty_insert(&m2, &mut sender_state.clone());
+    j0.faulty_insert(&m2, &mut validator_state.clone());
     // `false` now has weight 2.0, while true has weight `1.0`
     assert_eq!(
-        j0.mk_estimate(sender_state.equivocators(), &senders_weights)
+        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         BoolWrapper(false)
     );
-    j0.faulty_insert(&m3, &mut sender_state.clone());
+    j0.faulty_insert(&m3, &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(sender_state.equivocators(), &senders_weights)
+        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         BoolWrapper(true)
     );
@@ -93,19 +95,19 @@ fn equal_weight() {
 
 #[test]
 fn vote_swaying() {
-    let senders: Vec<u32> = (0..5).collect();
+    let validators: Vec<u32> = (0..5).collect();
     let weights = [1.0, 1.0, 1.0, 1.0, 1.0];
 
-    let senders_weights = validator::Weights::new(
-        senders
+    let validators_weights = validator::Weights::new(
+        validators
             .iter()
             .cloned()
             .zip(weights.iter().cloned())
             .collect(),
     );
 
-    let sender_state = validator::State::new(
-        senders_weights.clone(),
+    let validator_state = validator::State::new(
+        validators_weights.clone(),
         0.0, // state fault weight
         None,
         LatestMsgs::empty(),
@@ -113,32 +115,36 @@ fn vote_swaying() {
         HashSet::new(), // equivocators
     );
 
-    let m0 = BinaryMsg::new(senders[0], Justification::empty(), BoolWrapper(false));
-    let m1 = BinaryMsg::new(senders[1], Justification::empty(), BoolWrapper(true));
-    let m2 = BinaryMsg::new(senders[2], Justification::empty(), BoolWrapper(true));
-    let m3 = BinaryMsg::new(senders[3], Justification::empty(), BoolWrapper(false));
-    let m4 = BinaryMsg::new(senders[4], Justification::empty(), BoolWrapper(false));
+    let m0 = BinaryMsg::new(validators[0], Justification::empty(), BoolWrapper(false));
+    let m1 = BinaryMsg::new(validators[1], Justification::empty(), BoolWrapper(true));
+    let m2 = BinaryMsg::new(validators[2], Justification::empty(), BoolWrapper(true));
+    let m3 = BinaryMsg::new(validators[3], Justification::empty(), BoolWrapper(false));
+    let m4 = BinaryMsg::new(validators[4], Justification::empty(), BoolWrapper(false));
 
     let mut j0 = Justification::from_msgs(
         vec![m0.clone(), m1.clone(), m2.clone(), m3.clone(), m4.clone()],
-        &mut sender_state.clone(),
+        &mut validator_state.clone(),
     );
 
     // honest result of vote: false
     assert_eq!(
-        j0.mk_estimate(sender_state.equivocators(), &senders_weights)
+        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         BoolWrapper(false)
     );
 
-    // assume sender 0 has seen messages from sender 1 and sender 2 and reveals this in a published message
-    let m5 =
-        BinaryMsg::from_msgs(senders[0], vec![&m0, &m1, &m2], &mut sender_state.clone()).unwrap();
+    // assume validator 0 has seen messages from validator 1 and validator 2 and reveals this in a published message
+    let m5 = BinaryMsg::from_msgs(
+        validators[0],
+        vec![&m0, &m1, &m2],
+        &mut validator_state.clone(),
+    )
+    .unwrap();
 
-    j0.faulty_insert(&m5, &mut sender_state.clone());
-    // sender 0 now "votes" in the other direction and sways the result: true
+    j0.faulty_insert(&m5, &mut validator_state.clone());
+    // validator 0 now "votes" in the other direction and sways the result: true
     assert_eq!(
-        j0.mk_estimate(sender_state.equivocators(), &senders_weights)
+        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         BoolWrapper(true)
     );
