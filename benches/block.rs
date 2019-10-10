@@ -4,8 +4,8 @@ extern crate criterion;
 use casper::estimator::Estimator;
 use casper::justification::LatestMsgsHonest;
 use casper::message;
-use casper::sender;
 use casper::util::weight::{WeightUnit, Zero};
+use casper::validator;
 use casper::Block;
 use criterion::{black_box, Criterion};
 
@@ -19,7 +19,7 @@ pub enum Value {
     Two = 2,
 }
 
-impl sender::Trait for Value {}
+impl validator::Trait for Value {}
 
 impl<U: WeightUnit> From<((Value, U), (Value, U), (Value, U))> for Value {
     /// If equality between two or tree values exists, last value is
@@ -67,12 +67,12 @@ impl Estimator for Value {
 
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Message>,
-        senders_weights: &sender::Weights<Validator, U>,
+        validators_weights: &validator::Weights<Validator, U>,
     ) -> Result<Self, Self::Error> {
         use message::Trait;
         let res: Self = latest_msgs
             .iter()
-            .map(|msg| (msg.estimate(), senders_weights.weight(msg.sender())))
+            .map(|msg| (msg.estimate(), validators_weights.weight(msg.sender())))
             .fold(
                 (
                     (Value::Zero, <U as Zero<U>>::ZERO),
@@ -115,19 +115,19 @@ fn block_from_prevblock_msg(c: &mut Criterion) {
             use casper::justification::{Justification, LatestMsgs};
             use casper::message::Trait;
 
-            let senders: Vec<u8> = (1..=4).collect();
+            let validators: Vec<u8> = (1..=4).collect();
             let weights = [0.6, 1.0, 2.0, 1.3];
 
-            let senders_weights = sender::Weights::new(
-                senders
+            let validators_weights = validator::Weights::new(
+                validators
                     .iter()
                     .cloned()
                     .zip(weights.iter().cloned())
                     .collect(),
             );
 
-            let mut weights = sender::State::new(
-                senders_weights.clone(),
+            let mut weights = validator::State::new(
+                validators_weights.clone(),
                 0.0, // state fault weight
                 None,
                 LatestMsgs::empty(),
