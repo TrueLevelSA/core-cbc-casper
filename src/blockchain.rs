@@ -53,7 +53,7 @@ impl<S: sender::Trait> ProtoBlock<S> {
 }
 
 /// Simplest structure of a block with a `prevblock` pointer for runing Casper on a blockchain.
-#[derive(Clone, Eq, Hash)]
+#[derive(Clone, Eq)]
 pub struct Block<S: sender::Trait>(Arc<ProtoBlock<S>>);
 
 #[cfg(feature = "integration_test")]
@@ -88,6 +88,12 @@ impl<S: sender::Trait> serde::Serialize for Block<S> {
 
 impl<S: sender::Trait> Id for Block<S> {
     type ID = Hash;
+}
+
+impl<S: sender::Trait> std::hash::Hash for Block<S> {
+    fn hash<H: std::hash::Hasher>(&self, hasher: &mut H) {
+        self.0.hash(hasher);
+    }
 }
 
 impl<S: sender::Trait> PartialEq for Block<S> {
