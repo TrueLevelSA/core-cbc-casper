@@ -22,7 +22,7 @@ use std::fmt::{self, Display};
 use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 /// Define how to compare the trait type to zero
-pub trait Zero<T: PartialEq> {
+pub trait Zero<T: PartialEq + Copy> {
     const ZERO: T;
 
     /// Returns whether or not the value is equal to zero.
