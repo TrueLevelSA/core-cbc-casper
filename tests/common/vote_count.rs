@@ -30,7 +30,7 @@ use casper::message::{self, Trait};
 use casper::sender;
 use casper::util::weight::{WeightUnit, Zero};
 
-#[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]
+#[derive(Clone, Copy, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]
 pub struct VoteCount {
     yes: u32,
     no: u32,
