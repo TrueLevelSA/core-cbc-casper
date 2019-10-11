@@ -154,7 +154,7 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
         sender_state: Self,
         senders_weights: Option<Weights<M::Sender, U>>,
         state_fault_weight: Option<U>,
-        own_latest_msg: Option<Option<M>>,
+        own_latest_msg: Option<M>,
         latest_msgs: Option<LatestMsgs<M>>,
         thr: Option<U>,
         equivocators: Option<HashSet<M::Sender>>,
@@ -162,7 +162,7 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
         State {
             senders_weights: senders_weights.unwrap_or(sender_state.senders_weights),
             state_fault_weight: state_fault_weight.unwrap_or(sender_state.state_fault_weight),
-            own_latest_msg: own_latest_msg.unwrap_or(sender_state.own_latest_msg),
+            own_latest_msg: own_latest_msg.or(sender_state.own_latest_msg),
             latest_msgs: latest_msgs.unwrap_or(sender_state.latest_msgs),
             thr: thr.unwrap_or(sender_state.thr),
             equivocators: equivocators.unwrap_or(sender_state.equivocators),
@@ -209,7 +209,7 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
             })
             .collect();
 
-        let _ = msgs_sorted_by_faultw.sort_unstable_by(|(m0, w0), (m1, w1)| {
+        msgs_sorted_by_faultw.sort_unstable_by(|(m0, w0), (m1, w1)| {
             w0.partial_cmp(w1)
                 .unwrap_or_else(|| m0.getid().cmp(&m1.getid())) // tie breaker
         });
@@ -246,19 +246,17 @@ impl<S: self::Trait, U: WeightUnit> Weights<S, U> {
     /// Returns success of insertion. Failure happens if we cannot acquire the
     /// lock to write data.
     pub fn insert(&mut self, k: S, v: U) -> Result<bool, Error<HashMap<S, U>>> {
-        self.write()
-            .map_err(|err| Error::WriteLockError(err))
-            .map(|mut h| {
-                h.insert(k, v);
-                true
-            })
+        self.write().map_err(Error::WriteLockError).map(|mut h| {
+            h.insert(k, v);
+            true
+        })
     }
 
     /// Picks senders with positive weights striclty greather than zero.
     /// Failure happens if we cannot acquire the lock to read data
     pub fn senders(&self) -> Result<HashSet<S>, Error<HashMap<S, U>>> {
         self.read()
-            .map_err(|err| Error::ReadLockError(err))
+            .map_err(Error::ReadLockError)
             .map(|senders_weight| {
                 senders_weight
                     .iter()
@@ -277,7 +275,7 @@ impl<S: self::Trait, U: WeightUnit> Weights<S, U> {
     /// reading error or the sender does not exist.
     pub fn weight(&self, sender: &S) -> Result<U, Error<HashMap<S, U>>> {
         self.read()
-            .map_err(|err| Error::ReadLockError(err))
+            .map_err(Error::ReadLockError)
             .and_then(|weights| weights.get(sender).map(Clone::clone).ok_or(Error::NotFound))
     }
 

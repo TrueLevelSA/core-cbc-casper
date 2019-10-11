@@ -72,7 +72,7 @@ impl<S: sender::Trait> std::fmt::Debug for Block<S> {
             self.prevblock()
                 .as_ref()
                 .map(|p| p.getid())
-                .unwrap_or(Hash::default())
+                .unwrap_or_default()
         )
     }
 }
@@ -155,11 +155,10 @@ impl<S: sender::Trait> Block<S> {
         incomplete_block: Block<S>,
     ) -> Self {
         let prevblock = prevblock_msg.map(|m| Block::from(&m));
-        let block = Block::from(ProtoBlock {
+        Block::from(ProtoBlock {
             prevblock,
             ..((**incomplete_block.arc()).clone())
-        });
-        block
+        })
     }
 
     /// Mathematical definition of blockchain membership.
@@ -236,7 +235,7 @@ impl<S: sender::Trait> Block<S> {
             neighbours: HashMap<&S, HashSet<&S>>,
         ) {
             if p.is_empty() && x.is_empty() {
-                let rnew: BTreeSet<S> = r.into_iter().map(|x| x.clone()).collect();
+                let rnew: BTreeSet<S> = r.into_iter().cloned().collect();
                 mx_clqs.insert(rnew);
             } else {
                 let piter = p.clone();
@@ -316,9 +315,9 @@ impl<S: sender::Trait> Block<S> {
                     if visited_parents.contains_key(&parent) {
                         // visited parent before, fork found, add new child and don't add parent to
                         // queue (since it is already in the queue)
-                        visited_parents.get_mut(&parent).map(|parents_children| {
+                        if let Some(parents_children) = visited_parents.get_mut(&parent) {
                             parents_children.insert(child);
-                        });
+                        }
                     } else {
                         // didn't visit parent before, add it with known child, and push to queue
                         let mut parents_children = HashSet::new();
