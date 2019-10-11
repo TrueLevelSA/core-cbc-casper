@@ -298,6 +298,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::eq_op)]
     fn substraction() {
         assert_eq!(Unit(0), Unit(1) - Unit(1));
         assert_eq!(Infinity, Unit(1) - Infinity);
@@ -318,6 +319,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::eq_op)]
     fn equality() {
         assert_eq!(true, Unit(1) == Unit(1));
         assert_eq!(false, Unit(1) == Infinity);
@@ -328,6 +330,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::eq_op)]
     fn greater() {
         assert_eq!(false, Unit(1) > Unit(1));
         assert_eq!(true, Unit(1) >= Unit(1));
@@ -346,6 +349,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::eq_op)]
     fn smaller() {
         assert_eq!(true, Unit(1) <= Unit(1));
         assert_eq!(false, Unit(1) < Unit(1));
