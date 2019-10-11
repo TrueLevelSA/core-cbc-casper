@@ -254,7 +254,7 @@ impl<M: message::Trait> LatestMsgs<M> {
                     }
                     // new actually older than old
                     else if new_independent_from_old {
-                        false || acc
+                        acc
                     }
                     // new newer than old
                     else {

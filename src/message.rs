@@ -125,7 +125,7 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
             let estimate = latest_msgs_honest.mk_estimate(&sender_state.senders_weights());
             estimate
                 .map(|e| Self::new(sender, justification, e))
-                .map_err(|e| Error::Estimator(e))
+                .map_err(Error::Estimator)
         }
     }
 
