@@ -79,6 +79,10 @@ impl<M: message::Trait> Justification<M> {
         self.0.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     pub fn insert(&mut self, msg: M) -> bool {
         if self.contains(&msg) {
             false
@@ -224,6 +228,10 @@ impl<M: message::Trait> LatestMsgs<M> {
         self.0.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     /// Get the set keys, i.e. the senders.
     pub fn keys(&self) -> std::collections::hash_map::Keys<M::Sender, HashSet<M>> {
         self.0.keys()
@@ -340,6 +348,10 @@ impl<M: message::Trait> LatestMsgsHonest<M> {
 
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 
     pub fn mk_estimate<U: WeightUnit>(
