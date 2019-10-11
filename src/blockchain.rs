@@ -138,6 +138,10 @@ impl<S: sender::Trait> Estimator for Block<S> {
     }
 }
 
+type BlocksChildrenMap<S> = HashMap<Block<S>, HashSet<Block<S>>>;
+type GenesisBlocks<S> = HashSet<Block<S>>;
+type BlocksSendersMap<S> = HashMap<Block<S>, S>;
+
 impl<S: sender::Trait> Block<S> {
     pub fn new(prevblock: Option<Block<S>>) -> Self {
         Block::from(ProtoBlock::new(prevblock))
@@ -276,16 +280,14 @@ impl<S: sender::Trait> Block<S> {
         self.arc().prevblock.as_ref().cloned()
     }
 
-    /// Parses blockchain using the latest honest messages the return value is a tuple containing a
-    /// map and a set. The hashmap maps blocks to their respective children. The set contains all
-    /// the blocks that have a None as their prevblock (aka genesis blocks or finalized blocks).
+    /// Parses latest_msgs to return a tuple containing:
+    /// * a HashMap mapping blocks to their children;
+    /// * a HashSet containing blocks with None as their prevblock (aka genesis blocks or finalized
+    /// blocks);
+    /// * a HashMap mapping blocks to their senders.
     pub fn parse_blockchains(
         latest_msgs: &LatestMsgsHonest<Message<S>>,
-    ) -> (
-        HashMap<Block<S>, HashSet<Block<S>>>,
-        HashSet<Block<S>>,
-        HashMap<Block<S>, S>,
-    ) {
+    ) -> (BlocksChildrenMap<S>, GenesisBlocks<S>, BlocksSendersMap<S>) {
         let latest_blocks: HashMap<Block<S>, S> = latest_msgs
             .iter()
             .map(|msg| (Block::from(msg), msg.sender().clone()))
