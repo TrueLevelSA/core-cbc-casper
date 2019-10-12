@@ -124,41 +124,40 @@ fn add_messages<M>(
 where
     M: message::Trait,
 {
-    let result = messages_senders_recipients_datas.into_iter()
+    messages_senders_recipients_datas.into_iter()
         .map(|(m, sender, recipients)|{
-        recipients.into_iter().map(|recipient| {
+            recipients.into_iter().map(|recipient| {
 
-            let mut sender_state_reconstructed = sender::State::new(
-                state[&recipient].senders_weights().clone(),
-                0.0,
-                Some(m.clone()),
-                LatestMsgs::from(m.justification()),
-                0.0,
-                HashSet::new(),
-            );
-            if m.estimate()
-                != M::from_msgs(
-                    sender.clone(),
-                    m.justification().iter().collect(),
-                    &mut sender_state_reconstructed,
-                )
-                .unwrap()
-                .estimate()
-            {
-                return Err("Recipient must be able to reproduce the estimate from its justification and the justification only.");
-            }
+                let mut sender_state_reconstructed = sender::State::new(
+                    state[&recipient].senders_weights().clone(),
+                    0.0,
+                    Some(m.clone()),
+                    LatestMsgs::from(m.justification()),
+                    0.0,
+                    HashSet::new(),
+                );
+                if m.estimate()
+                    != M::from_msgs(
+                        sender.clone(),
+                        m.justification().iter().collect(),
+                        &mut sender_state_reconstructed,
+                    )
+                    .unwrap()
+                    .estimate()
+                {
+                    return Err("Recipient must be able to reproduce the estimate from its justification and the justification only.");
+                }
 
-            let state_to_update = state.get_mut(&recipient).unwrap().latests_msgs_as_mut();
-            state_to_update.update(&m);
-            m.justification().iter().for_each(|m| {
-                state_to_update.update(m);
-            });
+                let state_to_update = state.get_mut(&recipient).unwrap().latests_msgs_as_mut();
+                state_to_update.update(&m);
+                m.justification().iter().for_each(|m| {
+                    state_to_update.update(m);
+                });
 
-            Ok(())
+                Ok(())
 
+            }).collect()
         }).collect()
-        }).collect();
-    result
 }
 
 /// sender strategy that selects one validator at each step, in a round robin manner
@@ -186,7 +185,7 @@ fn parallel_arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> 
 }
 
 /// receiver strategy that picks between 0 and n receivers at random, n being the number of validators
-fn some_receivers(_sender: &u32, possible_senders: &Vec<u32>, rng: &mut TestRng) -> HashSet<u32> {
+fn some_receivers(_sender: u32, possible_senders: &Vec<u32>, rng: &mut TestRng) -> HashSet<u32> {
     let n = rng.gen_range(0, possible_senders.len());
     let mut receivers: HashSet<u32> = HashSet::new();
     // FIXME: this is constant time, however the number of receivers is not uniform as we always
@@ -199,7 +198,7 @@ fn some_receivers(_sender: &u32, possible_senders: &Vec<u32>, rng: &mut TestRng)
 }
 
 /// receiver strategy that picks all the receivers
-fn all_receivers(_sender: &u32, possible_senders: &Vec<u32>, _rng: &mut TestRng) -> HashSet<u32> {
+fn all_receivers(_sender: u32, possible_senders: &Vec<u32>, _rng: &mut TestRng) -> HashSet<u32> {
     HashSet::from_iter(possible_senders.iter().cloned())
 }
 
@@ -208,7 +207,7 @@ fn all_receivers(_sender: &u32, possible_senders: &Vec<u32>, _rng: &mut TestRng)
 fn create_receiver_strategy(
     validators: &Vec<u32>,
     sender_strategy: BoxedStrategy<HashSet<u32>>,
-    receivers_selector: fn(&u32, &Vec<u32>, &mut TestRng) -> HashSet<u32>,
+    receivers_selector: fn(u32, &Vec<u32>, &mut TestRng) -> HashSet<u32>,
 ) -> BoxedStrategy<HashMap<u32, HashSet<u32>>> {
     let v = validators.clone();
     sender_strategy
@@ -217,7 +216,7 @@ fn create_receiver_strategy(
         .prop_perturb(move |senders, mut rng| {
             let mut hashmap: HashMap<u32, HashSet<u32>> = HashMap::new();
             senders.iter().for_each(|sender| {
-                let hs = receivers_selector(sender, &v, &mut rng);
+                let hs = receivers_selector(*sender, &v, &mut rng);
                 hashmap.insert(*sender, hs);
             });
 
@@ -254,7 +253,7 @@ where
 
 fn full_consensus<M>(
     state: &HashMap<M::Sender, sender::State<M, f64>>,
-    _height_of_oracle: &u32,
+    _height_of_oracle: u32,
     _vec_data: &mut Vec<ChainData>,
     _chain_id: u32,
     _received_msgs: &mut HashMap<u32, HashSet<Block<u32>>>,
@@ -281,7 +280,7 @@ where
 /// the threshold for the safety oracle is set to half of the sum of the senders weights
 fn get_data_from_state(
     sender_state: &sender::State<blockchain::Message<u32>, f64>,
-    max_height_of_oracle: &u32,
+    max_height_of_oracle: u32,
     data: &mut ChainData,
 ) -> (bool) {
     let latest_msgs_honest =
@@ -296,7 +295,7 @@ fn get_data_from_state(
     let mut genesis_blocks = HashSet::new();
     genesis_blocks.insert(Block::new(None));
 
-    for height in 0..max_height_of_oracle + 1 {
+    for height in 0..=max_height_of_oracle {
         let truc: Vec<bool> = genesis_blocks
             .iter()
             .cloned()
@@ -322,11 +321,11 @@ fn get_data_from_state(
 
         genesis_blocks = tools::get_children_of_blocks(&latest_msgs_honest, genesis_blocks);
         // cant have a consensus over children if there is none
-        if genesis_blocks.len() == 0 {
+        if genesis_blocks.is_empty() {
             break;
         }
     }
-    let is_consensus_satisfied = consensus_height >= i64::from(*max_height_of_oracle);
+    let is_consensus_satisfied = consensus_height >= i64::from(max_height_of_oracle);
 
     data.consensus_height = consensus_height;
     data.longest_chain = height_selected_chain;
@@ -338,7 +337,7 @@ fn get_data_from_state(
 /// uses received_msgs to take note of which validator received which messages
 fn safety_oracle_at_height(
     state: &HashMap<u32, sender::State<blockchain::Message<u32>, f64>>,
-    height_of_oracle: &u32,
+    height_of_oracle: u32,
     vec_data: &mut Vec<ChainData>,
     chain_id: u32,
     received_msgs: &mut HashMap<u32, HashSet<Block<u32>>>,
@@ -396,7 +395,7 @@ fn chain<E: 'static, F: 'static, H: 'static>(
     consensus_value_strategy: BoxedStrategy<E>,
     validator_max_count: usize,
     message_producer_strategy: F,
-    message_receiver_strategy: fn(&u32, &Vec<u32>, &mut TestRng) -> HashSet<u32>,
+    message_receiver_strategy: fn(u32, &Vec<u32>, &mut TestRng) -> HashSet<u32>,
     consensus_satisfied: H,
     consensus_satisfied_value: u32,
     chain_id: u32,
@@ -407,7 +406,7 @@ where
     //G: Fn(&Vec<u32>, BoxedStrategy<HashSet<u32>>) -> BoxedStrategy<HashMap<u32, HashSet<u32>>>,
     H: Fn(
         &HashMap<u32, sender::State<Message<E, u32>, f64>>,
-        &u32,
+        u32,
         &mut Vec<ChainData>,
         u32,
         &mut HashMap<u32, HashSet<Block<u32>>>,
@@ -427,7 +426,7 @@ where
             let mut state = HashMap::new();
             let mut validators: Vec<u32> = (0..votes.len() as u32).collect();
             let mut received_msgs: HashMap<u32, HashSet<Block<u32>>> =
-                HashMap::from(validators.iter().map(|v| (*v, HashSet::new())).collect());
+                validators.iter().map(|v| (*v, HashSet::new())).collect();
 
             let weights: Vec<f64> = iter::repeat(1.0).take(votes.len() as usize).collect();
 
@@ -513,7 +512,7 @@ where
                         } else {
                             if consensus_satisfied(
                                 st,
-                                &consensus_satisfied_value,
+                                consensus_satisfied_value,
                                 &mut vec_data,
                                 chain_id,
                                 &mut received_msgs,
@@ -615,21 +614,17 @@ proptest! {
     #[test]
     fn round_robin_vote_count(ref chain in chain(VoteCount::arbitrary(), 5, round_robin, all_receivers, full_consensus, 0, 0)) {
         assert_eq!(chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len(),
-                   if chain.len() > 0 {chain.len()} else {0},
+                   if !chain.is_empty() {chain.len()} else {0},
                    "round robin with n validators should converge in n messages")
     }
 }
 
 fn boolwrapper_gen() -> BoxedStrategy<BoolWrapper> {
-    any::<bool>()
-        .prop_map(|boolean| BoolWrapper::new(boolean))
-        .boxed()
+    any::<bool>().prop_map(BoolWrapper::new).boxed()
 }
 
 fn integerwrapper_gen() -> BoxedStrategy<IntegerWrapper> {
-    any::<u32>()
-        .prop_map(|int| IntegerWrapper::new(int))
-        .boxed()
+    any::<u32>().prop_map(IntegerWrapper::new).boxed()
 }
 
 proptest! {
@@ -726,7 +721,7 @@ prop_compose! {
             .iter()
             .enumerate()
             .for_each(|(sender, vote)|
-                      {messages.push(VoteCount::create_vote_msg(sender as u32, vote.clone()))});
+                      {messages.push(VoteCount::create_vote_msg(sender as u32, *vote))});
         equivocators
             .iter()
             .for_each(|equivocator|
@@ -741,7 +736,7 @@ proptest! {
     #[test]
     fn detect_equivocation(ref vote_tuple in votes(5, 5)) {
         let (messages, equivocators, nodes) = vote_tuple;
-        let nodes = nodes.clone();
+        let nodes = *nodes;
         let senders: Vec<u32> = (0..nodes as u32).collect();
         let weights: Vec<f64> =
             iter::repeat(1.0).take(nodes as usize).collect();
@@ -762,13 +757,13 @@ proptest! {
         );
 
         // here, only take one equivocation
-        let single_equivocation: Vec<_> = messages[..nodes+1].iter().map(|message| message).collect();
+        let single_equivocation: Vec<_> = messages[..=nodes].iter().map(|message| message).collect();
         let equivocator = messages[nodes].sender();
         let m0 =
             &Message::from_msgs(0, single_equivocation.clone(), &mut sender_state.clone())
             .unwrap();
         let equivocations: Vec<_> = single_equivocation.iter().filter(|message| message.equivocates(&m0)).collect();
-        assert!(if *equivocator == 0 {equivocations.len() == 1} else {equivocations.len() == 0}, "should detect sender 0 equivocating if sender 0 equivocates");
+        assert!(if *equivocator == 0 {equivocations.len() == 1} else {equivocations.is_empty()}, "should detect sender 0 equivocating if sender 0 equivocates");
         // the following commented test should fail
         // assert_eq!(equivocations.len(), 1, "should detect sender 0 equivocating if sender 0 equivocates");
 
