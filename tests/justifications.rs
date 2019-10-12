@@ -28,6 +28,24 @@ use casper::justification::{Justification, LatestMsgs};
 use casper::message::{self, Trait};
 use casper::sender;
 
+macro_rules! float_eq {
+    ($lhs:expr, $rhs:expr) => {{
+        assert!(
+            f32::abs($lhs - $rhs) < std::f32::EPSILON,
+            format!("float_eq: {} and {} aren't equal", $lhs, $rhs),
+        )
+    }};
+    ($lhs:expr, $rhs:expr, $message:expr) => {{
+        assert!(
+            f32::abs($lhs - $rhs) < std::f32::EPSILON,
+            format!(
+                "float_eq: {} and {} aren't equal. Provided message: {}",
+                $lhs, $rhs, $message
+            ),
+        )
+    }};
+}
+
 #[test]
 fn faulty_inserts_sorted() {
     let senders_weights =
@@ -62,7 +80,7 @@ fn faulty_inserts_sorted() {
     assert!(j.contains(v0_prime));
     assert!(j.contains(v1_prime));
     assert!(!j.contains(v2_prime));
-    assert_eq!(sender_state.fault_weight(), 3.0);
+    float_eq!(sender_state.fault_weight(), 3.0);
 }
 
 #[test]
@@ -132,7 +150,7 @@ fn faulty_inserts() {
         None,
     );
     j1.clone().faulty_insert(v0_prime, &mut sender_state2);
-    assert_eq!(
+    float_eq!(
         sender_state2.fault_weight(), 1.0,
         "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set, and thus the state_fault_weight should be incremented to 1.0"
     );
@@ -161,7 +179,7 @@ fn faulty_inserts() {
         None,
     );
     j1.clone().faulty_insert(v0_prime, &mut sender_state2);
-    assert_eq!(sender_state2.fault_weight(), 0.1,
+    float_eq!(sender_state2.fault_weight(), 0.1,
         "$v0_prime$ conflicts with $v0$ through $m0$, and we should NOT accept this fault as the fault threshold gets crossed for the set, and thus the state_fault_weight should not be incremented"
     );
 
@@ -205,8 +223,8 @@ fn faulty_inserts() {
         HashSet::new(),
     );
     j1.clone().faulty_insert(v0_prime, &mut sender_state);
-    assert_eq!(
-            sender_state.fault_weight(),
+    float_eq!(
+        sender_state.fault_weight(),
         1.0,
         "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we can't know the weight of the sender, which could be Infinity, and thus the state_fault_weight should be unchanged"
     );
