@@ -116,10 +116,10 @@ impl VoteCount {
                 match m.justification().len() {
                     0 => {
                         // vote found, vote is a message with 0 justification
-                        let estimate = m.estimate().clone();
+                        let estimate = *m.estimate();
                         if VoteCount::is_valid_vote(&estimate) {
                             let equivocation = message::Message::new(
-                                m.sender().clone(),
+                                *m.sender(),
                                 m.justification().clone(),
                                 VoteCount::toggle_vote(&estimate),
                             );
@@ -198,7 +198,7 @@ impl Estimator for VoteCount {
         let votes = Self::get_vote_msgs(latest_msgs);
         let votes = votes
             .iter()
-            .fold(Self::ZERO, |acc, vote| acc + vote.estimate().clone());
+            .fold(Self::ZERO, |acc, vote| acc + *vote.estimate());
         Ok(votes)
     }
 }
