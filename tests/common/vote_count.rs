@@ -72,11 +72,12 @@ impl VoteCount {
         ])
         .boxed()
     }
+
     // makes sure nobody adds more than one vote to their unjustified VoteCount
     // object. if they did, their vote is invalid and will be ignored
-    fn is_valid_vote(vote: &Self) -> bool {
+    fn is_valid(self) -> bool {
         // these two are the only allowed votes (unjustified msgs)
-        match vote {
+        match self {
             VoteCount { yes: 1, no: 0 } => true,
             VoteCount { yes: 0, no: 1 } => true,
             _ => false,
@@ -84,9 +85,9 @@ impl VoteCount {
     }
 
     // used to create an equivocation vote
-    fn toggle_vote(vote: &Self) -> Self {
+    fn toggled_vote(self) -> Self {
         // these two are the only allowed votes (unjustified msgs)
-        match vote {
+        match self {
             VoteCount { yes: 1, no: 0 } => VoteCount { yes: 0, no: 1 },
             VoteCount { yes: 0, no: 1 } => VoteCount { yes: 1, no: 0 },
             _ => VoteCount::ZERO,
@@ -97,9 +98,10 @@ impl VoteCount {
     /// with no justification
     pub fn create_vote_msg(sender: u32, vote: bool) -> message::Message<Self, u32> {
         let justification = Justification::empty();
-        let estimate = match vote {
-            true => VoteCount { yes: 1, no: 0 },
-            false => VoteCount { yes: 0, no: 1 },
+        let estimate = if vote {
+            VoteCount { yes: 1, no: 0 }
+        } else {
+            VoteCount { yes: 0, no: 1 }
         };
 
         message::Message::new(sender, justification, estimate)
@@ -117,11 +119,11 @@ impl VoteCount {
                     0 => {
                         // vote found, vote is a message with 0 justification
                         let estimate = *m.estimate();
-                        if VoteCount::is_valid_vote(&estimate) {
+                        if estimate.is_valid() {
                             let equivocation = message::Message::new(
                                 *m.sender(),
                                 m.justification().clone(),
-                                VoteCount::toggle_vote(&estimate),
+                                estimate.toggled_vote(),
                             );
                             // search for the equivocation of the current latest_msgs
                             match acc_prime.get(&equivocation) {
