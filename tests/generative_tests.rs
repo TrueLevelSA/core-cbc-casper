@@ -315,7 +315,7 @@ fn get_data_from_state(
         let is_local_consensus_satisfied = truc.contains(&true);
 
         consensus_height = if is_local_consensus_satisfied {
-            height as i64
+            i64::from(height)
         } else {
             break;
         };
@@ -326,7 +326,7 @@ fn get_data_from_state(
             break;
         }
     }
-    let is_consensus_satisfied = consensus_height >= *max_height_of_oracle as i64;
+    let is_consensus_satisfied = consensus_height >= i64::from(*max_height_of_oracle);
 
     data.consensus_height = consensus_height;
     data.longest_chain = height_selected_chain;
