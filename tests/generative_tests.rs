@@ -179,13 +179,13 @@ fn parallel_arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> 
     let validators = val.clone();
     prop::sample::select((1..=validators.len()).collect::<Vec<usize>>())
         .prop_flat_map(move |val_count| {
-            prop::collection::hash_set(prop::sample::select(validators.clone()), val_count)
+            prop::collection::hash_set(prop::sample::select(validators.to_owned()), val_count)
         })
         .boxed()
 }
 
 /// receiver strategy that picks between 0 and n receivers at random, n being the number of validators
-fn some_receivers(_sender: u32, possible_senders: &Vec<u32>, rng: &mut TestRng) -> HashSet<u32> {
+fn some_receivers(_sender: u32, possible_senders: &[u32], rng: &mut TestRng) -> HashSet<u32> {
     let n = rng.gen_range(0, possible_senders.len());
     let mut receivers: HashSet<u32> = HashSet::new();
     // FIXME: this is constant time, however the number of receivers is not uniform as we always
@@ -198,18 +198,18 @@ fn some_receivers(_sender: u32, possible_senders: &Vec<u32>, rng: &mut TestRng) 
 }
 
 /// receiver strategy that picks all the receivers
-fn all_receivers(_sender: u32, possible_senders: &Vec<u32>, _rng: &mut TestRng) -> HashSet<u32> {
+fn all_receivers(_sender: u32, possible_senders: &[u32], _rng: &mut TestRng) -> HashSet<u32> {
     HashSet::from_iter(possible_senders.iter().cloned())
 }
 
 /// maps each sender from the sender_strategy to a set of receivers, using the receivers_selector
 /// function
 fn create_receiver_strategy(
-    validators: &Vec<u32>,
+    validators: &[u32],
     sender_strategy: BoxedStrategy<HashSet<u32>>,
-    receivers_selector: fn(u32, &Vec<u32>, &mut TestRng) -> HashSet<u32>,
+    receivers_selector: fn(u32, &[u32], &mut TestRng) -> HashSet<u32>,
 ) -> BoxedStrategy<HashMap<u32, HashSet<u32>>> {
-    let v = validators.clone();
+    let v = validators.to_owned();
     sender_strategy
         // prop_perturb uses a Rng based on the proptest seed, it can therefore safely be used to
         // create random data as they can be re-obtained
@@ -399,7 +399,7 @@ fn chain<E: 'static, F: 'static, H: 'static>(
     consensus_value_strategy: BoxedStrategy<E>,
     validator_max_count: usize,
     message_producer_strategy: F,
-    message_receiver_strategy: fn(u32, &Vec<u32>, &mut TestRng) -> HashSet<u32>,
+    message_receiver_strategy: fn(u32, &[u32], &mut TestRng) -> HashSet<u32>,
     consensus_satisfied: H,
     consensus_satisfied_value: u32,
     chain_id: u32,
