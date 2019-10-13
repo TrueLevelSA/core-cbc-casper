@@ -80,11 +80,10 @@ pub fn get_height_selected_chain(
             None => i,
         }
     }
-    let height_this_message = match selected_block {
+    match selected_block {
         Ok(b) => reduce(&b, 1),
         _ => 0,
-    };
-    height_this_message
+    }
 }
 
 pub fn get_children_of_blocks(
@@ -96,17 +95,13 @@ pub fn get_children_of_blocks(
         b: &Block<u32>,
         genesis_blocks: &HashSet<Block<u32>>,
         children: &mut HashSet<Block<u32>>,
-    ) -> () {
-        match b.prevblock() {
-            Some(_msg) => {
-                if genesis_blocks.contains(&_msg) {
-                    children.insert(b.clone());
-                    ()
-                } else {
-                    reduce(&_msg, genesis_blocks, children)
-                }
+    ) {
+        if let Some(_msg) = b.prevblock() {
+            if genesis_blocks.contains(&_msg) {
+                children.insert(b.clone());
+            } else {
+                reduce(&_msg, genesis_blocks, children)
             }
-            _ => (),
         }
     }
 

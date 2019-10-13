@@ -78,7 +78,7 @@ impl Estimator for BoolWrapper {
                 let sender_weight = senders_weights.weight(msg.sender()).unwrap_or(U::NAN);
 
                 // add the weight to the right accumulator
-                if msg.estimate().0.clone() {
+                if msg.estimate().0 {
                     (true_w + sender_weight, false_w)
                 } else {
                     (true_w, false_w + sender_weight)
