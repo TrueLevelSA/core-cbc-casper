@@ -225,10 +225,12 @@ fn create_receiver_strategy(
         .boxed()
 }
 
+type SendersStatesMap<M> = HashMap<<M as message::Trait>::Sender, sender::State<M, f64>>;
+
 fn message_events<M>(
     state: HashMap<M::Sender, sender::State<M, f64>>,
     sender_receiver_strategy: BoxedStrategy<HashMap<M::Sender, HashSet<M::Sender>>>,
-) -> BoxedStrategy<Result<HashMap<M::Sender, sender::State<M, f64>>, &'static str>>
+) -> BoxedStrategy<Result<SendersStatesMap<M>, &'static str>>
 where
     M: 'static + message::Trait,
 {
@@ -391,6 +393,8 @@ fn clique_collection(
         .collect()
 }
 
+type ValidatorStatesMap<E> = HashMap<u32, sender::State<Message<E, u32>, f64>>;
+
 fn chain<E: 'static, F: 'static, H: 'static>(
     consensus_value_strategy: BoxedStrategy<E>,
     validator_max_count: usize,
@@ -399,7 +403,7 @@ fn chain<E: 'static, F: 'static, H: 'static>(
     consensus_satisfied: H,
     consensus_satisfied_value: u32,
     chain_id: u32,
-) -> BoxedStrategy<Vec<Result<HashMap<u32, sender::State<Message<E, u32>, f64>>, &'static str>>>
+) -> BoxedStrategy<Vec<Result<ValidatorStatesMap<E>, &'static str>>>
 where
     E: Estimator<M = Message<E, u32>> + From<u32>,
     F: Fn(&mut Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
