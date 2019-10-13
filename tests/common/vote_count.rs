@@ -64,6 +64,7 @@ impl Debug for VoteCount {
 }
 
 impl VoteCount {
+    #[allow(dead_code)]
     #[cfg(feature = "integration_test")]
     pub fn arbitrary() -> BoxedStrategy<Self> {
         prop::sample::select(vec![
