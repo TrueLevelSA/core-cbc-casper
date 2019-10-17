@@ -5,20 +5,26 @@ image: rust:1.35.0
 before_script:
   - cargo version --verbose
   - rustup component add rustfmt
+  - rustup component add clippy
 
 stages:
-  - format
+  - linting
   - build
   - tests
   - examples
 
 fmt:
-  stage: format
+  stage: linting
   script:
       # When running with --check, Rustfmt will exit with 0 if Rustfmt would
       # not make any formatting changes to the input, and 1 if Rustfmt would
       # make changes.
     - cargo fmt --all --verbose -- --check --verbose
+
+clippy:
+  stage: linting
+  script:
+    - cargo clippy --all-targets --all-features -- -D warnings
 
 build:
   stage: build
