@@ -5,6 +5,7 @@ image: rust:1.35.0
 before_script:
   - cargo version --verbose
   - rustup component add rustfmt
+  - rustup component add clippy
 
 stages:
   - build
@@ -16,6 +17,11 @@ build:
   stage: build
   script:
     - cargo build --verbose
+
+build:
+  stage: build
+  script:
+    - cargo clippy --all-targets --all-features -- -D warnings
 
 tests:
   stage: tests
