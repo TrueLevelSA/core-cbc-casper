@@ -21,8 +21,7 @@ use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::convert::From;
 use std::iter::Iterator;
 use std::marker::PhantomData;
-use std::rc::Rc;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use serde_derive::Serialize;
 
@@ -342,7 +341,7 @@ impl<S: sender::Trait> Block<S> {
         block: &Block<S>,
         visited: &HashMap<Block<S>, HashSet<Block<S>>>,
         latest_blocks: &HashMap<Block<S>, S>,
-        b_in_lms_senders: Rc<RwLock<HashMap<Block<S>, HashSet<S>>>>,
+        b_in_lms_senders: &mut HashMap<Block<S>, HashSet<S>>,
     ) -> HashSet<S> {
         let mut senders = HashSet::new();
         // collect this sender if this block is his proposed one from his latest message
@@ -353,20 +352,13 @@ impl<S: sender::Trait> Block<S> {
             .get(block)
             .map(|children| {
                 children.iter().fold(senders.clone(), |acc, child| {
-                    let res = Self::collect_validators(
-                        child,
-                        visited,
-                        latest_blocks,
-                        b_in_lms_senders.clone(),
-                    );
+                    let res =
+                        Self::collect_validators(child, visited, latest_blocks, b_in_lms_senders);
                     res.union(&acc).cloned().collect()
                 })
             })
             .unwrap_or_else(|| senders);
-        b_in_lms_senders
-            .write()
-            .ok()
-            .map(|mut lms| lms.insert(block.clone(), res.clone()));
+        b_in_lms_senders.insert(block.clone(), res.clone());
         res
     }
 
@@ -376,7 +368,7 @@ impl<S: sender::Trait> Block<S> {
         visited: &HashMap<Block<S>, HashSet<Block<S>>>,
         weights: &sender::Weights<S, U>,
         latest_blocks: &HashMap<Block<S>, S>,
-        b_in_lms_senders: Rc<RwLock<HashMap<Block<S>, HashSet<S>>>>,
+        b_in_lms_senders: &mut HashMap<Block<S>, HashSet<S>>,
     ) -> Option<(Option<Self>, U, HashSet<Self>)> {
         let init = Some((None, <U as Zero<U>>::ZERO, HashSet::new()));
         let heaviest_child = match blocks.len() {
@@ -391,17 +383,13 @@ impl<S: sender::Trait> Block<S> {
                 let best_children =
                     best.and_then(|best| visited.get(&block).map(|children| (best, children)));
                 best_children.and_then(|((b_block, b_weight, b_children), children)| {
-                    let referred_senders = match b_in_lms_senders
-                        .read()
-                        .ok()
-                        .and_then(|lms| lms.get(block).cloned())
-                    {
+                    let referred_senders = match b_in_lms_senders.get(block).cloned() {
                         Some(rs) => rs,
                         None => Self::collect_validators(
                             block,
                             visited,
                             latest_blocks,
-                            b_in_lms_senders.clone(),
+                            b_in_lms_senders,
                         ),
                     };
                     let weight = weights.sum_weight_senders(&referred_senders);
@@ -436,7 +424,7 @@ impl<S: sender::Trait> Block<S> {
                     visited,
                     &weights,
                     latest_blocks,
-                    b_in_lms_senders.clone(),
+                    b_in_lms_senders,
                 )
             }
         })
@@ -447,13 +435,15 @@ impl<S: sender::Trait> Block<S> {
         senders_weights: &sender::Weights<S, U>,
     ) -> Result<Self, Error> {
         let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_msgs);
-        let b_in_lms_senders = Rc::new(RwLock::new(HashMap::<Block<S>, HashSet<S>>::new()));
+
+        let mut b_in_lms_senders = HashMap::<Block<S>, HashSet<S>>::new();
+
         Block::pick_heaviest(
             &genesis,
             &visited,
             senders_weights,
             &latest_blocks,
-            b_in_lms_senders,
+            &mut b_in_lms_senders,
         )
         .and_then(|(opt_block, ..)| opt_block)
         .ok_or(Error)
