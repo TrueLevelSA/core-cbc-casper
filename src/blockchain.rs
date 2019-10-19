@@ -131,7 +131,7 @@ impl<S: sender::Trait> Estimator for Block<S> {
 
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Self::M>,
-        senders_weights: &sender::Weights<<<Self as Estimator>::M as message::Trait>::Sender, U>,
+        senders_weights: &sender::Weights<S, U>,
     ) -> Result<Self, Self::Error> {
         let prevblock = Block::ghost(latest_msgs, senders_weights)?;
         Ok(Block::from(ProtoBlock::new(Some(prevblock))))
@@ -178,14 +178,14 @@ impl<S: sender::Trait> Block<S> {
     pub fn safety_oracles<U: WeightUnit>(
         block: Block<S>,
         latest_msgs_honest: &LatestMsgsHonest<Message<S>>,
-        equivocators: &HashSet<<Message<S> as message::Trait>::Sender>,
+        equivocators: &HashSet<S>,
         safety_oracle_threshold: U,
         weights: &sender::Weights<S, U>,
-    ) -> HashSet<BTreeSet<<Message<S> as message::Trait>::Sender>> {
+    ) -> HashSet<BTreeSet<S>> {
         fn latest_in_justification<S: sender::Trait>(
             j: &Justification<Message<S>>,
-            equivocators: &HashSet<<Message<S> as message::Trait>::Sender>,
-        ) -> HashMap<<Message<S> as message::Trait>::Sender, Message<S>> {
+            equivocators: &HashSet<S>,
+        ) -> HashMap<S, Message<S>> {
             LatestMsgsHonest::from_latest_msgs(&LatestMsgs::from(j), equivocators)
                 .iter()
                 .map(|m| (m.sender().clone(), m.clone()))
@@ -444,7 +444,7 @@ impl<S: sender::Trait> Block<S> {
 
     pub fn ghost<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Message<S>>,
-        senders_weights: &sender::Weights<<Message<S> as message::Trait>::Sender, U>,
+        senders_weights: &sender::Weights<S, U>,
     ) -> Result<Self, Error> {
         let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_msgs);
         let b_in_lms_senders = Rc::new(RwLock::new(HashMap::<Block<S>, HashSet<S>>::new()));

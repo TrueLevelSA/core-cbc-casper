@@ -133,8 +133,8 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
     fn equivocates_indirect(
         &self,
         rhs: &Self,
-        mut equivocators: HashSet<<Self as Trait>::Sender>,
-    ) -> (bool, HashSet<<Self as Trait>::Sender>) {
+        mut equivocators: HashSet<Self::Sender>,
+    ) -> (bool, HashSet<Self::Sender>) {
         let is_equivocation = self.equivocates(rhs);
         let init = if is_equivocation {
             equivocators.insert(self.sender().clone());

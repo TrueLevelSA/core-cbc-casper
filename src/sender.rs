@@ -111,6 +111,7 @@ pub enum Error<'rwlock, T> {
 }
 
 impl<'rwlock, T> std::error::Error for Error<'rwlock, T> {}
+
 impl<'rwlock, T> std::fmt::Display for Error<'rwlock, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
