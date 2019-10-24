@@ -22,7 +22,7 @@ use std::iter::FromIterator;
 
 use casper::estimator::Estimator;
 use casper::justification::LatestMsgsHonest;
-use casper::message::{self, Trait};
+use casper::message;
 use casper::util::weight::{WeightUnit, Zero};
 use casper::validator;
 
@@ -70,11 +70,11 @@ impl std::convert::From<&'static str> for Error {
 
 /// the goal here is to find the weighted median of all the values
 impl Estimator for IntegerWrapper {
-    type M = IntegerMsg;
+    type V = Validator;
     type Error = Error;
 
     fn estimate<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<IntegerMsg>,
+        latest_msgs: &LatestMsgsHonest<Self, Validator>,
         validators_weights: &validator::Weights<Validator, U>,
     ) -> Result<Self, Self::Error> {
         let mut msgs_sorted_by_estimate = Vec::from_iter(latest_msgs.iter().fold(

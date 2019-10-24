@@ -62,14 +62,13 @@ impl std::convert::From<&'static str> for Error {
 }
 
 impl Estimator for Value {
-    type M = Message;
+    type V = Validator;
     type Error = Error;
 
     fn estimate<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<Message>,
+        latest_msgs: &LatestMsgsHonest<Self, Validator>,
         validators_weights: &validator::Weights<Validator, U>,
     ) -> Result<Self, Self::Error> {
-        use message::Trait;
         let res: Self = latest_msgs
             .iter()
             .map(|msg| (msg.estimate(), validators_weights.weight(msg.sender())))
@@ -113,7 +112,6 @@ fn block_from_prevblock_msg(c: &mut Criterion) {
             use std::collections::HashSet;
 
             use casper::justification::{Justification, LatestMsgs};
-            use casper::message::Trait;
 
             let validators: Vec<u8> = (1..=4).collect();
             let weights = [0.6, 1.0, 2.0, 1.3];

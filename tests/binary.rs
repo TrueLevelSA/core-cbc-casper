@@ -28,7 +28,7 @@ use std::collections::HashSet;
 
 use casper::estimator::Estimator;
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
-use casper::message::Trait;
+use casper::message::Message;
 use casper::validator;
 
 #[test]
@@ -53,11 +53,11 @@ fn equal_weight() {
         HashSet::new(), // equivocators
     );
 
-    let m0 = BinaryMsg::new(validators[0], Justification::empty(), BoolWrapper(false));
-    let m1 = BinaryMsg::new(validators[1], Justification::empty(), BoolWrapper(true));
-    let m2 = BinaryMsg::new(validators[2], Justification::empty(), BoolWrapper(false));
+    let m0 = Message::new(validators[0], Justification::empty(), BoolWrapper(false));
+    let m1 = Message::new(validators[1], Justification::empty(), BoolWrapper(true));
+    let m2 = Message::new(validators[2], Justification::empty(), BoolWrapper(false));
     let m3 =
-        BinaryMsg::from_msgs(validators[0], vec![&m0, &m1], &mut validator_state.clone()).unwrap();
+        Message::from_msgs(validators[0], vec![&m0, &m1], &mut validator_state.clone()).unwrap();
 
     assert_eq!(
         BoolWrapper::estimate(
@@ -115,11 +115,11 @@ fn vote_swaying() {
         HashSet::new(), // equivocators
     );
 
-    let m0 = BinaryMsg::new(validators[0], Justification::empty(), BoolWrapper(false));
-    let m1 = BinaryMsg::new(validators[1], Justification::empty(), BoolWrapper(true));
-    let m2 = BinaryMsg::new(validators[2], Justification::empty(), BoolWrapper(true));
-    let m3 = BinaryMsg::new(validators[3], Justification::empty(), BoolWrapper(false));
-    let m4 = BinaryMsg::new(validators[4], Justification::empty(), BoolWrapper(false));
+    let m0 = Message::new(validators[0], Justification::empty(), BoolWrapper(false));
+    let m1 = Message::new(validators[1], Justification::empty(), BoolWrapper(true));
+    let m2 = Message::new(validators[2], Justification::empty(), BoolWrapper(true));
+    let m3 = Message::new(validators[3], Justification::empty(), BoolWrapper(false));
+    let m4 = Message::new(validators[4], Justification::empty(), BoolWrapper(false));
 
     let mut j0 = Justification::from_msgs(
         vec![m0.clone(), m1.clone(), m2.clone(), m3.clone(), m4.clone()],
@@ -134,7 +134,7 @@ fn vote_swaying() {
     );
 
     // assume validator 0 has seen messages from validator 1 and validator 2 and reveals this in a published message
-    let m5 = BinaryMsg::from_msgs(
+    let m5 = Message::from_msgs(
         validators[0],
         vec![&m0, &m1, &m2],
         &mut validator_state.clone(),

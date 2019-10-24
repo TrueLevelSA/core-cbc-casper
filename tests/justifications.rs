@@ -25,7 +25,7 @@ use common::vote_count::VoteCount;
 use std::collections::HashSet;
 
 use casper::justification::{Justification, LatestMsgs};
-use casper::message::{self, Trait};
+use casper::message;
 use casper::validator;
 
 macro_rules! float_eq {

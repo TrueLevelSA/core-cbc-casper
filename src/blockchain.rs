@@ -27,7 +27,7 @@ use serde_derive::Serialize;
 
 use crate::estimator::Estimator;
 use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest};
-use crate::message::{self, Trait};
+use crate::message;
 use crate::util::hash::Hash;
 use crate::util::id::Id;
 use crate::util::weight::{WeightUnit, Zero};
@@ -126,11 +126,11 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {}
 
 impl<V: validator::ValidatorName> Estimator for Block<V> {
-    type M = Message<V>;
     type Error = Error;
+    type V = V;
 
     fn estimate<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<Self::M>,
+        latest_msgs: &LatestMsgsHonest<Self, V>,
         validators_weights: &validator::Weights<V, U>,
     ) -> Result<Self, Self::Error> {
         let prevblock = Block::ghost(latest_msgs, validators_weights)?;
@@ -177,13 +177,13 @@ impl<V: validator::ValidatorName> Block<V> {
 
     pub fn safety_oracles<U: WeightUnit>(
         block: Block<V>,
-        latest_msgs_honest: &LatestMsgsHonest<Message<V>>,
+        latest_msgs_honest: &LatestMsgsHonest<Self, V>,
         equivocators: &HashSet<V>,
         safety_oracle_threshold: U,
         weights: &validator::Weights<V, U>,
     ) -> HashSet<BTreeSet<V>> {
         fn latest_in_justification<V: validator::ValidatorName>(
-            j: &Justification<Message<V>>,
+            j: &Justification<Block<V>, V>,
             equivocators: &HashSet<V>,
         ) -> HashMap<V, Message<V>> {
             LatestMsgsHonest::from_latest_msgs(&LatestMsgs::from(j), equivocators)
@@ -288,7 +288,7 @@ impl<V: validator::ValidatorName> Block<V> {
     /// blocks);
     /// * a HashMap mapping blocks to their senders.
     pub fn parse_blockchains(
-        latest_msgs: &LatestMsgsHonest<Message<V>>,
+        latest_msgs: &LatestMsgsHonest<Self, V>,
     ) -> (
         BlocksChildrenMap<V>,
         GenesisBlocks<V>,
@@ -442,7 +442,7 @@ impl<V: validator::ValidatorName> Block<V> {
     }
 
     pub fn ghost<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<Message<V>>,
+        latest_msgs: &LatestMsgsHonest<Self, V>,
         validators_weights: &validator::Weights<V, U>,
     ) -> Result<Self, Error> {
         let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_msgs);
@@ -469,7 +469,6 @@ mod tests {
 
     use crate::blockchain::{Block, Message, ProtoBlock};
     use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest};
-    use crate::message::Trait;
     use crate::validator;
 
     #[test]

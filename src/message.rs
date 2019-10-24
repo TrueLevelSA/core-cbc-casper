@@ -44,7 +44,6 @@
 
 use std::collections::HashSet;
 use std::fmt::Debug;
-use std::hash;
 use std::sync::{Arc, RwLock};
 
 use rayon::prelude::*;
@@ -74,160 +73,30 @@ impl<E: std::error::Error> std::fmt::Display for Error<E> {
 
 impl<E: std::error::Error> std::error::Error for Error<E> {}
 
-/// Abstraction of a Casper message, contain a value (`Estimator`) that will be sent over the
-/// network by validators (`validator::ValidatorName`) and used as `Justification` for a more recent messages.
-pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize {
-    /// Defines the validator type that generated this message
-    type Sender: validator::ValidatorName;
-
-    /// Defines the estimate type, or value, contained in that message
-    /// The estimate type must be compatible with `message::Trait`
-    type Estimator: Estimator<M = Self>;
-
-    /// Returns the validator, or sender, who sent this message
-    fn sender(&self) -> &Self::Sender;
-
-    /// Returns the estimate, or value, of this message
-    fn estimate(&self) -> &Self::Estimator;
-
-    /// Returns the justification of this message
-    fn justification<'z>(&'z self) -> &'z Justification<Self>;
-
-    /// creates a new instance of this message
-    fn new(
-        sender: Self::Sender,
-        justification: Justification<Self>,
-        estimate: Self::Estimator,
-    ) -> Self;
-
-    /// Create a message from newly received messages.
-    fn from_msgs<U: WeightUnit>(
-        sender: Self::Sender,
-        mut new_msgs: Vec<&Self>,
-        validator_state: &mut validator::State<Self, U>,
-    ) -> Result<Self, Error<<Self::Estimator as Estimator>::Error>> {
-        // dedup by putting msgs into a hashset
-        let new_msgs: HashSet<_> = new_msgs.drain(..).collect();
-        let new_msgs_len = new_msgs.len();
-
-        // update latest_msgs in validator_state with new_msgs
-        let mut justification = Justification::empty();
-        let inserted_msgs = justification.faulty_inserts(&new_msgs, validator_state);
-
-        if inserted_msgs.is_empty() && new_msgs_len > 0 {
-            Err(Error::NoNewMessage)
-        } else {
-            let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(
-                validator_state.latests_msgs(),
-                validator_state.equivocators(),
-            );
-
-            let estimate = latest_msgs_honest.mk_estimate(&validator_state.validators_weights());
-            estimate
-                .map(|e| Self::new(sender, justification, e))
-                .map_err(Error::Estimator)
-        }
-    }
-
-    // FIXME: insanely expensive to compute
-    fn equivocates_indirect(
-        &self,
-        rhs: &Self,
-        mut equivocators: HashSet<Self::Sender>,
-    ) -> (bool, HashSet<Self::Sender>) {
-        let is_equivocation = self.equivocates(rhs);
-        let init = if is_equivocation {
-            equivocators.insert(self.sender().clone());
-            (true, equivocators)
-        } else {
-            (false, equivocators)
-        };
-        self.justification().iter().fold(
-            init,
-            |(acc_has_equivocations, acc_equivocators), self_prime| {
-                // note the rotation between rhs and self, done because descending only on self,
-                // thus rhs has to become self on the recursion to get its justification visited
-                let (has_equivocation, equivocators) =
-                    rhs.equivocates_indirect(self_prime, acc_equivocators.clone());
-                let acc_equivocators = acc_equivocators.union(&equivocators).cloned().collect();
-                (acc_has_equivocations || has_equivocation, acc_equivocators)
-            },
-        )
-    }
-
-    /// Math definition of the equivocation
-    fn equivocates(&self, rhs: &Self) -> bool {
-        self != rhs && self.sender() == rhs.sender() && !rhs.depends(self) && !self.depends(rhs)
-    }
-
-    /// Checks whether self depends on rhs or not. Returns true if rhs is somewhere in the
-    /// justification of self. This check is heavy and work well only with messages where the
-    /// dependency is found on the surface, which what it was designed for.
-    fn depends(&self, rhs: &Self) -> bool {
-        // although the recursion ends supposedly only at genesis message, the
-        // trick is the following: it short-circuits while descending on the
-        // dependency tree, if it finds a dependent message. when dealing with
-        // honest validators, this would return true very fast. all the new
-        // derived branches of the justification will be evaluated in parallel.
-        // say if a msg is justified by 2 other msgs, then the 2 other msgs will
-        // be processed on different threads. this applies recursively, so if
-        // each of the 2 msgs have say 3 justifications, then each of the 2
-        // threads will spawn 3 new threads to process each of the messages.
-        // thus, highly parallelizable. when it shortcuts, because in one thread
-        // a dependency was found, the function returns true and all the
-        // computation on the other threads will be canceled.
-        fn recurse<M: Trait>(lhs: &M, rhs: &M, visited: Arc<RwLock<HashSet<M>>>) -> bool {
-            let justification = lhs.justification();
-
-            // Math definition of dependency
-            justification.contains(rhs)
-                || justification
-                    .par_iter()
-                    .filter(|lhs_prime| {
-                        visited
-                            .read()
-                            .map(|v| !v.contains(lhs_prime))
-                            .ok()
-                            .unwrap_or(true)
-                    })
-                    .any(|lhs_prime| {
-                        let visited_prime = visited.clone();
-                        let _ = visited_prime
-                            .write()
-                            .map(|mut v| v.insert(lhs_prime.clone()))
-                            .ok();
-                        recurse(lhs_prime, rhs, visited_prime)
-                    })
-        }
-        let visited = Arc::new(RwLock::new(HashSet::new()));
-        recurse(self, rhs, visited)
-    }
-}
-
 // Mathematical definition of a casper message with (value, validator, justification)
 #[derive(Clone, Eq, PartialEq)]
-struct ProtoMsg<E, V>
+struct ProtoMsg<E, S>
 where
-    E: Estimator<M = Message<E, V>>,
-    V: validator::ValidatorName,
+    E: Estimator,
+    S: validator::ValidatorName,
 {
     estimate: E,
-    sender: V,
-    justification: Justification<Message<E, V>>,
+    sender: S,
+    justification: Justification<E, <E as Estimator>::V>,
 }
 
-impl<E, V> Id for ProtoMsg<E, V>
+impl<E, S> Id for ProtoMsg<E, S>
 where
-    E: Estimator<M = Message<E, V>>,
-    V: validator::ValidatorName,
+    E: Estimator,
+    S: validator::ValidatorName,
 {
     type ID = Hash;
 }
 
-impl<E, V> Serialize for ProtoMsg<E, V>
+impl<E, S> Serialize for ProtoMsg<E, S>
 where
-    E: Estimator<M = Message<E, V>>,
-    V: validator::ValidatorName,
+    E: Estimator,
+    S: validator::ValidatorName,
 {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
@@ -271,14 +140,154 @@ where
 /// `Value` must implement `Estimator` to be valid for a `message::Message` and to produce
 /// estimates.
 #[derive(Eq, Clone)]
-pub struct Message<E, V>(Arc<ProtoMsg<E, V>>, Hash)
+pub struct Message<E, S>(Arc<ProtoMsg<E, S>>, Hash)
 where
-    E: Estimator<M = Message<E, V>>,
-    V: validator::ValidatorName;
+    E: Estimator<V = S>,
+    S: validator::ValidatorName;
+
+impl<E, S> Message<E, S>
+where
+    E: Estimator<V = S>,
+    S: validator::ValidatorName,
+{
+    pub fn sender(&self) -> &S {
+        &self.0.sender
+    }
+
+    pub fn estimate(&self) -> &E {
+        &self.0.estimate
+    }
+
+    pub fn justification<'z>(&'z self) -> &'z Justification<E, S> {
+        &self.0.justification
+    }
+
+    pub fn new(sender: S, justification: Justification<E, S>, estimate: E) -> Self {
+        let proto = ProtoMsg {
+            sender,
+            justification,
+            estimate,
+        };
+        // Message is not mutable, id is computed only once at creation
+        let id = proto.getid();
+        Message(Arc::new(proto), id)
+    }
+
+    /// Create a message from newly received messages.
+    pub fn from_msgs<U: WeightUnit>(
+        sender: S,
+        mut new_msgs: Vec<&Self>,
+        validator_state: &mut validator::State<E, S, U>,
+    ) -> Result<Self, Error<E::Error>> {
+        // dedup by putting msgs into a hashset
+        let new_msgs: HashSet<_> = new_msgs.drain(..).collect();
+        let new_msgs_len = new_msgs.len();
+
+        // update latest_msgs in validator_state with new_msgs
+        let mut justification = Justification::empty();
+        let inserted_msgs = justification.faulty_inserts(&new_msgs, validator_state);
+
+        if inserted_msgs.is_empty() && new_msgs_len > 0 {
+            Err(Error::NoNewMessage)
+        } else {
+            let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(
+                validator_state.latests_msgs(),
+                validator_state.equivocators(),
+            );
+
+            let estimate = latest_msgs_honest.mk_estimate(&validator_state.validators_weights());
+            estimate
+                .map(|e| Self::new(sender, justification, e))
+                .map_err(Error::Estimator)
+        }
+    }
+
+    // FIXME: insanely expensive to compute
+    pub fn equivocates_indirect(
+        &self,
+        rhs: &Self,
+        mut equivocators: HashSet<S>,
+    ) -> (bool, HashSet<S>) {
+        let is_equivocation = self.equivocates(rhs);
+        let init = if is_equivocation {
+            equivocators.insert(self.sender().clone());
+            (true, equivocators)
+        } else {
+            (false, equivocators)
+        };
+        self.justification().iter().fold(
+            init,
+            |(acc_has_equivocations, acc_equivocators), self_prime| {
+                // note the rotation between rhs and self, done because descending only on self,
+                // thus rhs has to become self on the recursion to get its justification visited
+                let (has_equivocation, equivocators) =
+                    rhs.equivocates_indirect(self_prime, acc_equivocators.clone());
+                let acc_equivocators = acc_equivocators.union(&equivocators).cloned().collect();
+                (acc_has_equivocations || has_equivocation, acc_equivocators)
+            },
+        )
+    }
+
+    /// Math definition of the equivocation
+    pub fn equivocates(&self, rhs: &Self) -> bool {
+        self != rhs && self.sender() == rhs.sender() && !rhs.depends(self) && !self.depends(rhs)
+    }
+
+    /// Checks whether self depends on rhs or not. Returns true if rhs is somewhere in the
+    /// justification of self. This check is heavy and work well only with messages where the
+    /// dependency is found on the surface, which what it was designed for.
+    pub fn depends(&self, rhs: &Self) -> bool {
+        // although the recursion ends supposedly only at genesis message, the
+        // trick is the following: it short-circuits while descending on the
+        // dependency tree, if it finds a dependent message. when dealing with
+        // honest validators, this would return true very fast. all the new
+        // derived branches of the justification will be evaluated in parallel.
+        // say if a msg is justified by 2 other msgs, then the 2 other msgs will
+        // be processed on different threads. this applies recursively, so if
+        // each of the 2 msgs have say 3 justifications, then each of the 2
+        // threads will spawn 3 new threads to process each of the messages.
+        // thus, highly parallelizable. when it shortcuts, because in one thread
+        // a dependency was found, the function returns true and all the
+        // computation on the other threads will be canceled.
+        fn recurse<E, S>(
+            lhs: &Message<E, S>,
+            rhs: &Message<E, S>,
+            visited: Arc<RwLock<HashSet<Message<E, S>>>>,
+        ) -> bool
+        where
+            E: Estimator<V = S>,
+            S: validator::ValidatorName,
+        {
+            let justification = lhs.justification();
+
+            // Math definition of dependency
+            justification.contains(rhs)
+                || justification
+                    .par_iter()
+                    .filter(|lhs_prime| {
+                        visited
+                            .read()
+                            .map(|v| !v.contains(lhs_prime))
+                            .ok()
+                            .unwrap_or(true)
+                    })
+                    .any(|lhs_prime| {
+                        let visited_prime = visited.clone();
+                        let _ = visited_prime
+                            .write()
+                            .map(|mut v| v.insert(lhs_prime.clone()))
+                            .ok();
+                        recurse(lhs_prime, rhs, visited_prime)
+                    })
+        }
+        let visited = Arc::new(RwLock::new(HashSet::new()));
+        recurse(self, rhs, visited)
+    }
+}
 
 impl<E, V> Id for Message<E, V>
 where
-    E: Estimator<M = Self>,
+    E: Estimator<V = S>,
     V: validator::ValidatorName,
 {
     type ID = Hash;
@@ -291,7 +300,7 @@ where
 
 impl<E, V> Serialize for Message<E, V>
 where
-    E: Estimator<M = Self>,
+    E: Estimator<V = S>,
     V: validator::ValidatorName,
 {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
@@ -299,41 +308,9 @@ where
     }
 }
 
-impl<E, V> self::Trait for Message<E, V>
-where
-    E: Estimator<M = Self>,
-    V: validator::ValidatorName,
-{
-    type Estimator = E;
-    type Sender = V;
-
-    fn sender(&self) -> &Self::Sender {
-        &self.0.sender
-    }
-
-    fn estimate(&self) -> &Self::Estimator {
-        &self.0.estimate
-    }
-
-    fn justification<'z>(&'z self) -> &'z Justification<Self> {
-        &self.0.justification
-    }
-
-    fn new(sender: V, justification: Justification<Self>, estimate: E) -> Self {
-        let proto = ProtoMsg {
-            sender,
-            justification,
-            estimate,
-        };
-        // Message is not mutable, id is computed only once at creation
-        let id = proto.getid();
-        Message(Arc::new(proto), id)
-    }
-}
-
 impl<E, V> std::hash::Hash for Message<E, V>
 where
-    E: Estimator<M = Self>,
+    E: Estimator<V = S>,
     V: validator::ValidatorName,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -343,7 +320,7 @@ where
 
 impl<E, V> PartialEq for Message<E, V>
 where
-    E: Estimator<M = Self>,
+    E: Estimator<V = S>,
     V: validator::ValidatorName,
 {
     fn eq(&self, rhs: &Self) -> bool {
@@ -353,7 +330,7 @@ where
 
 impl<E, V> Debug for Message<E, V>
 where
-    E: Estimator<M = Self>,
+    E: Estimator<V = S>,
     V: validator::ValidatorName,
 {
     // Note: format used for rendering illustrative gifs from generative tests; modify with care

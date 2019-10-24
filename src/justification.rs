@@ -39,16 +39,23 @@ use std::fmt::{Debug, Formatter};
 use rayon::iter::IntoParallelRefIterator;
 
 use crate::estimator::Estimator;
-use crate::message;
+use crate::message::Message;
 use crate::util::weight::{WeightUnit, Zero};
 use crate::validator;
 
 /// Struct that holds the set of the `message::Trait` that justify the current message. Works like
 /// a `vec`.
 #[derive(Eq, PartialEq, Clone, Hash)]
-pub struct Justification<M: message::Trait>(Vec<M>);
+pub struct Justification<E, V>(Vec<Message<E, V>>)
+where
+    E: Estimator<V = V>,
+    V: validator::ValidatorName;
 
-impl<M: message::Trait> Justification<M> {
+impl<E, V> Justification<E, V>
+where
+    E: Estimator<V = V>,
+    V: validator::ValidatorName,
+{
     /// Create an empty justification.
     pub fn empty() -> Self {
         Justification(Vec::new())
@@ -56,22 +63,25 @@ impl<M: message::Trait> Justification<M> {
 
     /// Creates and return a new justification instance from a vector of `message::Trait` and
     /// mutate the given `validator::State` with the updated state
-    pub fn from_msgs<U: WeightUnit>(messages: Vec<M>, state: &mut validator::State<M, U>) -> Self {
+    pub fn from_msgs<U: WeightUnit>(
+        messages: Vec<Message<E, V>>,
+        state: &mut validator::State<E, V, U>,
+    ) -> Self {
         let mut justification = Justification::empty();
         let messages: HashSet<_> = messages.iter().collect();
         justification.faulty_inserts(&messages, state);
         justification
     }
 
-    pub fn iter(&self) -> std::slice::Iter<M> {
+    pub fn iter(&self) -> std::slice::Iter<Message<E, V>> {
         self.0.iter()
     }
 
-    pub fn par_iter(&self) -> rayon::slice::Iter<M> {
+    pub fn par_iter(&self) -> rayon::slice::Iter<Message<E, V>> {
         self.0.par_iter()
     }
 
-    pub fn contains(&self, msg: &M) -> bool {
+    pub fn contains(&self, msg: &Message<E, V>) -> bool {
         self.0.contains(msg)
     }
 
@@ -83,7 +93,7 @@ impl<M: message::Trait> Justification<M> {
         self.0.is_empty()
     }
 
-    pub fn insert(&mut self, msg: M) -> bool {
+    pub fn insert(&mut self, msg: Message<E, V>) -> bool {
         if self.contains(&msg) {
             false
         } else {
@@ -95,21 +105,21 @@ impl<M: message::Trait> Justification<M> {
     /// Run the estimator on the justification given the set of equivocators and validators' weights.
     pub fn mk_estimate<U: WeightUnit>(
         &self,
-        equivocators: &HashSet<M::Sender>,
-        validators_weights: &validator::Weights<<M as message::Trait>::Sender, U>,
-    ) -> Result<M::Estimator, <M::Estimator as Estimator>::Error> {
+        equivocators: &HashSet<V>,
+        validators_weights: &validator::Weights<V, U>,
+    ) -> Result<E, E::Error> {
         let latest_msgs = LatestMsgs::from(self);
         let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(&latest_msgs, equivocators);
-        M::Estimator::estimate(&latest_msgs_honest, validators_weights)
+        Estimator::estimate(&latest_msgs_honest, validators_weights)
     }
 
     /// Insert messages to the justification, accepting up to the threshold faults by weight.
     /// Returns a HashSet of messages that got successfully included in the justification.
     pub fn faulty_inserts<'a, U: WeightUnit>(
         &mut self,
-        msgs: &HashSet<&'a M>,
-        state: &mut validator::State<M, U>,
-    ) -> HashSet<&'a M> {
+        msgs: &HashSet<&'a Message<E, V>>,
+        state: &mut validator::State<E, V, U>,
+    ) -> HashSet<&'a Message<E, V>> {
         let msgs = state.sort_by_faultweight(msgs);
         // do the actual insertions to the state
         msgs.into_iter()
@@ -121,8 +131,8 @@ impl<M: message::Trait> Justification<M> {
     /// justification only if it will not cross the fault tolerance threshold.
     pub fn faulty_insert<U: WeightUnit>(
         &mut self,
-        msg: &M,
-        state: &mut validator::State<M, U>,
+        msg: &Message<E, V>,
+        state: &mut validator::State<E, V, U>,
     ) -> bool {
         let is_equivocation = state.latest_msgs.equivocate(msg);
 
@@ -167,9 +177,9 @@ impl<M: message::Trait> Justification<M> {
     /// to the state fault weight anymore
     pub fn faulty_insert_with_slash<'a, U: WeightUnit>(
         &mut self,
-        msg: &M,
-        state: &'a mut validator::State<M, U>,
-    ) -> Result<bool, validator::Error<'a, HashMap<<M as message::Trait>::Sender, U>>> {
+        msg: &Message<E, V>,
+        state: &'a mut validator::State<E, V, U>,
+    ) -> Result<bool, validator::Error<'a, HashMap<V, U>>> {
         let is_equivocation = state.latest_msgs.equivocate(msg);
         if is_equivocation {
             let sender = msg.sender();
@@ -184,7 +194,11 @@ impl<M: message::Trait> Justification<M> {
     }
 }
 
-impl<M: message::Trait> Debug for Justification<M> {
+impl<E, V> Debug for Justification<E, V>
+where
+    E: Estimator<V = V>,
+    V: validator::ValidatorName,
+{
     fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
         write!(f, "{:?}", self.0)
     }
@@ -193,36 +207,43 @@ impl<M: message::Trait> Debug for Justification<M> {
 /// Mapping between validators and their latests messages. Latest messages from a validator are all
 /// their messages that are not in the dependency of another of their messages.
 #[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LatestMsgs<M: message::Trait>(HashMap<<M as message::Trait>::Sender, HashSet<M>>);
+pub struct LatestMsgs<E, V>(HashMap<V, HashSet<Message<E, V>>>)
+where
+    E: Estimator<V = V>,
+    V: validator::ValidatorName;
 
-impl<M: message::Trait> LatestMsgs<M> {
+impl<E, V> LatestMsgs<E, V>
+where
+    E: Estimator<V = V>,
+    V: validator::ValidatorName,
+{
     /// Create an empty set of latest messages.
     pub fn empty() -> Self {
         LatestMsgs(HashMap::new())
     }
 
     /// Insert a new set of messages for a sender.
-    pub fn insert(&mut self, k: M::Sender, v: HashSet<M>) -> Option<HashSet<M>> {
+    pub fn insert(&mut self, k: V, v: HashSet<Message<E, V>>) -> Option<HashSet<Message<E, V>>> {
         self.0.insert(k, v)
     }
 
     /// Checks whether a sender is already contained in the map.
-    pub fn contains_key(&self, k: &M::Sender) -> bool {
+    pub fn contains_key(&self, k: &V) -> bool {
         self.0.contains_key(k)
     }
 
     /// Get a set of messages sent by the sender.
-    pub fn get(&self, k: &M::Sender) -> Option<&HashSet<M>> {
+    pub fn get(&self, k: &V) -> Option<&HashSet<Message<E, V>>> {
         self.0.get(k)
     }
 
     /// Get a mutable set of messages sent by the sender.
-    pub fn get_mut(&mut self, k: &M::Sender) -> Option<&mut HashSet<M>> {
+    pub fn get_mut(&mut self, k: &V) -> Option<&mut HashSet<Message<E, V>>> {
         self.0.get_mut(k)
     }
 
     /// Get an iterator on the set.
-    pub fn iter(&self) -> std::collections::hash_map::Iter<M::Sender, HashSet<M>> {
+    pub fn iter(&self) -> std::collections::hash_map::Iter<V, HashSet<Message<E, V>>> {
         self.0.iter()
     }
 
@@ -236,19 +257,19 @@ impl<M: message::Trait> LatestMsgs<M> {
     }
 
     /// Get the set keys, i.e. the senders.
-    pub fn keys(&self) -> std::collections::hash_map::Keys<M::Sender, HashSet<M>> {
+    pub fn keys(&self) -> std::collections::hash_map::Keys<V, HashSet<Message<E, V>>> {
         self.0.keys()
     }
 
     /// Get the set values, i.e. the messages.
-    pub fn values(&self) -> std::collections::hash_map::Values<'_, M::Sender, HashSet<M>> {
+    pub fn values(&self) -> std::collections::hash_map::Values<'_, V, HashSet<Message<E, V>>> {
         self.0.values()
     }
 
     /// Update the data structure by adding a new message. Return true if the new message is a
     /// valid latest message, i.e. the first message of a validator or a message that is not in the
     /// justification of the existing latest messages.
-    pub fn update(&mut self, new_msg: &M) -> bool {
+    pub fn update(&mut self, new_msg: &Message<E, V>) -> bool {
         let sender = new_msg.sender();
         if let Some(latest_msgs_from_sender) = self.get(sender).cloned() {
             latest_msgs_from_sender
@@ -283,18 +304,22 @@ impl<M: message::Trait> LatestMsgs<M> {
     }
 
     /// Checks whether the new message equivocates with latest messages.
-    pub(crate) fn equivocate(&self, msg_new: &M) -> bool {
+    pub(crate) fn equivocate(&self, msg_new: &Message<E, V>) -> bool {
         self.get(msg_new.sender())
             .map(|latest_msgs| latest_msgs.iter().any(|m| m.equivocates(&msg_new)))
             .unwrap_or(false)
     }
 }
 
-impl<'z, M: message::Trait> From<&'z Justification<M>> for LatestMsgs<M> {
+impl<'z, E, V> From<&'z Justification<E, V>> for LatestMsgs<E, V>
+where
+    E: Estimator<V = V>,
+    V: validator::ValidatorName,
+{
     /// Extract the latest messages of each validator from a justification.
-    fn from(j: &Justification<M>) -> Self {
-        let mut latest_msgs: LatestMsgs<M> = LatestMsgs::empty();
-        let mut queue: VecDeque<M> = j.iter().cloned().collect();
+    fn from(j: &Justification<E, V>) -> Self {
+        let mut latest_msgs: LatestMsgs<E, V> = LatestMsgs::empty();
+        let mut queue: VecDeque<Message<E, V>> = j.iter().cloned().collect();
         while let Some(msg) = queue.pop_front() {
             if latest_msgs.update(&msg) {
                 msg.justification()
@@ -307,29 +332,33 @@ impl<'z, M: message::Trait> From<&'z Justification<M>> for LatestMsgs<M> {
 }
 
 /// Set of latest honest messages for each validator.
-pub struct LatestMsgsHonest<M: message::Trait>(HashSet<M>);
+pub struct LatestMsgsHonest<E, V>(HashSet<Message<E, V>>)
+where
+    E: Estimator<V = V>,
+    V: validator::ValidatorName;
 
-impl<M: message::Trait> LatestMsgsHonest<M> {
+impl<E, V> LatestMsgsHonest<E, V>
+where
+    E: Estimator<V = V>,
+    V: validator::ValidatorName,
+{
     /// Create an empty latest honest messages set.
     fn empty() -> Self {
         LatestMsgsHonest(HashSet::new())
     }
 
     /// Insert message to the set.
-    fn insert(&mut self, msg: M) -> bool {
+    fn insert(&mut self, msg: Message<E, V>) -> bool {
         self.0.insert(msg)
     }
 
     /// Remove messages of a validator.
-    pub fn remove(&mut self, validator: &M::Sender) {
+    pub fn remove(&mut self, validator: &V) {
         self.0.retain(|msg| msg.sender() != validator);
     }
 
     /// Filters the latest messages to retreive the latest honest messages and remove equivocators.
-    pub fn from_latest_msgs(
-        latest_msgs: &LatestMsgs<M>,
-        equivocators: &HashSet<M::Sender>,
-    ) -> Self {
+    pub fn from_latest_msgs(latest_msgs: &LatestMsgs<E, V>, equivocators: &HashSet<V>) -> Self {
         latest_msgs
             .iter()
             .filter_map(|(validator, msgs)| {
@@ -345,7 +374,7 @@ impl<M: message::Trait> LatestMsgsHonest<M> {
             })
     }
 
-    pub fn iter(&self) -> std::collections::hash_set::Iter<M> {
+    pub fn iter(&self) -> std::collections::hash_set::Iter<Message<E, V>> {
         self.0.iter()
     }
 
@@ -359,8 +388,8 @@ impl<M: message::Trait> LatestMsgsHonest<M> {
 
     pub fn mk_estimate<U: WeightUnit>(
         &self,
-        validators_weights: &validator::Weights<<M as message::Trait>::Sender, U>,
-    ) -> Result<M::Estimator, <M::Estimator as Estimator>::Error> {
-        M::Estimator::estimate(&self, validators_weights)
+        validators_weights: &validator::Weights<V, U>,
+    ) -> Result<E, E::Error> {
+        E::estimate(&self, validators_weights)
     }
 }

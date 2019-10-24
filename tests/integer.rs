@@ -28,7 +28,6 @@ use std::collections::HashSet;
 
 use casper::estimator::Estimator;
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
-use casper::message::Trait;
 use casper::validator;
 
 #[test]

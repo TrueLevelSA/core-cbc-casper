@@ -19,7 +19,6 @@
 
 use casper::estimator::Estimator;
 use casper::justification::LatestMsgsHonest;
-use casper::message::{self, Trait};
 use casper::util::weight::{WeightUnit, Zero};
 use casper::validator;
 
@@ -42,8 +41,6 @@ impl<V: validator::ValidatorName> From<V> for BoolWrapper {
     }
 }
 
-pub type BinaryMsg = message::Message<BoolWrapper /*Estimator*/, Validator /*Validator*/>;
-
 #[derive(Debug)]
 pub struct Error(&'static str);
 
@@ -62,12 +59,12 @@ impl std::convert::From<&'static str> for Error {
 }
 
 impl Estimator for BoolWrapper {
-    type M = BinaryMsg;
+    type V = Validator;
     type Error = Error;
 
     /// Weighted count of the votes contained in the latest messages.
     fn estimate<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<BinaryMsg>,
+        latest_msgs: &LatestMsgsHonest<BoolWrapper, Validator>,
         validators_weights: &validator::Weights<Validator, U>,
     ) -> Result<Self, Self::Error> {
         // loop over all the latest messages

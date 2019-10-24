@@ -25,7 +25,7 @@ use common::vote_count::VoteCount;
 use std::collections::HashSet;
 
 use casper::justification::{Justification, LatestMsgs};
-use casper::message::{Message, Trait};
+use casper::message::Message;
 use casper::validator;
 
 #[test]

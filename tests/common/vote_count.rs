@@ -26,7 +26,7 @@ use proptest::prelude::*;
 
 use casper::estimator::Estimator;
 use casper::justification::{Justification, LatestMsgsHonest};
-use casper::message::{self, Trait};
+use casper::message;
 use casper::util::weight::{WeightUnit, Zero};
 use casper::validator;
 
@@ -109,10 +109,10 @@ impl VoteCount {
     }
 
     fn get_vote_msgs(
-        latest_msgs: &LatestMsgsHonest<message::Message<Self, Voter>>,
+        latest_msgs: &LatestMsgsHonest<Self, Voter>,
     ) -> HashSet<message::Message<Self, Voter>> {
         fn recursor(
-            latest_msgs: &Justification<message::Message<VoteCount, Voter>>,
+            latest_msgs: &Justification<VoteCount, Voter>,
             acc: HashSet<message::Message<VoteCount, Voter>>,
         ) -> HashSet<message::Message<VoteCount, Voter>> {
             latest_msgs.iter().fold(acc, |mut acc_prime, m| {
@@ -160,7 +160,6 @@ impl VoteCount {
 }
 
 type Voter = u32;
-pub type VoteMsg = message::Message<VoteCount, Voter>;
 
 //impl Validator for Voter {}
 
@@ -184,7 +183,7 @@ impl std::convert::From<&'static str> for Error {
 impl Estimator for VoteCount {
     // the estimator just counts votes, which in this case are the unjustified
     // msgs
-    type M = VoteMsg;
+    type V = Voter;
     type Error = Error;
 
     // Data could be anything, as it will not be used, will just pass None to
@@ -192,7 +191,7 @@ impl Estimator for VoteCount {
     // type Data = Self;
 
     fn estimate<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<Self::M>,
+        latest_msgs: &LatestMsgsHonest<VoteCount, Voter>,
         _weights: &validator::Weights<Voter, U>, // all voters have same weight
     ) -> Result<Self, Self::Error> {
         // the estimates are actually the original votes of each of the voters /

@@ -20,7 +20,7 @@
 use std::collections::HashSet;
 use std::fmt;
 
-use casper::blockchain::{Block, Message};
+use casper::blockchain::Block;
 use casper::justification::LatestMsgsHonest;
 use casper::validator;
 
@@ -70,8 +70,8 @@ impl ChainData {
 
 /// returns the height of the GHOST-selected chain
 pub fn get_height_selected_chain(
-    latest_msgs_honest: &LatestMsgsHonest<Message<u32>>,
-    validator_state: &validator::State<Message<u32>, f64>,
+    latest_msgs_honest: &LatestMsgsHonest<Block<u32>, u32>,
+    validator_state: &validator::State<Block<u32>, u32, f64>,
 ) -> u32 {
     let selected_block = Block::ghost(&latest_msgs_honest, validator_state.validators_weights());
     fn reduce(b: &Block<u32>, i: u32) -> u32 {
@@ -87,7 +87,7 @@ pub fn get_height_selected_chain(
 }
 
 pub fn get_children_of_blocks(
-    latest_msgs_honest: &LatestMsgsHonest<Message<u32>>,
+    latest_msgs_honest: &LatestMsgsHonest<Block<u32>, u32>,
     genesis_blocks: HashSet<Block<u32>>,
 ) -> HashSet<Block<u32>> {
     let mut children = HashSet::new();

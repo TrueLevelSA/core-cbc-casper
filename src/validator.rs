@@ -65,8 +65,10 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use std::sync::{Arc, LockResult, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
+use crate::estimator::Estimator;
 use crate::justification::LatestMsgs;
-use crate::message;
+use crate::message::Message;
+use crate::util::id::Id;
 use crate::util::weight::{WeightUnit, Zero};
 
 /// All casper actors that send messages, aka validators, have to implement the validator name trait
@@ -84,17 +86,22 @@ impl ValidatorName for i64 {}
 /// Inner state of a validator. Validator's state implement `message::Trait` allowing validators to produce
 /// messages based on their latest view of the network.
 #[derive(Debug, Clone)]
-pub struct State<M: message::Trait, U: WeightUnit> {
+pub struct State<E, V, U>
+where
+    E: Estimator<V = V>,
+    V: self::ValidatorName,
+    U: WeightUnit,
+{
     /// current state total fault weight
     pub(crate) state_fault_weight: U,
     /// fault tolerance threshold
     pub(crate) thr: U,
     /// current validator set, mapped to their respective weights
-    pub(crate) validators_weights: Weights<M::Sender, U>,
+    pub(crate) validators_weights: Weights<V, U>,
     /// this validator's latest message
-    pub(crate) own_latest_msg: Option<M>,
-    pub(crate) latest_msgs: LatestMsgs<M>,
-    pub(crate) equivocators: HashSet<M::Sender>,
+    pub(crate) own_latest_msg: Option<Message<E, V>>,
+    pub(crate) latest_msgs: LatestMsgs<E, V>,
+    pub(crate) equivocators: HashSet<V>,
 }
 
 /// Error returned from the [`insert`], [`validators`] and [`weight`] function
@@ -132,14 +139,19 @@ impl<'rwlock, T> std::fmt::Debug for Error<'rwlock, T> {
     }
 }
 
-impl<M: message::Trait, U: WeightUnit> State<M, U> {
+impl<E, V, U> State<E, V, U>
+where
+    E: Estimator<V = V>,
+    V: self::ValidatorName,
+    U: WeightUnit,
+{
     pub fn new(
-        validators_weights: Weights<M::Sender, U>,
+        validators_weights: Weights<V, U>,
         state_fault_weight: U,
-        own_latest_msg: Option<M>,
-        latest_msgs: LatestMsgs<M>,
+        own_latest_msg: Option<Message<E, V>>,
+        latest_msgs: LatestMsgs<E, V>,
         thr: U,
-        equivocators: HashSet<M::Sender>,
+        equivocators: HashSet<V>,
     ) -> Self {
         State {
             validators_weights,
@@ -153,12 +165,12 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
 
     pub fn new_with_default_state(
         default_state: Self,
-        validators_weights: Option<Weights<M::Sender, U>>,
+        validators_weights: Option<Weights<V, U>>,
         state_fault_weight: Option<U>,
-        own_latest_msg: Option<M>,
-        latest_msgs: Option<LatestMsgs<M>>,
+        own_latest_msg: Option<Message<E, V>>,
+        latest_msgs: Option<LatestMsgs<E, V>>,
         thr: Option<U>,
-        equivocators: Option<HashSet<M::Sender>>,
+        equivocators: Option<HashSet<V>>,
     ) -> Self {
         State {
             validators_weights: validators_weights.unwrap_or(default_state.validators_weights),
@@ -170,23 +182,23 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
         }
     }
 
-    pub fn equivocators(&self) -> &HashSet<M::Sender> {
+    pub fn equivocators(&self) -> &HashSet<V> {
         &self.equivocators
     }
 
-    pub fn validators_weights(&self) -> &Weights<M::Sender, U> {
+    pub fn validators_weights(&self) -> &Weights<V, U> {
         &self.validators_weights
     }
 
-    pub fn own_latest_msg(&self) -> &Option<M> {
+    pub fn own_latest_msg(&self) -> &Option<Message<E, V>> {
         &self.own_latest_msg
     }
 
-    pub fn latests_msgs(&self) -> &LatestMsgs<M> {
+    pub fn latests_msgs(&self) -> &LatestMsgs<E, V> {
         &self.latest_msgs
     }
 
-    pub fn latests_msgs_as_mut(&mut self) -> &mut LatestMsgs<M> {
+    pub fn latests_msgs_as_mut(&mut self) -> &mut LatestMsgs<E, V> {
         &mut self.latest_msgs
     }
 
@@ -196,7 +208,10 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
 
     /// get msgs and fault weight overhead and equivocators overhead sorted
     /// by fault weight overhead against the current validator_state
-    pub fn sort_by_faultweight<'z>(&self, msgs: &HashSet<&'z M>) -> Vec<&'z M> {
+    pub fn sort_by_faultweight<'z>(
+        &self,
+        msgs: &HashSet<&'z Message<E, V>>,
+    ) -> Vec<&'z Message<E, V>> {
         let mut msgs_sorted_by_faultw: Vec<_> = msgs
             .iter()
             .filter_map(|&msg| {

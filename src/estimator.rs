@@ -22,7 +22,6 @@ use std::fmt::Debug;
 use std::hash::Hash;
 
 use crate::justification::LatestMsgsHonest;
-use crate::message;
 use crate::util::weight::WeightUnit;
 use crate::validator;
 
@@ -30,15 +29,12 @@ use crate::validator;
 /// allows to produce an estimate given the set of latest messages and the set of validators and
 /// their weights.
 pub trait Estimator: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {
-    type M: message::Trait<Estimator = Self>;
+    type V: validator::ValidatorName;
     type Error: Error;
 
     /// Choses an estimate from a set of latest messages.
     fn estimate<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<Self::M>,
-        validators_weights: &validator::Weights<
-            <<Self as Estimator>::M as message::Trait>::Sender,
-            U,
-        >,
+        latest_msgs: &LatestMsgsHonest<Self, Self::V>,
+        validators_weights: &validator::Weights<Self::V, U>,
     ) -> Result<Self, Self::Error>;
 }
