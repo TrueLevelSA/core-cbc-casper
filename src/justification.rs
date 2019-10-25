@@ -45,7 +45,7 @@ use crate::util::weight::{WeightUnit, Zero};
 
 /// Struct that holds the set of the `message::Trait` that justify the current message. Works like
 /// a `vec`.
-#[derive(Eq, PartialEq, Clone, Default, Hash)]
+#[derive(Eq, PartialEq, Clone, Hash)]
 pub struct Justification<M: message::Trait>(Vec<M>);
 
 impl<M: message::Trait> Justification<M> {
@@ -189,7 +189,7 @@ impl<M: message::Trait> Debug for Justification<M> {
 
 /// Mapping between senders and their latests messages. Latest messages from a sender are all
 /// their messages that are not in the dependency of another of their messages.
-#[derive(Eq, PartialEq, Clone, Default, Debug)]
+#[derive(Eq, PartialEq, Clone, Debug)]
 pub struct LatestMsgs<M: message::Trait>(HashMap<<M as message::Trait>::Sender, HashSet<M>>);
 
 impl<M: message::Trait> LatestMsgs<M> {

@@ -225,7 +225,7 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
 }
 
 // Note: RwLock locks only before writing, while Mutex locks to both read and write
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug)]
 pub struct Weights<S: self::Trait, U: WeightUnit>(Arc<RwLock<HashMap<S, U>>>);
 
 impl<S: self::Trait, U: WeightUnit> Weights<S, U> {

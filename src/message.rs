@@ -210,7 +210,7 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
 }
 
 // Mathematical definition of a casper message with (value, validator, justification)
-#[derive(Clone, Default, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 struct ProtoMsg<E, S>
 where
     E: Estimator<M = Message<E, S>>,
@@ -275,7 +275,7 @@ where
 ///
 /// `Value` must implement `Estimator` to be valid for a `message::Message` and to produce
 /// estimates.
-#[derive(Eq, Clone, Default)]
+#[derive(Eq, Clone)]
 pub struct Message<E, S>(Arc<ProtoMsg<E, S>>, Hash)
 where
     E: Estimator<M = Message<E, S>>,
