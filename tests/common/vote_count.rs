@@ -32,8 +32,8 @@ use casper::validator;
 
 #[derive(Clone, Copy, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]
 pub struct VoteCount {
-    yes: u32,
-    no: u32,
+    pub yes: u32,
+    pub no: u32,
 }
 
 #[cfg(feature = "integration_test")]

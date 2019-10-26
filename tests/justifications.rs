@@ -406,3 +406,53 @@ fn from_msgs() {
         "Justification should deduplicate messages"
     );
 }
+
+#[test]
+fn justification_mk_estimate() {
+    let validators_weights =
+        validator::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+    let validator_state = validator::State::new(
+        validators_weights,
+        0.0,
+        None,
+        LatestMsgs::empty(),
+        0.0,
+        HashSet::new(),
+    );
+
+    let v0 = VoteCount::create_vote_msg(0, true);
+    let v1 = VoteCount::create_vote_msg(1, true);
+    let v2 = VoteCount::create_vote_msg(2, false);
+
+    let initial_msgs = vec![v0.clone(), v1.clone(), v2.clone()];
+    let mut validator_clone = validator_state.clone();
+    let justification = Justification::from_msgs(initial_msgs.clone(), &mut validator_clone);
+
+    let estimate = justification.mk_estimate(
+        validator_state.equivocators(),
+        validator_clone.validators_weights(),
+    );
+
+    assert_eq!(
+        estimate.expect("Estimate failed"),
+        VoteCount { yes: 2, no: 1 }
+    );
+
+    let v0 = VoteCount::create_vote_msg(0, true);
+    let v1 = VoteCount::create_vote_msg(1, false);
+    let v2 = VoteCount::create_vote_msg(2, false);
+
+    let initial_msgs = vec![v0.clone(), v1.clone(), v2.clone()];
+    let mut validator_clone = validator_state.clone();
+    let justification = Justification::from_msgs(initial_msgs.clone(), &mut validator_clone);
+
+    let estimate = justification.mk_estimate(
+        validator_state.equivocators(),
+        validator_clone.validators_weights(),
+    );
+
+    assert_eq!(
+        estimate.expect("Estimate failed"),
+        VoteCount { yes: 1, no: 2 }
+    );
+}
