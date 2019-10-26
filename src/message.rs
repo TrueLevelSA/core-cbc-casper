@@ -202,11 +202,6 @@ pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize 
         let visited = Arc::new(RwLock::new(HashSet::new()));
         recurse(self, rhs, visited)
     }
-
-    /// Checks whether ther is a circular dependency between self and rhs.
-    fn is_circular(&self, rhs: &Self) -> bool {
-        rhs.depends(self) && self.depends(rhs)
-    }
 }
 
 // Mathematical definition of a casper message with (value, validator, justification)
