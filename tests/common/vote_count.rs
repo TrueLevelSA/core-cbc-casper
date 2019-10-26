@@ -31,8 +31,8 @@ use casper::util::weight::{WeightUnit, Zero};
 
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]
 pub struct VoteCount {
-    yes: u32,
-    no: u32,
+    pub yes: u32,
+    pub no: u32,
 }
 
 impl<S: sender::Trait> From<S> for VoteCount {

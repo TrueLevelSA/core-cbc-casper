@@ -426,3 +426,49 @@ proptest! {
         assert_eq!(latest_msgs_honest.len(), latest_msgs.len() - equivocators.len(), "Latest honest messages length should be the same as latest messages minus equivocators");
     }
 }
+
+#[test]
+fn justification_mk_estimate() {
+    let senders_weights =
+        sender::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+    let sender_state = sender::State::new(
+        senders_weights,
+        0.0,
+        None,
+        LatestMsgs::empty(),
+        0.0,
+        HashSet::new(),
+    );
+
+    let v0 = VoteCount::create_vote_msg(0, true);
+    let v1 = VoteCount::create_vote_msg(1, true);
+    let v2 = VoteCount::create_vote_msg(2, false);
+
+    let initial_msgs = vec![v0.clone(), v1.clone(), v2.clone()];
+    let mut sender_clone = sender_state.clone();
+    let justification = Justification::from_msgs(initial_msgs.clone(), &mut sender_clone);
+
+    let estimate =
+        justification.mk_estimate(sender_state.equivocators(), sender_clone.senders_weights());
+
+    assert_eq!(
+        estimate.expect("Estimate failed"),
+        VoteCount { yes: 2, no: 1 }
+    );
+
+    let v0 = VoteCount::create_vote_msg(0, true);
+    let v1 = VoteCount::create_vote_msg(1, false);
+    let v2 = VoteCount::create_vote_msg(2, false);
+
+    let initial_msgs = vec![v0.clone(), v1.clone(), v2.clone()];
+    let mut sender_clone = sender_state.clone();
+    let justification = Justification::from_msgs(initial_msgs.clone(), &mut sender_clone);
+
+    let estimate =
+        justification.mk_estimate(sender_state.equivocators(), sender_clone.senders_weights());
+
+    assert_eq!(
+        estimate.expect("Estimate failed"),
+        VoteCount { yes: 1, no: 2 }
+    );
+}
