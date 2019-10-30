@@ -134,18 +134,22 @@ impl<M: message::Trait> Justification<M> {
             // if it's already equivocating and listed as such, or not equivocating at all, an
             // insertion can be done without more checks
             (false, _) | (true, true) => {
-                let success = self.insert(msg.clone());
-                if success {
-                    state.latest_msgs.update(msg);
+                let contains = self.contains(&msg);
+                if contains {
+                    false 
+                } else {
+                    self.insert(msg.clone());
+                    state.latest_msgs.update(msg)
                 }
-                success
             }
             // in the other case, we have to check that the threshold is not reached
             (true, false) => {
                 if sender_weight + state.state_fault_weight <= state.thr {
-                    let success = self.insert(msg.clone());
-                    if success {
-                        state.latest_msgs.update(msg);
+                    let contains = self.contains(&msg);
+                    let mut success = false;
+                    if !contains {
+                        self.insert(msg.clone());
+                        success = state.latest_msgs.update(msg);
                         if state.equivocators.insert(sender.clone()) {
                             state.state_fault_weight += sender_weight;
                         }
