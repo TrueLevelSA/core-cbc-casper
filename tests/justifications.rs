@@ -29,6 +29,7 @@ use std::collections::HashSet;
 
 use casper::justification::{Justification, LatestMsgs};
 use casper::message;
+use casper::message::Message;
 use casper::validator;
 
 macro_rules! float_eq {
@@ -455,4 +456,34 @@ fn justification_mk_estimate() {
         estimate.expect("Estimate failed"),
         VoteCount { yes: 1, no: 2 }
     );
+}
+
+#[test]
+fn latest_msgs_update() {
+    let mut latest_msgs = LatestMsgs::empty();
+
+    // First message of sender, should return true
+    assert_eq!(
+        latest_msgs.update(&VoteCount::create_vote_msg(0, true)),
+        true
+    );
+
+    // Duplicate message of sender, should return false
+    assert_eq!(
+        latest_msgs.update(&VoteCount::create_vote_msg(0, true)),
+        false
+    );
+
+    let v1 = VoteCount::create_vote_msg(1, false);
+    let new_v1 = Message::new(
+        *v1.sender(),
+        v1.justification().clone(),
+        VoteCount { yes: 0, no: 1 },
+    );
+
+    // First message of sender, should return true
+    assert_eq!(latest_msgs.update(&new_v1), true);
+
+    // v1 is in the justification of new_v1, should return false
+    assert_eq!(latest_msgs.update(&v1), false);
 }
