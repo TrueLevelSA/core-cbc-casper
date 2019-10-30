@@ -304,7 +304,8 @@ fn equivocate() {
     let mut sender_state =
         sender::State::new(senders_weights, 0.0, None, latest_msgs, 0.0, HashSet::new());
 
-    let v0_not_equivocated = message::Message::from_msgs(0, vec![&v0], &mut sender_state).unwrap();
+    let new_vote = VoteCount::create_vote_msg(1, true);
+    let v0_not_equivocated = message::Message::from_msgs(0, vec![&new_vote], &mut sender_state).unwrap();
 
     assert_eq!(
         sender_state.latests_msgs().equivocate(&v0_not_equivocated),
