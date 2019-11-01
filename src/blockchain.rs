@@ -33,16 +33,17 @@ use crate::util::id::Id;
 use crate::util::weight::{WeightUnit, Zero};
 use crate::validator;
 
-/// Casper message (`message::Message`) for a `Block` send by a validator `V: validator::Trait`
+/// Casper message (`message::Message`) for a `Block` send by a validator `V:
+/// validator::ValidatorName`
 pub type Message<V> = message::Message<Block<V> /*Estimator*/, V /*Validator*/>;
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize)]
-struct ProtoBlock<V: validator::Trait> {
+struct ProtoBlock<V: validator::ValidatorName> {
     prevblock: Option<Block<V>>,
     validator_type: PhantomData<V>,
 }
 
-impl<V: validator::Trait> ProtoBlock<V> {
+impl<V: validator::ValidatorName> ProtoBlock<V> {
     pub fn new(prevblock: Option<Block<V>>) -> ProtoBlock<V> {
         ProtoBlock {
             prevblock,
@@ -53,16 +54,16 @@ impl<V: validator::Trait> ProtoBlock<V> {
 
 /// Simplest structure of a block with a `prevblock` pointer for runing Casper on a blockchain.
 #[derive(Clone, Eq)]
-pub struct Block<V: validator::Trait>(Arc<ProtoBlock<V>>);
+pub struct Block<V: validator::ValidatorName>(Arc<ProtoBlock<V>>);
 
 #[cfg(feature = "integration_test")]
-impl<V: validator::Trait + Into<V>> From<V> for Block<V> {
+impl<V: validator::ValidatorName + Into<V>> From<V> for Block<V> {
     fn from(_validator: V) -> Self {
         Block::from(ProtoBlock::new(None))
     }
 }
 
-impl<V: validator::Trait> std::fmt::Debug for Block<V> {
+impl<V: validator::ValidatorName> std::fmt::Debug for Block<V> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -76,7 +77,7 @@ impl<V: validator::Trait> std::fmt::Debug for Block<V> {
     }
 }
 
-impl<V: validator::Trait> serde::Serialize for Block<V> {
+impl<V: validator::ValidatorName> serde::Serialize for Block<V> {
     fn serialize<T: serde::Serializer>(&self, rhs: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
         let mut msg = rhs.serialize_struct("Block", 1)?;
@@ -85,29 +86,29 @@ impl<V: validator::Trait> serde::Serialize for Block<V> {
     }
 }
 
-impl<V: validator::Trait> Id for Block<V> {
+impl<V: validator::ValidatorName> Id for Block<V> {
     type ID = Hash;
 }
 
-impl<V: validator::Trait> std::hash::Hash for Block<V> {
+impl<V: validator::ValidatorName> std::hash::Hash for Block<V> {
     fn hash<H: std::hash::Hasher>(&self, hasher: &mut H) {
         self.0.hash(hasher);
     }
 }
 
-impl<V: validator::Trait> PartialEq for Block<V> {
+impl<V: validator::ValidatorName> PartialEq for Block<V> {
     fn eq(&self, rhs: &Self) -> bool {
         Arc::ptr_eq(self.arc(), rhs.arc()) || self.getid() == rhs.getid()
     }
 }
 
-impl<V: validator::Trait> From<ProtoBlock<V>> for Block<V> {
+impl<V: validator::ValidatorName> From<ProtoBlock<V>> for Block<V> {
     fn from(protoblock: ProtoBlock<V>) -> Self {
         Block(Arc::new(protoblock))
     }
 }
 
-impl<'z, V: validator::Trait> From<&'z Message<V>> for Block<V> {
+impl<'z, V: validator::ValidatorName> From<&'z Message<V>> for Block<V> {
     fn from(msg: &Message<V>) -> Self {
         msg.estimate().clone()
     }
@@ -124,7 +125,7 @@ impl std::fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-impl<V: validator::Trait> Estimator for Block<V> {
+impl<V: validator::ValidatorName> Estimator for Block<V> {
     type M = Message<V>;
     type Error = Error;
 
@@ -141,7 +142,7 @@ type BlocksChildrenMap<V> = HashMap<Block<V>, HashSet<Block<V>>>;
 type GenesisBlocks<V> = HashSet<Block<V>>;
 type BlocksValidatorsMap<V> = HashMap<Block<V>, V>;
 
-impl<V: validator::Trait> Block<V> {
+impl<V: validator::ValidatorName> Block<V> {
     pub fn new(prevblock: Option<Block<V>>) -> Self {
         Block::from(ProtoBlock::new(prevblock))
     }
@@ -181,7 +182,7 @@ impl<V: validator::Trait> Block<V> {
         safety_oracle_threshold: U,
         weights: &validator::Weights<V, U>,
     ) -> HashSet<BTreeSet<V>> {
-        fn latest_in_justification<V: validator::Trait>(
+        fn latest_in_justification<V: validator::ValidatorName>(
             j: &Justification<Message<V>>,
             equivocators: &HashSet<V>,
         ) -> HashMap<V, Message<V>> {
@@ -230,7 +231,7 @@ impl<V: validator::Trait> Block<V> {
             })
             .collect();
 
-        fn bron_kerbosch<V: validator::Trait>(
+        fn bron_kerbosch<V: validator::ValidatorName>(
             r: HashSet<&V>,
             p: HashSet<&V>,
             x: HashSet<&V>,

@@ -19,7 +19,7 @@ pub enum Value {
     Two = 2,
 }
 
-impl validator::Trait for Value {}
+impl validator::ValidatorName for Value {}
 
 impl<U: WeightUnit> From<((Value, U), (Value, U), (Value, U))> for Value {
     /// If equality between two or tree values exists, last value is

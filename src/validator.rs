@@ -48,7 +48,7 @@
 //!     Byzantine failure which we call equivocation. We refer to the violation of this rule as
 //!     faults.
 //!
-//! When a node (`validator::Trait`) equivocates, it is basically executing multiple separate
+//! When a node (`validator::ValidatorName`) equivocates, it is basically executing multiple separate
 //! instances of the protocol, and may attempt to show messages from a single instance of these
 //! executions to separate peers in the network. To clarify what separate instances of the protocol
 //! are: consider a validator who violates consensus *rule 2* by generating messages **A** and
@@ -69,17 +69,17 @@ use crate::justification::LatestMsgs;
 use crate::message;
 use crate::util::weight::{WeightUnit, Zero};
 
-/// All casper actors that send messages, aka validators, have to implement the validator trait
-pub trait Trait: Hash + Clone + Ord + Eq + Send + Sync + Debug + serde::Serialize {}
+/// All casper actors that send messages, aka validators, have to implement the validator name trait
+pub trait ValidatorName: Hash + Clone + Ord + Eq + Send + Sync + Debug + serde::Serialize {}
 
 // Default implementations
 
-impl Trait for u8 {}
-impl Trait for u32 {}
-impl Trait for u64 {}
-impl Trait for i8 {}
-impl Trait for i32 {}
-impl Trait for i64 {}
+impl ValidatorName for u8 {}
+impl ValidatorName for u32 {}
+impl ValidatorName for u64 {}
+impl ValidatorName for i8 {}
+impl ValidatorName for i32 {}
+impl ValidatorName for i64 {}
 
 /// Inner state of a validator. Validator's state implement `message::Trait` allowing validators to produce
 /// messages based on their latest view of the network.
@@ -229,9 +229,9 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
 
 // Note: RwLock locks only before writing, while Mutex locks to both read and write
 #[derive(Clone, Debug)]
-pub struct Weights<V: self::Trait, U: WeightUnit>(Arc<RwLock<HashMap<V, U>>>);
+pub struct Weights<V: self::ValidatorName, U: WeightUnit>(Arc<RwLock<HashMap<V, U>>>);
 
-impl<V: self::Trait, U: WeightUnit> Weights<V, U> {
+impl<V: self::ValidatorName, U: WeightUnit> Weights<V, U> {
     /// Creates a new weight set from a HashMap of validators to unit.
     pub fn new(weights: HashMap<V, U>) -> Self {
         Weights(Arc::new(RwLock::new(weights)))
