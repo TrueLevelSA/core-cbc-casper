@@ -75,7 +75,7 @@ impl<E: std::error::Error> std::fmt::Display for Error<E> {
 impl<E: std::error::Error> std::error::Error for Error<E> {}
 
 /// Abstraction of a Casper message, contain a value (`Estimator`) that will be sent over the
-/// network by validators (`validator::Trait`) and used as `Justification` for a more recent messages.
+/// network by validators (`validator::ValidatorName`) and used as `Justification` for a more recent messages.
 pub trait Trait: hash::Hash + Clone + Eq + Sync + Send + Debug + Id + Serialize {
     /// Defines the validator type that generated this message
     type Sender: validator::ValidatorName;
