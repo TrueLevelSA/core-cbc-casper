@@ -34,7 +34,7 @@ pub trait Estimator: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize 
 
     /// Choses an estimate from a set of latest messages.
     fn estimate<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<Self, Self::V>,
+        latest_msgs: &LatestMsgsHonest<Self>,
         validators_weights: &validator::Weights<Self::V, U>,
     ) -> Result<Self, Self::Error>;
 }

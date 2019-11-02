@@ -75,28 +75,25 @@ impl<E: std::error::Error> std::error::Error for Error<E> {}
 
 // Mathematical definition of a casper message with (value, validator, justification)
 #[derive(Clone, Eq, PartialEq)]
-struct ProtoMsg<E, S>
+struct ProtoMsg<E>
 where
     E: Estimator,
-    S: validator::ValidatorName,
 {
     estimate: E,
-    sender: S,
-    justification: Justification<E, <E as Estimator>::V>,
+    sender: <E as Estimator>::V,
+    justification: Justification<E>,
 }
 
-impl<E, S> Id for ProtoMsg<E, S>
+impl<E> Id for ProtoMsg<E>
 where
     E: Estimator,
-    S: validator::ValidatorName,
 {
     type ID = Hash;
 }
 
-impl<E, S> Serialize for ProtoMsg<E, S>
+impl<E> Serialize for ProtoMsg<E>
 where
     E: Estimator,
-    S: validator::ValidatorName,
 {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
@@ -134,23 +131,21 @@ where
 ///
 /// type Validator = u64;
 ///
-/// type Message = message::Message<Value, Validator>;
+/// type Message = message::Message<Value>;
 /// ```
 ///
 /// `Value` must implement `Estimator` to be valid for a `message::Message` and to produce
 /// estimates.
 #[derive(Eq, Clone)]
-pub struct Message<E, S>(Arc<ProtoMsg<E, S>>, Hash)
+pub struct Message<E>(Arc<ProtoMsg<E>>, Hash)
 where
-    E: Estimator<V = S>,
-    S: validator::ValidatorName;
+    E: Estimator;
 
-impl<E, S> Message<E, S>
+impl<E> Message<E>
 where
-    E: Estimator<V = S>,
-    S: validator::ValidatorName,
+    E: Estimator,
 {
-    pub fn sender(&self) -> &S {
+    pub fn sender(&self) -> &<E as Estimator>::V {
         &self.0.sender
     }
 
@@ -158,11 +153,11 @@ where
         &self.0.estimate
     }
 
-    pub fn justification<'z>(&'z self) -> &'z Justification<E, S> {
+    pub fn justification<'z>(&'z self) -> &'z Justification<E> {
         &self.0.justification
     }
 
-    pub fn new(sender: S, justification: Justification<E, S>, estimate: E) -> Self {
+    pub fn new(sender: <E as Estimator>::V, justification: Justification<E>, estimate: E) -> Self {
         let proto = ProtoMsg {
             sender,
             justification,
@@ -175,9 +170,9 @@ where
 
     /// Create a message from newly received messages.
     pub fn from_msgs<U: WeightUnit>(
-        sender: S,
+        sender: <E as Estimator>::V,
         mut new_msgs: Vec<&Self>,
-        validator_state: &mut validator::State<E, S, U>,
+        validator_state: &mut validator::State<E, U>,
     ) -> Result<Self, Error<E::Error>> {
         // dedup by putting msgs into a hashset
         let new_msgs: HashSet<_> = new_msgs.drain(..).collect();
@@ -206,8 +201,8 @@ where
     pub fn equivocates_indirect(
         &self,
         rhs: &Self,
-        mut equivocators: HashSet<S>,
-    ) -> (bool, HashSet<S>) {
+        mut equivocators: HashSet<<E as Estimator>::V>,
+    ) -> (bool, HashSet<<E as Estimator>::V>) {
         let is_equivocation = self.equivocates(rhs);
         let init = if is_equivocation {
             equivocators.insert(self.sender().clone());
@@ -249,14 +244,13 @@ where
         // thus, highly parallelizable. when it shortcuts, because in one thread
         // a dependency was found, the function returns true and all the
         // computation on the other threads will be canceled.
-        fn recurse<E, S>(
-            lhs: &Message<E, S>,
-            rhs: &Message<E, S>,
-            visited: Arc<RwLock<HashSet<Message<E, S>>>>,
+        fn recurse<E>(
+            lhs: &Message<E>,
+            rhs: &Message<E>,
+            visited: Arc<RwLock<HashSet<Message<E>>>>,
         ) -> bool
         where
-            E: Estimator<V = S>,
-            S: validator::ValidatorName,
+            E: Estimator,
         {
             let justification = lhs.justification();
 
@@ -285,10 +279,9 @@ where
     }
 }
 
-impl<E, V> Id for Message<E, V>
+impl<E> Id for Message<E>
 where
-    E: Estimator<V = S>,
-    V: validator::ValidatorName,
+    E: Estimator,
 {
     type ID = Hash;
 
@@ -298,40 +291,36 @@ where
     }
 }
 
-impl<E, V> Serialize for Message<E, V>
+impl<E> Serialize for Message<E>
 where
-    E: Estimator<V = S>,
-    V: validator::ValidatorName,
+    E: Estimator,
 {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
         serde::Serialize::serialize(&self.0, serializer)
     }
 }
 
-impl<E, V> std::hash::Hash for Message<E, V>
+impl<E> std::hash::Hash for Message<E>
 where
-    E: Estimator<V = S>,
-    V: validator::ValidatorName,
+    E: Estimator,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.getid().hash(state)
     }
 }
 
-impl<E, V> PartialEq for Message<E, V>
+impl<E> PartialEq for Message<E>
 where
-    E: Estimator<V = S>,
-    V: validator::ValidatorName,
+    E: Estimator,
 {
     fn eq(&self, rhs: &Self) -> bool {
         Arc::ptr_eq(&self.0, &rhs.0) || self.getid() == rhs.getid() // should make this line unnecessary
     }
 }
 
-impl<E, V> Debug for Message<E, V>
+impl<E> Debug for Message<E>
 where
-    E: Estimator<V = S>,
-    V: validator::ValidatorName,
+    E: Estimator,
 {
     // Note: format used for rendering illustrative gifs from generative tests; modify with care
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

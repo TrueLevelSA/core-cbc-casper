@@ -35,7 +35,7 @@ use crate::validator;
 
 /// Casper message (`message::Message`) for a `Block` send by a validator `V:
 /// validator::ValidatorName`
-pub type Message<V> = message::Message<Block<V> /*Estimator*/, V /*Validator*/>;
+pub type Message<V> = message::Message<Block<V>>;
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize)]
 struct ProtoBlock<V: validator::ValidatorName> {
@@ -130,7 +130,7 @@ impl<V: validator::ValidatorName> Estimator for Block<V> {
     type V = V;
 
     fn estimate<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<Self, V>,
+        latest_msgs: &LatestMsgsHonest<Self>,
         validators_weights: &validator::Weights<V, U>,
     ) -> Result<Self, Self::Error> {
         let prevblock = Block::ghost(latest_msgs, validators_weights)?;
@@ -177,13 +177,13 @@ impl<V: validator::ValidatorName> Block<V> {
 
     pub fn safety_oracles<U: WeightUnit>(
         block: Block<V>,
-        latest_msgs_honest: &LatestMsgsHonest<Self, V>,
+        latest_msgs_honest: &LatestMsgsHonest<Self>,
         equivocators: &HashSet<V>,
         safety_oracle_threshold: U,
         weights: &validator::Weights<V, U>,
     ) -> HashSet<BTreeSet<V>> {
         fn latest_in_justification<V: validator::ValidatorName>(
-            j: &Justification<Block<V>, V>,
+            j: &Justification<Block<V>>,
             equivocators: &HashSet<V>,
         ) -> HashMap<V, Message<V>> {
             LatestMsgsHonest::from_latest_msgs(&LatestMsgs::from(j), equivocators)
@@ -288,7 +288,7 @@ impl<V: validator::ValidatorName> Block<V> {
     /// blocks);
     /// * a HashMap mapping blocks to their senders.
     pub fn parse_blockchains(
-        latest_msgs: &LatestMsgsHonest<Self, V>,
+        latest_msgs: &LatestMsgsHonest<Self>,
     ) -> (
         BlocksChildrenMap<V>,
         GenesisBlocks<V>,
@@ -442,7 +442,7 @@ impl<V: validator::ValidatorName> Block<V> {
     }
 
     pub fn ghost<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<Self, V>,
+        latest_msgs: &LatestMsgsHonest<Self>,
         validators_weights: &validator::Weights<V, U>,
     ) -> Result<Self, Error> {
         let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_msgs);

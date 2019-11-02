@@ -59,9 +59,9 @@ use tools::ChainData;
 /// create a message for each validator in the validators_recipients_data vector
 /// messages are added to theirs validators state
 fn create_messages<'z, E, U>(
-    state: &'z mut HashMap<u32, validator::State<E, u32, U>>,
+    state: &'z mut HashMap<u32, validator::State<E, U>>,
     validators_recipients_data: Vec<(u32, HashSet<u32>)>,
-) -> Vec<(Message<E, u32>, u32, HashSet<u32>)>
+) -> Vec<(Message<E>, u32, HashSet<u32>)>
 where
     E: Estimator<V = u32>,
     U: WeightUnit,
@@ -71,7 +71,7 @@ where
         .into_iter()
         .map(|(validator, recipients)| {
             // get all latest messages
-            let latest: HashSet<Message<E, u32>> = state[&validator]
+            let latest: HashSet<Message<E>> = state[&validator]
                 .latests_msgs()
                 .iter()
                 .fold(HashSet::new(), |acc, (_, lms)| {
@@ -118,8 +118,8 @@ where
 /// send messages to the recipients they're meant to be sent to
 /// state of the recipients are updated accordingly
 fn add_messages<E>(
-    state: &mut HashMap<u32, validator::State<E, u32, f64>>,
-    messages_validators_recipients_datas: Vec<(Message<E, u32>, u32, HashSet<u32>)>,
+    state: &mut HashMap<u32, validator::State<E, f64>>,
+    messages_validators_recipients_datas: Vec<(Message<E>, u32, HashSet<u32>)>,
 ) -> Result<(), &'static str>
 where
     E: Estimator<V = u32>,
@@ -225,10 +225,10 @@ fn create_receiver_strategy(
         .boxed()
 }
 
-type SendersStatesMap<E> = HashMap<u32, validator::State<E, u32, f64>>;
+type SendersStatesMap<E> = HashMap<u32, validator::State<E, f64>>;
 
 fn message_events<E>(
-    state: HashMap<u32, validator::State<E, u32, f64>>,
+    state: HashMap<u32, validator::State<E, f64>>,
     validator_receiver_strategy: BoxedStrategy<HashMap<u32, HashSet<u32>>>,
 ) -> BoxedStrategy<Result<SendersStatesMap<E>, &'static str>>
 where
@@ -253,7 +253,7 @@ where
 }
 
 fn full_consensus<E>(
-    state: &HashMap<u32, validator::State<E, u32, f64>>,
+    state: &HashMap<u32, validator::State<E, f64>>,
     _height_of_oracle: u32,
     _vec_data: &mut Vec<ChainData>,
     _chain_id: u32,
@@ -280,7 +280,7 @@ where
 /// return true if some safety oracle is detected at max_heaight_of_oracle
 /// the threshold for the safety oracle is set to half of the sum of the validators weights
 fn get_data_from_state(
-    validator_state: &validator::State<blockchain::Block<u32>, u32, f64>,
+    validator_state: &validator::State<blockchain::Block<u32>, f64>,
     max_height_of_oracle: u32,
     data: &mut ChainData,
 ) -> (bool) {
@@ -338,7 +338,7 @@ fn get_data_from_state(
 /// adds a new data to vec_data for each new message that is sent
 /// uses received_msgs to take note of which validator received which messages
 fn safety_oracle_at_height(
-    state: &HashMap<u32, validator::State<blockchain::Block<u32>, u32, f64>>,
+    state: &HashMap<u32, validator::State<blockchain::Block<u32>, f64>>,
     height_of_oracle: u32,
     vec_data: &mut Vec<ChainData>,
     chain_id: u32,
@@ -366,7 +366,7 @@ fn safety_oracle_at_height(
 }
 
 fn clique_collection(
-    state: HashMap<u32, validator::State<blockchain::Block<u32>, u32, f64>>,
+    state: HashMap<u32, validator::State<blockchain::Block<u32>, f64>>,
 ) -> Vec<Vec<Vec<u32>>> {
     state
         .iter()
@@ -393,7 +393,7 @@ fn clique_collection(
         .collect()
 }
 
-type ValidatorStatesMap<E> = HashMap<u32, validator::State<E, u32, f64>>;
+type ValidatorStatesMap<E> = HashMap<u32, validator::State<E, f64>>;
 
 fn chain<E: 'static, F: 'static, H: 'static>(
     consensus_value_strategy: BoxedStrategy<E>,
@@ -409,7 +409,7 @@ where
     F: Fn(&mut Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
     //G: Fn(&Vec<u32>, BoxedStrategy<HashSet<u32>>) -> BoxedStrategy<HashMap<u32, HashSet<u32>>>,
     H: Fn(
-        &HashMap<u32, validator::State<E, u32, f64>>,
+        &HashMap<u32, validator::State<E, f64>>,
         u32,
         &mut Vec<ChainData>,
         u32,
@@ -714,7 +714,7 @@ prop_compose! {
         (votes in prop::collection::vec(prop::bool::weighted(0.3), validators as usize),
          equivocations in Just(equivocations),
          validators in Just(validators))
-         -> (Vec<Message<VoteCount, u32>>, HashSet<u32>, usize)
+         -> (Vec<Message<VoteCount>>, HashSet<u32>, usize)
     {
         let mut validators_enumeration: Vec<u32> = (0..validators as u32).collect();
         validators_enumeration.shuffle(&mut thread_rng());

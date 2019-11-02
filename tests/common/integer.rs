@@ -45,8 +45,7 @@ impl<V: validator::ValidatorName> From<V> for IntegerWrapper {
     }
 }
 
-pub type IntegerMsg =
-    message::Message<IntegerWrapper /*Estimator*/, Validator /*Validator*/>;
+pub type IntegerMsg = message::Message<IntegerWrapper>;
 
 #[derive(Clone, Eq, Debug, Ord, PartialOrd, PartialEq, Hash)]
 pub struct Tx;
@@ -74,7 +73,7 @@ impl Estimator for IntegerWrapper {
     type Error = Error;
 
     fn estimate<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<Self, Validator>,
+        latest_msgs: &LatestMsgsHonest<Self>,
         validators_weights: &validator::Weights<Validator, U>,
     ) -> Result<Self, Self::Error> {
         let mut msgs_sorted_by_estimate = Vec::from_iter(latest_msgs.iter().fold(

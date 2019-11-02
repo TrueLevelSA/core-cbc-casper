@@ -97,7 +97,7 @@ impl VoteCount {
 
     /// Creates a new empty vote message, issued by the validator
     /// with no justification
-    pub fn create_vote_msg(validator: u32, vote: bool) -> message::Message<Self, u32> {
+    pub fn create_vote_msg(validator: u32, vote: bool) -> message::Message<Self> {
         let justification = Justification::empty();
         let estimate = if vote {
             VoteCount { yes: 1, no: 0 }
@@ -108,13 +108,11 @@ impl VoteCount {
         message::Message::new(validator, justification, estimate)
     }
 
-    fn get_vote_msgs(
-        latest_msgs: &LatestMsgsHonest<Self, Voter>,
-    ) -> HashSet<message::Message<Self, Voter>> {
+    fn get_vote_msgs(latest_msgs: &LatestMsgsHonest<Self>) -> HashSet<message::Message<Self>> {
         fn recursor(
-            latest_msgs: &Justification<VoteCount, Voter>,
-            acc: HashSet<message::Message<VoteCount, Voter>>,
-        ) -> HashSet<message::Message<VoteCount, Voter>> {
+            latest_msgs: &Justification<VoteCount>,
+            acc: HashSet<message::Message<VoteCount>>,
+        ) -> HashSet<message::Message<VoteCount>> {
             latest_msgs.iter().fold(acc, |mut acc_prime, m| {
                 match m.justification().len() {
                     0 => {
@@ -191,7 +189,7 @@ impl Estimator for VoteCount {
     // type Data = Self;
 
     fn estimate<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<VoteCount, Voter>,
+        latest_msgs: &LatestMsgsHonest<VoteCount>,
         _weights: &validator::Weights<Voter, U>, // all voters have same weight
     ) -> Result<Self, Self::Error> {
         // the estimates are actually the original votes of each of the voters /

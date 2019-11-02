@@ -29,7 +29,7 @@ use casper::validator;
 
 type Validator = u32;
 
-pub type Message = message::Message<Value, Validator>;
+pub type Message = message::Message<Value>;
 
 #[derive(Debug, Hash, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, serde_derive::Serialize)]
 pub enum Value {
@@ -83,7 +83,7 @@ impl Estimator for Value {
     type Error = Error;
 
     fn estimate<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<Value, Validator>,
+        latest_msgs: &LatestMsgsHonest<Value>,
         validators_weights: &validator::Weights<Validator, U>,
     ) -> Result<Self, Self::Error> {
         let res: Self = latest_msgs

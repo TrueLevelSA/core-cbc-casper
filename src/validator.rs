@@ -86,10 +86,9 @@ impl ValidatorName for i64 {}
 /// Inner state of a validator. Validator's state implement `message::Trait` allowing validators to produce
 /// messages based on their latest view of the network.
 #[derive(Debug, Clone)]
-pub struct State<E, V, U>
+pub struct State<E, U>
 where
-    E: Estimator<V = V>,
-    V: self::ValidatorName,
+    E: Estimator,
     U: WeightUnit,
 {
     /// current state total fault weight
@@ -97,11 +96,11 @@ where
     /// fault tolerance threshold
     pub(crate) thr: U,
     /// current validator set, mapped to their respective weights
-    pub(crate) validators_weights: Weights<V, U>,
+    pub(crate) validators_weights: Weights<<E as Estimator>::V, U>,
     /// this validator's latest message
-    pub(crate) own_latest_msg: Option<Message<E, V>>,
-    pub(crate) latest_msgs: LatestMsgs<E, V>,
-    pub(crate) equivocators: HashSet<V>,
+    pub(crate) own_latest_msg: Option<Message<E>>,
+    pub(crate) latest_msgs: LatestMsgs<E>,
+    pub(crate) equivocators: HashSet<<E as Estimator>::V>,
 }
 
 /// Error returned from the [`insert`], [`validators`] and [`weight`] function
@@ -139,19 +138,18 @@ impl<'rwlock, T> std::fmt::Debug for Error<'rwlock, T> {
     }
 }
 
-impl<E, V, U> State<E, V, U>
+impl<E, U> State<E, U>
 where
-    E: Estimator<V = V>,
-    V: self::ValidatorName,
+    E: Estimator,
     U: WeightUnit,
 {
     pub fn new(
-        validators_weights: Weights<V, U>,
+        validators_weights: Weights<<E as Estimator>::V, U>,
         state_fault_weight: U,
-        own_latest_msg: Option<Message<E, V>>,
-        latest_msgs: LatestMsgs<E, V>,
+        own_latest_msg: Option<Message<E>>,
+        latest_msgs: LatestMsgs<E>,
         thr: U,
-        equivocators: HashSet<V>,
+        equivocators: HashSet<<E as Estimator>::V>,
     ) -> Self {
         State {
             validators_weights,
@@ -165,12 +163,12 @@ where
 
     pub fn new_with_default_state(
         default_state: Self,
-        validators_weights: Option<Weights<V, U>>,
+        validators_weights: Option<Weights<<E as Estimator>::V, U>>,
         state_fault_weight: Option<U>,
-        own_latest_msg: Option<Message<E, V>>,
-        latest_msgs: Option<LatestMsgs<E, V>>,
+        own_latest_msg: Option<Message<E>>,
+        latest_msgs: Option<LatestMsgs<E>>,
         thr: Option<U>,
-        equivocators: Option<HashSet<V>>,
+        equivocators: Option<HashSet<<E as Estimator>::V>>,
     ) -> Self {
         State {
             validators_weights: validators_weights.unwrap_or(default_state.validators_weights),
@@ -182,23 +180,23 @@ where
         }
     }
 
-    pub fn equivocators(&self) -> &HashSet<V> {
+    pub fn equivocators(&self) -> &HashSet<<E as Estimator>::V> {
         &self.equivocators
     }
 
-    pub fn validators_weights(&self) -> &Weights<V, U> {
+    pub fn validators_weights(&self) -> &Weights<<E as Estimator>::V, U> {
         &self.validators_weights
     }
 
-    pub fn own_latest_msg(&self) -> &Option<Message<E, V>> {
+    pub fn own_latest_msg(&self) -> &Option<Message<E>> {
         &self.own_latest_msg
     }
 
-    pub fn latests_msgs(&self) -> &LatestMsgs<E, V> {
+    pub fn latests_msgs(&self) -> &LatestMsgs<E> {
         &self.latest_msgs
     }
 
-    pub fn latests_msgs_as_mut(&mut self) -> &mut LatestMsgs<E, V> {
+    pub fn latests_msgs_as_mut(&mut self) -> &mut LatestMsgs<E> {
         &mut self.latest_msgs
     }
 
@@ -208,10 +206,7 @@ where
 
     /// get msgs and fault weight overhead and equivocators overhead sorted
     /// by fault weight overhead against the current validator_state
-    pub fn sort_by_faultweight<'z>(
-        &self,
-        msgs: &HashSet<&'z Message<E, V>>,
-    ) -> Vec<&'z Message<E, V>> {
+    pub fn sort_by_faultweight<'z>(&self, msgs: &HashSet<&'z Message<E>>) -> Vec<&'z Message<E>> {
         let mut msgs_sorted_by_faultw: Vec<_> = msgs
             .iter()
             .filter_map(|&msg| {

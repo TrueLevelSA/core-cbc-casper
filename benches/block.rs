@@ -10,7 +10,7 @@ use casper::Block;
 use criterion::{black_box, Criterion};
 
 type Validator = u8;
-type Message = message::Message<Value, Validator>;
+type Message = message::Message<Value>;
 
 #[derive(Debug, Hash, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, serde_derive::Serialize)]
 pub enum Value {
@@ -66,7 +66,7 @@ impl Estimator for Value {
     type Error = Error;
 
     fn estimate<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<Self, Validator>,
+        latest_msgs: &LatestMsgsHonest<Self>,
         validators_weights: &validator::Weights<Validator, U>,
     ) -> Result<Self, Self::Error> {
         let res: Self = latest_msgs

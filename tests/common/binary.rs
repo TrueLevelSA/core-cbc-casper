@@ -64,7 +64,7 @@ impl Estimator for BoolWrapper {
 
     /// Weighted count of the votes contained in the latest messages.
     fn estimate<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<BoolWrapper, Validator>,
+        latest_msgs: &LatestMsgsHonest<BoolWrapper>,
         validators_weights: &validator::Weights<Validator, U>,
     ) -> Result<Self, Self::Error> {
         // loop over all the latest messages
