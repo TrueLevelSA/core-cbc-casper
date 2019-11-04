@@ -75,26 +75,17 @@ impl<E: std::error::Error> std::error::Error for Error<E> {}
 
 // Mathematical definition of a casper message with (value, validator, justification)
 #[derive(Clone, Eq, PartialEq)]
-struct ProtoMsg<E>
-where
-    E: Estimator,
-{
+struct ProtoMsg<E: Estimator> {
     estimate: E,
     sender: <E as Estimator>::V,
     justification: Justification<E>,
 }
 
-impl<E> Id for ProtoMsg<E>
-where
-    E: Estimator,
-{
+impl<E: Estimator> Id for ProtoMsg<E> {
     type ID = Hash;
 }
 
-impl<E> Serialize for ProtoMsg<E>
-where
-    E: Estimator,
-{
+impl<E: Estimator> Serialize for ProtoMsg<E> {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
 
@@ -137,14 +128,9 @@ where
 /// `Value` must implement `Estimator` to be valid for a `message::Message` and to produce
 /// estimates.
 #[derive(Eq, Clone)]
-pub struct Message<E>(Arc<ProtoMsg<E>>, Hash)
-where
-    E: Estimator;
+pub struct Message<E: Estimator>(Arc<ProtoMsg<E>>, Hash);
 
-impl<E> Message<E>
-where
-    E: Estimator,
-{
+impl<E: Estimator> Message<E> {
     pub fn sender(&self) -> &<E as Estimator>::V {
         &self.0.sender
     }
@@ -244,14 +230,11 @@ where
         // thus, highly parallelizable. when it shortcuts, because in one thread
         // a dependency was found, the function returns true and all the
         // computation on the other threads will be canceled.
-        fn recurse<E>(
+        fn recurse<E: Estimator>(
             lhs: &Message<E>,
             rhs: &Message<E>,
             visited: Arc<RwLock<HashSet<Message<E>>>>,
-        ) -> bool
-        where
-            E: Estimator,
-        {
+        ) -> bool {
             let justification = lhs.justification();
 
             // Math definition of dependency
@@ -279,10 +262,7 @@ where
     }
 }
 
-impl<E> Id for Message<E>
-where
-    E: Estimator,
-{
+impl<E: Estimator> Id for Message<E> {
     type ID = Hash;
 
     // Redefine getid to not recompute the hash every time
@@ -291,37 +271,25 @@ where
     }
 }
 
-impl<E> Serialize for Message<E>
-where
-    E: Estimator,
-{
+impl<E: Estimator> Serialize for Message<E> {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
         serde::Serialize::serialize(&self.0, serializer)
     }
 }
 
-impl<E> std::hash::Hash for Message<E>
-where
-    E: Estimator,
-{
+impl<E: Estimator> std::hash::Hash for Message<E> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.getid().hash(state)
     }
 }
 
-impl<E> PartialEq for Message<E>
-where
-    E: Estimator,
-{
+impl<E: Estimator> PartialEq for Message<E> {
     fn eq(&self, rhs: &Self) -> bool {
         Arc::ptr_eq(&self.0, &rhs.0) || self.getid() == rhs.getid() // should make this line unnecessary
     }
 }
 
-impl<E> Debug for Message<E>
-where
-    E: Estimator,
-{
+impl<E: Estimator> Debug for Message<E> {
     // Note: format used for rendering illustrative gifs from generative tests; modify with care
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "M{:?}({:?})", self.sender(), self.estimate().clone())

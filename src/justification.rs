@@ -46,14 +46,9 @@ use crate::validator;
 /// Struct that holds the set of the `message::Trait` that justify the current message. Works like
 /// a `vec`.
 #[derive(Eq, PartialEq, Clone, Hash)]
-pub struct Justification<E>(Vec<Message<E>>)
-where
-    E: Estimator;
+pub struct Justification<E: Estimator>(Vec<Message<E>>);
 
-impl<E> Justification<E>
-where
-    E: Estimator,
-{
+impl<E: Estimator> Justification<E> {
     /// Create an empty justification.
     pub fn empty() -> Self {
         Justification(Vec::new())
@@ -192,10 +187,7 @@ where
     }
 }
 
-impl<E> Debug for Justification<E>
-where
-    E: Estimator,
-{
+impl<E: Estimator> Debug for Justification<E> {
     fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
         write!(f, "{:?}", self.0)
     }
@@ -204,14 +196,9 @@ where
 /// Mapping between validators and their latests messages. Latest messages from a validator are all
 /// their messages that are not in the dependency of another of their messages.
 #[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LatestMsgs<E>(HashMap<<E as Estimator>::V, HashSet<Message<E>>>)
-where
-    E: Estimator;
+pub struct LatestMsgs<E: Estimator>(HashMap<<E as Estimator>::V, HashSet<Message<E>>>);
 
-impl<E> LatestMsgs<E>
-where
-    E: Estimator,
-{
+impl<E: Estimator> LatestMsgs<E> {
     /// Create an empty set of latest messages.
     pub fn empty() -> Self {
         LatestMsgs(HashMap::new())
@@ -316,10 +303,7 @@ where
     }
 }
 
-impl<'z, E> From<&'z Justification<E>> for LatestMsgs<E>
-where
-    E: Estimator,
-{
+impl<'z, E: Estimator> From<&'z Justification<E>> for LatestMsgs<E> {
     /// Extract the latest messages of each validator from a justification.
     fn from(j: &Justification<E>) -> Self {
         let mut latest_msgs: LatestMsgs<E> = LatestMsgs::empty();
@@ -336,14 +320,9 @@ where
 }
 
 /// Set of latest honest messages for each validator.
-pub struct LatestMsgsHonest<E>(HashSet<Message<E>>)
-where
-    E: Estimator;
+pub struct LatestMsgsHonest<E: Estimator>(HashSet<Message<E>>);
 
-impl<E> LatestMsgsHonest<E>
-where
-    E: Estimator,
-{
+impl<E: Estimator> LatestMsgsHonest<E> {
     /// Create an empty latest honest messages set.
     fn empty() -> Self {
         LatestMsgsHonest(HashSet::new())
