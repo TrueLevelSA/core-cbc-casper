@@ -59,7 +59,7 @@ impl std::convert::From<&'static str> for Error {
 }
 
 impl Estimator for BoolWrapper {
-    type V = Validator;
+    type ValidatorName = Validator;
     type Error = Error;
 
     /// Weighted count of the votes contained in the latest messages.

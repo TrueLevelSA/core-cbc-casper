@@ -181,7 +181,7 @@ impl std::convert::From<&'static str> for Error {
 impl Estimator for VoteCount {
     // the estimator just counts votes, which in this case are the unjustified
     // msgs
-    type V = Voter;
+    type ValidatorName = Voter;
     type Error = Error;
 
     // Data could be anything, as it will not be used, will just pass None to

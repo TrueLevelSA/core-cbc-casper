@@ -77,7 +77,7 @@ impl<E: std::error::Error> std::error::Error for Error<E> {}
 #[derive(Clone, Eq, PartialEq)]
 struct ProtoMsg<E: Estimator> {
     estimate: E,
-    sender: <E as Estimator>::V,
+    sender: <E as Estimator>::ValidatorName,
     justification: Justification<E>,
 }
 
@@ -131,7 +131,7 @@ impl<E: Estimator> Serialize for ProtoMsg<E> {
 pub struct Message<E: Estimator>(Arc<ProtoMsg<E>>, Hash);
 
 impl<E: Estimator> Message<E> {
-    pub fn sender(&self) -> &<E as Estimator>::V {
+    pub fn sender(&self) -> &<E as Estimator>::ValidatorName {
         &self.0.sender
     }
 
@@ -143,7 +143,11 @@ impl<E: Estimator> Message<E> {
         &self.0.justification
     }
 
-    pub fn new(sender: <E as Estimator>::V, justification: Justification<E>, estimate: E) -> Self {
+    pub fn new(
+        sender: <E as Estimator>::ValidatorName,
+        justification: Justification<E>,
+        estimate: E,
+    ) -> Self {
         let proto = ProtoMsg {
             sender,
             justification,
@@ -156,7 +160,7 @@ impl<E: Estimator> Message<E> {
 
     /// Create a message from newly received messages.
     pub fn from_msgs<U: WeightUnit>(
-        sender: <E as Estimator>::V,
+        sender: <E as Estimator>::ValidatorName,
         mut new_msgs: Vec<&Self>,
         validator_state: &mut validator::State<E, U>,
     ) -> Result<Self, Error<E::Error>> {
@@ -187,8 +191,8 @@ impl<E: Estimator> Message<E> {
     pub fn equivocates_indirect(
         &self,
         rhs: &Self,
-        mut equivocators: HashSet<<E as Estimator>::V>,
-    ) -> (bool, HashSet<<E as Estimator>::V>) {
+        mut equivocators: HashSet<<E as Estimator>::ValidatorName>,
+    ) -> (bool, HashSet<<E as Estimator>::ValidatorName>) {
         let is_equivocation = self.equivocates(rhs);
         let init = if is_equivocation {
             equivocators.insert(self.sender().clone());

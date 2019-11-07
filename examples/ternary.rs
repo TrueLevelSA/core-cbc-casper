@@ -79,7 +79,7 @@ impl std::convert::From<&'static str> for Error {
 }
 
 impl Estimator for Value {
-    type V = Validator;
+    type ValidatorName = Validator;
     type Error = Error;
 
     fn estimate<U: WeightUnit>(

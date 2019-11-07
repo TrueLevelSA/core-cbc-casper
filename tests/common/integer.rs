@@ -69,7 +69,7 @@ impl std::convert::From<&'static str> for Error {
 
 /// the goal here is to find the weighted median of all the values
 impl Estimator for IntegerWrapper {
-    type V = Validator;
+    type ValidatorName = Validator;
     type Error = Error;
 
     fn estimate<U: WeightUnit>(

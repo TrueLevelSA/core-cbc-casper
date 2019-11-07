@@ -29,12 +29,12 @@ use crate::validator;
 /// allows to produce an estimate given the set of latest messages and the set of validators and
 /// their weights.
 pub trait Estimator: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize {
-    type V: validator::ValidatorName;
+    type ValidatorName: validator::ValidatorName;
     type Error: Error;
 
     /// Choses an estimate from a set of latest messages.
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Self>,
-        validators_weights: &validator::Weights<Self::V, U>,
+        validators_weights: &validator::Weights<Self::ValidatorName, U>,
     ) -> Result<Self, Self::Error>;
 }

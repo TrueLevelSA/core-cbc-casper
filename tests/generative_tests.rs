@@ -63,7 +63,7 @@ fn create_messages<'z, E, U>(
     validators_recipients_data: Vec<(u32, HashSet<u32>)>,
 ) -> Vec<(Message<E>, u32, HashSet<u32>)>
 where
-    E: Estimator<V = u32>,
+    E: Estimator<ValidatorName = u32>,
     U: WeightUnit,
 {
     validators_recipients_data
@@ -122,7 +122,7 @@ fn add_messages<E>(
     messages_validators_recipients_datas: Vec<(Message<E>, u32, HashSet<u32>)>,
 ) -> Result<(), &'static str>
 where
-    E: Estimator<V = u32>,
+    E: Estimator<ValidatorName = u32>,
 {
     messages_validators_recipients_datas.into_iter()
         .map(|(m, validator, recipients)|{
@@ -232,7 +232,7 @@ fn message_events<E>(
     validator_receiver_strategy: BoxedStrategy<HashMap<u32, HashSet<u32>>>,
 ) -> BoxedStrategy<Result<SendersStatesMap<E>, &'static str>>
 where
-    E: Estimator<V = u32> + 'static,
+    E: Estimator<ValidatorName = u32> + 'static,
 {
     (validator_receiver_strategy, Just(state))
         .prop_map(|(map_validator_receivers, mut state)| {
@@ -260,7 +260,7 @@ fn full_consensus<E>(
     _received_msgs: &mut HashMap<u32, HashSet<Block<u32>>>,
 ) -> bool
 where
-    E: Estimator<V = u32>,
+    E: Estimator<ValidatorName = u32>,
 {
     let m: HashSet<_> = state
         .iter()
@@ -405,7 +405,7 @@ fn chain<E: 'static, F: 'static, H: 'static>(
     chain_id: u32,
 ) -> BoxedStrategy<Vec<Result<ValidatorStatesMap<E>, &'static str>>>
 where
-    E: Estimator<V = u32> + From<u32>,
+    E: Estimator<ValidatorName = u32> + From<u32>,
     F: Fn(&mut Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
     //G: Fn(&Vec<u32>, BoxedStrategy<HashSet<u32>>) -> BoxedStrategy<HashMap<u32, HashSet<u32>>>,
     H: Fn(

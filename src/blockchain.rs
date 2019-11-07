@@ -127,7 +127,7 @@ impl std::error::Error for Error {}
 
 impl<V: validator::ValidatorName> Estimator for Block<V> {
     type Error = Error;
-    type V = V;
+    type ValidatorName = V;
 
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Self>,
