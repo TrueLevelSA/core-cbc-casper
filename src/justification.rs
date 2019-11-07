@@ -98,8 +98,8 @@ impl<E: Estimator> Justification<E> {
     /// Run the estimator on the justification given the set of equivocators and validators' weights.
     pub fn mk_estimate<U: WeightUnit>(
         &self,
-        equivocators: &HashSet<<E as Estimator>::ValidatorName>,
-        validators_weights: &validator::Weights<<E as Estimator>::ValidatorName, U>,
+        equivocators: &HashSet<E::ValidatorName>,
+        validators_weights: &validator::Weights<E::ValidatorName, U>,
     ) -> Result<E, E::Error> {
         let latest_msgs = LatestMsgs::from(self);
         let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(&latest_msgs, equivocators);
@@ -172,7 +172,7 @@ impl<E: Estimator> Justification<E> {
         &mut self,
         msg: &Message<E>,
         state: &'a mut validator::State<E, U>,
-    ) -> Result<bool, validator::Error<'a, HashMap<<E as Estimator>::ValidatorName, U>>> {
+    ) -> Result<bool, validator::Error<'a, HashMap<E::ValidatorName, U>>> {
         let is_equivocation = state.latest_msgs.equivocate(msg);
         if is_equivocation {
             let sender = msg.sender();
@@ -196,7 +196,7 @@ impl<E: Estimator> Debug for Justification<E> {
 /// Mapping between validators and their latests messages. Latest messages from a validator are all
 /// their messages that are not in the dependency of another of their messages.
 #[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LatestMsgs<E: Estimator>(HashMap<<E as Estimator>::ValidatorName, HashSet<Message<E>>>);
+pub struct LatestMsgs<E: Estimator>(HashMap<E::ValidatorName, HashSet<Message<E>>>);
 
 impl<E: Estimator> LatestMsgs<E> {
     /// Create an empty set of latest messages.
@@ -207,19 +207,19 @@ impl<E: Estimator> LatestMsgs<E> {
     /// Insert a new set of messages for a sender.
     pub fn insert(
         &mut self,
-        k: <E as Estimator>::ValidatorName,
+        k: E::ValidatorName,
         v: HashSet<Message<E>>,
     ) -> Option<HashSet<Message<E>>> {
         self.0.insert(k, v)
     }
 
     /// Checks whether a sender is already contained in the map.
-    pub fn contains_key(&self, k: &<E as Estimator>::ValidatorName) -> bool {
+    pub fn contains_key(&self, k: &E::ValidatorName) -> bool {
         self.0.contains_key(k)
     }
 
     /// Get a set of messages sent by the sender.
-    pub fn get(&self, k: &<E as Estimator>::ValidatorName) -> Option<&HashSet<Message<E>>> {
+    pub fn get(&self, k: &E::ValidatorName) -> Option<&HashSet<Message<E>>> {
         self.0.get(k)
     }
 
@@ -232,10 +232,7 @@ impl<E: Estimator> LatestMsgs<E> {
     }
 
     /// Get an iterator on the set.
-    pub fn iter(
-        &self,
-    ) -> std::collections::hash_map::Iter<<E as Estimator>::ValidatorName, HashSet<Message<E>>>
-    {
+    pub fn iter(&self) -> std::collections::hash_map::Iter<E::ValidatorName, HashSet<Message<E>>> {
         self.0.iter()
     }
 
@@ -249,18 +246,14 @@ impl<E: Estimator> LatestMsgs<E> {
     }
 
     /// Get the set keys, i.e. the senders.
-    pub fn keys(
-        &self,
-    ) -> std::collections::hash_map::Keys<<E as Estimator>::ValidatorName, HashSet<Message<E>>>
-    {
+    pub fn keys(&self) -> std::collections::hash_map::Keys<E::ValidatorName, HashSet<Message<E>>> {
         self.0.keys()
     }
 
     /// Get the set values, i.e. the messages.
     pub fn values(
         &self,
-    ) -> std::collections::hash_map::Values<'_, <E as Estimator>::ValidatorName, HashSet<Message<E>>>
-    {
+    ) -> std::collections::hash_map::Values<'_, E::ValidatorName, HashSet<Message<E>>> {
         self.0.values()
     }
 
@@ -340,14 +333,14 @@ impl<E: Estimator> LatestMsgsHonest<E> {
     }
 
     /// Remove messages of a validator.
-    pub fn remove(&mut self, validator: &<E as Estimator>::ValidatorName) {
+    pub fn remove(&mut self, validator: &E::ValidatorName) {
         self.0.retain(|msg| msg.sender() != validator);
     }
 
     /// Filters the latest messages to retreive the latest honest messages and remove equivocators.
     pub fn from_latest_msgs(
         latest_msgs: &LatestMsgs<E>,
-        equivocators: &HashSet<<E as Estimator>::ValidatorName>,
+        equivocators: &HashSet<E::ValidatorName>,
     ) -> Self {
         latest_msgs
             .iter()
@@ -378,7 +371,7 @@ impl<E: Estimator> LatestMsgsHonest<E> {
 
     pub fn mk_estimate<U: WeightUnit>(
         &self,
-        validators_weights: &validator::Weights<<E as Estimator>::ValidatorName, U>,
+        validators_weights: &validator::Weights<E::ValidatorName, U>,
     ) -> Result<E, E::Error> {
         E::estimate(&self, validators_weights)
     }

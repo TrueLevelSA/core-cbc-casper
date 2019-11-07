@@ -96,11 +96,11 @@ where
     /// fault tolerance threshold
     pub(crate) thr: U,
     /// current validator set, mapped to their respective weights
-    pub(crate) validators_weights: Weights<<E as Estimator>::ValidatorName, U>,
+    pub(crate) validators_weights: Weights<E::ValidatorName, U>,
     /// this validator's latest message
     pub(crate) own_latest_msg: Option<Message<E>>,
     pub(crate) latest_msgs: LatestMsgs<E>,
-    pub(crate) equivocators: HashSet<<E as Estimator>::ValidatorName>,
+    pub(crate) equivocators: HashSet<E::ValidatorName>,
 }
 
 /// Error returned from the [`insert`], [`validators`] and [`weight`] function
@@ -144,12 +144,12 @@ where
     U: WeightUnit,
 {
     pub fn new(
-        validators_weights: Weights<<E as Estimator>::ValidatorName, U>,
+        validators_weights: Weights<E::ValidatorName, U>,
         state_fault_weight: U,
         own_latest_msg: Option<Message<E>>,
         latest_msgs: LatestMsgs<E>,
         thr: U,
-        equivocators: HashSet<<E as Estimator>::ValidatorName>,
+        equivocators: HashSet<E::ValidatorName>,
     ) -> Self {
         State {
             validators_weights,
@@ -163,12 +163,12 @@ where
 
     pub fn new_with_default_state(
         default_state: Self,
-        validators_weights: Option<Weights<<E as Estimator>::ValidatorName, U>>,
+        validators_weights: Option<Weights<E::ValidatorName, U>>,
         state_fault_weight: Option<U>,
         own_latest_msg: Option<Message<E>>,
         latest_msgs: Option<LatestMsgs<E>>,
         thr: Option<U>,
-        equivocators: Option<HashSet<<E as Estimator>::ValidatorName>>,
+        equivocators: Option<HashSet<E::ValidatorName>>,
     ) -> Self {
         State {
             validators_weights: validators_weights.unwrap_or(default_state.validators_weights),
@@ -180,11 +180,11 @@ where
         }
     }
 
-    pub fn equivocators(&self) -> &HashSet<<E as Estimator>::ValidatorName> {
+    pub fn equivocators(&self) -> &HashSet<E::ValidatorName> {
         &self.equivocators
     }
 
-    pub fn validators_weights(&self) -> &Weights<<E as Estimator>::ValidatorName, U> {
+    pub fn validators_weights(&self) -> &Weights<E::ValidatorName, U> {
         &self.validators_weights
     }
 
