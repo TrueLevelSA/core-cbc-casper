@@ -126,7 +126,7 @@ fn faulty_inserts() {
         "$v0_prime$ should conflict with $v0$ through $m0$, and we should reject as our fault tolerance thr is zero"
     );
 
-    let mut state = validator::State::from_state(
+    let mut state = validator::State::new_with_default_state(
         validator_state.clone(),
         None,
         None,
@@ -140,7 +140,7 @@ fn faulty_inserts() {
         "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set"
     );
 
-    let mut validator_state2 = validator::State::from_state(
+    let mut validator_state2 = validator::State::new_with_default_state(
         validator_state.clone(),
         None,
         None,
@@ -155,7 +155,7 @@ fn faulty_inserts() {
         "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set, and thus the state_fault_weight should be incremented to 1.0"
     );
 
-    let mut state = validator::State::from_state(
+    let mut state = validator::State::new_with_default_state(
         validator_state.clone(),
         None,
         Some(0.1),
@@ -169,7 +169,7 @@ fn faulty_inserts() {
         "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as the fault threshold gets crossed for the set"
     );
 
-    let mut validator_state2 = validator::State::from_state(
+    let mut validator_state2 = validator::State::new_with_default_state(
         validator_state.clone(),
         None,
         Some(0.1),
@@ -183,7 +183,7 @@ fn faulty_inserts() {
         "$v0_prime$ conflicts with $v0$ through $m0$, and we should NOT accept this fault as the fault threshold gets crossed for the set, and thus the state_fault_weight should not be incremented"
     );
 
-    let mut state = validator::State::from_state(
+    let mut state = validator::State::new_with_default_state(
         validator_state.clone(),
         None,
         Some(1.0),
@@ -199,7 +199,7 @@ fn faulty_inserts() {
 
     let validators_weights = validator::Weights::new([].iter().cloned().collect());
     // bug found
-    let mut state = validator::State::from_state(
+    let mut state = validator::State::new_with_default_state(
         validator_state.clone(),
         Some(validators_weights.clone()),
         Some(1.0),

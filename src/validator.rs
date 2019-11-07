@@ -151,8 +151,8 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
         }
     }
 
-    pub fn from_state(
-        validator_state: Self,
+    pub fn new_with_default_state(
+        default_state: Self,
         validators_weights: Option<Weights<M::Sender, U>>,
         state_fault_weight: Option<U>,
         own_latest_msg: Option<M>,
@@ -161,12 +161,12 @@ impl<M: message::Trait, U: WeightUnit> State<M, U> {
         equivocators: Option<HashSet<M::Sender>>,
     ) -> Self {
         State {
-            validators_weights: validators_weights.unwrap_or(validator_state.validators_weights),
-            state_fault_weight: state_fault_weight.unwrap_or(validator_state.state_fault_weight),
-            own_latest_msg: own_latest_msg.or(validator_state.own_latest_msg),
-            latest_msgs: latest_msgs.unwrap_or(validator_state.latest_msgs),
-            thr: thr.unwrap_or(validator_state.thr),
-            equivocators: equivocators.unwrap_or(validator_state.equivocators),
+            validators_weights: validators_weights.unwrap_or(default_state.validators_weights),
+            state_fault_weight: state_fault_weight.unwrap_or(default_state.state_fault_weight),
+            own_latest_msg: own_latest_msg.or(default_state.own_latest_msg),
+            latest_msgs: latest_msgs.unwrap_or(default_state.latest_msgs),
+            thr: thr.unwrap_or(default_state.thr),
+            equivocators: equivocators.unwrap_or(default_state.equivocators),
         }
     }
 
