@@ -238,6 +238,33 @@ fn from_msgs() {
 }
 
 #[test]
+fn from_msgs_duplicates() {
+    let v0 = VoteCount::create_vote_msg(0, true);
+    let v0_prime = VoteCount::create_vote_msg(0, true);
+
+    let res = Message::from_msgs(
+        0,
+        vec![&v0, &v0_prime],
+        &mut validator::State::new(
+            validator::Weights::new(vec![(0, 1.0)].into_iter().collect()),
+            0.0,
+            None,
+            LatestMsgs::empty(),
+            0.0,
+            HashSet::new(),
+        ),
+    )
+    .expect("No errors expected");
+
+    assert_eq!(*res.estimate(), VoteCount { yes: 1, no: 0 });
+    assert_eq!(*res.sender(), 0);
+    assert_eq!(
+        HashSet::<&Message<VoteCount>>::from_iter(res.justification().iter()),
+        HashSet::from_iter(vec![&v0]),
+    );
+}
+
+#[test]
 fn from_msgs_with_equivocations_and_no_latest_msgs() {
     let v0 = VoteCount::create_vote_msg(0, false);
     let v0_prime = VoteCount::create_vote_msg(0, true);
