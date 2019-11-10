@@ -303,6 +303,8 @@ fn from_msgs_unknown_equivocator() {
 fn from_msgs_unknown_equivocator_at_threshhold() {
     // This is an edge case where the equivocator gets one of his
     // votes counted in the estimate... At random.
+    // The randomness comes from the HashSet used by from_msgs to
+    // remove duplicate messages.
     // In this case, the fault weight will tip over the threshold.
 
     let v0 = VoteCount::create_vote_msg(0, false);
