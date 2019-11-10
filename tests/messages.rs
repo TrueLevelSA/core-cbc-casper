@@ -25,7 +25,7 @@ use common::vote_count::VoteCount;
 use std::collections::HashSet;
 
 use casper::justification::{Justification, LatestMsgs};
-use casper::message::Message;
+use casper::message::{self, Message};
 use casper::validator;
 
 #[test]
@@ -206,6 +206,32 @@ fn msg_equivocates() {
         m1.equivocates_indirect(v0_prime, HashSet::new()).0,
         "should be an indirect equivocation, equivocates to m0 through v0"
     );
+}
+
+#[test]
+fn from_msgs_only_equivocations() {
+    let v0 = VoteCount::create_vote_msg(0, false);
+    let v0_prime = VoteCount::create_vote_msg(0, true);
+
+    let mut latest_msgs = LatestMsgs::empty();
+    latest_msgs.update(&v0);
+
+    let res = Message::<VoteCount>::from_msgs(
+        0,
+        vec![&v0_prime],
+        &mut validator::State::new(
+            validator::Weights::new(vec![(0, 1.0)].into_iter().collect()),
+            0.0,
+            None,
+            latest_msgs,
+            0.0,
+            HashSet::new(),
+        ),
+    );
+    match res {
+        Err(message::Error::NoNewMessage) => (),
+        _ => panic!("Expected NoNewMessage"),
+    }
 }
 
 // #[test]
