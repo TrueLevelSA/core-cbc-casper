@@ -209,6 +209,34 @@ fn msg_equivocates() {
 }
 
 #[test]
+fn from_msgs() {
+    let v0 = VoteCount::create_vote_msg(0, false);
+    let v1 = VoteCount::create_vote_msg(1, false);
+    let v2 = VoteCount::create_vote_msg(2, true);
+
+    let res = Message::from_msgs(
+        0,
+        vec![&v0, &v1, &v2],
+        &mut validator::State::new(
+            validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
+            0.0,
+            None,
+            LatestMsgs::empty(),
+            0.0,
+            HashSet::new(),
+        ),
+    )
+    .expect("No errors expected");
+
+    assert_eq!(*res.estimate(), VoteCount { yes: 1, no: 2 });
+    assert_eq!(*res.sender(), 0);
+    assert!(res
+        .justification()
+        .iter()
+        .all(|m| vec![&v0, &v1, &v2].contains(&m)));
+}
+
+#[test]
 fn from_msgs_only_equivocations() {
     let v0 = VoteCount::create_vote_msg(0, false);
     let v0_prime = VoteCount::create_vote_msg(0, true);
