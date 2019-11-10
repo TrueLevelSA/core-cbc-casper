@@ -265,7 +265,46 @@ fn from_msgs_duplicates() {
 }
 
 #[test]
-fn from_msgs_with_equivocations_and_no_latest_msgs() {
+fn from_msgs_unknown_equivocator() {
+    // The equivocator is unknown to from_msgs as it is not contained
+    // in the validator::State.LatestMsgs.
+    // In this case, the fault weight will not cross the tolerance
+    // threshold.
+
+    let v0 = VoteCount::create_vote_msg(0, false);
+    let v0_prime = VoteCount::create_vote_msg(0, true);
+    let v1 = VoteCount::create_vote_msg(1, true);
+
+    let res = Message::from_msgs(
+        2,
+        vec![&v0, &v0_prime, &v1],
+        &mut validator::State::new(
+            validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
+            0.0,
+            None,
+            LatestMsgs::empty(),
+            4.0,
+            HashSet::new(),
+        ),
+    )
+    .expect("No errors expected");
+
+    // Note that even though the votes from the equivator are not
+    // counted in the estimate, they are present in the justification.
+    assert_eq!(*res.sender(), 2);
+    assert_eq!(*res.estimate(), VoteCount { yes: 1, no: 0 });
+    assert_eq!(
+        HashSet::<&Message<VoteCount>>::from_iter(res.justification().iter()),
+        HashSet::from_iter(vec![&v0, &v0_prime, &v1]),
+    );
+}
+
+#[test]
+fn from_msgs_unknown_equivocator_at_threshhold() {
+    // This is an edge case where the equivocator gets one of his
+    // votes counted in the estimate... At random.
+    // In this case, the fault weight will tip over the threshold.
+
     let v0 = VoteCount::create_vote_msg(0, false);
     let v0_prime = VoteCount::create_vote_msg(0, true);
     let v1 = VoteCount::create_vote_msg(1, true);
@@ -284,6 +323,8 @@ fn from_msgs_with_equivocations_and_no_latest_msgs() {
     )
     .expect("No errors expected");
 
+    // Here, the equivator has a random vote in the estimate, and the
+    // other vote is not in the justification.
     assert_eq!(*res.sender(), 2);
     match *res.estimate() {
         VoteCount { yes: 1, no: 1 } => {
@@ -303,11 +344,13 @@ fn from_msgs_with_equivocations_and_no_latest_msgs() {
 }
 
 #[test]
-fn from_msgs_with_equivocations_and_latest_msgs() {
+fn from_msgs_known_equivocator() {
     let v0 = VoteCount::create_vote_msg(0, false);
     let v0_prime = VoteCount::create_vote_msg(0, true);
     let v1 = VoteCount::create_vote_msg(1, true);
 
+    // Here, we populate latest_msgs before calling from_msgs,
+    // which thus knows about the equivator beforehand.
     let mut latest_msgs = LatestMsgs::empty();
     latest_msgs.update(&v0);
     latest_msgs.update(&v0_prime);
@@ -327,6 +370,7 @@ fn from_msgs_with_equivocations_and_latest_msgs() {
     )
     .expect("No errors expected");
 
+    // No message from the equivator in the justification.
     assert_eq!(*res.estimate(), VoteCount { yes: 1, no: 0 });
     assert_eq!(*res.sender(), 2);
     assert_eq!(
@@ -337,6 +381,9 @@ fn from_msgs_with_equivocations_and_latest_msgs() {
 
 #[test]
 fn from_msgs_only_equivocations() {
+    // With a known equivocator and only his message in the new_msgs,
+    // from_msgs returns an error.
+
     let v0 = VoteCount::create_vote_msg(0, false);
     let v0_prime = VoteCount::create_vote_msg(0, true);
 
