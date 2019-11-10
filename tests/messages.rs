@@ -23,6 +23,7 @@ mod common;
 use common::vote_count::VoteCount;
 
 use std::collections::HashSet;
+use std::iter::FromIterator;
 
 use casper::justification::{Justification, LatestMsgs};
 use casper::message::{self, Message};
@@ -230,10 +231,10 @@ fn from_msgs() {
 
     assert_eq!(*res.estimate(), VoteCount { yes: 1, no: 2 });
     assert_eq!(*res.sender(), 0);
-    assert!(res
-        .justification()
-        .iter()
-        .all(|m| vec![&v0, &v1, &v2].contains(&m)));
+    assert_eq!(
+        HashSet::<&Message<VoteCount>>::from_iter(res.justification().iter()),
+        HashSet::from_iter(vec![&v0, &v1, &v2]),
+    );
 }
 
 #[test]
@@ -256,15 +257,22 @@ fn from_msgs_with_equivocations_and_no_latest_msgs() {
     )
     .expect("No errors expected");
 
-    assert!(
-        *res.estimate() == VoteCount { yes: 1, no: 1 }
-            || *res.estimate() == VoteCount { yes: 2, no: 0 }
-    );
     assert_eq!(*res.sender(), 2);
-    assert!(res
-        .justification()
-        .iter()
-        .all(|m| vec![&v0, &v0_prime, &v1].contains(&m)));
+    match *res.estimate() {
+        VoteCount { yes: 1, no: 1 } => {
+            assert_eq!(
+                HashSet::<&Message<VoteCount>>::from_iter(res.justification().iter()),
+                HashSet::from_iter(vec![&v0, &v1]),
+            );
+        }
+        VoteCount { yes: 2, no: 0 } => {
+            assert_eq!(
+                HashSet::<&Message<VoteCount>>::from_iter(res.justification().iter()),
+                HashSet::from_iter(vec![&v0_prime, &v1]),
+            );
+        }
+        _ => panic!("Expected estimate to either be {{ yes: 1, no: 1 }} or {{ yes: 2, no: 0 }}"),
+    }
 }
 
 #[test]
@@ -294,7 +302,10 @@ fn from_msgs_with_equivocations_and_latest_msgs() {
 
     assert_eq!(*res.estimate(), VoteCount { yes: 1, no: 0 });
     assert_eq!(*res.sender(), 2);
-    assert!(res.justification().iter().all(|m| vec![&v1].contains(&m)));
+    assert_eq!(
+        HashSet::<&Message<VoteCount>>::from_iter(res.justification().iter()),
+        HashSet::from_iter(vec![&v1]),
+    );
 }
 
 #[test]
