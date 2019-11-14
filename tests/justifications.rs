@@ -247,17 +247,19 @@ fn faulty_insert() {
         0.0,
         None,
         LatestMsgs::empty(),
-        2.5,
+        1.0,
         HashSet::new(),
     );
 
     // Validator 0 and v0 is not equivocating
     assert_eq!(j0.faulty_insert(v0, &mut validator_state), true);
+    assert_eq!(j0.contains(v0), true);
 
     // Validator 0 is not equivocating, v0_prime is equivocating
     // State fault weight (0.0) is still below threshold (2.5), so vote can be
     // inserted
     assert_eq!(j0.faulty_insert(v0_prime, &mut validator_state), true);
+    assert_eq!(j0.contains(v0_prime), true);
 
     // After insert, state fault weight should be 1.0 and Validator 0 is now
     // equivocating
@@ -268,16 +270,23 @@ fn faulty_insert() {
     // Validator 0 can still send new votes, as it's already a equivocator
     // and the fault is below threshold
     assert_eq!(j0.faulty_insert(v0_new, &mut validator_state), true);
+    assert_eq!(j0.contains(v0_new), true);
 
     // A new Validator sending an equivocating vote will make the fault weight go
     // above the threshold, and stop accepting equivocating votes
     let v1 = &message::Message::new(1, Justification::empty(), IntegerWrapper::new(0));
-    let v1_equivocating = &message::Message::new(1, Justification::empty(), IntegerWrapper::new(0));
+    let v1_equivocating = &message::Message::new(1, Justification::empty(), IntegerWrapper::new(1));
     assert_eq!(j0.faulty_insert(v1, &mut validator_state), true);
+    assert_eq!(j0.contains(v1), true);
     assert_eq!(
         j0.faulty_insert(v1_equivocating, &mut validator_state),
         false
     );
+    assert_eq!(
+        j0.faulty_insert(v1_equivocating, &mut validator_state),
+        false
+    );
+    assert_eq!(j0.contains(v1_equivocating), false);
 }
 
 #[test]
