@@ -265,6 +265,50 @@ fn from_msgs_duplicates() {
 }
 
 #[test]
+fn from_msgs_no_need_to_justify() {
+    let v0 = VoteCount::create_vote_msg(0, true);
+    let v1 = VoteCount::create_vote_msg(1, false);
+    let v2 = VoteCount::create_vote_msg(2, false);
+
+    let mut latest_msgs = LatestMsgs::empty();
+    latest_msgs.update(&v1);
+    latest_msgs.update(&v2);
+
+    let res = Message::from_msgs(
+        0,
+        vec![&v0],
+        &mut validator::State::new(
+            validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
+            0.0,
+            None,
+            latest_msgs,
+            0.0,
+            HashSet::new(),
+        ),
+    )
+    .expect("No errors expected");
+
+    // The new message we created with `from_msgs` contains two votes
+    // that are not justified because they were in the latest
+    // messages of the state but not in the `new_msgs` parameter.
+    // I don't think there is a state transition from {v0} to
+    // {v0, v1, v2} so I suspect `from_msgs` is broken.
+    // https://github.com/cbc-casper/cbc-casper-paper/blob/acc66e2ba4461a005262e2d5f434fd2e30ef0ff3/cbc-casper-paper-draft.tex#L276
+    // This behaviour comes from the fact that `from_msgs` creates
+    // the justification from the `new_msgs` parameter and then calls
+    // `LatestMsgs::mk_estimate` with the `validator::State`.
+    assert_eq!(*res.estimate(), VoteCount { yes: 1, no: 2 });
+    assert_eq!(*res.sender(), 0);
+    assert_eq!(
+        HashSet::<&Message<VoteCount>>::from_iter(res.justification().iter()),
+        HashSet::from_iter(vec![&v0]),
+    );
+    assert!(res.depends(&v0));
+    assert!(!res.depends(&v1));
+    assert!(!res.depends(&v2));
+}
+
+#[test]
 fn from_msgs_unknown_equivocator() {
     // The equivocator is unknown to from_msgs as it is not contained
     // in the validator::State.LatestMsgs.
