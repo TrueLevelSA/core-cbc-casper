@@ -430,7 +430,7 @@ fn justification_mk_estimate() {
         0.0,
         None,
         LatestMsgs::empty(),
-        0.0,
+        1.0,
         HashSet::new(),
     );
 
@@ -468,6 +468,26 @@ fn justification_mk_estimate() {
     assert_eq!(
         estimate.expect("Estimate failed"),
         VoteCount { yes: 1, no: 2 }
+    );
+
+    let v0 = VoteCount::create_vote_msg(0, true);
+    let v0_equivocated = VoteCount::create_vote_msg(0, false);
+    let v1 = VoteCount::create_vote_msg(1, false);
+    let v2 = VoteCount::create_vote_msg(2, false);
+
+    let initial_msgs = vec![v0.clone(), v1.clone(), v2.clone()];
+    let mut validator_clone = validator_state.clone();
+    let mut justification = Justification::from_msgs(initial_msgs.clone(), &mut validator_clone);
+    justification.faulty_insert(&v0_equivocated, &mut validator_clone);
+
+    let estimate = justification.mk_estimate(
+        validator_state.equivocators(),
+        validator_clone.validators_weights(),
+    );
+
+    assert_eq!(
+        estimate.expect("Estimate failed"),
+        VoteCount { yes: 0, no: 2 }
     );
 }
 
