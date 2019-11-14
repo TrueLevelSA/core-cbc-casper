@@ -313,3 +313,33 @@ fn faulty_insert_with_slash() {
         0.0
     );
 }
+
+#[test]
+fn equivocate() {
+    let mut latest_msgs = LatestMsgs::empty();
+    let v0 = VoteCount::create_vote_msg(0, true);
+    let v0_equivocated = VoteCount::create_vote_msg(0, false);
+
+    assert_eq!(latest_msgs.update(&v0), true);
+    assert_eq!(latest_msgs.equivocate(&v0_equivocated), true);
+
+    let validators_weights = validator::Weights::new([(0, 1.0)].iter().cloned().collect());
+    let mut validator_state = validator::State::new(
+        validators_weights,
+        0.0,
+        None,
+        latest_msgs,
+        0.0,
+        HashSet::new(),
+    );
+
+    let v0_not_equivocated =
+        message::Message::from_msgs(0, vec![&v0], &mut validator_state).unwrap();
+
+    assert_eq!(
+        validator_state
+            .latests_msgs()
+            .equivocate(&v0_not_equivocated),
+        false
+    );
+}

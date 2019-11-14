@@ -295,7 +295,7 @@ impl<E: Estimator> LatestMsgs<E> {
     }
 
     /// Checks whether the new message equivocates with latest messages.
-    pub(crate) fn equivocate(&self, msg_new: &Message<E>) -> bool {
+    pub fn equivocate(&self, msg_new: &Message<E>) -> bool {
         self.get(msg_new.sender())
             .map(|latest_msgs| latest_msgs.iter().any(|m| m.equivocates(&msg_new)))
             .unwrap_or(false)
