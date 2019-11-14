@@ -237,7 +237,7 @@ fn faulty_inserts() {
 #[test]
 fn faulty_insert() {
     let validators_weights =
-        validator::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+        validator::Weights::new([(0, 1.0), (1, 1.0)].iter().cloned().collect());
     let v0 = &message::Message::new(0, Justification::empty(), IntegerWrapper::new(0));
     let v0_prime = &message::Message::new(0, Justification::empty(), IntegerWrapper::new(1)); // equivocating vote
     let mut j0 = Justification::empty();
