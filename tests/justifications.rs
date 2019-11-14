@@ -495,17 +495,18 @@ fn justification_mk_estimate() {
 fn latest_msgs_update() {
     let mut latest_msgs = LatestMsgs::empty();
 
+    let v0 = VoteCount::create_vote_msg(0, true);
+
+    let sender_latest_msgs_hashset = vec![v0.clone()].into_iter().collect();
     // First message of sender, should return true
-    assert_eq!(
-        latest_msgs.update(&VoteCount::create_vote_msg(0, true)),
-        true
-    );
+    assert_eq!(latest_msgs.update(&v0), true);
+    assert_eq!(latest_msgs.get(&0), Some(&sender_latest_msgs_hashset));
 
     // Duplicate message of sender, should return false
-    assert_eq!(
-        latest_msgs.update(&VoteCount::create_vote_msg(0, true)),
-        false
-    );
+    assert_eq!(latest_msgs.update(&v0.clone()), false);
+
+    // LatestMsgs HashSet for sender 0 did not change
+    assert_eq!(latest_msgs.get(&0), Some(&sender_latest_msgs_hashset));
 
     let v1 = VoteCount::create_vote_msg(1, false);
     let new_v1 = Message::new(
@@ -514,9 +515,14 @@ fn latest_msgs_update() {
         VoteCount { yes: 0, no: 1 },
     );
 
+    let sender_latest_msgs_hashset = vec![v1.clone()].into_iter().collect();
     // First message of sender, should return true
     assert_eq!(latest_msgs.update(&new_v1), true);
+    assert_eq!(latest_msgs.get(&1), Some(&sender_latest_msgs_hashset));
 
     // v1 is in the justification of new_v1, should return false
     assert_eq!(latest_msgs.update(&v1), false);
+
+    // LatestMsgs HashSet for sender 1 did not change
+    assert_eq!(latest_msgs.get(&1), Some(&sender_latest_msgs_hashset));
 }
