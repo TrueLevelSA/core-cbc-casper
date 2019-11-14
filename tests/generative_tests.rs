@@ -797,20 +797,20 @@ proptest! {
 }
 
 prop_compose! {
-    fn latest_msgs(validators: usize)
+    fn latest_msgs(validators_count: usize)
         (equivocations in prop::collection::vec(
-                0..validators,
-                0..validators),
+                0..validators_count,
+                0..validators_count),
         votes in prop::collection::vec(
             VoteCount::arbitrary(),
-            validators),
-        validators in Just(validators))
+            validators_count),
+        validators_count in Just(validators_count))
         -> (LatestMsgs<VoteCount>, HashSet<u32>) {
         let latest_msgs = LatestMsgs::empty();
         let equivocators = HashSet::new();
 
         let validators_weights = validator::Weights::new(
-            (0..validators)
+            (0..validators_count)
                 .map(|s| s as u32)
                 .zip(std::iter::repeat(1.0))
                 .collect(),
@@ -826,7 +826,7 @@ prop_compose! {
         );
 
         let mut messages = vec![];
-        for (validator, vote) in votes.iter().enumerate().take(validators) {
+        for (validator, vote) in votes.iter().enumerate().take(validators_count) {
             messages.push(Message::new(validator as u32, Justification::empty(), *vote));
 
             if equivocations.contains(&validator) {
