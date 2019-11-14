@@ -809,12 +809,10 @@ prop_compose! {
         let latest_msgs = LatestMsgs::empty();
         let equivocators = HashSet::new();
 
-        let weights: Vec<f64> =
-            std::iter::repeat(1.0).take(validators).collect();
         let validators_weights = validator::Weights::new(
             (0..validators)
                 .map(|s| s as u32)
-                .zip(weights.iter().cloned())
+                .zip(std::iter::repeat(1.0))
                 .collect(),
         );
 
