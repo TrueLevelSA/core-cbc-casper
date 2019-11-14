@@ -311,6 +311,7 @@ fn faulty_insert_with_slash() {
             .unwrap(),
         true
     );
+    assert_eq!(j0.contains(v0), true);
 
     // Sender 0 is not equivocating, v0_prime is equivocating
     assert_eq!(
@@ -318,12 +319,15 @@ fn faulty_insert_with_slash() {
             .unwrap(),
         true
     );
+    assert_eq!(j0.contains(v0_prime), true);
 
     // Sender 0 gets slashed because of equivocation
     float_eq!(
         validator_state.validators_weights().weight(&0).unwrap(),
         0.0
     );
+
+    float_eq!(validator_state.fault_weight(), 0.0);
 }
 
 #[test]
