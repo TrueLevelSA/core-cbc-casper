@@ -797,6 +797,11 @@ proptest! {
 }
 
 prop_compose! {
+    /// `latest_msgs` produces a `LatestMsgs<VoteCount>` and a `HashSet<u32>`
+    /// (equivocators). To produce that we create a `validator::State` and a
+    /// `Justification` and use `Justification::from_msg` to populate the
+    /// `latest_msgs` and `equivocators` field in the state, which we then
+    /// return here
     fn latest_msgs(validators_count: usize)
         (equivocations in prop::collection::vec(
                 0..validators_count,
