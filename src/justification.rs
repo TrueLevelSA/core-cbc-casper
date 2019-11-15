@@ -55,8 +55,8 @@ impl<E: Estimator> Justification<E> {
     }
 
     /// Creates and return a new justification instance from a vector of `message::Trait` and
-    /// mutate the given `sender::State` with the updated state. This function
-    /// does not guarantee that the vector of `message::Trait` will be
+    /// mutate the given `validator::State` with the updated state. This function
+    /// does not guarantee that the vector of `Message` will be
     /// processed in order, as it internally uses a `HashSet` to deduplicate
     /// messages
     pub fn from_msgs<U: WeightUnit>(
