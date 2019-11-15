@@ -850,6 +850,16 @@ proptest! {
     fn latest_msgs_honest_from_latest_msgs(latest_msgs in latest_msgs(10)) {
         let (latest_msgs, equivocators) = latest_msgs;
         let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(&latest_msgs, &equivocators);
-        assert_eq!(latest_msgs_honest.len(), latest_msgs.len() - equivocators.len(), "Latest honest messages length should be the same as latest messages minus equivocators");
+        assert_eq!(
+            latest_msgs_honest
+                .iter()
+                .any(|msg| equivocators.contains(&msg.sender())),
+            false
+        );
+        assert_eq!(
+            latest_msgs_honest.len(),
+            latest_msgs.len() - equivocators.len(),
+            "Latest honest messages length should be the same as latest messages minus equivocators"
+        );
     }
 }
