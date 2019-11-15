@@ -282,10 +282,6 @@ fn faulty_insert() {
         j0.faulty_insert(v1_equivocating, &mut validator_state),
         false
     );
-    assert_eq!(
-        j0.faulty_insert(v1_equivocating, &mut validator_state),
-        false
-    );
     assert_eq!(j0.contains(v1_equivocating), false);
 }
 
