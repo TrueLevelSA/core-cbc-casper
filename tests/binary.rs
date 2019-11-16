@@ -47,7 +47,6 @@ fn equal_weight() {
     let validator_state = validator::State::new(
         validators_weights.clone(),
         0.0, // state fault weight
-        None,
         LatestMsgs::empty(),
         1.0,            // subjective fault weight threshold
         HashSet::new(), // equivocators
@@ -109,7 +108,6 @@ fn vote_swaying() {
     let validator_state = validator::State::new(
         validators_weights.clone(),
         0.0, // state fault weight
-        None,
         LatestMsgs::empty(),
         1.0,            // subjective fault weight threshold
         HashSet::new(), // equivocators

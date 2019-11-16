@@ -127,7 +127,6 @@ fn block_from_prevblock_msg(c: &mut Criterion) {
             let mut weights = validator::State::new(
                 validators_weights.clone(),
                 0.0, // state fault weight
-                None,
                 LatestMsgs::empty(),
                 1.0,            // subjective fault weight threshold
                 HashSet::new(), // equivocators

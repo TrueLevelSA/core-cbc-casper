@@ -66,7 +66,6 @@ fn faulty_inserts_sorted() {
     let mut validator_state = validator::State::new(
         validators_weights.clone(),
         0.0,
-        None,
         latest_msgs,
         3.0,
         HashSet::new(),
@@ -95,7 +94,6 @@ fn faulty_inserts() {
     let mut validator_state = validator::State::new(
         validators_weights.clone(),
         0.0,
-        None,
         LatestMsgs::empty(),
         0.0,
         HashSet::new(),
@@ -131,7 +129,6 @@ fn faulty_inserts() {
         None,
         None,
         None,
-        None,
         Some(1.0),
         None,
     );
@@ -142,7 +139,6 @@ fn faulty_inserts() {
 
     let mut validator_state2 = validator::State::new_with_default_state(
         validator_state.clone(),
-        None,
         None,
         None,
         None,
@@ -160,7 +156,6 @@ fn faulty_inserts() {
         None,
         Some(0.1),
         None,
-        None,
         Some(1.0),
         None,
     );
@@ -174,7 +169,6 @@ fn faulty_inserts() {
         None,
         Some(0.1),
         None,
-        None,
         Some(1.0),
         None,
     );
@@ -187,7 +181,6 @@ fn faulty_inserts() {
         validator_state.clone(),
         None,
         Some(1.0),
-        None,
         None,
         Some(2.0),
         None,
@@ -204,7 +197,6 @@ fn faulty_inserts() {
         Some(validators_weights.clone()),
         Some(1.0),
         None,
-        None,
         Some(2.0),
         None,
     );
@@ -217,7 +209,6 @@ fn faulty_inserts() {
     let mut validator_state = validator::State::new(
         validators_weights.clone(),
         1.0,
-        None,
         LatestMsgs::empty(),
         2.0,
         HashSet::new(),

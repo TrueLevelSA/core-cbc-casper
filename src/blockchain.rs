@@ -490,8 +490,7 @@ mod tests {
         );
         let state = validator::State::new(
             validators_weights.clone(),
-            0.0,  // state fault weight
-            None, // latest messages
+            0.0, // state fault weight
             LatestMsgs::empty(),
             1.0,            // subjective fault weight threshold
             HashSet::new(), // equivocators
@@ -597,8 +596,7 @@ mod tests {
 
         let state = validator::State::new(
             validators_weights.clone(),
-            0.0,  // state fault weight
-            None, // latest messages
+            0.0, // state fault weight
             LatestMsgs::empty(),
             1.0,            // subjective fault weight threshold
             HashSet::new(), // equivocators
@@ -699,8 +697,7 @@ mod tests {
 
         let mut state = validator::State::new(
             validators_weights.clone(),
-            0.0,  // state fault weight
-            None, // latest messages
+            0.0, // state fault weight
             LatestMsgs::empty(),
             1.0,            // subjective fault weight threshold
             HashSet::new(), // equivocators

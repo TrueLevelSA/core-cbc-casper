@@ -131,7 +131,6 @@ where
                 let mut validator_state_reconstructed = validator::State::new(
                     state[&recipient].validators_weights().clone(),
                     0.0,
-                    Some(m.clone()),
                     LatestMsgs::from(m.justification()),
                     0.0,
                     HashSet::new(),
@@ -451,7 +450,6 @@ where
                     validator::State::new(
                         validators_weights.clone(),
                         0.0,
-                        Some(m),
                         LatestMsgs::from(&j),
                         0.0,
                         HashSet::new(),
@@ -757,7 +755,6 @@ proptest! {
         let validator_state = validator::State::new(
             validators_weights.clone(),
             0.0,
-            None,
             LatestMsgs::empty(),
             0.0,
             HashSet::new(),
@@ -783,7 +780,6 @@ proptest! {
         let validator_state = validator::State::new(
             validators_weights,
             0.0,
-            None,
             LatestMsgs::empty(),
             equivocators.len() as f64,
             HashSet::new(),

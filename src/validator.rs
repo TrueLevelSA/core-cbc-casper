@@ -97,8 +97,6 @@ where
     pub(crate) thr: U,
     /// current validator set, mapped to their respective weights
     pub(crate) validators_weights: Weights<E::ValidatorName, U>,
-    /// this validator's latest message
-    pub(crate) own_latest_msg: Option<Message<E>>,
     pub(crate) latest_msgs: LatestMsgs<E>,
     pub(crate) equivocators: HashSet<E::ValidatorName>,
 }
@@ -146,7 +144,6 @@ where
     pub fn new(
         validators_weights: Weights<E::ValidatorName, U>,
         state_fault_weight: U,
-        own_latest_msg: Option<Message<E>>,
         latest_msgs: LatestMsgs<E>,
         thr: U,
         equivocators: HashSet<E::ValidatorName>,
@@ -156,7 +153,6 @@ where
             equivocators,
             state_fault_weight,
             thr,
-            own_latest_msg,
             latest_msgs,
         }
     }
@@ -165,7 +161,6 @@ where
         default_state: Self,
         validators_weights: Option<Weights<E::ValidatorName, U>>,
         state_fault_weight: Option<U>,
-        own_latest_msg: Option<Message<E>>,
         latest_msgs: Option<LatestMsgs<E>>,
         thr: Option<U>,
         equivocators: Option<HashSet<E::ValidatorName>>,
@@ -173,7 +168,6 @@ where
         State {
             validators_weights: validators_weights.unwrap_or(default_state.validators_weights),
             state_fault_weight: state_fault_weight.unwrap_or(default_state.state_fault_weight),
-            own_latest_msg: own_latest_msg.or(default_state.own_latest_msg),
             latest_msgs: latest_msgs.unwrap_or(default_state.latest_msgs),
             thr: thr.unwrap_or(default_state.thr),
             equivocators: equivocators.unwrap_or(default_state.equivocators),
@@ -186,10 +180,6 @@ where
 
     pub fn validators_weights(&self) -> &Weights<E::ValidatorName, U> {
         &self.validators_weights
-    }
-
-    pub fn own_latest_msg(&self) -> &Option<Message<E>> {
-        &self.own_latest_msg
     }
 
     pub fn latests_msgs(&self) -> &LatestMsgs<E> {

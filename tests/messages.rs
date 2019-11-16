@@ -47,7 +47,6 @@ fn msg_equality() {
     let validator_state = validator::State::new(
         validators_weights,
         0.0,
-        None,
         LatestMsgs::empty(),
         0.0,
         HashSet::new(),
@@ -102,7 +101,6 @@ fn msg_depends() {
     let validator_state = validator::State::new(
         validators_weights,
         0.0,
-        None,
         LatestMsgs::empty(),
         0.0,
         HashSet::new(),
@@ -176,7 +174,6 @@ fn msg_equivocates() {
     let validator_state = validator::State::new(
         validators_weights,
         0.0,
-        None,
         LatestMsgs::empty(),
         0.0,
         HashSet::new(),
@@ -221,7 +218,6 @@ fn from_msgs() {
         &mut validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
-            None,
             LatestMsgs::empty(),
             0.0,
             HashSet::new(),
@@ -248,7 +244,6 @@ fn from_msgs_duplicates() {
         &mut validator::State::new(
             validator::Weights::new(vec![(0, 1.0)].into_iter().collect()),
             0.0,
-            None,
             LatestMsgs::empty(),
             0.0,
             HashSet::new(),
@@ -280,7 +275,6 @@ fn from_msgs_no_need_to_justify() {
         &mut validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
-            None,
             latest_msgs,
             0.0,
             HashSet::new(),
@@ -325,7 +319,6 @@ fn from_msgs_unknown_equivocator() {
         &mut validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
-            None,
             LatestMsgs::empty(),
             4.0,
             HashSet::new(),
@@ -361,7 +354,6 @@ fn from_msgs_unknown_equivocator_at_threshhold() {
         &mut validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
-            None,
             LatestMsgs::empty(),
             0.0,
             HashSet::new(),
@@ -408,7 +400,6 @@ fn from_msgs_known_equivocator() {
         &mut validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
-            None,
             latest_msgs,
             0.0,
             HashSet::new(),
@@ -442,7 +433,6 @@ fn from_msgs_only_equivocations() {
         &mut validator::State::new(
             validator::Weights::new(vec![(0, 1.0)].into_iter().collect()),
             0.0,
-            None,
             latest_msgs,
             0.0,
             HashSet::new(),
@@ -464,7 +454,6 @@ fn from_msgs_only_equivocations() {
 //     let validator_state = validator::State::new(
 //         validators_weights.clone(),
 //         0.0,
-//         None,
 //         LatestMsgs::empty(),
 //         0.0,
 //         HashSet::new(),
@@ -480,7 +469,6 @@ fn from_msgs_only_equivocations() {
 //     let (m0, validator_state) = &mut Message::from_msgs(
 //         validator0,
 //         vec![v0],
-//         None,
 //         &validator_state,
 //         None as Option<VoteCount>,
 //     ).unwrap();
@@ -488,7 +476,6 @@ fn from_msgs_only_equivocations() {
 //     let (m1, validator_state) = &Message::from_msgs(
 //         validator1,
 //         vec![m0],
-//         None,
 //         &validator_state,
 //         None as Option<VoteCount>,
 //     ).unwrap();
@@ -496,7 +483,6 @@ fn from_msgs_only_equivocations() {
 //     let (m2, _) = &Message::from_msgs(
 //         validator0,
 //         vec![m1],
-//         None,
 //         &validator_state,
 //         None as Option<VoteCount>,
 //     ).unwrap();

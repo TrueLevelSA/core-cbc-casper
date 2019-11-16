@@ -126,7 +126,6 @@ fn main() {
     let mut weights = validator::State::new(
         validators_weights.clone(),
         0.0, // state fault weight
-        None,
         LatestMsgs::empty(),
         1.0,            // subjective fault weight threshold
         HashSet::new(), // equivocators
