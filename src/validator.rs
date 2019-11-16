@@ -19,7 +19,7 @@
 
 //! ## Validators
 //!
-//! Validators produce and receive messages (`message::Trait`) from other validators in the
+//! Validators produce and receive messages (`message::Message`) from other validators in the
 //! network. When a validator want to produce a message he needs to collect his justification
 //! (`Justification`) and run an estimator (`Estimator`) to get a value. See [§ Estimator
 //! Function](../justification/index.html#estimator-function) in § Justification.
@@ -83,8 +83,8 @@ impl ValidatorName for i8 {}
 impl ValidatorName for i32 {}
 impl ValidatorName for i64 {}
 
-/// Inner state of a validator. Validator's state implement `message::Trait` allowing validators to produce
-/// messages based on their latest view of the network.
+/// Inner state of a validator. This represents the validator's view
+/// of the network.
 #[derive(Debug, Clone)]
 pub struct State<E, U>
 where
@@ -228,7 +228,6 @@ where
                 .unwrap_or_else(|| m0.getid().cmp(&m1.getid())) // tie breaker
         });
 
-        // return a Vec<message::Trait>
         msgs_sorted_by_faultw
             .iter()
             .map(|(m, _)| m)

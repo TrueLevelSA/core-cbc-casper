@@ -39,12 +39,7 @@
 //! ## Using the library
 //!
 //! To benefit from the CBC Casper safety proofs this library builds upon, developers have to
-//! implement `message::Trait`. This trait in turn requires implementing other traits in this
-//! library, such as the `validator::ValidatorName` for validators, and the `Estimator` trait for the estimate.
-//!
-//! One generic type implements the `message::Trait`, namely `message::Message<Estimator,
-//! validator::ValidatorName>`, and can be used to helps getting to a compliant `message::Trait` concrete type
-//! implementation easily.
+//! implement `validator::ValidatorName` for validators, and the `Estimator` trait for the estimate.
 //!
 //! We also present a basic blockchain implementation heavily under developement.  You can also
 //! find another implementation of an integer consensus in `tests/`.

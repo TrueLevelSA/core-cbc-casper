@@ -98,7 +98,7 @@ impl<E: Estimator> Serialize for ProtoMsg<E> {
     }
 }
 
-/// Concrete Casper message implementing `message::Trait` containing a value as `Estimator`, a
+/// Concrete Casper message containing a value as `Estimator`, a
 /// validator as `validator::ValidatorName`, and a justification as `Justification`.
 ///
 /// # Example

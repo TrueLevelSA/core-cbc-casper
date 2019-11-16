@@ -43,8 +43,8 @@ use crate::message::Message;
 use crate::util::weight::{WeightUnit, Zero};
 use crate::validator;
 
-/// Struct that holds the set of the `message::Trait` that justify the current message. Works like
-/// a `vec`.
+/// Struct that holds the set of the `message::Message` that justify
+/// the current message. Works like a `vec`.
 #[derive(Eq, PartialEq, Clone, Hash)]
 pub struct Justification<E: Estimator>(Vec<Message<E>>);
 
@@ -54,8 +54,9 @@ impl<E: Estimator> Justification<E> {
         Justification(Vec::new())
     }
 
-    /// Creates and return a new justification instance from a vector of `message::Trait` and
-    /// mutate the given `validator::State` with the updated state
+    /// Creates and returns a new justification from a vector of
+    /// `message::Message` and mutates the given `validator::State`
+    /// with the updated state.
     pub fn from_msgs<U: WeightUnit>(
         messages: Vec<Message<E>>,
         state: &mut validator::State<E, U>,
