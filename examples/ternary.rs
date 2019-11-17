@@ -123,7 +123,7 @@ fn main() {
             .collect(),
     );
 
-    let mut weights = validator::State::new(
+    let validator_state = validator::State::new(
         validators_weights.clone(),
         0.0, // state fault weight
         LatestMsgs::empty(),
@@ -140,11 +140,21 @@ fn main() {
     let msg2 = Message::new(2, Justification::empty(), Value::Two);
     let msg3 = Message::new(3, Justification::empty(), Value::Zero);
     let msg4 = Message::new(4, Justification::empty(), Value::One);
-    let msg5 = Message::from_msgs(1, vec![&msg1, &msg2], &mut weights).unwrap();
-    let msg6 = Message::from_msgs(3, vec![&msg3, &msg4], &mut weights).unwrap();
-    let msg7 = Message::from_msgs(2, vec![&msg2, &msg5, &msg6], &mut weights).unwrap();
-    let msg8 = Message::from_msgs(3, vec![&msg7, &msg6], &mut weights).unwrap();
-    let msg9 = Message::from_msgs(4, vec![&msg4, &msg6], &mut weights).unwrap();
+    let mut validator_state_clone = validator_state.clone();
+    validator_state_clone.update(&[&msg1, &msg2]);
+    let msg5 = Message::from_msgs(1, &validator_state_clone).unwrap();
+    let mut validator_state_clone = validator_state.clone();
+    validator_state_clone.update(&[&msg3, &msg4]);
+    let msg6 = Message::from_msgs(3, &validator_state_clone).unwrap();
+    let mut validator_state_clone = validator_state.clone();
+    validator_state_clone.update(&[&msg2, &msg5, &msg6]);
+    let msg7 = Message::from_msgs(2, &validator_state_clone).unwrap();
+    let mut validator_state_clone = validator_state.clone();
+    validator_state_clone.update(&[&msg7, &msg6]);
+    let msg8 = Message::from_msgs(3, &validator_state_clone).unwrap();
+    let mut validator_state_clone = validator_state.clone();
+    validator_state_clone.update(&[&msg4, &msg6]);
+    let msg9 = Message::from_msgs(4, &validator_state_clone).unwrap();
 
     assert_eq!(msg5.estimate(), &Value::Two);
     assert_eq!(msg6.estimate(), &Value::Zero);

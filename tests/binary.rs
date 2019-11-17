@@ -55,8 +55,9 @@ fn equal_weight() {
     let m0 = Message::new(validators[0], Justification::empty(), BoolWrapper(false));
     let m1 = Message::new(validators[1], Justification::empty(), BoolWrapper(true));
     let m2 = Message::new(validators[2], Justification::empty(), BoolWrapper(false));
-    let m3 =
-        Message::from_msgs(validators[0], vec![&m0, &m1], &mut validator_state.clone()).unwrap();
+    let mut validator_state_clone = validator_state.clone();
+    validator_state_clone.update(&[&m0, &m1]);
+    let m3 = Message::from_msgs(validators[0], &validator_state_clone).unwrap();
 
     assert_eq!(
         BoolWrapper::estimate(
@@ -132,12 +133,9 @@ fn vote_swaying() {
     );
 
     // assume validator 0 has seen messages from validator 1 and validator 2 and reveals this in a published message
-    let m5 = Message::from_msgs(
-        validators[0],
-        vec![&m0, &m1, &m2],
-        &mut validator_state.clone(),
-    )
-    .unwrap();
+    let mut validator_state_clone = validator_state.clone();
+    validator_state_clone.update(&[&m0, &m1, &m2]);
+    let m5 = Message::from_msgs(validators[0], &validator_state_clone).unwrap();
 
     j0.faulty_insert(&m5, &mut validator_state.clone());
     // validator 0 now "votes" in the other direction and sways the result: true

@@ -488,7 +488,7 @@ mod tests {
             .cloned()
             .collect(),
         );
-        let state = validator::State::new(
+        let mut state = validator::State::new(
             validators_weights.clone(),
             0.0, // state fault weight
             LatestMsgs::empty(),
@@ -511,23 +511,24 @@ mod tests {
             "genesis block with None as prevblock"
         );
 
-        let m1 =
-            Message::from_msgs(validator1, vec![&genesis_block_msg], &mut state.clone()).unwrap();
+        state.update(&[&genesis_block_msg]);
+        let m1 = Message::from_msgs(validator1, &state.clone()).unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)     \--m1
         // (s2, w=2.0)
         // (s3, w=1.0)
         // (s4, w=1.1)
 
-        let m2 =
-            Message::from_msgs(validator2, vec![&genesis_block_msg], &mut state.clone()).unwrap();
+        state.update(&[&genesis_block_msg]);
+        let m2 = Message::from_msgs(validator2, &state.clone()).unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)    |\--m1
         // (s2, w=2.0)    \---m2
         // (s3, w=1.0)
         // (s4, w=1.1)
 
-        let m3 = Message::from_msgs(validator3, vec![&m1, &m2], &mut state.clone()).unwrap();
+        state.update(&[&m1, &m2]);
+        let m3 = Message::from_msgs(validator3, &state.clone()).unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)    |\--m1
         // (s2, w=2.0)    \---m2
@@ -540,7 +541,8 @@ mod tests {
             "should build on top of m2 as validator2 has more weight"
         );
 
-        let m4 = Message::from_msgs(validator4, vec![&m1], &mut state.clone()).unwrap();
+        state.update(&[&m1]);
+        let m4 = Message::from_msgs(validator4, &state.clone()).unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)    |\--m1-------\
         // (s2, w=2.0)    \---m2       |
@@ -553,7 +555,8 @@ mod tests {
             "should build on top of m1 as thats the only msg it saw"
         );
 
-        let m5 = Message::from_msgs(validator0, vec![&m3, &m2], &mut state.clone()).unwrap();
+        state.update(&[&m3, &m2]);
+        let m5 = Message::from_msgs(validator0, &state.clone()).unwrap();
         // (s0, w=1.0)   gen               m5
         // (s1, w=1.0)    |\--m1-------\   |
         // (s2, w=2.0)    \---m2       |   |
@@ -594,7 +597,7 @@ mod tests {
             .collect(),
         );
 
-        let state = validator::State::new(
+        let mut state = validator::State::new(
             validators_weights.clone(),
             0.0, // state fault weight
             LatestMsgs::empty(),
@@ -613,8 +616,8 @@ mod tests {
         // (s4, w=1.1)
         // (s5, w=1.0)
 
-        let m0 =
-            Message::from_msgs(validator0, vec![&genesis_block_msg], &mut state.clone()).unwrap();
+        state.update(&[&genesis_block_msg]);
+        let m0 = Message::from_msgs(validator0, &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)     \--m0
         // (s1, w=1.0)
@@ -623,7 +626,8 @@ mod tests {
         // (s4, w=1.1)
         // (s5, w=1.0)
 
-        let m1 = Message::from_msgs(validator1, vec![&m0], &mut state.clone()).unwrap();
+        state.update(&[&m0]);
+        let m1 = Message::from_msgs(validator1, &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)     \--m0
         // (s1, w=1.0)         \--m1
@@ -632,8 +636,8 @@ mod tests {
         // (s4, w=1.1)
         // (s5, w=1.0)
 
-        let m2 =
-            Message::from_msgs(validator2, vec![&genesis_block_msg], &mut state.clone()).unwrap();
+        state.update(&[&genesis_block_msg]);
+        let m2 = Message::from_msgs(validator2, &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -642,7 +646,8 @@ mod tests {
         // (s4, w=1.1)
         // (s5, w=1.0)
 
-        let m3 = Message::from_msgs(validator3, vec![&m2], &mut state.clone()).unwrap();
+        state.update(&[&m2]);
+        let m3 = Message::from_msgs(validator3, &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -651,7 +656,8 @@ mod tests {
         // (s4, w=1.1)
         // (s5, w=1.0)
 
-        let m4 = Message::from_msgs(validator4, vec![&m2], &mut state.clone()).unwrap();
+        state.update(&[&m2]);
+        let m4 = Message::from_msgs(validator4, &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -660,12 +666,8 @@ mod tests {
         // (s4, w=1.1)                \-------m4
         // (s5, w=1.0)
 
-        let m5 = Message::from_msgs(
-            validator5,
-            vec![&m0, &m1, &m2, &m3, &m4],
-            &mut state.clone(),
-        )
-        .unwrap();
+        state.update(&[&m0, &m1, &m2, &m3, &m4]);
+        let m5 = Message::from_msgs(validator5, &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -709,10 +711,12 @@ mod tests {
         let m0 = Message::new(validators[0], latest_msgs, proto_b0.clone());
 
         let proto_b1 = Block::new(Some(proto_b0.clone()));
-        let m1 = Message::from_msgs(validators[1], vec![&m0], &mut state).unwrap();
+        state.update(&[&m0]);
+        let m1 = Message::from_msgs(validators[1], &state).unwrap();
 
         let proto_b2 = Block::new(Some(proto_b1.clone()));
-        let m2 = Message::from_msgs(validators[0], vec![&m1], &mut state).unwrap();
+        state.update(&[&m1]);
+        let m2 = Message::from_msgs(validators[0], &state).unwrap();
 
         // no clique yet, since validators[1] has not seen validators[0] seeing validators[1] having
         // proto_b0 in the chain
@@ -727,7 +731,8 @@ mod tests {
             HashSet::new()
         );
 
-        let m3 = Message::from_msgs(validators[1], vec![&m2], &mut state).unwrap();
+        state.update(&[&m2]);
+        let m3 = Message::from_msgs(validators[1], &state).unwrap();
 
         // clique, since both validators have seen each other having proto_b0 in the chain
         assert_eq!(
@@ -744,9 +749,11 @@ mod tests {
             ])])
         );
 
-        let m4 = Message::from_msgs(validators[2], vec![&m3], &mut state).unwrap();
+        state.update(&[&m3]);
+        let m4 = Message::from_msgs(validators[2], &state).unwrap();
 
-        let m5 = Message::from_msgs(validators[1], vec![&m4], &mut state).unwrap();
+        state.update(&[&m4]);
+        let m5 = Message::from_msgs(validators[1], &state).unwrap();
 
         // no second clique yet, since validators[2] has not seen validators[1] seeing validators[2] having
         // proto_b0.clone() in the chain
@@ -764,7 +771,8 @@ mod tests {
             ])])
         );
 
-        let m6 = Message::from_msgs(validators[2], vec![&m5], &mut state).unwrap();
+        state.update(&[&m5]);
+        let m6 = Message::from_msgs(validators[2], &state).unwrap();
 
         // have two cliques on proto_b0 now
         assert_eq!(
@@ -809,11 +817,14 @@ mod tests {
             ])])
         );
 
-        let m7 = Message::from_msgs(validators[0], vec![&m6], &mut state).unwrap();
+        state.update(&[&m6]);
+        let m7 = Message::from_msgs(validators[0], &state).unwrap();
 
-        let m8 = Message::from_msgs(validators[2], vec![&m7], &mut state).unwrap();
+        state.update(&[&m7]);
+        let m8 = Message::from_msgs(validators[2], &state).unwrap();
 
-        let _ = Message::from_msgs(validators[0], vec![&m8], &mut state).unwrap();
+        state.update(&[&m8]);
+        let _ = Message::from_msgs(validators[0], &state).unwrap();
 
         // now entire network is clique
         assert_eq!(

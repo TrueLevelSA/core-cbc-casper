@@ -157,24 +157,17 @@ impl<E: Estimator> Message<E> {
     /// Create a message from newly received messages.
     pub fn from_msgs<U: WeightUnit>(
         sender: E::ValidatorName,
-        mut new_msgs: Vec<&Self>,
-        validator_state: &mut validator::State<E, U>,
+        validator_state: &validator::State<E, U>,
     ) -> Result<Self, Error<E::Error>> {
-        // dedup by putting msgs into a hashset
-        let new_msgs: HashSet<_> = new_msgs.drain(..).collect();
-        let new_msgs_len = new_msgs.len();
+        let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(
+            validator_state.latests_msgs(),
+            validator_state.equivocators(),
+        );
 
-        // update latest_msgs in validator_state with new_msgs
-        let mut justification = Justification::empty();
-        let inserted_msgs = justification.faulty_inserts(&new_msgs, validator_state);
-
-        if inserted_msgs.is_empty() && new_msgs_len > 0 {
+        if latest_msgs_honest.is_empty() {
             Err(Error::NoNewMessage)
         } else {
-            let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(
-                validator_state.latests_msgs(),
-                validator_state.equivocators(),
-            );
+            let justification = Justification::from(latest_msgs_honest.clone());
 
             let estimate = latest_msgs_honest.mk_estimate(&validator_state.validators_weights());
             estimate

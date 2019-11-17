@@ -188,6 +188,16 @@ impl<E: Estimator> Justification<E> {
     }
 }
 
+impl<E: Estimator> From<LatestMsgsHonest<E>> for Justification<E> {
+    fn from(lmh: LatestMsgsHonest<E>) -> Self {
+        let mut j = Self::empty();
+        for m in lmh.iter() {
+            j.insert(m.clone());
+        }
+        j
+    }
+}
+
 impl<E: Estimator> Debug for Justification<E> {
     fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
         write!(f, "{:?}", self.0)
@@ -320,6 +330,7 @@ impl<'z, E: Estimator> From<&'z Justification<E>> for LatestMsgs<E> {
 }
 
 /// Set of latest honest messages for each validator.
+#[derive(Clone)]
 pub struct LatestMsgsHonest<E: Estimator>(HashSet<Message<E>>);
 
 impl<E: Estimator> LatestMsgsHonest<E> {

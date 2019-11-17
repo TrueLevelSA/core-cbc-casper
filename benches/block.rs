@@ -134,7 +134,8 @@ fn block_from_prevblock_msg(c: &mut Criterion) {
             let block: Block<u8> = Block::new(None);
             let mut msg = Message::new(1, Justification::empty(), Value::One);
             for _ in 0..=(**loops) {
-                msg = Message::from_msgs(1, vec![&msg], &mut weights).unwrap();
+                weights.update(&[&msg]);
+                msg = Message::from_msgs(1, &weights).unwrap();
             }
 
             b.iter(|| {

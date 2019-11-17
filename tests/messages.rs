@@ -61,7 +61,9 @@ fn msg_equality() {
         .is_empty();
     assert_eq!(failure, false);
 
-    let m0 = Message::from_msgs(0, vec![v0], &mut validator_state.clone()).unwrap();
+    let mut validator_state_clone = validator_state.clone();
+    validator_state_clone.update(&[v0]);
+    let m0 = Message::from_msgs(0, &validator_state_clone).unwrap();
     // let m0 = &Message::new(0, justification, estimate);
 
     let mut j1 = Justification::empty();
@@ -82,11 +84,17 @@ fn msg_equality() {
         .is_empty();
     assert_eq!(failure, false);
 
-    let msg1 = Message::from_msgs(0, vec![v0], &mut validator_state.clone()).unwrap();
-    let msg2 = Message::from_msgs(0, vec![v0], &mut validator_state.clone()).unwrap();
+    let mut validator_state_clone = validator_state.clone();
+    validator_state_clone.update(&[v0]);
+    let msg1 = Message::from_msgs(0, &validator_state_clone).unwrap();
+    let mut validator_state_clone = validator_state.clone();
+    validator_state_clone.update(&[v0]);
+    let msg2 = Message::from_msgs(0, &validator_state_clone).unwrap();
     assert!(msg1 == msg2, "messages should be equal");
 
-    let msg3 = Message::from_msgs(0, vec![v0, &m0], &mut validator_state.clone()).unwrap();
+    let mut validator_state_clone = validator_state.clone();
+    validator_state_clone.update(&[v0, &m0]);
+    let msg3 = Message::from_msgs(0, &validator_state_clone).unwrap();
     assert!(msg1 != msg3, "msg1 should be different than msg3");
 }
 
@@ -115,7 +123,9 @@ fn msg_depends() {
         .is_empty();
     assert_eq!(failure, false);
 
-    let m0 = Message::from_msgs(0, vec![v0], &mut validator_state.clone()).unwrap();
+    let mut validator_state_clone = validator_state.clone();
+    validator_state_clone.update(&[v0]);
+    let m0 = Message::from_msgs(0, &validator_state_clone).unwrap();
 
     assert!(
         !v0.depends(v0_prime),
@@ -137,7 +147,9 @@ fn msg_depends() {
         .is_empty();
     assert_eq!(failure, false);
 
-    let m0 = Message::from_msgs(0, vec![v0], &mut validator_state.clone()).unwrap();
+    let mut validator_state_clone = validator_state.clone();
+    validator_state_clone.update(&[&v0]);
+    let m0 = Message::from_msgs(0, &validator_state_clone).unwrap();
 
     let mut j1 = Justification::empty();
     let failure = j1
@@ -156,7 +168,9 @@ fn msg_depends() {
         .is_empty();
     assert_eq!(failure, false);
 
-    let m1 = Message::from_msgs(0, vec![v0, &m0], &mut validator_state.clone()).unwrap();
+    let mut validator_state_clone = validator_state.clone();
+    validator_state_clone.update(&[v0, &m0]);
+    let m1 = Message::from_msgs(0, &validator_state_clone).unwrap();
 
     assert!(m1.depends(&m0), "m1 DOES depent on m0");
     assert!(!m0.depends(&m1), "but m0 does NOT depend on m1");
@@ -188,9 +202,13 @@ fn msg_equivocates() {
         .is_empty();
     assert_eq!(failure, false);
 
-    let m0 = Message::from_msgs(0, vec![v0], &mut validator_state.clone()).unwrap();
+    let mut validator_state_clone = validator_state.clone();
+    validator_state_clone.update(&[&v0]);
+    let m0 = Message::from_msgs(0, &validator_state_clone).unwrap();
 
-    let m1 = Message::from_msgs(1, vec![v0], &mut validator_state.clone()).unwrap();
+    let mut validator_state_clone = validator_state.clone();
+    validator_state_clone.update(&[&v0]);
+    let m1 = Message::from_msgs(1, &validator_state_clone).unwrap();
     assert!(!v0.equivocates(v0), "should be all good");
     assert!(!v1.equivocates(&m0), "should be all good");
     assert!(!m0.equivocates(v1), "should be all good");
@@ -212,13 +230,17 @@ fn from_msgs() {
     let v1 = VoteCount::create_vote_msg(1, false);
     let v2 = VoteCount::create_vote_msg(2, true);
 
+    let mut latest_msgs = LatestMsgs::empty();
+    latest_msgs.update(&v0);
+    latest_msgs.update(&v1);
+    latest_msgs.update(&v2);
+
     let res = Message::from_msgs(
         0,
-        vec![&v0, &v1, &v2],
-        &mut validator::State::new(
+        &validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            latest_msgs,
             0.0,
             HashSet::new(),
         ),
@@ -238,13 +260,16 @@ fn from_msgs_duplicates() {
     let v0 = VoteCount::create_vote_msg(0, true);
     let v0_prime = VoteCount::create_vote_msg(0, true);
 
+    let mut latest_msgs = LatestMsgs::empty();
+    latest_msgs.update(&v0);
+    latest_msgs.update(&v0_prime);
+
     let res = Message::from_msgs(
         0,
-        vec![&v0, &v0_prime],
-        &mut validator::State::new(
+        &validator::State::new(
             validator::Weights::new(vec![(0, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            latest_msgs,
             0.0,
             HashSet::new(),
         ),
@@ -266,13 +291,13 @@ fn from_msgs_no_need_to_justify() {
     let v2 = VoteCount::create_vote_msg(2, false);
 
     let mut latest_msgs = LatestMsgs::empty();
+    latest_msgs.update(&v0);
     latest_msgs.update(&v1);
     latest_msgs.update(&v2);
 
     let res = Message::from_msgs(
         0,
-        vec![&v0],
-        &mut validator::State::new(
+        &validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
             latest_msgs,
@@ -295,11 +320,11 @@ fn from_msgs_no_need_to_justify() {
     assert_eq!(*res.sender(), 0);
     assert_eq!(
         HashSet::<&Message<VoteCount>>::from_iter(res.justification().iter()),
-        HashSet::from_iter(vec![&v0]),
+        HashSet::from_iter(vec![&v0, &v1, &v2]),
     );
     assert!(res.depends(&v0));
-    assert!(!res.depends(&v1));
-    assert!(!res.depends(&v2));
+    assert!(res.depends(&v1));
+    assert!(res.depends(&v2));
 }
 
 #[test]
@@ -313,13 +338,17 @@ fn from_msgs_unknown_equivocator() {
     let v0_prime = VoteCount::create_vote_msg(0, true);
     let v1 = VoteCount::create_vote_msg(1, true);
 
+    let mut latest_msgs = LatestMsgs::empty();
+    latest_msgs.update(&v0);
+    latest_msgs.update(&v0_prime);
+    latest_msgs.update(&v1);
+
     let res = Message::from_msgs(
         2,
-        vec![&v0, &v0_prime, &v1],
-        &mut validator::State::new(
+        &validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            latest_msgs,
             4.0,
             HashSet::new(),
         ),
@@ -332,7 +361,7 @@ fn from_msgs_unknown_equivocator() {
     assert_eq!(*res.estimate(), VoteCount { yes: 1, no: 0 });
     assert_eq!(
         HashSet::<&Message<VoteCount>>::from_iter(res.justification().iter()),
-        HashSet::from_iter(vec![&v0, &v0_prime, &v1]),
+        HashSet::from_iter(vec![&v1]),
     );
 }
 
@@ -348,13 +377,17 @@ fn from_msgs_unknown_equivocator_at_threshhold() {
     let v0_prime = VoteCount::create_vote_msg(0, true);
     let v1 = VoteCount::create_vote_msg(1, true);
 
+    let mut latest_msgs = LatestMsgs::empty();
+    latest_msgs.update(&v0);
+    latest_msgs.update(&v0_prime);
+    latest_msgs.update(&v1);
+
     let res = Message::from_msgs(
         2,
-        vec![&v0, &v0_prime, &v1],
-        &mut validator::State::new(
+        &validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            latest_msgs,
             0.0,
             HashSet::new(),
         ),
@@ -364,21 +397,11 @@ fn from_msgs_unknown_equivocator_at_threshhold() {
     // Here, the equivator has a random vote in the estimate, and the
     // other vote is not in the justification.
     assert_eq!(*res.sender(), 2);
-    match *res.estimate() {
-        VoteCount { yes: 1, no: 1 } => {
-            assert_eq!(
-                HashSet::<&Message<VoteCount>>::from_iter(res.justification().iter()),
-                HashSet::from_iter(vec![&v0, &v1]),
-            );
-        }
-        VoteCount { yes: 2, no: 0 } => {
-            assert_eq!(
-                HashSet::<&Message<VoteCount>>::from_iter(res.justification().iter()),
-                HashSet::from_iter(vec![&v0_prime, &v1]),
-            );
-        }
-        _ => panic!("Expected estimate to either be {{ yes: 1, no: 1 }} or {{ yes: 2, no: 0 }}"),
-    }
+    assert_eq!(*res.estimate(), VoteCount { yes: 1, no: 0 });
+    assert_eq!(
+        HashSet::<&Message<VoteCount>>::from_iter(res.justification().iter()),
+        HashSet::from_iter(vec![&v1]),
+    );
 }
 
 #[test]
@@ -396,8 +419,7 @@ fn from_msgs_known_equivocator() {
 
     let res = Message::from_msgs(
         2,
-        vec![&v0, &v0_prime, &v1],
-        &mut validator::State::new(
+        &validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
             latest_msgs,
@@ -426,11 +448,11 @@ fn from_msgs_only_equivocations() {
 
     let mut latest_msgs = LatestMsgs::empty();
     latest_msgs.update(&v0);
+    latest_msgs.update(&v0_prime);
 
     let res = Message::<VoteCount>::from_msgs(
         0,
-        vec![&v0_prime],
-        &mut validator::State::new(
+        &validator::State::new(
             validator::Weights::new(vec![(0, 1.0)].into_iter().collect()),
             0.0,
             latest_msgs,

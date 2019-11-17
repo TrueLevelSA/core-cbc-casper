@@ -104,7 +104,9 @@ fn faulty_inserts() {
         .is_empty();
     assert_eq!(failure, false);
 
-    let m0 = message::Message::from_msgs(0, vec![v0], &mut validator_state.clone()).unwrap();
+    let mut validator_state_clone = validator_state.clone();
+    validator_state_clone.update(&[v0]);
+    let m0 = message::Message::from_msgs(0, &validator_state_clone).unwrap();
 
     // let m0 = &message::Message::new(0, justification, estimate);
     let mut j1 = Justification::empty();

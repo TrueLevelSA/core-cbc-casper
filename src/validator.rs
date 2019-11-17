@@ -174,6 +174,25 @@ where
         }
     }
 
+    pub fn update(&mut self, messages: &[&Message<E>]) -> bool {
+        messages.iter().fold(true, |acc, message| {
+            let sender = message.sender();
+            let weight = self
+                .validators_weights
+                .weight(sender)
+                .unwrap_or(U::INFINITY);
+
+            if self.latest_msgs.equivocate(message)
+                && weight + self.state_fault_weight <= self.thr
+                && self.equivocators.insert(sender.clone())
+            {
+                self.state_fault_weight += weight;
+            }
+
+            self.latest_msgs.update(message) && acc
+        })
+    }
+
     pub fn equivocators(&self) -> &HashSet<E::ValidatorName> {
         &self.equivocators
     }
