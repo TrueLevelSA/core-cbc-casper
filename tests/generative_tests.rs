@@ -37,7 +37,7 @@ use rand::thread_rng;
 use casper::blockchain::{self, Block};
 use casper::estimator::Estimator;
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
-use casper::message::Message;
+use casper::message::{self, Message};
 use casper::util::weight::WeightUnit;
 use casper::validator;
 
@@ -765,23 +765,32 @@ proptest! {
         let equivocator = messages[nodes].sender();
         let mut validator_state_clone = validator_state.clone();
         for m in single_equivocation.iter() {
-            validator_state_clone.update(&m);
+            validator_state_clone.update(&[&m]);
         }
         let m0 =
             &Message::from_msgs(0, &validator_state_clone)
             .unwrap();
         let equivocations: Vec<_> = single_equivocation.iter().filter(|message| message.equivocates(&m0)).collect();
-        assert!(if *equivocator == 0 {equivocations.len() == 1} else {equivocations.is_empty()}, "should detect validator 0 equivocating if validator 0 equivocates");
+        assert!(
+            if *equivocator == 0 {equivocations.len() == 2} else {equivocations.is_empty()},
+            "should detect both validator 0 equivocating messages if validator 0 equivocates",
+        );
         // the following commented test should fail
         // assert_eq!(equivocations.len(), 1, "should detect validator 0 equivocating if validator 0 equivocates");
 
         let mut validator_state_clone = validator_state.clone();
         for message in messages.iter() {
-            validator_state_clone.update(&message);
+            validator_state_clone.update(&[&message]);
         }
-        let m0 = &Message::from_msgs(0, &validator_state_clone).unwrap();
-        let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
-        assert_eq!(equivocations.len(), 1, "should detect validator 0 equivocating if validator 0 equivocates");
+        let result = &Message::from_msgs(0, &validator_state_clone);
+        match result {
+            Err(message::Error::NoNewMessage) => (),
+            _ => panic!("from_msgs should return NoNewMessage when state.latest_msgs contains only equivocating messages"),
+        };
+        assert!(
+            validator_state_clone.equivocators().is_empty(),
+            "when state.thr is 0, state.equivocators should be empty",
+        );
 
         let validator_state = validator::State::new(
             validators_weights,
@@ -792,10 +801,17 @@ proptest! {
         );
         let mut validator_state_clone = validator_state.clone();
         for message in messages.iter() {
-            validator_state_clone.update(message);
+            validator_state_clone.update(&[&message]);
         }
-        let m0 = &Message::from_msgs(0, &validator_state_clone).unwrap();
-        let equivocations: Vec<_> = messages.iter().filter(|message| message.equivocates(&m0)).collect();
-        assert_eq!(equivocations.len(), 0, "equivocation absorbed in threshold");
+        let result = &Message::from_msgs(0, &validator_state_clone);
+        match result {
+            Err(message::Error::NoNewMessage) => (),
+            _ => panic!("from_msgs should return NoNewMessage when state.latest_msgs contains only equivocating messages"),
+        };
+        assert_eq!(
+            validator_state_clone.equivocators().len(),
+            equivocators.len(),
+            "when state.thr is arbitrily big, state.equivocators should be filled with every equivocator",
+        );
     }
 }

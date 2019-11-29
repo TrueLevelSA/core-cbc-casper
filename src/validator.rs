@@ -182,6 +182,10 @@ where
                 .weight(sender)
                 .unwrap_or(U::INFINITY);
 
+            if !self.latest_msgs.update(message) {
+                return false;
+            }
+
             if self.latest_msgs.equivocate(message)
                 && weight + self.state_fault_weight <= self.thr
                 && self.equivocators.insert(sender.clone())
@@ -189,7 +193,7 @@ where
                 self.state_fault_weight += weight;
             }
 
-            self.latest_msgs.update(message) && acc
+            acc
         })
     }
 
