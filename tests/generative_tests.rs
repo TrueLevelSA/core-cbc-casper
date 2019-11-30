@@ -769,8 +769,6 @@ proptest! {
             if *equivocator == 0 {equivocations.len() == 2} else {equivocations.is_empty()},
             "should detect both validator 0 equivocating messages if validator 0 equivocates",
         );
-        // the following commented test should fail
-        // assert_eq!(equivocations.len(), 1, "should detect validator 0 equivocating if validator 0 equivocates");
 
         let mut validator_state_clone = validator_state.clone();
         for message in messages.iter() {
