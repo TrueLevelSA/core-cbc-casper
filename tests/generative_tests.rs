@@ -742,15 +742,9 @@ proptest! {
     fn detect_equivocation(ref vote_tuple in votes(5, 5)) {
         let (messages, equivocators, nodes) = vote_tuple;
         let nodes = *nodes;
-        let validators: Vec<u32> = (0..nodes as u32).collect();
-        let weights: Vec<f64> =
-            iter::repeat(1.0).take(nodes as usize).collect();
+
         let validators_weights = validator::Weights::new(
-            validators
-                .iter()
-                .cloned()
-                .zip(weights.iter().cloned())
-                .collect(),
+            (0..nodes as u32).zip(iter::repeat(1.0)).collect(),
         );
         let validator_state = validator::State::new(
             validators_weights.clone(),
