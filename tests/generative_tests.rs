@@ -99,7 +99,7 @@ where
             for m in latest_delta.iter() {
                 validator_state.update(&[&m]);
             }
-            let m = Message::from_msgs(validator, &validator_state).unwrap();
+            let m = Message::from_validator_state(validator, &validator_state).unwrap();
 
             state.insert(validator, validator_state);
             state
@@ -137,7 +137,7 @@ where
                     validator_state_reconstructed.update(&[&justification_message]);
                 }
                 if m.estimate()
-                    != Message::from_msgs(
+                    != Message::from_validator_state(
                         validator,
                         &validator_state_reconstructed,
                     )
@@ -768,7 +768,7 @@ proptest! {
             validator_state_clone.update(&[&m]);
         }
         let m0 =
-            &Message::from_msgs(0, &validator_state_clone)
+            &Message::from_validator_state(0, &validator_state_clone)
             .unwrap();
         let equivocations: Vec<_> = single_equivocation.iter().filter(|message| message.equivocates(&m0)).collect();
         assert!(
@@ -782,10 +782,10 @@ proptest! {
         for message in messages.iter() {
             validator_state_clone.update(&[&message]);
         }
-        let result = &Message::from_msgs(0, &validator_state_clone);
+        let result = &Message::from_validator_state(0, &validator_state_clone);
         match result {
             Err(message::Error::NoNewMessage) => (),
-            _ => panic!("from_msgs should return NoNewMessage when state.latest_msgs contains only equivocating messages"),
+            _ => panic!("from_validator_state should return NoNewMessage when state.latest_msgs contains only equivocating messages"),
         };
         assert!(
             validator_state_clone.equivocators().is_empty(),
@@ -803,10 +803,10 @@ proptest! {
         for message in messages.iter() {
             validator_state_clone.update(&[&message]);
         }
-        let result = &Message::from_msgs(0, &validator_state_clone);
+        let result = &Message::from_validator_state(0, &validator_state_clone);
         match result {
             Err(message::Error::NoNewMessage) => (),
-            _ => panic!("from_msgs should return NoNewMessage when state.latest_msgs contains only equivocating messages"),
+            _ => panic!("from_validator_state should return NoNewMessage when state.latest_msgs contains only equivocating messages"),
         };
         assert_eq!(
             validator_state_clone.equivocators().len(),

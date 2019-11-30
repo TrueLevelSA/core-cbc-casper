@@ -135,7 +135,7 @@ fn block_from_prevblock_msg(c: &mut Criterion) {
             let mut msg = Message::new(1, Justification::empty(), Value::One);
             for _ in 0..=(**loops) {
                 weights.update(&[&msg]);
-                msg = Message::from_msgs(1, &weights).unwrap();
+                msg = Message::from_validator_state(1, &weights).unwrap();
             }
 
             b.iter(|| {

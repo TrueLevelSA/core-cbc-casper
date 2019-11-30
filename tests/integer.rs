@@ -67,7 +67,7 @@ fn equal_weight() {
     let m2 = IntegerMsg::new(validators[2], Justification::empty(), IntegerWrapper(3));
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[&m0, &m1, &m2]);
-    let m3 = IntegerMsg::from_msgs(validators[0], &validator_state_clone).unwrap();
+    let m3 = IntegerMsg::from_validator_state(validators[0], &validator_state_clone).unwrap();
 
     let mut j0 =
         Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut validator_state.clone());
@@ -130,7 +130,7 @@ fn uneven_weights_1() {
     let m2 = IntegerMsg::new(validators[2], Justification::empty(), IntegerWrapper(3));
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[&m0, &m1, &m2]);
-    let m3 = IntegerMsg::from_msgs(validators[0], &validator_state_clone).unwrap();
+    let m3 = IntegerMsg::from_validator_state(validators[0], &validator_state_clone).unwrap();
 
     let mut j0 =
         Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut validator_state.clone());
@@ -195,7 +195,7 @@ fn uneven_weights_4() {
 
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[&m0, &m1, &m2, &m3]);
-    let m4 = IntegerMsg::from_msgs(validators[3], &validator_state_clone).unwrap();
+    let m4 = IntegerMsg::from_validator_state(validators[3], &validator_state_clone).unwrap();
 
     let mut j0 =
         Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut validator_state.clone());

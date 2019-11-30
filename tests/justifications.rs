@@ -106,7 +106,7 @@ fn faulty_inserts() {
 
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[v0]);
-    let m0 = message::Message::from_msgs(0, &validator_state_clone).unwrap();
+    let m0 = message::Message::from_validator_state(0, &validator_state_clone).unwrap();
 
     // let m0 = &message::Message::new(0, justification, estimate);
     let mut j1 = Justification::empty();

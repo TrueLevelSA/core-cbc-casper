@@ -142,19 +142,19 @@ fn main() {
     let msg4 = Message::new(4, Justification::empty(), Value::One);
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[&msg1, &msg2]);
-    let msg5 = Message::from_msgs(1, &validator_state_clone).unwrap();
+    let msg5 = Message::from_validator_state(1, &validator_state_clone).unwrap();
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[&msg3, &msg4]);
-    let msg6 = Message::from_msgs(3, &validator_state_clone).unwrap();
+    let msg6 = Message::from_validator_state(3, &validator_state_clone).unwrap();
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[&msg2, &msg5, &msg6]);
-    let msg7 = Message::from_msgs(2, &validator_state_clone).unwrap();
+    let msg7 = Message::from_validator_state(2, &validator_state_clone).unwrap();
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[&msg7, &msg6]);
-    let msg8 = Message::from_msgs(3, &validator_state_clone).unwrap();
+    let msg8 = Message::from_validator_state(3, &validator_state_clone).unwrap();
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[&msg4, &msg6]);
-    let msg9 = Message::from_msgs(4, &validator_state_clone).unwrap();
+    let msg9 = Message::from_validator_state(4, &validator_state_clone).unwrap();
 
     assert_eq!(msg5.estimate(), &Value::Two);
     assert_eq!(msg6.estimate(), &Value::Zero);

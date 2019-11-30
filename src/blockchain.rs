@@ -512,7 +512,7 @@ mod tests {
         );
 
         state.update(&[&genesis_block_msg]);
-        let m1 = Message::from_msgs(validator1, &state.clone()).unwrap();
+        let m1 = Message::from_validator_state(validator1, &state.clone()).unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)     \--m1
         // (s2, w=2.0)
@@ -520,7 +520,7 @@ mod tests {
         // (s4, w=1.1)
 
         state.update(&[&genesis_block_msg]);
-        let m2 = Message::from_msgs(validator2, &state.clone()).unwrap();
+        let m2 = Message::from_validator_state(validator2, &state.clone()).unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)    |\--m1
         // (s2, w=2.0)    \---m2
@@ -528,7 +528,7 @@ mod tests {
         // (s4, w=1.1)
 
         state.update(&[&m1, &m2]);
-        let m3 = Message::from_msgs(validator3, &state.clone()).unwrap();
+        let m3 = Message::from_validator_state(validator3, &state.clone()).unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)    |\--m1
         // (s2, w=2.0)    \---m2
@@ -542,7 +542,7 @@ mod tests {
         );
 
         state.update(&[&m1]);
-        let m4 = Message::from_msgs(validator4, &state.clone()).unwrap();
+        let m4 = Message::from_validator_state(validator4, &state.clone()).unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)    |\--m1-------\
         // (s2, w=2.0)    \---m2       |
@@ -556,7 +556,7 @@ mod tests {
         );
 
         state.update(&[&m3, &m2]);
-        let m5 = Message::from_msgs(validator0, &state.clone()).unwrap();
+        let m5 = Message::from_validator_state(validator0, &state.clone()).unwrap();
         // (s0, w=1.0)   gen               m5
         // (s1, w=1.0)    |\--m1-------\   |
         // (s2, w=2.0)    \---m2       |   |
@@ -617,7 +617,7 @@ mod tests {
         // (s5, w=1.0)
 
         state.update(&[&genesis_block_msg]);
-        let m0 = Message::from_msgs(validator0, &state).unwrap();
+        let m0 = Message::from_validator_state(validator0, &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)     \--m0
         // (s1, w=1.0)
@@ -627,7 +627,7 @@ mod tests {
         // (s5, w=1.0)
 
         state.update(&[&m0]);
-        let m1 = Message::from_msgs(validator1, &state).unwrap();
+        let m1 = Message::from_validator_state(validator1, &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)     \--m0
         // (s1, w=1.0)         \--m1
@@ -637,7 +637,7 @@ mod tests {
         // (s5, w=1.0)
 
         state.update(&[&genesis_block_msg]);
-        let m2 = Message::from_msgs(validator2, &state).unwrap();
+        let m2 = Message::from_validator_state(validator2, &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -647,7 +647,7 @@ mod tests {
         // (s5, w=1.0)
 
         state.update(&[&m2]);
-        let m3 = Message::from_msgs(validator3, &state).unwrap();
+        let m3 = Message::from_validator_state(validator3, &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -657,7 +657,7 @@ mod tests {
         // (s5, w=1.0)
 
         state.update(&[&m2]);
-        let m4 = Message::from_msgs(validator4, &state).unwrap();
+        let m4 = Message::from_validator_state(validator4, &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -667,7 +667,7 @@ mod tests {
         // (s5, w=1.0)
 
         state.update(&[&m0, &m1, &m2, &m3, &m4]);
-        let m5 = Message::from_msgs(validator5, &state).unwrap();
+        let m5 = Message::from_validator_state(validator5, &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -712,11 +712,11 @@ mod tests {
 
         let proto_b1 = Block::new(Some(proto_b0.clone()));
         state.update(&[&m0]);
-        let m1 = Message::from_msgs(validators[1], &state).unwrap();
+        let m1 = Message::from_validator_state(validators[1], &state).unwrap();
 
         let proto_b2 = Block::new(Some(proto_b1.clone()));
         state.update(&[&m1]);
-        let m2 = Message::from_msgs(validators[0], &state).unwrap();
+        let m2 = Message::from_validator_state(validators[0], &state).unwrap();
 
         // no clique yet, since validators[1] has not seen validators[0] seeing validators[1] having
         // proto_b0 in the chain
@@ -732,7 +732,7 @@ mod tests {
         );
 
         state.update(&[&m2]);
-        let m3 = Message::from_msgs(validators[1], &state).unwrap();
+        let m3 = Message::from_validator_state(validators[1], &state).unwrap();
 
         // clique, since both validators have seen each other having proto_b0 in the chain
         assert_eq!(
@@ -750,10 +750,10 @@ mod tests {
         );
 
         state.update(&[&m3]);
-        let m4 = Message::from_msgs(validators[2], &state).unwrap();
+        let m4 = Message::from_validator_state(validators[2], &state).unwrap();
 
         state.update(&[&m4]);
-        let m5 = Message::from_msgs(validators[1], &state).unwrap();
+        let m5 = Message::from_validator_state(validators[1], &state).unwrap();
 
         // no second clique yet, since validators[2] has not seen validators[1] seeing validators[2] having
         // proto_b0.clone() in the chain
@@ -772,7 +772,7 @@ mod tests {
         );
 
         state.update(&[&m5]);
-        let m6 = Message::from_msgs(validators[2], &state).unwrap();
+        let m6 = Message::from_validator_state(validators[2], &state).unwrap();
 
         // have two cliques on proto_b0 now
         assert_eq!(
@@ -818,13 +818,13 @@ mod tests {
         );
 
         state.update(&[&m6]);
-        let m7 = Message::from_msgs(validators[0], &state).unwrap();
+        let m7 = Message::from_validator_state(validators[0], &state).unwrap();
 
         state.update(&[&m7]);
-        let m8 = Message::from_msgs(validators[2], &state).unwrap();
+        let m8 = Message::from_validator_state(validators[2], &state).unwrap();
 
         state.update(&[&m8]);
-        let _ = Message::from_msgs(validators[0], &state).unwrap();
+        let _ = Message::from_validator_state(validators[0], &state).unwrap();
 
         // now entire network is clique
         assert_eq!(

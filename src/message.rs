@@ -154,8 +154,9 @@ impl<E: Estimator> Message<E> {
         Message(Arc::new(proto), id)
     }
 
-    /// Create a message from newly received messages.
-    pub fn from_msgs<U: WeightUnit>(
+    /// Create a message from newly received messages contained in
+    /// validator_state.
+    pub fn from_validator_state<U: WeightUnit>(
         sender: E::ValidatorName,
         validator_state: &validator::State<E, U>,
     ) -> Result<Self, Error<E::Error>> {
