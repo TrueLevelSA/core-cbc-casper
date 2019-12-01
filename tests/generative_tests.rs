@@ -739,14 +739,14 @@ prop_compose! {
 proptest! {
     #![proptest_config(Config::with_cases(1000))]
     #[test]
-    fn detect_equivocation(ref vote_tuple in votes(5, 5)) {
-        let (messages, equivocators, nodes) = vote_tuple;
+    fn detect_equivocation_one_equivocation(ref vote_tuple in votes(5, 5)) {
+        let (messages, _, nodes) = vote_tuple;
         let nodes = *nodes;
 
         let validators_weights = validator::Weights::new(
             (0..nodes as u32).zip(iter::repeat(1.0)).collect(),
         );
-        let validator_state = validator::State::new(
+        let mut validator_state = validator::State::new(
             validators_weights.clone(),
             0.0,
             LatestMsgs::empty(),
@@ -757,51 +757,80 @@ proptest! {
         // here, only take one equivocation
         let single_equivocation: Vec<_> = messages[..=nodes].iter().map(|message| message).collect();
         let equivocator = messages[nodes].sender();
-        let mut validator_state_clone = validator_state.clone();
         for m in single_equivocation.iter() {
-            validator_state_clone.update(&[&m]);
+            validator_state.update(&[&m]);
         }
         let m0 =
-            &Message::from_validator_state(0, &validator_state_clone)
+            &Message::from_validator_state(0, &validator_state)
             .unwrap();
         let equivocations: Vec<_> = single_equivocation.iter().filter(|message| message.equivocates(&m0)).collect();
         assert!(
             if *equivocator == 0 {equivocations.len() == 2} else {equivocations.is_empty()},
             "should detect both validator 0 equivocating messages if validator 0 equivocates",
         );
+    }
+}
 
-        let mut validator_state_clone = validator_state.clone();
+proptest! {
+    #![proptest_config(Config::with_cases(1000))]
+    #[test]
+    fn detect_equivocation_all_equivocate(ref vote_tuple in votes(5, 5)) {
+        let (messages, _, nodes) = vote_tuple;
+        let nodes = *nodes;
+
+        let validators_weights = validator::Weights::new(
+            (0..nodes as u32).zip(iter::repeat(1.0)).collect(),
+        );
+        let mut validator_state = validator::State::new(
+            validators_weights.clone(),
+            0.0,
+            LatestMsgs::empty(),
+            0.0,
+            HashSet::new(),
+        );
+
         for message in messages.iter() {
-            validator_state_clone.update(&[&message]);
+            validator_state.update(&[&message]);
         }
-        let result = &Message::from_validator_state(0, &validator_state_clone);
+        let result = &Message::from_validator_state(0, &validator_state);
         match result {
             Err(message::Error::NoNewMessage) => (),
             _ => panic!("from_validator_state should return NoNewMessage when state.latest_msgs contains only equivocating messages"),
         };
         assert!(
-            validator_state_clone.equivocators().is_empty(),
+            validator_state.equivocators().is_empty(),
             "when state.thr is 0, state.equivocators should be empty",
         );
+    }
+}
 
-        let validator_state = validator::State::new(
+proptest! {
+    #![proptest_config(Config::with_cases(1000))]
+    #[test]
+    fn detect_equivocation_all_equivocate_high_thr(ref vote_tuple in votes(5, 5)) {
+        let (messages, equivocators, nodes) = vote_tuple;
+        let nodes = *nodes;
+
+        let validators_weights = validator::Weights::new(
+            (0..nodes as u32).zip(iter::repeat(1.0)).collect(),
+        );
+        let mut validator_state = validator::State::new(
             validators_weights,
             0.0,
             LatestMsgs::empty(),
             equivocators.len() as f64,
             HashSet::new(),
         );
-        let mut validator_state_clone = validator_state.clone();
         for message in messages.iter() {
-            validator_state_clone.update(&[&message]);
+            validator_state.update(&[&message]);
         }
-        let result = &Message::from_validator_state(0, &validator_state_clone);
+        let result = &Message::from_validator_state(0, &validator_state);
         match result {
             Err(message::Error::NoNewMessage) => (),
             _ => panic!("from_validator_state should return NoNewMessage when state.latest_msgs contains only equivocating messages"),
         };
         assert_eq!(
-            validator_state_clone.equivocators().len(),
+            validator_state.equivocators().len(),
             equivocators.len(),
             "when state.thr is arbitrily big, state.equivocators should be filled with every equivocator",
         );
