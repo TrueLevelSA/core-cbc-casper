@@ -123,9 +123,8 @@ where
     E: Estimator<ValidatorName = u32>,
 {
     messages_validators_recipients_datas.into_iter()
-        .map(|(m, validator, recipients)|{
+        .map(|(m, validator, recipients)| {
             recipients.into_iter().map(|recipient| {
-
                 let mut validator_state_reconstructed = validator::State::new(
                     state[&recipient].validators_weights().clone(),
                     0.0,
@@ -133,11 +132,12 @@ where
                     0.0,
                     HashSet::new(),
                 );
+
                 for justification_message in m.justification().iter() {
                     validator_state_reconstructed.update(&[&justification_message]);
                 }
-                if m.estimate()
-                    != Message::from_validator_state(
+
+                if m.estimate() != Message::from_validator_state(
                         validator,
                         &validator_state_reconstructed,
                     )
@@ -154,7 +154,6 @@ where
                 });
 
                 Ok(())
-
             }).collect()
         }).collect()
 }
@@ -614,10 +613,22 @@ fn blockchain() {
 proptest! {
     #![proptest_config(Config::with_cases(30))]
     #[test]
-    fn round_robin_vote_count(ref chain in chain(VoteCount::arbitrary(), 5, round_robin, all_receivers, full_consensus, 0, 0)) {
-        assert_eq!(chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len(),
-                   if !chain.is_empty() {chain.len()} else {0},
-                   "round robin with n validators should converge in n messages")
+    fn round_robin_vote_count(
+        ref chain in chain(
+            VoteCount::arbitrary(),
+            5,
+            round_robin,
+            all_receivers,
+            full_consensus,
+            0,
+            0,
+        ),
+    ) {
+        assert_eq!(
+            chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len(),
+            if !chain.is_empty() {chain.len()} else {0},
+            "round robin with n validators should converge in n messages",
+        );
     }
 }
 
@@ -632,86 +643,170 @@ fn integerwrapper_gen() -> BoxedStrategy<IntegerWrapper> {
 proptest! {
     #![proptest_config(Config::with_cases(30))]
     #[test]
-    fn round_robin_binary(ref chain in chain(boolwrapper_gen(), 15, round_robin, all_receivers, full_consensus, 0, 0)) {
-        assert!(chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len() >=
-                chain.len(),
-                "round robin with n validators should converge in at most n messages")
+    fn round_robin_binary(
+        ref chain in chain(
+            boolwrapper_gen(),
+            15,
+            round_robin,
+            all_receivers,
+            full_consensus,
+            0,
+            0,
+        ),
+    ) {
+        assert!(
+            chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len() >= chain.len(),
+            "round robin with n validators should converge in at most n messages",
+        );
     }
 }
 
 proptest! {
     #![proptest_config(Config::with_cases(10))]
     #[test]
-    fn round_robin_integer(ref chain in chain(integerwrapper_gen(), 2000, round_robin, all_receivers, full_consensus, 0, 0)) {
+    fn round_robin_integer(
+        ref chain in chain(
+            integerwrapper_gen(),
+            2000,
+            round_robin,
+            all_receivers,
+            full_consensus,
+            0,
+            0,
+        )
+    ) {
         // total messages until unilateral consensus
-        println!("{} validators -> {:?} message(s)",
-                 match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
-                 {"0" => "Unknown",
-                  x => x},
-                 chain.len());
-        assert!(chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len() >=
-                chain.len(),
-                "round robin with n validators should converge in at most n messages")
+        println!(
+            "{} validators -> {:?} message(s)",
+            match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+            {
+                "0" => "Unknown",
+                x => x,
+            },
+            chain.len(),
+        );
+        assert!(
+            chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len() >= chain.len(),
+            "round robin with n validators should converge in at most n messages",
+        );
     }
 }
 
 proptest! {
     #![proptest_config(Config::with_cases(1))]
     #[test]
-    fn arbitrary_messenger_vote_count(ref chain in chain(VoteCount::arbitrary(), 8, arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
+    fn arbitrary_messenger_vote_count(
+        ref chain in chain(
+            VoteCount::arbitrary(),
+            8,
+            arbitrary_in_set,
+            some_receivers,
+            full_consensus,
+            0,
+            0,
+        ),
+    ) {
         // total messages until unilateral consensus
-        println!("{} validators -> {:?} message(s)",
-                 match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
-                 {"0" => "Unknown",
-                  x => x},
-                 chain.len());
+        println!(
+            "{} validators -> {:?} message(s)",
+            match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+            {
+                "0" => "Unknown",
+                x => x,
+            },
+            chain.len(),
+        );
     }
 }
 
 proptest! {
     #![proptest_config(Config::with_cases(1))]
     #[test]
-    fn parallel_arbitrary_messenger_vote_count(ref chain in chain(VoteCount::arbitrary(), 8, parallel_arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
+    fn parallel_arbitrary_messenger_vote_count(
+        ref chain in chain(
+            VoteCount::arbitrary(),
+            8,
+            parallel_arbitrary_in_set,
+            some_receivers,
+            full_consensus,
+            0,
+            0,
+        ),
+    ) {
         // total messages until unilateral consensus
-        println!("{} validators -> {:?} message(s)",
-                 match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
-                 {"0" => "Unknown",
-                  x => x},
-                 chain.len());
+        println!(
+            "{} validators -> {:?} message(s)",
+            match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+            {
+                "0" => "Unknown",
+                x => x,
+            },
+            chain.len(),
+        );
     }
 }
 
 proptest! {
     #![proptest_config(Config::with_cases(1))]
     #[test]
-    fn arbitrary_messenger_binary(ref chain in chain(boolwrapper_gen(), 100, arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
+    fn arbitrary_messenger_binary(
+        ref chain in chain(
+            boolwrapper_gen(),
+            100,
+            arbitrary_in_set,
+            some_receivers,
+            full_consensus,
+            0,
+            0,
+        ),
+    ) {
         // total messages until unilateral consensus
-        println!("{} validators -> {:?} message(s)",
-                 match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
-                 {"0" => "Unknown",
-                  x => x},
-                 chain.len());
+        println!(
+            "{} validators -> {:?} message(s)",
+            match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+            {
+                "0" => "Unknown",
+                 x => x,
+            },
+            chain.len(),
+        );
     }
 }
 
 proptest! {
     #![proptest_config(Config::with_cases(1))]
     #[test]
-    fn arbitrary_messenger_integer(ref chain in chain(integerwrapper_gen(), 50, arbitrary_in_set, some_receivers, full_consensus, 0, 0)) {
+    fn arbitrary_messenger_integer(
+        ref chain in chain(
+            integerwrapper_gen(),
+            50,
+            arbitrary_in_set,
+            some_receivers,
+            full_consensus,
+            0,
+            0,
+        ),
+    ) {
         // total messages until unilateral consensus
-        println!("{} validators -> {:?} message(s)",
-                 match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
-                 {"0" => "Unknown",
-                  x => x},
-                 chain.len());
+        println!(
+            "{} validators -> {:?} message(s)",
+            match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+            {
+                "0" => "Unknown",
+                x => x,
+            },
+            chain.len(),
+        );
     }
 }
 
 prop_compose! {
     fn votes(validators: usize, equivocations: usize)
-        (votes in prop::collection::vec(prop::bool::weighted(0.3), validators as usize),
-         equivocations in Just(equivocations),
-         validators in Just(validators))
+        (
+            votes in prop::collection::vec(prop::bool::weighted(0.3), validators as usize),
+            equivocations in Just(equivocations),
+            validators in Just(validators),
+        )
          -> (Vec<Message<VoteCount>>, HashSet<u32>, usize)
     {
         let mut validators_enumeration: Vec<u32> = (0..validators as u32).collect();
