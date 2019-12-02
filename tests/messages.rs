@@ -285,55 +285,7 @@ fn from_validator_state_duplicates() {
 }
 
 #[test]
-fn from_validator_state_no_need_to_justify() {
-    let v0 = VoteCount::create_vote_msg(0, true);
-    let v1 = VoteCount::create_vote_msg(1, false);
-    let v2 = VoteCount::create_vote_msg(2, false);
-
-    let mut latest_msgs = LatestMsgs::empty();
-    latest_msgs.update(&v0);
-    latest_msgs.update(&v1);
-    latest_msgs.update(&v2);
-
-    let res = Message::from_validator_state(
-        0,
-        &validator::State::new(
-            validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
-            0.0,
-            latest_msgs,
-            0.0,
-            HashSet::new(),
-        ),
-    )
-    .expect("No errors expected");
-
-    // The new message we created with `from_validator_state` contains two votes
-    // that are not justified because they were in the latest
-    // messages of the state but not in the `new_msgs` parameter.
-    // I don't think there is a state transition from {v0} to
-    // {v0, v1, v2} so I suspect `from_validator_state` is broken.
-    // https://github.com/cbc-casper/cbc-casper-paper/blob/acc66e2ba4461a005262e2d5f434fd2e30ef0ff3/cbc-casper-paper-draft.tex#L276
-    // This behaviour comes from the fact that `from_validator_state` creates
-    // the justification from the `new_msgs` parameter and then calls
-    // `LatestMsgs::mk_estimate` with the `validator::State`.
-    assert_eq!(*res.estimate(), VoteCount { yes: 1, no: 2 });
-    assert_eq!(*res.sender(), 0);
-    assert_eq!(
-        HashSet::<&Message<VoteCount>>::from_iter(res.justification().iter()),
-        HashSet::from_iter(vec![&v0, &v1, &v2]),
-    );
-    assert!(res.depends(&v0));
-    assert!(res.depends(&v1));
-    assert!(res.depends(&v2));
-}
-
-#[test]
-fn from_validator_state_unknown_equivocator() {
-    // The equivocator is unknown to from_validator_state as it is not contained
-    // in the validator::State.LatestMsgs.
-    // In this case, the fault weight will not cross the tolerance
-    // threshold.
-
+fn from_validator_state_equivocator() {
     let v0 = VoteCount::create_vote_msg(0, false);
     let v0_prime = VoteCount::create_vote_msg(0, true);
     let v1 = VoteCount::create_vote_msg(1, true);
@@ -355,8 +307,9 @@ fn from_validator_state_unknown_equivocator() {
     )
     .expect("No errors expected");
 
-    // Note that even though the votes from the equivator are not
-    // counted in the estimate, they are present in the justification.
+    // No messages from the equivator in the justification. The
+    // result is the same as from_validator_state_equivocator_at_threshhold
+    // because from_validator_state uses the latest honest messages.
     assert_eq!(*res.sender(), 2);
     assert_eq!(*res.estimate(), VoteCount { yes: 1, no: 0 });
     assert_eq!(
@@ -366,13 +319,7 @@ fn from_validator_state_unknown_equivocator() {
 }
 
 #[test]
-fn from_validator_state_unknown_equivocator_at_threshhold() {
-    // This is an edge case where the equivocator gets one of his
-    // votes counted in the estimate... At random.
-    // The randomness comes from the HashSet used by from_validator_state to
-    // remove duplicate messages.
-    // In this case, the fault weight will tip over the threshold.
-
+fn from_validator_state_equivocator_at_threshhold() {
     let v0 = VoteCount::create_vote_msg(0, false);
     let v0_prime = VoteCount::create_vote_msg(0, true);
     let v1 = VoteCount::create_vote_msg(1, true);
@@ -394,44 +341,9 @@ fn from_validator_state_unknown_equivocator_at_threshhold() {
     )
     .expect("No errors expected");
 
-    // Here, the equivator has a random vote in the estimate, and the
-    // other vote is not in the justification.
+    // No messages from the equivator in the justification.
     assert_eq!(*res.sender(), 2);
     assert_eq!(*res.estimate(), VoteCount { yes: 1, no: 0 });
-    assert_eq!(
-        HashSet::<&Message<VoteCount>>::from_iter(res.justification().iter()),
-        HashSet::from_iter(vec![&v1]),
-    );
-}
-
-#[test]
-fn from_validator_state_known_equivocator() {
-    let v0 = VoteCount::create_vote_msg(0, false);
-    let v0_prime = VoteCount::create_vote_msg(0, true);
-    let v1 = VoteCount::create_vote_msg(1, true);
-
-    // Here, we populate latest_msgs before calling from_validator_state,
-    // which thus knows about the equivator beforehand.
-    let mut latest_msgs = LatestMsgs::empty();
-    latest_msgs.update(&v0);
-    latest_msgs.update(&v0_prime);
-    latest_msgs.update(&v1);
-
-    let res = Message::from_validator_state(
-        2,
-        &validator::State::new(
-            validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
-            0.0,
-            latest_msgs,
-            0.0,
-            HashSet::new(),
-        ),
-    )
-    .expect("No errors expected");
-
-    // No message from the equivator in the justification.
-    assert_eq!(*res.estimate(), VoteCount { yes: 1, no: 0 });
-    assert_eq!(*res.sender(), 2);
     assert_eq!(
         HashSet::<&Message<VoteCount>>::from_iter(res.justification().iter()),
         HashSet::from_iter(vec![&v1]),
@@ -440,7 +352,7 @@ fn from_validator_state_known_equivocator() {
 
 #[test]
 fn from_validator_state_only_equivocations() {
-    // With a known equivocator and only his message in the new_msgs,
+    // With an equivocator and only his messages in the State,
     // from_validator_state returns an error.
 
     let v0 = VoteCount::create_vote_msg(0, false);

@@ -155,7 +155,7 @@ impl<E: Estimator> Message<E> {
     }
 
     /// Create a message from newly received messages contained in
-    /// validator_state.
+    /// validator_state. Uses the latest honest messages.
     pub fn from_validator_state<U: WeightUnit>(
         sender: E::ValidatorName,
         validator_state: &validator::State<E, U>,
