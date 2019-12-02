@@ -64,7 +64,6 @@ fn msg_equality() {
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[v0]);
     let m0 = Message::from_validator_state(0, &validator_state_clone).unwrap();
-    // let m0 = &Message::new(0, justification, estimate);
 
     let mut j1 = Justification::empty();
 
