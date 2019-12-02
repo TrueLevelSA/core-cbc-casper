@@ -35,9 +35,9 @@ fn msg_equality() {
     let v0 = &VoteCount::create_vote_msg(0, false);
     let v1 = &VoteCount::create_vote_msg(1, true);
     let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
-    let v0_idem = &VoteCount::create_vote_msg(0, false);
+    let v0_duplicate = &VoteCount::create_vote_msg(0, false);
 
-    assert!(v0 == v0_idem, "v0 and v0_idem should be equal");
+    assert!(v0 == v0_duplicate, "v0 and v0_duplicate should be equal");
     assert!(v0 != v0_prime, "v0 and v0_prime should NOT be equal");
     assert!(v0 != v1, "v0 and v1 should NOT be equal");
 
