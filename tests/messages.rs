@@ -31,26 +31,19 @@ use casper::validator;
 
 #[test]
 fn msg_equality() {
-    // v0 and v0_prime are equivocating messages (first child of a fork).
-    let v0 = &VoteCount::create_vote_msg(0, false);
-    let v1 = &VoteCount::create_vote_msg(1, true);
-    let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
-    let v0_duplicate = &VoteCount::create_vote_msg(0, false);
-
-    assert!(v0 == v0_duplicate, "v0 and v0_duplicate should be equal");
-    assert!(v0 != v0_prime, "v0 and v0_prime should NOT be equal");
-    assert!(v0 != v1, "v0 and v1 should NOT be equal");
-
-    let validators_weights =
-        validator::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
-
     let validator_state = validator::State::new(
-        validators_weights,
+        validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
         0.0,
         LatestMsgs::empty(),
         0.0,
         HashSet::new(),
     );
+
+    // v0 and v0_prime are equivocating messages (first child of a fork).
+    let v0 = &VoteCount::create_vote_msg(0, false);
+    let v1 = &VoteCount::create_vote_msg(1, true);
+    let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
+    let v0_duplicate = &VoteCount::create_vote_msg(0, false);
 
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[v0]);
@@ -59,36 +52,46 @@ fn msg_equality() {
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[v0]);
     let msg1 = Message::from_validator_state(0, &validator_state_clone).unwrap();
+
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[v0]);
     let msg2 = Message::from_validator_state(0, &validator_state_clone).unwrap();
-    assert!(msg1 == msg2, "messages should be equal");
 
     let mut validator_state_clone = validator_state;
     validator_state_clone.update(&[v0, &m0]);
     let msg3 = Message::from_validator_state(0, &validator_state_clone).unwrap();
+
+    assert!(v0 == v0_duplicate, "v0 and v0_duplicate should be equal");
+    assert!(v0 != v0_prime, "v0 and v0_prime should NOT be equal");
+    assert!(v0 != v1, "v0 and v1 should NOT be equal");
+    assert!(msg1 == msg2, "messages should be equal");
     assert!(msg1 != msg3, "msg1 should be different than msg3");
 }
 
 #[test]
 fn msg_depends() {
-    let v0 = &VoteCount::create_vote_msg(0, false);
-    let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
-
-    let validators_weights =
-        validator::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
-
     let validator_state = validator::State::new(
-        validators_weights,
+        validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
         0.0,
         LatestMsgs::empty(),
         0.0,
         HashSet::new(),
     );
 
+    let v0 = &VoteCount::create_vote_msg(0, false);
+    let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
+
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[v0]);
     let m0 = Message::from_validator_state(0, &validator_state_clone).unwrap();
+
+    let mut validator_state_clone = validator_state.clone();
+    validator_state_clone.update(&[&v0]);
+    let m0_2 = Message::from_validator_state(0, &validator_state_clone).unwrap();
+
+    let mut validator_state_clone = validator_state;
+    validator_state_clone.update(&[v0, &m0_2]);
+    let m1 = Message::from_validator_state(0, &validator_state_clone).unwrap();
 
     assert!(
         !v0.depends(v0_prime),
@@ -100,35 +103,24 @@ fn msg_depends() {
     );
     assert!(!m0.depends(v0_prime), "m0 depends on v0 directly");
     assert!(m0.depends(v0), "m0 depends on v0 directly");
-
-    let mut validator_state_clone = validator_state.clone();
-    validator_state_clone.update(&[&v0]);
-    let m0_2 = Message::from_validator_state(0, &validator_state_clone).unwrap();
-
-    let mut validator_state_clone = validator_state;
-    validator_state_clone.update(&[v0, &m0_2]);
-    let m1 = Message::from_validator_state(0, &validator_state_clone).unwrap();
-
-    assert!(m1.depends(&m0_2), "m1 DOES depent on m0_2");
-    assert!(!m0_2.depends(&m1), "but m0_2 does NOT depend on m1");
-    assert!(m1.depends(v0), "m1 depends on v0 through m0_2");
+    assert!(m1.depends(&m0), "m1 DOES depent on m0");
+    assert!(!m0.depends(&m1), "but m0 does NOT depend on m1");
+    assert!(m1.depends(v0), "m1 depends on v0 through m0");
 }
 
 #[test]
 fn msg_equivocates() {
-    let v0 = &VoteCount::create_vote_msg(0, false);
-    let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
-    let v1 = &VoteCount::create_vote_msg(1, true);
-
-    let validators_weights =
-        validator::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
     let validator_state = validator::State::new(
-        validators_weights,
+        validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
         0.0,
         LatestMsgs::empty(),
         0.0,
         HashSet::new(),
     );
+
+    let v0 = &VoteCount::create_vote_msg(0, false);
+    let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
+    let v1 = &VoteCount::create_vote_msg(1, true);
 
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[&v0]);
@@ -137,11 +129,11 @@ fn msg_equivocates() {
     let mut validator_state_clone = validator_state;
     validator_state_clone.update(&[&v0]);
     let m1 = Message::from_validator_state(1, &validator_state_clone).unwrap();
+
     assert!(!v0.equivocates(v0), "should be all good");
     assert!(!v1.equivocates(&m0), "should be all good");
     assert!(!m0.equivocates(v1), "should be all good");
     assert!(v0.equivocates(v0_prime), "should be a direct equivocation");
-
     assert!(
         m0.equivocates(v0_prime),
         "should be an indirect equivocation, equivocates to m0 through v0"
