@@ -25,7 +25,7 @@ use common::vote_count::VoteCount;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
-use casper::justification::{Justification, LatestMsgs};
+use casper::justification::LatestMsgs;
 use casper::message::{self, Message};
 use casper::validator;
 
@@ -52,36 +52,9 @@ fn msg_equality() {
         HashSet::new(),
     );
 
-    let mut j0 = Justification::empty();
-    let failure = j0
-        .faulty_inserts(
-            &vec![v0].iter().cloned().collect(),
-            &mut validator_state.clone(),
-        )
-        .is_empty();
-    assert_eq!(failure, false);
-
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[v0]);
     let m0 = Message::from_validator_state(0, &validator_state_clone).unwrap();
-
-    let mut j1 = Justification::empty();
-
-    let failure = j1
-        .faulty_inserts(
-            &vec![v0].iter().cloned().collect(),
-            &mut validator_state.clone(),
-        )
-        .is_empty();
-    assert_eq!(failure, false);
-
-    let failure = j1
-        .faulty_inserts(
-            &vec![&m0].iter().cloned().collect(),
-            &mut validator_state.clone(),
-        )
-        .is_empty();
-    assert_eq!(failure, false);
 
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[v0]);
@@ -113,15 +86,6 @@ fn msg_depends() {
         HashSet::new(),
     );
 
-    let mut j0 = Justification::empty();
-    let failure = j0
-        .faulty_inserts(
-            &vec![v0].iter().cloned().collect(),
-            &mut validator_state.clone(),
-        )
-        .is_empty();
-    assert_eq!(failure, false);
-
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[v0]);
     let m0 = Message::from_validator_state(0, &validator_state_clone).unwrap();
@@ -137,35 +101,9 @@ fn msg_depends() {
     assert!(!m0.depends(v0_prime), "m0 depends on v0 directly");
     assert!(m0.depends(v0), "m0 depends on v0 directly");
 
-    let mut j0 = Justification::empty();
-    let failure = j0
-        .faulty_inserts(
-            &[v0].iter().cloned().collect(),
-            &mut validator_state.clone(),
-        )
-        .is_empty();
-    assert_eq!(failure, false);
-
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[&v0]);
     let m0 = Message::from_validator_state(0, &validator_state_clone).unwrap();
-
-    let mut j1 = Justification::empty();
-    let failure = j1
-        .faulty_inserts(
-            &[v0].iter().cloned().collect(),
-            &mut validator_state.clone(),
-        )
-        .is_empty();
-    assert_eq!(failure, false);
-
-    let failure = j1
-        .faulty_inserts(
-            &[&m0].iter().cloned().collect(),
-            &mut validator_state.clone(),
-        )
-        .is_empty();
-    assert_eq!(failure, false);
 
     let mut validator_state_clone = validator_state;
     validator_state_clone.update(&[v0, &m0]);
@@ -191,15 +129,6 @@ fn msg_equivocates() {
         0.0,
         HashSet::new(),
     );
-
-    let mut j0 = Justification::empty();
-    let failure = j0
-        .faulty_inserts(
-            &vec![v0].iter().cloned().collect(),
-            &mut validator_state.clone(),
-        )
-        .is_empty();
-    assert_eq!(failure, false);
 
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[&v0]);
