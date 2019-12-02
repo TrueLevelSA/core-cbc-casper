@@ -103,15 +103,15 @@ fn msg_depends() {
 
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[&v0]);
-    let m0 = Message::from_validator_state(0, &validator_state_clone).unwrap();
+    let m0_2 = Message::from_validator_state(0, &validator_state_clone).unwrap();
 
     let mut validator_state_clone = validator_state;
-    validator_state_clone.update(&[v0, &m0]);
+    validator_state_clone.update(&[v0, &m0_2]);
     let m1 = Message::from_validator_state(0, &validator_state_clone).unwrap();
 
-    assert!(m1.depends(&m0), "m1 DOES depent on m0");
-    assert!(!m0.depends(&m1), "but m0 does NOT depend on m1");
-    assert!(m1.depends(v0), "m1 depends on v0 through m0");
+    assert!(m1.depends(&m0_2), "m1 DOES depent on m0_2");
+    assert!(!m0_2.depends(&m1), "but m0_2 does NOT depend on m1");
+    assert!(m1.depends(v0), "m1 depends on v0 through m0_2");
 }
 
 #[test]
