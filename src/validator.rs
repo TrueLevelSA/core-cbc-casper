@@ -174,6 +174,8 @@ where
         }
     }
 
+    /// Adds messages to the state's latests_msgs. Returns true if
+    /// all messages added are valid latest messages.
     pub fn update(&mut self, messages: &[&Message<E>]) -> bool {
         messages.iter().fold(true, |acc, message| {
             let sender = message.sender();
@@ -182,9 +184,10 @@ where
                 .weight(sender)
                 .unwrap_or(U::INFINITY);
 
-            if !self.latest_msgs.update(message) {
-                return false;
-            }
+            // TODO #49: investigate why LatestMsgs.update does not
+            // return as its documentation says and if the code or
+            // the documentation should be fixed.
+            let a = self.latest_msgs.update(message);
 
             if self.latest_msgs.equivocate(message)
                 && weight + self.state_fault_weight <= self.thr
@@ -193,7 +196,7 @@ where
                 self.state_fault_weight += weight;
             }
 
-            acc
+            acc && a
         })
     }
 
