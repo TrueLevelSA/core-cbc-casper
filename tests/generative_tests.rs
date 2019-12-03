@@ -122,40 +122,44 @@ fn add_messages<E>(
 where
     E: Estimator<ValidatorName = u32>,
 {
-    messages_validators_recipients_datas.into_iter()
+    messages_validators_recipients_datas
+        .into_iter()
         .map(|(m, validator, recipients)| {
-            recipients.into_iter().map(|recipient| {
-                let mut validator_state_reconstructed = validator::State::new(
-                    state[&recipient].validators_weights().clone(),
-                    0.0,
-                    LatestMsgs::from(m.justification()),
-                    0.0,
-                    HashSet::new(),
-                );
+            recipients
+                .into_iter()
+                .map(|recipient| {
+                    let mut validator_state_reconstructed = validator::State::new(
+                        state[&recipient].validators_weights().clone(),
+                        0.0,
+                        LatestMsgs::from(m.justification()),
+                        0.0,
+                        HashSet::new(),
+                    );
 
-                for justification_message in m.justification().iter() {
-                    validator_state_reconstructed.update(&[&justification_message]);
-                }
+                    for justification_message in m.justification().iter() {
+                        validator_state_reconstructed.update(&[&justification_message]);
+                    }
 
-                if m.estimate() != Message::from_validator_state(
-                        validator,
-                        &validator_state_reconstructed,
-                    )
-                    .unwrap()
-                    .estimate()
-                {
-                    return Err("Recipient must be able to reproduce the estimate from its justification and the justification only.");
-                }
+                    if m.estimate()
+                        != Message::from_validator_state(validator, &validator_state_reconstructed)
+                            .unwrap()
+                            .estimate()
+                    {
+                        return Err("Recipient must be able to reproduce the estimate \
+                                    from its justification and the justification only.");
+                    }
 
-                let state_to_update = state.get_mut(&recipient).unwrap().latests_msgs_as_mut();
-                state_to_update.update(&m);
-                m.justification().iter().for_each(|m| {
-                    state_to_update.update(m);
-                });
+                    let state_to_update = state.get_mut(&recipient).unwrap().latests_msgs_as_mut();
+                    state_to_update.update(&m);
+                    m.justification().iter().for_each(|m| {
+                        state_to_update.update(m);
+                    });
 
-                Ok(())
-            }).collect()
-        }).collect()
+                    Ok(())
+                })
+                .collect()
+        })
+        .collect()
 }
 
 /// validator strategy that selects one validator at each step, in a round robin manner
@@ -307,7 +311,8 @@ fn get_data_from_state(
                     safety_threshold,
                     validator_state.validators_weights(),
                 );
-                //returns set of btreeset? basically the cliques; if the set is not empty, there is at least one clique
+                // returns set of btreeset? basically the cliques; if
+                // the set is not empty, there is at least one clique
                 set_of_stuff != HashSet::new()
             })
             .collect();
@@ -890,7 +895,10 @@ proptest! {
         let result = &Message::from_validator_state(0, &validator_state);
         match result {
             Err(message::Error::NoNewMessage) => (),
-            _ => panic!("from_validator_state should return NoNewMessage when state.latest_msgs contains only equivocating messages"),
+            _ => panic!(
+                "from_validator_state should return NoNewMessage when \
+                state.latest_msgs contains only equivocating messages"
+            ),
         };
         assert!(
             validator_state.equivocators().is_empty(),
@@ -922,12 +930,16 @@ proptest! {
         let result = &Message::from_validator_state(0, &validator_state);
         match result {
             Err(message::Error::NoNewMessage) => (),
-            _ => panic!("from_validator_state should return NoNewMessage when state.latest_msgs contains only equivocating messages"),
+            _ => panic!(
+                "from_validator_state should return NoNewMessage when \
+                state.latest_msgs contains only equivocating messages"
+            ),
         };
         assert_eq!(
             validator_state.equivocators().len(),
             equivocators.len(),
-            "when state.thr is arbitrily big, state.equivocators should be filled with every equivocator",
+            "when state.thr is arbitrarily big, state.equivocators should be filled with every \
+             equivocator",
         );
     }
 }
