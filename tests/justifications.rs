@@ -69,10 +69,12 @@ fn faulty_inserts_sorted() {
 
     let mut j = Justification::empty();
     let sorted_msgs = validator_state
-        .sort_by_faultweight(&vec![v2_prime, v1_prime, v0_prime].iter().cloned().collect());
+        .sort_by_faultweight(&vec![v2_prime, v1_prime, v0_prime].into_iter().collect());
+
     sorted_msgs.iter().for_each(|&m| {
         j.faulty_insert(m, &mut validator_state);
     });
+
     assert!(j.contains(v0_prime));
     assert!(j.contains(v1_prime));
     assert!(!j.contains(v2_prime));
@@ -95,7 +97,7 @@ fn faulty_inserts() {
     );
 
     let failure = j0
-        .faulty_inserts(&[v0].iter().cloned().collect(), &mut validator_state)
+        .faulty_inserts(&vec![v0].into_iter().collect(), &mut validator_state)
         .is_empty();
     assert_eq!(failure, false);
 
@@ -105,12 +107,12 @@ fn faulty_inserts() {
 
     let mut j1 = Justification::empty();
     let failure = j1
-        .faulty_inserts(&vec![v1].iter().cloned().collect(), &mut validator_state)
+        .faulty_inserts(&vec![v1].into_iter().collect(), &mut validator_state)
         .is_empty();
     assert_eq!(failure, false);
 
     let failure = j1
-        .faulty_inserts(&vec![&m0].iter().cloned().collect(), &mut validator_state)
+        .faulty_inserts(&vec![&m0].into_iter().collect(), &mut validator_state)
         .is_empty();
     assert_eq!(failure, false);
 
