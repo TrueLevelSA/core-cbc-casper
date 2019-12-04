@@ -99,12 +99,10 @@ fn faulty_inserts_one_message() {
     assert_eq!(failure, false);
 }
 
-#[test]
-fn faulty_inserts() {
-    let v0 = &VoteCount::create_vote_msg(0, false);
-    let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
-    let v1 = &VoteCount::create_vote_msg(1, true);
-
+fn faulty_insert_setup() -> (
+    message::Message<VoteCount>,
+    validator::State<VoteCount, f32>,
+) {
     let mut validator_state = validator::State::new(
         validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
         0.0,
@@ -113,11 +111,22 @@ fn faulty_inserts() {
         HashSet::new(),
     );
 
+    let v0 = VoteCount::create_vote_msg(0, false);
+    let v0_prime = VoteCount::create_vote_msg(0, true); // equivocating vote
+    let v1 = VoteCount::create_vote_msg(1, true);
+
     let mut validator_state_clone = validator_state.clone();
-    validator_state_clone.update(&[v0]);
+    validator_state_clone.update(&[&v0]);
     let m0 = message::Message::from_validator_state(0, &validator_state_clone).unwrap();
 
-    validator_state.update(&[v1, &m0, v0_prime]);
+    validator_state.update(&[&v1, &m0, &v0_prime]);
+
+    (v0_prime, validator_state)
+}
+
+#[test]
+fn faulty_inserts() {
+    let (v0_prime, validator_state) = faulty_insert_setup();
 
     let mut state = validator::State::new_with_default_state(
         validator_state.clone(),
@@ -127,7 +136,7 @@ fn faulty_inserts() {
         Some(1.0),
         None,
     );
-    let success = Justification::empty().faulty_insert(v0_prime, &mut state);
+    let success = Justification::empty().faulty_insert(&v0_prime, &mut state);
     assert!(
         success,
         "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it \
@@ -142,7 +151,7 @@ fn faulty_inserts() {
         Some(1.0),
         None,
     );
-    Justification::empty().faulty_insert(v0_prime, &mut validator_state2);
+    Justification::empty().faulty_insert(&v0_prime, &mut validator_state2);
     float_eq!(
         validator_state2.fault_weight(),
         1.0,
@@ -159,7 +168,7 @@ fn faulty_inserts() {
         Some(1.0),
         None,
     );
-    let success = Justification::empty().faulty_insert(v0_prime, &mut state);
+    let success = Justification::empty().faulty_insert(&v0_prime, &mut state);
     assert!(
         !success,
         "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as the \
@@ -174,7 +183,7 @@ fn faulty_inserts() {
         Some(1.0),
         None,
     );
-    Justification::empty().faulty_insert(v0_prime, &mut validator_state2);
+    Justification::empty().faulty_insert(&v0_prime, &mut validator_state2);
     float_eq!(
         validator_state2.fault_weight(),
         0.1,
@@ -191,7 +200,7 @@ fn faulty_inserts() {
         Some(2.0),
         None,
     );
-    let success = Justification::empty().faulty_insert(v0_prime, &mut state);
+    let success = Justification::empty().faulty_insert(&v0_prime, &mut state);
     assert!(
         success,
         "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the thr \
@@ -207,7 +216,7 @@ fn faulty_inserts() {
         Some(2.0),
         None,
     );
-    let success = Justification::empty().faulty_insert(v0_prime, &mut state);
+    let success = Justification::empty().faulty_insert(&v0_prime, &mut state);
     assert!(
         !success,
         "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we \
@@ -221,7 +230,7 @@ fn faulty_inserts() {
         2.0,
         HashSet::new(),
     );
-    Justification::empty().faulty_insert(v0_prime, &mut validator_state);
+    Justification::empty().faulty_insert(&v0_prime, &mut validator_state);
     float_eq!(
         validator_state.fault_weight(),
         1.0,
