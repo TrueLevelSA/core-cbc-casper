@@ -142,23 +142,8 @@ fn faulty_insert_accept_fault() {
         "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it \
          doesnt cross the fault threshold for the set"
     );
-}
-
-#[test]
-fn faulty_insert_accept_fault_check_weight() {
-    let (v0_prime, validator_state) = faulty_insert_setup();
-
-    let mut validator_state2 = validator::State::new_with_default_state(
-        validator_state,
-        None,
-        None,
-        None,
-        Some(1.0),
-        None,
-    );
-    Justification::empty().faulty_insert(&v0_prime, &mut validator_state2);
     float_eq!(
-        validator_state2.fault_weight(),
+        state.fault_weight(),
         1.0,
         "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it \
          doesnt cross the fault threshold for the set, and thus the state_fault_weight should \
@@ -184,23 +169,8 @@ fn faulty_insert_no_accept() {
         "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as the \
          fault threshold gets crossed for the set"
     );
-}
-
-#[test]
-fn faulty_insert_no_accept_check_weight() {
-    let (v0_prime, validator_state) = faulty_insert_setup();
-
-    let mut validator_state2 = validator::State::new_with_default_state(
-        validator_state,
-        None,
-        Some(0.1),
-        None,
-        Some(1.0),
-        None,
-    );
-    Justification::empty().faulty_insert(&v0_prime, &mut validator_state2);
     float_eq!(
-        validator_state2.fault_weight(),
+        state.fault_weight(),
         0.1,
         "$v0_prime$ conflicts with $v0$ through $m0$, and we should NOT accept this fault as the \
          fault threshold gets crossed for the set, and thus the state_fault_weight should not be \
@@ -247,22 +217,8 @@ fn faulty_insert_unknown_weights() {
         "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we \
          can't know the weight of the validator, which could be Infinity"
     );
-}
-
-#[test]
-fn faulty_insert_unknown_weights_check_weight() {
-    let (v0_prime, _validator_state) = faulty_insert_setup();
-
-    let mut validator_state = validator::State::new(
-        validator::Weights::new(vec![].into_iter().collect()),
-        1.0,
-        LatestMsgs::empty(),
-        2.0,
-        HashSet::new(),
-    );
-    Justification::empty().faulty_insert(&v0_prime, &mut validator_state);
     float_eq!(
-        validator_state.fault_weight(),
+        state.fault_weight(),
         1.0,
         "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we \
          can't know the weight of the validator, which could be Infinity, and thus the \
