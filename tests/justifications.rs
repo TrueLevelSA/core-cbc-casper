@@ -117,8 +117,6 @@ fn faulty_inserts() {
     validator_state_clone.update(&[v0]);
     let m0 = message::Message::from_validator_state(0, &validator_state_clone).unwrap();
 
-    let j1 = Justification::empty();
-
     validator_state.update(&[v1, &m0, v0_prime]);
 
     let mut state = validator::State::new_with_default_state(
@@ -129,7 +127,7 @@ fn faulty_inserts() {
         Some(1.0),
         None,
     );
-    let success = j1.clone().faulty_insert(v0_prime, &mut state);
+    let success = Justification::empty().faulty_insert(v0_prime, &mut state);
     assert!(
         success,
         "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it \
@@ -144,7 +142,7 @@ fn faulty_inserts() {
         Some(1.0),
         None,
     );
-    j1.clone().faulty_insert(v0_prime, &mut validator_state2);
+    Justification::empty().faulty_insert(v0_prime, &mut validator_state2);
     float_eq!(
         validator_state2.fault_weight(),
         1.0,
@@ -161,7 +159,7 @@ fn faulty_inserts() {
         Some(1.0),
         None,
     );
-    let success = j1.clone().faulty_insert(v0_prime, &mut state);
+    let success = Justification::empty().faulty_insert(v0_prime, &mut state);
     assert!(
         !success,
         "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as the \
@@ -176,7 +174,7 @@ fn faulty_inserts() {
         Some(1.0),
         None,
     );
-    j1.clone().faulty_insert(v0_prime, &mut validator_state2);
+    Justification::empty().faulty_insert(v0_prime, &mut validator_state2);
     float_eq!(
         validator_state2.fault_weight(),
         0.1,
@@ -193,7 +191,7 @@ fn faulty_inserts() {
         Some(2.0),
         None,
     );
-    let success = j1.clone().faulty_insert(v0_prime, &mut state);
+    let success = Justification::empty().faulty_insert(v0_prime, &mut state);
     assert!(
         success,
         "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the thr \
@@ -209,7 +207,7 @@ fn faulty_inserts() {
         Some(2.0),
         None,
     );
-    let success = j1.clone().faulty_insert(v0_prime, &mut state);
+    let success = Justification::empty().faulty_insert(v0_prime, &mut state);
     assert!(
         !success,
         "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we \
@@ -223,7 +221,7 @@ fn faulty_inserts() {
         2.0,
         HashSet::new(),
     );
-    j1.faulty_insert(v0_prime, &mut validator_state);
+    Justification::empty().faulty_insert(v0_prime, &mut validator_state);
     float_eq!(
         validator_state.fault_weight(),
         1.0,
