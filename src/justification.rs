@@ -388,3 +388,372 @@ impl<E: Estimator> LatestMsgsHonest<E> {
         E::estimate(&self, validators_weights)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::tests_common::vote_count::VoteCount;
+
+    use std::collections::HashSet;
+
+    use crate::justification::{Justification, LatestMsgs};
+    use crate::message;
+    use crate::validator;
+
+    macro_rules! float_eq {
+        ($lhs:expr, $rhs:expr) => {{
+            assert!(
+                f32::abs($lhs - $rhs) < std::f32::EPSILON,
+                format!("float_eq: {} and {} aren't equal", $lhs, $rhs),
+            )
+        }};
+        ($lhs:expr, $rhs:expr, $message:expr) => {{
+            assert!(
+                f32::abs($lhs - $rhs) < std::f32::EPSILON,
+                format!(
+                    "float_eq: {} and {} aren't equal. Provided message: {}",
+                    $lhs, $rhs, $message
+                ),
+            )
+        }};
+    }
+
+    #[test]
+    fn faulty_insert_sorted() {
+        let v0 = &VoteCount::create_vote_msg(0, false);
+        let v0_prime = &VoteCount::create_vote_msg(0, true);
+        let v1 = &VoteCount::create_vote_msg(1, true);
+        let v1_prime = &VoteCount::create_vote_msg(1, false);
+        let v2 = &VoteCount::create_vote_msg(2, true);
+        let v2_prime = &VoteCount::create_vote_msg(2, false);
+
+        let mut latest_msgs = LatestMsgs::empty();
+        latest_msgs.update(v0);
+        latest_msgs.update(v1);
+        latest_msgs.update(v2);
+
+        let mut validator_state = validator::State::new(
+            validator::Weights::new(vec![(0, 1.0), (1, 2.0), (2, 3.0)].into_iter().collect()),
+            0.0,
+            latest_msgs,
+            3.0,
+            HashSet::new(),
+        );
+        let mut j = Justification::empty();
+        let sorted_msgs = validator_state
+            .sort_by_faultweight(&vec![v2_prime, v1_prime, v0_prime].into_iter().collect());
+
+        sorted_msgs.iter().for_each(|&m| {
+            j.faulty_insert(m, &mut validator_state);
+        });
+
+        assert!(j.contains(v0_prime));
+        assert!(j.contains(v1_prime));
+        assert!(!j.contains(v2_prime));
+        float_eq!(validator_state.fault_weight(), 3.0);
+    }
+
+    #[test]
+    fn faulty_inserts_one_message() {
+        let v0 = &VoteCount::create_vote_msg(0, false);
+
+        let mut validator_state = validator::State::new(
+            validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
+            0.0,
+            LatestMsgs::empty(),
+            0.0,
+            HashSet::new(),
+        );
+
+        let failure = Justification::empty()
+            .faulty_inserts(&vec![v0].into_iter().collect(), &mut validator_state)
+            .is_empty();
+        assert_eq!(failure, false);
+    }
+
+    fn faulty_insert_setup() -> (
+        message::Message<VoteCount>,
+        validator::State<VoteCount, f32>,
+    ) {
+        let mut validator_state = validator::State::new(
+            validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
+            0.0,
+            LatestMsgs::empty(),
+            0.0,
+            HashSet::new(),
+        );
+
+        let v0 = VoteCount::create_vote_msg(0, false);
+        let v0_prime = VoteCount::create_vote_msg(0, true); // equivocating vote
+        let v1 = VoteCount::create_vote_msg(1, true);
+
+        let mut validator_state_clone = validator_state.clone();
+        validator_state_clone.update(&[&v0]);
+        let m0 = message::Message::from_validator_state(0, &validator_state_clone).unwrap();
+
+        validator_state.update(&[&v1, &m0, &v0_prime]);
+
+        (v0_prime, validator_state)
+    }
+
+    #[test]
+    fn faulty_insert_accept_fault() {
+        let (v0_prime, validator_state) = faulty_insert_setup();
+
+        let mut state = validator::State::new_with_default_state(
+            validator_state,
+            None,
+            None,
+            None,
+            Some(1.0),
+            None,
+        );
+        let success = Justification::empty().faulty_insert(&v0_prime, &mut state);
+        assert!(
+            success,
+            "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it \
+             doesnt cross the fault threshold for the set"
+        );
+        float_eq!(
+            state.fault_weight(),
+            1.0,
+            "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it \
+             doesnt cross the fault threshold for the set, and thus the state_fault_weight should \
+             be incremented to 1.0"
+        );
+    }
+
+    #[test]
+    fn faulty_insert_no_accept() {
+        let (v0_prime, validator_state) = faulty_insert_setup();
+
+        let mut state = validator::State::new_with_default_state(
+            validator_state,
+            None,
+            Some(0.1),
+            None,
+            Some(1.0),
+            None,
+        );
+        let success = Justification::empty().faulty_insert(&v0_prime, &mut state);
+        assert!(
+            !success,
+            "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as \
+             the fault threshold gets crossed for the set"
+        );
+        float_eq!(
+            state.fault_weight(),
+            0.1,
+            "$v0_prime$ conflicts with $v0$ through $m0$, and we should NOT accept this fault as \
+             the fault threshold gets crossed for the set, and thus the state_fault_weight should \
+             not be incremented"
+        );
+    }
+
+    #[test]
+    fn faulty_insert_accept_with_bigger_numbers() {
+        let (v0_prime, validator_state) = faulty_insert_setup();
+
+        let mut state = validator::State::new_with_default_state(
+            validator_state,
+            None,
+            Some(1.0),
+            None,
+            Some(2.0),
+            None,
+        );
+        let success = Justification::empty().faulty_insert(&v0_prime, &mut state);
+        assert!(
+            success,
+            "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the \
+             threshold doesnt get crossed for the set"
+        );
+    }
+
+    #[test]
+    fn faulty_insert_unknown_weights() {
+        let (v0_prime, validator_state) = faulty_insert_setup();
+
+        // bug found
+        let mut state = validator::State::new_with_default_state(
+            validator_state,
+            Some(validator::Weights::new(vec![].into_iter().collect())),
+            Some(1.0),
+            None,
+            Some(2.0),
+            None,
+        );
+        let success = Justification::empty().faulty_insert(&v0_prime, &mut state);
+        assert!(
+            !success,
+            "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as \
+             we can't know the weight of the validator, which could be Infinity"
+        );
+        float_eq!(
+            state.fault_weight(),
+            1.0,
+            "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as \
+             we can't know the weight of the validator, which could be Infinity, and thus the \
+             state_fault_weight should be unchanged"
+        );
+    }
+
+    #[test]
+    fn validator_state_update() {
+        let mut validator_state = validator::State::new(
+            validator::Weights::new(vec![(0, 1.0), (1, 1.0)].into_iter().collect()),
+            0.0,
+            LatestMsgs::empty(),
+            2.0,
+            HashSet::new(),
+        );
+
+        let v0 = VoteCount::create_vote_msg(0, false);
+        let v1 = VoteCount::create_vote_msg(1, true);
+
+        let all_valid = validator_state.update(&[&v0, &v1]);
+
+        let hs0 = validator_state
+            .latests_msgs()
+            .get(&0)
+            .expect("state should contain validator 0");
+        let hs1 = validator_state
+            .latests_msgs()
+            .get(&1)
+            .expect("state should contain validator 1");
+
+        assert!(all_valid, "messages should not be all valid messages");
+        assert_eq!(
+            hs0.len(),
+            1,
+            "validator_state should have only 1 message for validator 0",
+        );
+        assert_eq!(
+            hs1.len(),
+            1,
+            "validator_state should have only 1 message for validator 1",
+        );
+        assert!(hs0.contains(&v0), "validator_state should contain v0");
+        assert!(hs1.contains(&v1), "validator_state should contain v1");
+        float_eq!(
+            validator_state.fault_weight(),
+            0.0,
+            "fault weight should be 0"
+        );
+        assert!(
+            validator_state.equivocators().is_empty(),
+            "no equivocators should exist",
+        );
+    }
+
+    #[test]
+    fn validator_state_update_equivocate_under_threshold() {
+        let mut validator_state = validator::State::new(
+            validator::Weights::new(vec![(0, 1.0), (1, 1.0)].into_iter().collect()),
+            0.0,
+            LatestMsgs::empty(),
+            2.0,
+            HashSet::new(),
+        );
+
+        let v0 = VoteCount::create_vote_msg(0, false);
+        let v0_prime = VoteCount::create_vote_msg(0, true);
+        let v1 = VoteCount::create_vote_msg(1, true);
+
+        let _all_valid = validator_state.update(&[&v0, &v0_prime, &v1]);
+
+        let hs0 = validator_state
+            .latests_msgs()
+            .get(&0)
+            .expect("state should contain validator 0");
+        let hs1 = validator_state
+            .latests_msgs()
+            .get(&1)
+            .expect("state should contain validator 1");
+
+        // TODO #49: investigate why LatestMsgs.update does not return as
+        // its documentation says and if the code or the documentation
+        // should be fixed.
+        //assert!(!all_valid, "messages should not be all valid messages");
+        assert_eq!(
+            hs0.len(),
+            2,
+            "validator_state should have 2 messages for validator 0",
+        );
+        assert_eq!(
+            hs1.len(),
+            1,
+            "validator_state should have only 1 message for validator 1",
+        );
+        assert!(hs0.contains(&v0), "validator_state should contain v0");
+        assert!(
+            hs0.contains(&v0_prime),
+            "validator_state should contain v0_prime",
+        );
+        assert!(hs1.contains(&v1), "validator_state should contain v1");
+        float_eq!(
+            validator_state.fault_weight(),
+            1.0,
+            "fault weight should be 1"
+        );
+        assert!(
+            validator_state.equivocators().contains(&0),
+            "validator 0 should be in equivocators",
+        );
+    }
+
+    #[test]
+    fn validator_state_update_equivocate_at_threshold() {
+        let mut validator_state = validator::State::new(
+            validator::Weights::new(vec![(0, 1.0), (1, 1.0)].into_iter().collect()),
+            0.0,
+            LatestMsgs::empty(),
+            0.0,
+            HashSet::new(),
+        );
+
+        let v0 = VoteCount::create_vote_msg(0, false);
+        let v0_prime = VoteCount::create_vote_msg(0, true);
+        let v1 = VoteCount::create_vote_msg(1, true);
+
+        let _all_valid = validator_state.update(&[&v0, &v0_prime, &v1]);
+
+        let hs0 = validator_state
+            .latests_msgs()
+            .get(&0)
+            .expect("state should contain validator 0");
+        let hs1 = validator_state
+            .latests_msgs()
+            .get(&1)
+            .expect("state should contain validator 1");
+
+        // TODO #49: investigate why LatestMsgs.update does not return as
+        // its documentation says and if the code or the documentation
+        // should be fixed.
+        //assert!(!all_valid, "messages should not be all valid messages");
+        assert_eq!(
+            hs0.len(),
+            2,
+            "validator_state should have 2 messages for validator 0",
+        );
+        assert_eq!(
+            hs1.len(),
+            1,
+            "validator_state should have only 1 message for validator 1",
+        );
+        assert!(hs0.contains(&v0), "validator_state should contain v0");
+        assert!(
+            hs0.contains(&v0_prime),
+            "validator_state should contain v0_prime",
+        );
+        assert!(hs1.contains(&v1), "validator_state should contain v1");
+        float_eq!(
+            validator_state.fault_weight(),
+            0.0,
+            "fault weight should be 0"
+        );
+        assert!(
+            validator_state.equivocators().is_empty(),
+            "validator 0 should not be in equivocators"
+        );
+    }
+}
