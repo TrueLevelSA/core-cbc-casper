@@ -125,11 +125,11 @@ fn faulty_insert_setup() -> (
 }
 
 #[test]
-fn faulty_inserts() {
+fn faulty_insert_accept_fault() {
     let (v0_prime, validator_state) = faulty_insert_setup();
 
     let mut state = validator::State::new_with_default_state(
-        validator_state.clone(),
+        validator_state,
         None,
         None,
         None,
@@ -142,9 +142,14 @@ fn faulty_inserts() {
         "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it \
          doesnt cross the fault threshold for the set"
     );
+}
+
+#[test]
+fn faulty_insert_accept_fault_check_weight() {
+    let (v0_prime, validator_state) = faulty_insert_setup();
 
     let mut validator_state2 = validator::State::new_with_default_state(
-        validator_state.clone(),
+        validator_state,
         None,
         None,
         None,
@@ -159,9 +164,14 @@ fn faulty_inserts() {
          doesnt cross the fault threshold for the set, and thus the state_fault_weight should \
          be incremented to 1.0"
     );
+}
+
+#[test]
+fn faulty_insert_no_accept() {
+    let (v0_prime, validator_state) = faulty_insert_setup();
 
     let mut state = validator::State::new_with_default_state(
-        validator_state.clone(),
+        validator_state,
         None,
         Some(0.1),
         None,
@@ -174,9 +184,14 @@ fn faulty_inserts() {
         "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as the \
          fault threshold gets crossed for the set"
     );
+}
+
+#[test]
+fn faulty_insert_no_accept_check_weight() {
+    let (v0_prime, validator_state) = faulty_insert_setup();
 
     let mut validator_state2 = validator::State::new_with_default_state(
-        validator_state.clone(),
+        validator_state,
         None,
         Some(0.1),
         None,
@@ -191,9 +206,14 @@ fn faulty_inserts() {
          fault threshold gets crossed for the set, and thus the state_fault_weight should not be \
          incremented"
     );
+}
+
+#[test]
+fn faulty_insert_accept_with_bigger_numbers() {
+    let (v0_prime, validator_state) = faulty_insert_setup();
 
     let mut state = validator::State::new_with_default_state(
-        validator_state.clone(),
+        validator_state,
         None,
         Some(1.0),
         None,
@@ -206,6 +226,11 @@ fn faulty_inserts() {
         "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the thr \
          doesnt get crossed for the set"
     );
+}
+
+#[test]
+fn faulty_insert_unknown_weights() {
+    let (v0_prime, validator_state) = faulty_insert_setup();
 
     // bug found
     let mut state = validator::State::new_with_default_state(
@@ -222,6 +247,11 @@ fn faulty_inserts() {
         "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we \
          can't know the weight of the validator, which could be Infinity"
     );
+}
+
+#[test]
+fn faulty_insert_unknown_weights_check_weight() {
+    let (v0_prime, _validator_state) = faulty_insert_setup();
 
     let mut validator_state = validator::State::new(
         validator::Weights::new(vec![].into_iter().collect()),
