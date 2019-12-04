@@ -117,7 +117,8 @@ fn faulty_inserts() {
     let success = j1.faulty_insert(v0_prime, &mut validator_state);
     assert!(
         !success,
-        "$v0_prime$ should conflict with $v0$ through $m0$, and we should reject as our fault tolerance thr is zero"
+        "$v0_prime$ should conflict with $v0$ through $m0$, and we should reject as our fault \
+         tolerance thr is zero"
     );
 
     let mut state = validator::State::new_with_default_state(
@@ -129,8 +130,10 @@ fn faulty_inserts() {
         None,
     );
     let success = j1.clone().faulty_insert(v0_prime, &mut state);
-    assert!(success,
-        "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set"
+    assert!(
+        success,
+        "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it \
+         doesnt cross the fault threshold for the set"
     );
 
     let mut validator_state2 = validator::State::new_with_default_state(
@@ -143,8 +146,11 @@ fn faulty_inserts() {
     );
     j1.clone().faulty_insert(v0_prime, &mut validator_state2);
     float_eq!(
-        validator_state2.fault_weight(), 1.0,
-        "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it doesnt cross the fault threshold for the set, and thus the state_fault_weight should be incremented to 1.0"
+        validator_state2.fault_weight(),
+        1.0,
+        "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it \
+         doesnt cross the fault threshold for the set, and thus the state_fault_weight should \
+         be incremented to 1.0"
     );
 
     let mut state = validator::State::new_with_default_state(
@@ -156,8 +162,10 @@ fn faulty_inserts() {
         None,
     );
     let success = j1.clone().faulty_insert(v0_prime, &mut state);
-    assert!(!success,
-        "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as the fault threshold gets crossed for the set"
+    assert!(
+        !success,
+        "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as the \
+         fault threshold gets crossed for the set"
     );
 
     let mut validator_state2 = validator::State::new_with_default_state(
@@ -169,8 +177,12 @@ fn faulty_inserts() {
         None,
     );
     j1.clone().faulty_insert(v0_prime, &mut validator_state2);
-    float_eq!(validator_state2.fault_weight(), 0.1,
-        "$v0_prime$ conflicts with $v0$ through $m0$, and we should NOT accept this fault as the fault threshold gets crossed for the set, and thus the state_fault_weight should not be incremented"
+    float_eq!(
+        validator_state2.fault_weight(),
+        0.1,
+        "$v0_prime$ conflicts with $v0$ through $m0$, and we should NOT accept this fault as the \
+         fault threshold gets crossed for the set, and thus the state_fault_weight should not be \
+         incremented"
     );
 
     let mut state = validator::State::new_with_default_state(
@@ -182,8 +194,10 @@ fn faulty_inserts() {
         None,
     );
     let success = j1.clone().faulty_insert(v0_prime, &mut state);
-    assert!(success,
-        "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the thr doesnt get crossed for the set"
+    assert!(
+        success,
+        "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the thr \
+         doesnt get crossed for the set"
     );
 
     let validators_weights = validator::Weights::new([].iter().cloned().collect());
@@ -199,7 +213,8 @@ fn faulty_inserts() {
     let success = j1.clone().faulty_insert(v0_prime, &mut state);
     assert!(
         !success,
-        "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we can't know the weight of the validator, which could be Infinity"
+        "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we \
+         can't know the weight of the validator, which could be Infinity"
     );
 
     let mut validator_state = validator::State::new(
@@ -213,7 +228,9 @@ fn faulty_inserts() {
     float_eq!(
         validator_state.fault_weight(),
         1.0,
-        "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we can't know the weight of the validator, which could be Infinity, and thus the state_fault_weight should be unchanged"
+        "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as we \
+         can't know the weight of the validator, which could be Infinity, and thus the \
+         state_fault_weight should be unchanged"
     );
 }
 
