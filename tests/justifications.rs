@@ -47,9 +47,6 @@ macro_rules! float_eq {
 
 #[test]
 fn faulty_inserts_sorted() {
-    let validators_weights =
-        validator::Weights::new([(0, 1.0), (1, 2.0), (2, 3.0)].iter().cloned().collect());
-
     let v0 = &VoteCount::create_vote_msg(0, false);
     let v0_prime = &VoteCount::create_vote_msg(0, true);
     let v1 = &VoteCount::create_vote_msg(1, true);
@@ -62,8 +59,14 @@ fn faulty_inserts_sorted() {
     latest_msgs.update(v1);
     latest_msgs.update(v2);
 
-    let mut validator_state =
-        validator::State::new(validators_weights, 0.0, latest_msgs, 3.0, HashSet::new());
+    let mut validator_state = validator::State::new(
+        validator::Weights::new(vec![(0, 1.0), (1, 2.0), (2, 3.0)].into_iter().collect()),
+        0.0,
+        latest_msgs,
+        3.0,
+        HashSet::new(),
+    );
+
     let mut j = Justification::empty();
     let sorted_msgs = validator_state
         .sort_by_faultweight(&vec![v2_prime, v1_prime, v0_prime].iter().cloned().collect());
@@ -78,15 +81,13 @@ fn faulty_inserts_sorted() {
 
 #[test]
 fn faulty_inserts() {
-    let validators_weights =
-        validator::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
     let v0 = &VoteCount::create_vote_msg(0, false);
     let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
     let v1 = &VoteCount::create_vote_msg(1, true);
     let mut j0 = Justification::empty();
 
     let mut validator_state = validator::State::new(
-        validators_weights,
+        validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
         0.0,
         LatestMsgs::empty(),
         0.0,
@@ -199,11 +200,10 @@ fn faulty_inserts() {
          doesnt get crossed for the set"
     );
 
-    let validators_weights = validator::Weights::new([].iter().cloned().collect());
     // bug found
     let mut state = validator::State::new_with_default_state(
         validator_state,
-        Some(validators_weights.clone()),
+        Some(validator::Weights::new(vec![].into_iter().collect())),
         Some(1.0),
         None,
         Some(2.0),
@@ -217,7 +217,7 @@ fn faulty_inserts() {
     );
 
     let mut validator_state = validator::State::new(
-        validators_weights,
+        validator::Weights::new(vec![].into_iter().collect()),
         1.0,
         LatestMsgs::empty(),
         2.0,
