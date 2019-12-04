@@ -102,7 +102,6 @@ fn faulty_inserts() {
     validator_state_clone.update(&[v0]);
     let m0 = message::Message::from_validator_state(0, &validator_state_clone).unwrap();
 
-    // let m0 = &message::Message::new(0, justification, estimate);
     let mut j1 = Justification::empty();
     let failure = j1
         .faulty_inserts(&vec![v1].iter().cloned().collect(), &mut validator_state)
