@@ -82,11 +82,8 @@ fn faulty_insert_sorted() {
 }
 
 #[test]
-fn faulty_inserts() {
+fn faulty_inserts_one_message() {
     let v0 = &VoteCount::create_vote_msg(0, false);
-    let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
-    let v1 = &VoteCount::create_vote_msg(1, true);
-    let mut j0 = Justification::empty();
 
     let mut validator_state = validator::State::new(
         validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
@@ -96,10 +93,25 @@ fn faulty_inserts() {
         HashSet::new(),
     );
 
-    let failure = j0
+    let failure = Justification::empty()
         .faulty_inserts(&vec![v0].into_iter().collect(), &mut validator_state)
         .is_empty();
     assert_eq!(failure, false);
+}
+
+#[test]
+fn faulty_inserts() {
+    let v0 = &VoteCount::create_vote_msg(0, false);
+    let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
+    let v1 = &VoteCount::create_vote_msg(1, true);
+
+    let mut validator_state = validator::State::new(
+        validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
+        0.0,
+        LatestMsgs::empty(),
+        0.0,
+        HashSet::new(),
+    );
 
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[v0]);
