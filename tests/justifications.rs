@@ -117,23 +117,9 @@ fn faulty_inserts() {
     validator_state_clone.update(&[v0]);
     let m0 = message::Message::from_validator_state(0, &validator_state_clone).unwrap();
 
-    let mut j1 = Justification::empty();
-    let failure = j1
-        .faulty_inserts(&vec![v1].into_iter().collect(), &mut validator_state)
-        .is_empty();
-    assert_eq!(failure, false);
+    let j1 = Justification::empty();
 
-    let failure = j1
-        .faulty_inserts(&vec![&m0].into_iter().collect(), &mut validator_state)
-        .is_empty();
-    assert_eq!(failure, false);
-
-    let success = j1.faulty_insert(v0_prime, &mut validator_state);
-    assert!(
-        !success,
-        "$v0_prime$ should conflict with $v0$ through $m0$, and we should reject as our fault \
-         tolerance thr is zero"
-    );
+    validator_state.update(&[v1, &m0, v0_prime]);
 
     let mut state = validator::State::new_with_default_state(
         validator_state.clone(),
