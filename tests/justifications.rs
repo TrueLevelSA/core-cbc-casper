@@ -46,7 +46,7 @@ macro_rules! float_eq {
 }
 
 #[test]
-fn faulty_inserts_sorted() {
+fn faulty_insert_sorted() {
     let v0 = &VoteCount::create_vote_msg(0, false);
     let v0_prime = &VoteCount::create_vote_msg(0, true);
     let v1 = &VoteCount::create_vote_msg(1, true);
