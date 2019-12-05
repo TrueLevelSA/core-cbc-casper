@@ -17,7 +17,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod vote_count;
-
-#[macro_use]
-pub mod utils;
+#[cfg(test)]
+macro_rules! float_eq {
+    ($lhs:expr, $rhs:expr) => {{
+        assert!(
+            f32::abs($lhs - $rhs) < std::f32::EPSILON,
+            format!("float_eq: {} and {} aren't equal", $lhs, $rhs),
+        )
+    }};
+    ($lhs:expr, $rhs:expr, $message:expr) => {{
+        assert!(
+            f32::abs($lhs - $rhs) < std::f32::EPSILON,
+            format!(
+                "float_eq: {} and {} aren't equal. Provided message: {}",
+                $lhs, $rhs, $message
+            ),
+        )
+    }};
+}
