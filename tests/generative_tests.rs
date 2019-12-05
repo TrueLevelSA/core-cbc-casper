@@ -942,3 +942,70 @@ proptest! {
         );
     }
 }
+
+prop_compose! {
+    /// `latest_msgs` produces a `LatestMsgs<VoteCount>` and a `HashSet<u32>`
+    /// (equivocators). To produce that we create a `validator::State` and a
+    /// `Justification` and use `Justification::from_msg` to populate the
+    /// `latest_msgs` and `equivocators` field in the state, which we then
+    /// return here
+    fn latest_msgs(validators_count: usize)
+        (equivocations in prop::collection::vec(
+                0..validators_count,
+                0..validators_count),
+        votes in prop::collection::vec(
+            VoteCount::arbitrary(),
+            validators_count),
+        validators_count in Just(validators_count))
+        -> (LatestMsgs<VoteCount>, HashSet<u32>) {
+        let latest_msgs = LatestMsgs::empty();
+        let equivocators = HashSet::new();
+
+        let validators_weights = validator::Weights::new(
+            (0..validators_count)
+                .map(|s| s as u32)
+                .zip(std::iter::repeat(1.0))
+                .collect(),
+        );
+
+        let mut validator_state = validator::State::new(
+            validators_weights,
+            0.0,
+            latest_msgs,
+            4.0,
+            equivocators,
+        );
+
+        let mut messages = vec![];
+        for (validator, vote) in votes.iter().enumerate().take(validators_count) {
+            messages.push(Message::new(validator as u32, Justification::empty(), *vote));
+
+            if equivocations.contains(&validator) {
+                messages.push(Message::new(validator as u32, Justification::empty(), vote.toggled_vote()));
+            }
+        }
+
+        Justification::from_msgs(messages, &mut validator_state);
+
+        (validator_state.latests_msgs().clone(), validator_state.equivocators().clone())
+    }
+}
+
+proptest! {
+    #[test]
+    fn latest_msgs_honest_from_latest_msgs(latest_msgs in latest_msgs(10)) {
+        let (latest_msgs, equivocators) = latest_msgs;
+        let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(&latest_msgs, &equivocators);
+        assert_eq!(
+            latest_msgs_honest
+                .iter()
+                .any(|msg| equivocators.contains(&msg.sender())),
+            false
+        );
+        assert_eq!(
+            latest_msgs_honest.len(),
+            latest_msgs.len() - equivocators.len(),
+            "Latest honest messages length should be the same as latest messages minus equivocators"
+        );
+    }
+}
