@@ -391,7 +391,7 @@ impl<E: Estimator> LatestMsgsHonest<E> {
 
 #[cfg(test)]
 mod test {
-    use crate::tests_common::vote_count::VoteCount;
+    use crate::VoteCount;
 
     use std::collections::HashSet;
 

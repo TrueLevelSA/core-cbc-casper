@@ -41,7 +41,7 @@ use casper::message::{self, Message};
 use casper::util::weight::WeightUnit;
 use casper::validator;
 
-use casper::tests_common::vote_count::VoteCount;
+use casper::VoteCount;
 
 mod common;
 use common::binary::BoolWrapper;

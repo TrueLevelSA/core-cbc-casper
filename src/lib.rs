@@ -103,10 +103,11 @@ extern crate itertools;
 extern crate serde;
 extern crate serde_derive;
 
-/// The tests_common module is exported to permit integration tests
-/// to use its contents.
+/// The tests_common module is privately exported to use the macros
+/// in tests_common/utils and to publicly export VoteCount for the
+/// integration tests.
 #[macro_use]
-pub mod tests_common;
+mod tests_common;
 
 /// Implementation of basic types for a casper based blockchain consensus mechanism.
 pub mod blockchain;
@@ -125,3 +126,5 @@ pub mod validator;
 pub use blockchain::{Block, Message};
 pub use justification::Justification;
 pub use validator::State;
+
+pub use tests_common::vote_count::VoteCount;

@@ -336,7 +336,7 @@ impl<V: self::ValidatorName, U: WeightUnit> Weights<V, U> {
 mod tests {
     use super::*;
 
-    use crate::tests_common::vote_count::VoteCount;
+    use crate::VoteCount;
 
     #[test]
     fn include_positive_weight() {
