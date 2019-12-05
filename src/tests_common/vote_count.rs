@@ -24,11 +24,11 @@ use std::ops::Add;
 #[cfg(feature = "integration_test")]
 use proptest::prelude::*;
 
-use casper::estimator::Estimator;
-use casper::justification::{Justification, LatestMsgsHonest};
-use casper::message;
-use casper::util::weight::{WeightUnit, Zero};
-use casper::validator;
+use crate::estimator::Estimator;
+use crate::justification::{Justification, LatestMsgsHonest};
+use crate::message;
+use crate::util::weight::{WeightUnit, Zero};
+use crate::validator;
 
 #[derive(Clone, Copy, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]
 pub struct VoteCount {

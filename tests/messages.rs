@@ -19,8 +19,7 @@
 
 extern crate casper;
 
-mod common;
-use common::vote_count::VoteCount;
+use casper::tests_common::vote_count::VoteCount;
 
 use std::collections::HashSet;
 use std::iter::FromIterator;

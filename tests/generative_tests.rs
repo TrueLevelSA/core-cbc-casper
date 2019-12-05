@@ -41,12 +41,11 @@ use casper::message::{self, Message};
 use casper::util::weight::WeightUnit;
 use casper::validator;
 
-// Explicitly allowing dead code here because of https://gitlab.com/TrueLevel/casper/core-cbc/issues/43
-#[allow(dead_code)]
+use casper::tests_common::vote_count::VoteCount;
+
 mod common;
 use common::binary::BoolWrapper;
 use common::integer::IntegerWrapper;
-use common::vote_count::VoteCount;
 
 use std::fs::OpenOptions;
 use std::io::Write;

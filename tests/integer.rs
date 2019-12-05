@@ -19,8 +19,6 @@
 
 extern crate casper;
 
-// Explicitly allowing dead code here because of https://gitlab.com/TrueLevel/casper/core-cbc/issues/43
-#[allow(dead_code)]
 mod common;
 use common::integer::*;
 

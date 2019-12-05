@@ -117,6 +117,10 @@ pub mod util;
 /// The consensus forming peers nodes in the network are called validators.
 pub mod validator;
 
+/// The tests_common module is exported to permit integration tests
+/// to use its contents.
+pub mod tests_common;
+
 pub use blockchain::{Block, Message};
 pub use justification::Justification;
 pub use validator::State;
