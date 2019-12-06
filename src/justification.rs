@@ -391,12 +391,12 @@ impl<E: Estimator> LatestMsgsHonest<E> {
 
 #[cfg(test)]
 mod test {
-    use crate::VoteCount;
+    use crate::{IntegerWrapper, VoteCount};
 
     use std::collections::HashSet;
 
     use crate::justification::{Justification, LatestMsgs};
-    use crate::message;
+    use crate::message::Message;
     use crate::validator;
 
     #[test]
@@ -452,10 +452,7 @@ mod test {
         assert_eq!(failure, false);
     }
 
-    fn faulty_insert_setup() -> (
-        message::Message<VoteCount>,
-        validator::State<VoteCount, f32>,
-    ) {
+    fn faulty_insert_setup() -> (Message<VoteCount>, validator::State<VoteCount, f32>) {
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
@@ -470,7 +467,7 @@ mod test {
 
         let mut validator_state_clone = validator_state.clone();
         validator_state_clone.update(&[&v0]);
-        let m0 = message::Message::from_validator_state(0, &validator_state_clone).unwrap();
+        let m0 = Message::from_validator_state(0, &validator_state_clone).unwrap();
 
         validator_state.update(&[&v1, &m0, &v0_prime]);
 
@@ -576,6 +573,305 @@ mod test {
             "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as \
              we can't know the weight of the validator, which could be Infinity, and thus the \
              state_fault_weight should be unchanged"
+        );
+    }
+
+    #[test]
+    fn faulty_insert() {
+        let validators_weights =
+            validator::Weights::new([(0, 1.0), (1, 1.0)].iter().cloned().collect());
+        let v0 = &Message::new(0, Justification::empty(), IntegerWrapper::new(0));
+        let v0_prime = &Message::new(0, Justification::empty(), IntegerWrapper::new(1)); // equivocating vote
+        let mut j0 = Justification::empty();
+
+        let mut validator_state = validator::State::new(
+            validators_weights,
+            0.0,
+            LatestMsgs::empty(),
+            1.0,
+            HashSet::new(),
+        );
+
+        // Validator 0 and v0 is not equivocating
+        assert_eq!(j0.faulty_insert(v0, &mut validator_state), true);
+        assert_eq!(j0.contains(v0), true);
+
+        // Validator 0 is not equivocating, v0_prime is equivocating
+        // State fault weight (0.0) is still below threshold (2.5), so vote can be
+        // inserted
+        assert_eq!(j0.faulty_insert(v0_prime, &mut validator_state), true);
+        assert_eq!(j0.contains(v0_prime), true);
+
+        // After insert, state fault weight should be 1.0 and Validator 0 is now
+        // equivocating
+        float_eq!(validator_state.fault_weight(), 1.0);
+        assert_eq!(validator_state.equivocators().contains(&0), true);
+
+        let v0_new = &Message::new(0, Justification::empty(), IntegerWrapper::new(2));
+        // Validator 0 can still send new votes, as it's already a equivocator
+        // and the fault is below threshold
+        assert_eq!(j0.faulty_insert(v0_new, &mut validator_state), true);
+        assert_eq!(j0.contains(v0_new), true);
+
+        // A new Validator sending an equivocating vote will make the fault weight go
+        // above the threshold, and stop accepting equivocating votes
+        let v1 = &Message::new(1, Justification::empty(), IntegerWrapper::new(0));
+        let v1_equivocating = &Message::new(1, Justification::empty(), IntegerWrapper::new(1));
+        assert_eq!(j0.faulty_insert(v1, &mut validator_state), true);
+        assert_eq!(j0.contains(v1), true);
+        assert_eq!(
+            j0.faulty_insert(v1_equivocating, &mut validator_state),
+            false
+        );
+        assert_eq!(j0.contains(v1_equivocating), false);
+    }
+
+    #[test]
+    fn faulty_insert_with_slash() {
+        let validators_weights = validator::Weights::new([(0, 1.0)].iter().cloned().collect());
+        let v0 = &Message::new(0, Justification::empty(), IntegerWrapper::new(0));
+        let v0_prime = &Message::new(0, Justification::empty(), IntegerWrapper::new(1)); // equivocating vote
+        let mut j0 = Justification::empty();
+
+        let mut validator_state = validator::State::new(
+            validators_weights,
+            0.0,
+            LatestMsgs::empty(),
+            1.0,
+            HashSet::new(),
+        );
+
+        // Sender 0 and v0 are not equivocating
+        assert_eq!(
+            j0.faulty_insert_with_slash(v0, &mut validator_state)
+                .unwrap(),
+            true
+        );
+        assert_eq!(j0.contains(v0), true);
+
+        // Sender 0 is not equivocating, v0_prime is equivocating
+        assert_eq!(
+            j0.faulty_insert_with_slash(v0_prime, &mut validator_state)
+                .unwrap(),
+            true
+        );
+        assert_eq!(j0.contains(v0_prime), true);
+
+        // Sender 0 gets slashed because of equivocation
+        float_eq!(
+            validator_state.validators_weights().weight(&0).unwrap(),
+            0.0
+        );
+
+        float_eq!(validator_state.fault_weight(), 0.0);
+    }
+
+    #[test]
+    fn equivocate() {
+        let mut latest_msgs = LatestMsgs::empty();
+        let v0 = VoteCount::create_vote_msg(0, true);
+        let v0_equivocated = VoteCount::create_vote_msg(0, false);
+
+        assert_eq!(latest_msgs.update(&v0), true);
+        assert_eq!(latest_msgs.equivocate(&v0_equivocated), true);
+
+        let validators_weights = validator::Weights::new([(0, 1.0)].iter().cloned().collect());
+        let mut validator_state =
+            validator::State::new(validators_weights, 0.0, latest_msgs, 0.0, HashSet::new());
+
+        validator_state.update(&[&v0]);
+        let v0_not_equivocated = Message::from_validator_state(0, &validator_state).unwrap();
+
+        assert_eq!(
+            validator_state
+                .latests_msgs()
+                .equivocate(&v0_not_equivocated),
+            false
+        );
+    }
+
+    #[test]
+    fn from_msgs() {
+        let validators_weights =
+            validator::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+        let mut validator_state = validator::State::new(
+            validators_weights,
+            0.0,
+            LatestMsgs::empty(),
+            0.0,
+            HashSet::new(),
+        );
+
+        let v0 = VoteCount::create_vote_msg(0, true);
+        let v1 = VoteCount::create_vote_msg(1, true);
+        let v2 = VoteCount::create_vote_msg(2, false);
+
+        let initial_msgs = vec![v0.clone(), v1.clone(), v2.clone()];
+        let justification =
+            Justification::from_msgs(initial_msgs.clone(), &mut validator_state.clone());
+
+        assert_eq!(
+            justification.contains(&v0),
+            true,
+            "Justification should contain v0"
+        );
+        assert_eq!(
+            justification.contains(&v1),
+            true,
+            "Justification should contain v1"
+        );
+        assert_eq!(
+            justification.contains(&v2),
+            true,
+            "Justification should contain v2"
+        );
+
+        let v0_equivocated = VoteCount::create_vote_msg(0, false);
+
+        let mut new_validator_state = validator_state.clone();
+        let mut justification =
+            Justification::from_msgs(initial_msgs.clone(), &mut new_validator_state);
+        justification.faulty_insert(&v0_equivocated, &mut new_validator_state);
+
+        assert_eq!(
+            justification.contains(&v0_equivocated),
+            false,
+            "Justification should not contain v0_equivocated"
+        );
+
+        let mut with_duplicates = initial_msgs;
+        with_duplicates.push(v0);
+
+        let justification = Justification::from_msgs(with_duplicates, &mut validator_state);
+        assert_eq!(
+            justification.len(),
+            3,
+            "Justification should deduplicate messages"
+        );
+    }
+
+    #[test]
+    fn justification_mk_estimate() {
+        let validators_weights =
+            validator::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+        let validator_state = validator::State::new(
+            validators_weights,
+            0.0,
+            LatestMsgs::empty(),
+            1.0,
+            HashSet::new(),
+        );
+
+        let v0 = VoteCount::create_vote_msg(0, true);
+        let v1 = VoteCount::create_vote_msg(1, true);
+        let v2 = VoteCount::create_vote_msg(2, false);
+
+        let initial_msgs = vec![v0, v1, v2];
+        let mut validator_clone = validator_state.clone();
+        let justification = Justification::from_msgs(initial_msgs, &mut validator_clone);
+
+        let estimate = justification.mk_estimate(
+            validator_state.equivocators(),
+            validator_clone.validators_weights(),
+        );
+
+        assert_eq!(
+            estimate.expect("Estimate failed"),
+            VoteCount { yes: 2, no: 1 }
+        );
+
+        let v0 = VoteCount::create_vote_msg(0, true);
+        let v1 = VoteCount::create_vote_msg(1, false);
+        let v2 = VoteCount::create_vote_msg(2, false);
+
+        let initial_msgs = vec![v0, v1, v2];
+        let mut validator_clone = validator_state.clone();
+        let justification = Justification::from_msgs(initial_msgs, &mut validator_clone);
+
+        let estimate = justification.mk_estimate(
+            validator_state.equivocators(),
+            validator_clone.validators_weights(),
+        );
+
+        assert_eq!(
+            estimate.expect("Estimate failed"),
+            VoteCount { yes: 1, no: 2 }
+        );
+
+        let v0 = VoteCount::create_vote_msg(0, true);
+        let v0_equivocated = VoteCount::create_vote_msg(0, false);
+        let v1 = VoteCount::create_vote_msg(1, false);
+        let v2 = VoteCount::create_vote_msg(2, false);
+
+        let initial_msgs = vec![v0, v1, v2];
+        let mut validator_clone = validator_state.clone();
+        let mut justification = Justification::from_msgs(initial_msgs, &mut validator_clone);
+        justification.faulty_insert(&v0_equivocated, &mut validator_clone);
+
+        let estimate = justification.mk_estimate(
+            validator_state.equivocators(),
+            validator_clone.validators_weights(),
+        );
+
+        assert_eq!(
+            estimate.expect("Estimate failed"),
+            VoteCount { yes: 0, no: 2 }
+        );
+    }
+
+    #[test]
+    fn latest_msgs_update_new_sender() {
+        let mut latest_msgs = LatestMsgs::empty();
+
+        let v0 = VoteCount::create_vote_msg(0, true);
+
+        let sender_latest_msgs_hashset = vec![v0.clone()].into_iter().collect();
+        // First message of sender, should return true
+        assert_eq!(latest_msgs.update(&v0), true);
+        assert_eq!(latest_msgs.get(&0), Some(&sender_latest_msgs_hashset));
+    }
+
+    #[test]
+    fn latest_msgs_update_duplicate_msg() {
+        let mut latest_msgs = LatestMsgs::empty();
+        let v0 = VoteCount::create_vote_msg(0, true);
+        let sender_latest_msgs_hashset = vec![v0.clone()].into_iter().collect();
+
+        // First message of sender, should return true
+        assert_eq!(latest_msgs.update(&v0), true);
+        assert_eq!(latest_msgs.get(&0), Some(&sender_latest_msgs_hashset));
+
+        // Duplicate message of sender, should return false
+        assert_eq!(latest_msgs.update(&v0), false);
+
+        // LatestMsgs HashSet for sender 0 did not change
+        assert_eq!(latest_msgs.get(&0), Some(&sender_latest_msgs_hashset));
+    }
+
+    #[test]
+    fn latest_msgs_update_new_msg_newer_than_old() {
+        let mut latest_msgs = LatestMsgs::empty();
+        let v1 = VoteCount::create_vote_msg(1, false);
+        let new_v1 = Message::new(
+            *v1.sender(),
+            v1.justification().clone(),
+            VoteCount { yes: 1, no: 0 },
+        );
+
+        // First message of sender, should return true
+        assert_eq!(latest_msgs.update(&v1), true);
+        assert_eq!(
+            latest_msgs.get(&1),
+            Some(&vec![v1.clone()].into_iter().collect())
+        );
+
+        // New message correctly inserted into latest_msgs
+        assert_eq!(latest_msgs.update(&new_v1), true);
+
+        // LatestMsgs HashSet for sender 1 now has new_v1
+        assert_eq!(
+            latest_msgs.get(&1),
+            Some(&vec![v1, new_v1].into_iter().collect())
         );
     }
 }
