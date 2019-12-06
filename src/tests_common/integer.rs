@@ -22,7 +22,7 @@ use std::iter::FromIterator;
 
 use crate::estimator::Estimator;
 use crate::justification::LatestMsgsHonest;
-use crate::message;
+use crate::message::Message;
 use crate::util::weight::{WeightUnit, Zero};
 use crate::validator;
 
@@ -44,8 +44,6 @@ impl<V: validator::ValidatorName> From<V> for IntegerWrapper {
         IntegerWrapper::new(u32::default())
     }
 }
-
-pub type IntegerMsg = message::Message<IntegerWrapper>;
 
 #[derive(Clone, Eq, Debug, Ord, PartialOrd, PartialEq, Hash)]
 pub struct Tx;
@@ -95,7 +93,7 @@ impl Estimator for IntegerWrapper {
 
         let mut running_weight = <U as Zero<U>>::ZERO;
         let mut msg_iter = msgs_sorted_by_estimate.iter();
-        let mut current_msg: Result<&&IntegerMsg, &str> = Err("no msg");
+        let mut current_msg: Result<&&Message<IntegerWrapper>, &str> = Err("no msg");
 
         // since the messages are ordered according to their estimates,
         // whichever estimate is found after iterating over half of the total weight

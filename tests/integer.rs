@@ -21,10 +21,11 @@ extern crate casper;
 
 use std::collections::HashSet;
 
-use casper::{IntegerMsg, IntegerWrapper};
+use casper::IntegerWrapper;
 
 use casper::estimator::Estimator;
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
+use casper::message::Message;
 use casper::validator;
 
 #[test]
@@ -59,12 +60,12 @@ fn equal_weight() {
         Err("no msg".into())
     );
 
-    let m0 = IntegerMsg::new(validators[0], Justification::empty(), IntegerWrapper(1));
-    let m1 = IntegerMsg::new(validators[1], Justification::empty(), IntegerWrapper(2));
-    let m2 = IntegerMsg::new(validators[2], Justification::empty(), IntegerWrapper(3));
+    let m0 = Message::new(validators[0], Justification::empty(), IntegerWrapper(1));
+    let m1 = Message::new(validators[1], Justification::empty(), IntegerWrapper(2));
+    let m2 = Message::new(validators[2], Justification::empty(), IntegerWrapper(3));
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[&m0, &m1, &m2]);
-    let m3 = IntegerMsg::from_validator_state(validators[0], &validator_state_clone).unwrap();
+    let m3 = Message::from_validator_state(validators[0], &validator_state_clone).unwrap();
 
     let mut j0 = Justification::from_msgs(vec![m0, m1], &mut validator_state.clone());
     assert_eq!(
@@ -121,12 +122,12 @@ fn uneven_weights_1() {
         Err("no msg".into())
     );
 
-    let m0 = IntegerMsg::new(validators[0], Justification::empty(), IntegerWrapper(1));
-    let m1 = IntegerMsg::new(validators[1], Justification::empty(), IntegerWrapper(2));
-    let m2 = IntegerMsg::new(validators[2], Justification::empty(), IntegerWrapper(3));
+    let m0 = Message::new(validators[0], Justification::empty(), IntegerWrapper(1));
+    let m1 = Message::new(validators[1], Justification::empty(), IntegerWrapper(2));
+    let m2 = Message::new(validators[2], Justification::empty(), IntegerWrapper(3));
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[&m0, &m1, &m2]);
-    let m3 = IntegerMsg::from_validator_state(validators[0], &validator_state_clone).unwrap();
+    let m3 = Message::from_validator_state(validators[0], &validator_state_clone).unwrap();
 
     let mut j0 = Justification::from_msgs(vec![m0, m1], &mut validator_state.clone());
     assert_eq!(
@@ -183,14 +184,14 @@ fn uneven_weights_4() {
         Err("no msg".into())
     );
 
-    let m0 = IntegerMsg::new(validators[0], Justification::empty(), IntegerWrapper(1));
-    let m1 = IntegerMsg::new(validators[1], Justification::empty(), IntegerWrapper(2));
-    let m2 = IntegerMsg::new(validators[2], Justification::empty(), IntegerWrapper(3));
-    let m3 = IntegerMsg::new(validators[3], Justification::empty(), IntegerWrapper(4));
+    let m0 = Message::new(validators[0], Justification::empty(), IntegerWrapper(1));
+    let m1 = Message::new(validators[1], Justification::empty(), IntegerWrapper(2));
+    let m2 = Message::new(validators[2], Justification::empty(), IntegerWrapper(3));
+    let m3 = Message::new(validators[3], Justification::empty(), IntegerWrapper(4));
 
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[&m0, &m1, &m2, &m3]);
-    let m4 = IntegerMsg::from_validator_state(validators[3], &validator_state_clone).unwrap();
+    let m4 = Message::from_validator_state(validators[3], &validator_state_clone).unwrap();
 
     let mut j0 = Justification::from_msgs(vec![m0, m1], &mut validator_state.clone());
     assert_eq!(

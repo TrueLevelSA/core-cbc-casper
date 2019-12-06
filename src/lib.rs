@@ -127,5 +127,5 @@ pub use blockchain::{Block, Message};
 pub use justification::Justification;
 pub use validator::State;
 
-pub use tests_common::integer::{IntegerMsg, IntegerWrapper};
+pub use tests_common::integer::IntegerWrapper;
 pub use tests_common::vote_count::VoteCount;
