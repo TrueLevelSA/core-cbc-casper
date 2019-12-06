@@ -19,10 +19,9 @@
 
 extern crate casper;
 
-mod common;
-use common::integer::*;
-
 use std::collections::HashSet;
+
+use casper::{IntegerMsg, IntegerWrapper};
 
 use casper::estimator::Estimator;
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};

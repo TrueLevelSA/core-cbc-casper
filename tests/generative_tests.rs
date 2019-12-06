@@ -41,11 +41,11 @@ use casper::message::{self, Message};
 use casper::util::weight::WeightUnit;
 use casper::validator;
 
+use casper::IntegerWrapper;
 use casper::VoteCount;
 
 mod common;
 use common::binary::BoolWrapper;
-use common::integer::IntegerWrapper;
 
 use std::fs::OpenOptions;
 use std::io::Write;

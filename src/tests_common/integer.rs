@@ -20,11 +20,11 @@
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
-use casper::estimator::Estimator;
-use casper::justification::LatestMsgsHonest;
-use casper::message;
-use casper::util::weight::{WeightUnit, Zero};
-use casper::validator;
+use crate::estimator::Estimator;
+use crate::justification::LatestMsgsHonest;
+use crate::message;
+use crate::util::weight::{WeightUnit, Zero};
+use crate::validator;
 
 type Validator = u32;
 
