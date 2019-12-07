@@ -707,8 +707,7 @@ mod test {
         let v2 = VoteCount::create_vote_msg(2, false);
 
         let initial_msgs = vec![v0.clone(), v1.clone(), v2.clone()];
-        let justification =
-            Justification::from_msgs(initial_msgs.clone(), &mut validator_state.clone());
+        let justification = Justification::from_msgs(initial_msgs, &mut validator_state);
 
         assert_eq!(
             justification.contains(&v0),
@@ -725,27 +724,56 @@ mod test {
             true,
             "Justification should contain v2"
         );
+    }
 
+    #[test]
+    fn from_msgs_equivocation() {
+        let validators_weights =
+            validator::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+        let mut validator_state = validator::State::new(
+            validators_weights,
+            0.0,
+            LatestMsgs::empty(),
+            0.0,
+            HashSet::new(),
+        );
+
+        let v0 = VoteCount::create_vote_msg(0, true);
+        let v1 = VoteCount::create_vote_msg(1, true);
+        let v2 = VoteCount::create_vote_msg(2, false);
         let v0_equivocated = VoteCount::create_vote_msg(0, false);
+        let initial_msgs = vec![v0, v1, v2];
 
-        let mut new_validator_state = validator_state.clone();
-        let mut justification =
-            Justification::from_msgs(initial_msgs.clone(), &mut new_validator_state);
-        justification.faulty_insert(&v0_equivocated, &mut new_validator_state);
+        let mut justification = Justification::from_msgs(initial_msgs, &mut validator_state);
+        justification.faulty_insert(&v0_equivocated, &mut validator_state);
 
         assert_eq!(
             justification.contains(&v0_equivocated),
             false,
             "Justification should not contain v0_equivocated"
         );
+    }
 
-        let mut with_duplicates = initial_msgs;
-        with_duplicates.push(v0);
+    #[test]
+    fn from_msgs_duplicate() {
+        let validators_weights = validator::Weights::new([(0, 1.0)].iter().cloned().collect());
+        let mut validator_state = validator::State::new(
+            validators_weights,
+            0.0,
+            LatestMsgs::empty(),
+            0.0,
+            HashSet::new(),
+        );
 
-        let justification = Justification::from_msgs(with_duplicates, &mut validator_state);
+        let v0 = VoteCount::create_vote_msg(0, true);
+        let v0_dup = VoteCount::create_vote_msg(0, true);
+
+        let initial_msgs = vec![v0, v0_dup];
+
+        let justification = Justification::from_msgs(initial_msgs, &mut validator_state);
         assert_eq!(
             justification.len(),
-            3,
+            1,
             "Justification should deduplicate messages"
         );
     }
@@ -754,7 +782,7 @@ mod test {
     fn justification_mk_estimate() {
         let validators_weights =
             validator::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
-        let validator_state = validator::State::new(
+        let mut validator_state = validator::State::new(
             validators_weights,
             0.0,
             LatestMsgs::empty(),
@@ -767,35 +795,29 @@ mod test {
         let v2 = VoteCount::create_vote_msg(2, false);
 
         let initial_msgs = vec![v0, v1, v2];
-        let mut validator_clone = validator_state.clone();
-        let justification = Justification::from_msgs(initial_msgs, &mut validator_clone);
+        let justification = Justification::from_msgs(initial_msgs, &mut validator_state);
 
         let estimate = justification.mk_estimate(
             validator_state.equivocators(),
-            validator_clone.validators_weights(),
+            validator_state.validators_weights(),
         );
 
         assert_eq!(
             estimate.expect("Estimate failed"),
             VoteCount { yes: 2, no: 1 }
         );
+    }
 
-        let v0 = VoteCount::create_vote_msg(0, true);
-        let v1 = VoteCount::create_vote_msg(1, false);
-        let v2 = VoteCount::create_vote_msg(2, false);
-
-        let initial_msgs = vec![v0, v1, v2];
-        let mut validator_clone = validator_state.clone();
-        let justification = Justification::from_msgs(initial_msgs, &mut validator_clone);
-
-        let estimate = justification.mk_estimate(
-            validator_state.equivocators(),
-            validator_clone.validators_weights(),
-        );
-
-        assert_eq!(
-            estimate.expect("Estimate failed"),
-            VoteCount { yes: 1, no: 2 }
+    #[test]
+    fn justification_mk_estimate_equivocator_not_at_threshold() {
+        let validators_weights =
+            validator::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+        let mut validator_state = validator::State::new(
+            validators_weights,
+            0.0,
+            LatestMsgs::empty(),
+            1.0,
+            HashSet::new(),
         );
 
         let v0 = VoteCount::create_vote_msg(0, true);
@@ -804,13 +826,12 @@ mod test {
         let v2 = VoteCount::create_vote_msg(2, false);
 
         let initial_msgs = vec![v0, v1, v2];
-        let mut validator_clone = validator_state.clone();
-        let mut justification = Justification::from_msgs(initial_msgs, &mut validator_clone);
-        justification.faulty_insert(&v0_equivocated, &mut validator_clone);
+        let mut justification = Justification::from_msgs(initial_msgs, &mut validator_state);
+        justification.faulty_insert(&v0_equivocated, &mut validator_state);
 
         let estimate = justification.mk_estimate(
             validator_state.equivocators(),
-            validator_clone.validators_weights(),
+            validator_state.validators_weights(),
         );
 
         assert_eq!(
