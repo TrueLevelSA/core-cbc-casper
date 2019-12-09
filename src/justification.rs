@@ -492,24 +492,6 @@ mod test {
         );
     }
 
-    #[test]
-    fn faulty_inserts_one_message() {
-        let v0 = &VoteCount::create_vote_msg(0, false);
-
-        let mut validator_state = validator::State::new(
-            validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
-            0.0,
-            LatestMsgs::empty(),
-            0.0,
-            HashSet::new(),
-        );
-
-        let failure = Justification::empty()
-            .faulty_inserts(&vec![v0].into_iter().collect(), &mut validator_state)
-            .is_empty();
-        assert_eq!(failure, false);
-    }
-
     fn faulty_insert_setup() -> (Message<VoteCount>, validator::State<VoteCount, f32>) {
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
