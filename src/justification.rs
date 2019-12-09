@@ -394,6 +394,7 @@ mod test {
     use crate::{IntegerWrapper, VoteCount};
 
     use std::collections::HashSet;
+    use std::iter::FromIterator;
 
     use crate::justification::{Justification, LatestMsgs};
     use crate::message::Message;
@@ -401,17 +402,17 @@ mod test {
 
     #[test]
     fn faulty_insert_sorted() {
-        let v0 = &VoteCount::create_vote_msg(0, false);
-        let v0_prime = &VoteCount::create_vote_msg(0, true);
-        let v1 = &VoteCount::create_vote_msg(1, true);
-        let v1_prime = &VoteCount::create_vote_msg(1, false);
-        let v2 = &VoteCount::create_vote_msg(2, true);
-        let v2_prime = &VoteCount::create_vote_msg(2, false);
+        let v0 = VoteCount::create_vote_msg(0, false);
+        let v0_prime = VoteCount::create_vote_msg(0, true);
+        let v1 = VoteCount::create_vote_msg(1, true);
+        let v1_prime = VoteCount::create_vote_msg(1, false);
+        let v2 = VoteCount::create_vote_msg(2, true);
+        let v2_prime = VoteCount::create_vote_msg(2, false);
 
         let mut latest_msgs = LatestMsgs::empty();
-        latest_msgs.update(v0);
-        latest_msgs.update(v1);
-        latest_msgs.update(v2);
+        latest_msgs.update(&v0);
+        latest_msgs.update(&v1);
+        latest_msgs.update(&v2);
 
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 2.0), (2, 3.0)].into_iter().collect()),
@@ -422,31 +423,43 @@ mod test {
         );
         let mut j = Justification::empty();
         let sorted_msgs = validator_state
-            .sort_by_faultweight(&vec![v2_prime, v1_prime, v0_prime].into_iter().collect());
+            .sort_by_faultweight(&vec![&v2_prime, &v1_prime, &v0_prime].into_iter().collect());
 
         sorted_msgs.iter().for_each(|&m| {
             j.faulty_insert(m, &mut validator_state);
         });
 
-        assert!(j.contains(v0_prime));
-        assert!(j.contains(v1_prime));
-        assert!(!j.contains(v2_prime));
+        assert!(j.contains(&v0_prime));
+        assert!(j.contains(&v1_prime));
+        assert!(!j.contains(&v2_prime));
         float_eq!(validator_state.fault_weight(), 3.0);
+        assert_eq!(
+            *validator_state.latests_msgs().get(&0).unwrap(),
+            HashSet::from_iter(vec![v0, v0_prime]),
+        );
+        assert_eq!(
+            *validator_state.latests_msgs().get(&1).unwrap(),
+            HashSet::from_iter(vec![v1, v1_prime]),
+        );
+        assert_eq!(
+            *validator_state.latests_msgs().get(&2).unwrap(),
+            HashSet::from_iter(vec![v2]),
+        );
     }
 
     #[test]
     fn faulty_inserts() {
-        let v0 = &VoteCount::create_vote_msg(0, false);
-        let v0_prime = &VoteCount::create_vote_msg(0, true);
-        let v1 = &VoteCount::create_vote_msg(1, true);
-        let v1_prime = &VoteCount::create_vote_msg(1, false);
-        let v2 = &VoteCount::create_vote_msg(2, true);
-        let v2_prime = &VoteCount::create_vote_msg(2, false);
+        let v0 = VoteCount::create_vote_msg(0, false);
+        let v0_prime = VoteCount::create_vote_msg(0, true);
+        let v1 = VoteCount::create_vote_msg(1, true);
+        let v1_prime = VoteCount::create_vote_msg(1, false);
+        let v2 = VoteCount::create_vote_msg(2, true);
+        let v2_prime = VoteCount::create_vote_msg(2, false);
 
         let mut latest_msgs = LatestMsgs::empty();
-        latest_msgs.update(v0);
-        latest_msgs.update(v1);
-        latest_msgs.update(v2);
+        latest_msgs.update(&v0);
+        latest_msgs.update(&v1);
+        latest_msgs.update(&v2);
 
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 2.0), (2, 3.0)].into_iter().collect()),
@@ -457,14 +470,26 @@ mod test {
         );
         let mut j = Justification::empty();
         j.faulty_inserts(
-            &vec![v2_prime, v1_prime, v0_prime].into_iter().collect(),
+            &vec![&v2_prime, &v1_prime, &v0_prime].into_iter().collect(),
             &mut validator_state,
         );
 
-        assert!(j.contains(v0_prime));
-        assert!(j.contains(v1_prime));
-        assert!(!j.contains(v2_prime));
+        assert!(j.contains(&v0_prime));
+        assert!(j.contains(&v1_prime));
+        assert!(!j.contains(&v2_prime));
         float_eq!(validator_state.fault_weight(), 3.0);
+        assert_eq!(
+            *validator_state.latests_msgs().get(&0).unwrap(),
+            HashSet::from_iter(vec![v0, v0_prime]),
+        );
+        assert_eq!(
+            *validator_state.latests_msgs().get(&1).unwrap(),
+            HashSet::from_iter(vec![v1, v1_prime]),
+        );
+        assert_eq!(
+            *validator_state.latests_msgs().get(&2).unwrap(),
+            HashSet::from_iter(vec![v2]),
+        );
     }
 
     #[test]
