@@ -435,6 +435,39 @@ mod test {
     }
 
     #[test]
+    fn faulty_inserts() {
+        let v0 = &VoteCount::create_vote_msg(0, false);
+        let v0_prime = &VoteCount::create_vote_msg(0, true);
+        let v1 = &VoteCount::create_vote_msg(1, true);
+        let v1_prime = &VoteCount::create_vote_msg(1, false);
+        let v2 = &VoteCount::create_vote_msg(2, true);
+        let v2_prime = &VoteCount::create_vote_msg(2, false);
+
+        let mut latest_msgs = LatestMsgs::empty();
+        latest_msgs.update(v0);
+        latest_msgs.update(v1);
+        latest_msgs.update(v2);
+
+        let mut validator_state = validator::State::new(
+            validator::Weights::new(vec![(0, 1.0), (1, 2.0), (2, 3.0)].into_iter().collect()),
+            0.0,
+            latest_msgs,
+            3.0,
+            HashSet::new(),
+        );
+        let mut j = Justification::empty();
+        j.faulty_inserts(
+            &vec![v2_prime, v1_prime, v0_prime].into_iter().collect(),
+            &mut validator_state,
+        );
+
+        assert!(j.contains(v0_prime));
+        assert!(j.contains(v1_prime));
+        assert!(!j.contains(v2_prime));
+        float_eq!(validator_state.fault_weight(), 3.0);
+    }
+
+    #[test]
     fn faulty_inserts_one_message() {
         let v0 = &VoteCount::create_vote_msg(0, false);
 
