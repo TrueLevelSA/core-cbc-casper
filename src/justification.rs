@@ -751,19 +751,8 @@ mod test {
         let justification = Justification::from_msgs(initial_msgs, &mut validator_state);
 
         assert_eq!(
-            justification.contains(&v0),
-            true,
-            "Justification should contain v0"
-        );
-        assert_eq!(
-            justification.contains(&v1),
-            true,
-            "Justification should contain v1"
-        );
-        assert_eq!(
-            justification.contains(&v2),
-            true,
-            "Justification should contain v2"
+            HashSet::<&Message<VoteCount>>::from_iter(justification.iter()),
+            HashSet::from_iter(vec![&v0, &v1, &v2]),
         );
     }
 
@@ -780,16 +769,16 @@ mod test {
         let v0 = VoteCount::create_vote_msg(0, true);
         let v1 = VoteCount::create_vote_msg(1, true);
         let v2 = VoteCount::create_vote_msg(2, false);
-        let v0_equivocated = VoteCount::create_vote_msg(0, false);
-        let initial_msgs = vec![v0, v1, v2];
+        let v0_prime = VoteCount::create_vote_msg(0, false);
 
+        let initial_msgs = vec![v0.clone(), v1.clone(), v2.clone()];
         let mut justification = Justification::from_msgs(initial_msgs, &mut validator_state);
-        justification.faulty_insert(&v0_equivocated, &mut validator_state);
+
+        justification.faulty_insert(&v0_prime, &mut validator_state);
 
         assert_eq!(
-            justification.contains(&v0_equivocated),
-            false,
-            "Justification should not contain v0_equivocated"
+            HashSet::<&Message<VoteCount>>::from_iter(justification.iter()),
+            HashSet::from_iter(vec![&v0, &v1, &v2]),
         );
     }
 
