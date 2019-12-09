@@ -494,7 +494,7 @@ mod test {
 
     fn faulty_insert_setup() -> (Message<VoteCount>, validator::State<VoteCount, f32>) {
         let mut validator_state = validator::State::new(
-            validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
+            validator::Weights::new(vec![(0, 1.0), (1, 1.0)].into_iter().collect()),
             0.0,
             LatestMsgs::empty(),
             0.0,
@@ -651,10 +651,8 @@ mod test {
 
     #[test]
     fn faulty_insert_double_equivocation() {
-        let validators_weights =
-            validator::Weights::new(vec![(0, 1.0)].into_iter().collect());
         let mut validator_state = validator::State::new(
-            validators_weights,
+            validator::Weights::new(vec![(0, 1.0)].into_iter().collect()),
             0.0,
             LatestMsgs::empty(),
             1.0,
@@ -682,13 +680,12 @@ mod test {
 
     #[test]
     fn faulty_insert_with_slash() {
-        let validators_weights = validator::Weights::new([(0, 1.0)].iter().cloned().collect());
         let v0 = &Message::new(0, Justification::empty(), IntegerWrapper::new(0));
         let v0_prime = &Message::new(0, Justification::empty(), IntegerWrapper::new(1)); // equivocating vote
         let mut j0 = Justification::empty();
 
         let mut validator_state = validator::State::new(
-            validators_weights,
+            validator::Weights::new(vec![(0, 1.0)].into_iter().collect()),
             0.0,
             LatestMsgs::empty(),
             1.0,
@@ -729,9 +726,13 @@ mod test {
         assert_eq!(latest_msgs.update(&v0), true);
         assert_eq!(latest_msgs.equivocate(&v0_equivocated), true);
 
-        let validators_weights = validator::Weights::new([(0, 1.0)].iter().cloned().collect());
-        let mut validator_state =
-            validator::State::new(validators_weights, 0.0, latest_msgs, 0.0, HashSet::new());
+        let mut validator_state = validator::State::new(
+            validator::Weights::new(vec![(0, 1.0)].into_iter().collect()),
+            0.0,
+            latest_msgs,
+            0.0,
+            HashSet::new(),
+        );
 
         validator_state.update(&[&v0]);
         let v0_not_equivocated = Message::from_validator_state(0, &validator_state).unwrap();
@@ -746,10 +747,8 @@ mod test {
 
     #[test]
     fn from_msgs() {
-        let validators_weights =
-            validator::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
         let mut validator_state = validator::State::new(
-            validators_weights,
+            validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
             LatestMsgs::empty(),
             0.0,
@@ -782,10 +781,8 @@ mod test {
 
     #[test]
     fn from_msgs_equivocation() {
-        let validators_weights =
-            validator::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
         let mut validator_state = validator::State::new(
-            validators_weights,
+            validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
             LatestMsgs::empty(),
             0.0,
@@ -810,9 +807,8 @@ mod test {
 
     #[test]
     fn from_msgs_duplicate() {
-        let validators_weights = validator::Weights::new([(0, 1.0)].iter().cloned().collect());
         let mut validator_state = validator::State::new(
-            validators_weights,
+            validator::Weights::new(vec![(0, 1.0)].into_iter().collect()),
             0.0,
             LatestMsgs::empty(),
             0.0,
@@ -834,10 +830,8 @@ mod test {
 
     #[test]
     fn justification_mk_estimate() {
-        let validators_weights =
-            validator::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
         let mut validator_state = validator::State::new(
-            validators_weights,
+            validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
             LatestMsgs::empty(),
             1.0,
@@ -864,10 +858,8 @@ mod test {
 
     #[test]
     fn justification_mk_estimate_equivocator_not_at_threshold() {
-        let validators_weights =
-            validator::Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
         let mut validator_state = validator::State::new(
-            validators_weights,
+            validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
             LatestMsgs::empty(),
             1.0,
