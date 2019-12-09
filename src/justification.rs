@@ -526,12 +526,17 @@ mod test {
             Some(1.0),
             None,
         );
-        let success = Justification::empty().faulty_insert(&v0_prime, &mut state);
+        let mut justification = Justification::empty();
+        let success = justification.faulty_insert(&v0_prime, &mut state);
+
         assert!(
             success,
             "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it \
              doesnt cross the fault threshold for the set"
         );
+        assert!(justification.contains(&v0_prime));
+        assert!(state.latests_msgs().get(&0).unwrap().contains(&v0_prime));
+        assert!(state.equivocators().contains(&0));
         float_eq!(
             state.fault_weight(),
             1.0,
@@ -553,12 +558,20 @@ mod test {
             Some(1.0),
             None,
         );
-        let success = Justification::empty().faulty_insert(&v0_prime, &mut state);
+        let mut justification = Justification::empty();
+        let success = justification.faulty_insert(&v0_prime, &mut state);
+
         assert!(
             !success,
             "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as \
              the fault threshold gets crossed for the set"
         );
+        assert!(!justification.contains(&v0_prime));
+        assert!(
+            state.latests_msgs().get(&0).unwrap().contains(&v0_prime),
+            "$v0_prime$ should still be contained in $state.latests_msgs()$",
+        );
+        assert!(!state.equivocators().contains(&0));
         float_eq!(
             state.fault_weight(),
             0.1,
@@ -580,11 +593,23 @@ mod test {
             Some(2.0),
             None,
         );
-        let success = Justification::empty().faulty_insert(&v0_prime, &mut state);
+        let mut justification = Justification::empty();
+        let success = justification.faulty_insert(&v0_prime, &mut state);
+
         assert!(
             success,
             "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the \
              threshold doesnt get crossed for the set"
+        );
+        assert!(justification.contains(&v0_prime));
+        assert!(state.latests_msgs().get(&0).unwrap().contains(&v0_prime));
+        assert!(state.equivocators().contains(&0));
+        float_eq!(
+            state.fault_weight(),
+            2.0,
+            "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as \
+             we can't know the weight of the validator, which could be Infinity, and thus the \
+             state_fault_weight should be unchanged"
         );
     }
 
@@ -601,12 +626,20 @@ mod test {
             Some(2.0),
             None,
         );
-        let success = Justification::empty().faulty_insert(&v0_prime, &mut state);
+        let mut justification = Justification::empty();
+        let success = justification.faulty_insert(&v0_prime, &mut state);
+
         assert!(
             !success,
             "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as \
              we can't know the weight of the validator, which could be Infinity"
         );
+        assert!(!justification.contains(&v0_prime));
+        assert!(
+            state.latests_msgs().get(&0).unwrap().contains(&v0_prime),
+            "$v0_prime$ should still be contained in $state.latests_msgs()$",
+        );
+        assert!(!state.equivocators().contains(&0));
         float_eq!(
             state.fault_weight(),
             1.0,
