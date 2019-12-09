@@ -650,9 +650,9 @@ mod test {
     }
 
     #[test]
-    fn faulty_insert() {
+    fn faulty_insert_double_equivocation() {
         let validators_weights =
-            validator::Weights::new([(0, 1.0), (1, 1.0)].iter().cloned().collect());
+            validator::Weights::new(vec![(0, 1.0)].into_iter().collect());
         let mut validator_state = validator::State::new(
             validators_weights,
             0.0,
@@ -662,39 +662,22 @@ mod test {
         );
 
         let v0 = &Message::new(0, Justification::empty(), IntegerWrapper::new(0));
-        let v0_prime = &Message::new(0, Justification::empty(), IntegerWrapper::new(1)); // equivocating vote
+        let v0_prime = &Message::new(0, Justification::empty(), IntegerWrapper::new(1));
         let v0_second = &Message::new(0, Justification::empty(), IntegerWrapper::new(2));
-        let v1 = &Message::new(1, Justification::empty(), IntegerWrapper::new(0));
-        let v1_prime = &Message::new(1, Justification::empty(), IntegerWrapper::new(1));
 
         let mut justification = Justification::empty();
 
-        // Validator 0 and v0 is not equivocating
+        // 0's equivocation can be registered as it would not cross the threshold. Its third
+        // message would not change the fault weight and is also accepted.
         assert!(justification.faulty_insert(v0, &mut validator_state));
-        assert!(justification.contains(v0));
-
-        // Validator 0 is not equivocating, v0_prime is equivocating
-        // State fault weight (0.0) is still below threshold (2.5), so vote can be
-        // inserted
         assert!(justification.faulty_insert(v0_prime, &mut validator_state));
-        assert!(justification.contains(v0_prime));
-
-        // After insert, state fault weight should be 1.0 and Validator 0 is now
-        // equivocating
-        float_eq!(validator_state.fault_weight(), 1.0);
-        assert!(validator_state.equivocators().contains(&0));
-
-        // Validator 0 can still send new votes, as it's already a equivocator
-        // and the fault is below threshold
         assert!(justification.faulty_insert(v0_second, &mut validator_state));
-        assert!(justification.contains(v0_second));
 
-        // A new Validator sending an equivocating vote will make the fault weight go
-        // above the threshold, and stop accepting equivocating votes
-        assert!(justification.faulty_insert(v1, &mut validator_state));
-        assert!(justification.contains(v1));
-        assert!(!justification.faulty_insert(v1_prime, &mut validator_state));
-        assert!(!justification.contains(v1_prime));
+        assert!(justification.contains(v0));
+        assert!(justification.contains(v0_prime));
+        assert!(justification.contains(v0_second));
+        assert!(validator_state.equivocators().contains(&0));
+        float_eq!(validator_state.fault_weight(), 1.0);
     }
 
     #[test]
