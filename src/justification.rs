@@ -680,10 +680,6 @@ mod test {
 
     #[test]
     fn faulty_insert_with_slash() {
-        let v0 = &Message::new(0, Justification::empty(), IntegerWrapper::new(0));
-        let v0_prime = &Message::new(0, Justification::empty(), IntegerWrapper::new(1)); // equivocating vote
-        let mut j0 = Justification::empty();
-
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0)].into_iter().collect()),
             0.0,
@@ -692,28 +688,28 @@ mod test {
             HashSet::new(),
         );
 
-        // Sender 0 and v0 are not equivocating
-        assert_eq!(
-            j0.faulty_insert_with_slash(v0, &mut validator_state)
-                .unwrap(),
-            true
-        );
-        assert_eq!(j0.contains(v0), true);
+        let v0 = Message::new(0, Justification::empty(), IntegerWrapper::new(0));
+        let v0_prime = Message::new(0, Justification::empty(), IntegerWrapper::new(1));
 
-        // Sender 0 is not equivocating, v0_prime is equivocating
-        assert_eq!(
-            j0.faulty_insert_with_slash(v0_prime, &mut validator_state)
-                .unwrap(),
-            true
-        );
-        assert_eq!(j0.contains(v0_prime), true);
+        let mut justification = Justification::empty();
 
-        // Sender 0 gets slashed because of equivocation
+        assert!(justification
+            .faulty_insert_with_slash(&v0, &mut validator_state)
+            .unwrap());
+        assert!(justification
+            .faulty_insert_with_slash(&v0_prime, &mut validator_state)
+            .unwrap());
+
+        assert!(justification.contains(&v0));
+        assert!(justification.contains(&v0_prime));
+        assert_eq!(
+            *validator_state.latests_msgs().get(&0).unwrap(),
+            HashSet::from_iter(vec![v0, v0_prime]),
+        );
         float_eq!(
             validator_state.validators_weights().weight(&0).unwrap(),
             0.0
         );
-
         float_eq!(validator_state.fault_weight(), 0.0);
     }
 
