@@ -715,30 +715,22 @@ mod test {
 
     #[test]
     fn equivocate() {
-        let mut latest_msgs = LatestMsgs::empty();
-        let v0 = VoteCount::create_vote_msg(0, true);
-        let v0_equivocated = VoteCount::create_vote_msg(0, false);
-
-        assert_eq!(latest_msgs.update(&v0), true);
-        assert_eq!(latest_msgs.equivocate(&v0_equivocated), true);
-
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0)].into_iter().collect()),
             0.0,
-            latest_msgs,
+            LatestMsgs::empty(),
             0.0,
             HashSet::new(),
         );
 
-        validator_state.update(&[&v0]);
-        let v0_not_equivocated = Message::from_validator_state(0, &validator_state).unwrap();
+        let v0 = VoteCount::create_vote_msg(0, true);
+        let v0_prime = VoteCount::create_vote_msg(0, false);
 
-        assert_eq!(
-            validator_state
-                .latests_msgs()
-                .equivocate(&v0_not_equivocated),
-            false
-        );
+        validator_state.update(&[&v0]);
+        let v0_second = Message::from_validator_state(0, &validator_state).unwrap();
+
+        assert!(validator_state.latests_msgs().equivocate(&v0_prime));
+        assert!(!validator_state.latests_msgs().equivocate(&v0_second));
     }
 
     #[test]
