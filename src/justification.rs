@@ -904,8 +904,7 @@ mod test {
         let v0 = VoteCount::create_vote_msg(0, true);
 
         let sender_latest_msgs_hashset = vec![v0.clone()].into_iter().collect();
-        // First message of sender, should return true
-        assert_eq!(latest_msgs.update(&v0), true);
+        assert!(latest_msgs.update(&v0));
         assert_eq!(latest_msgs.get(&0), Some(&sender_latest_msgs_hashset));
     }
 
@@ -915,41 +914,24 @@ mod test {
         let v0 = VoteCount::create_vote_msg(0, true);
         let sender_latest_msgs_hashset = vec![v0.clone()].into_iter().collect();
 
-        // First message of sender, should return true
-        assert_eq!(latest_msgs.update(&v0), true);
+        assert!(latest_msgs.update(&v0));
         assert_eq!(latest_msgs.get(&0), Some(&sender_latest_msgs_hashset));
-
-        // Duplicate message of sender, should return false
-        assert_eq!(latest_msgs.update(&v0), false);
-
-        // LatestMsgs HashSet for sender 0 did not change
+        assert!(!latest_msgs.update(&v0));
         assert_eq!(latest_msgs.get(&0), Some(&sender_latest_msgs_hashset));
     }
 
     #[test]
-    fn latest_msgs_update_new_msg_newer_than_old() {
-        let mut latest_msgs = LatestMsgs::empty();
+    fn latest_msgs_update_equivocation() {
         let v1 = VoteCount::create_vote_msg(1, false);
-        let new_v1 = Message::new(
-            *v1.sender(),
-            v1.justification().clone(),
-            VoteCount { yes: 1, no: 0 },
-        );
+        let v1_prime = VoteCount::create_vote_msg(1, true);
 
-        // First message of sender, should return true
-        assert_eq!(latest_msgs.update(&v1), true);
+        let mut latest_msgs = LatestMsgs::empty();
+        assert!(latest_msgs.update(&v1));
+        assert!(latest_msgs.update(&v1_prime));
+
         assert_eq!(
             latest_msgs.get(&1),
-            Some(&vec![v1.clone()].into_iter().collect())
-        );
-
-        // New message correctly inserted into latest_msgs
-        assert_eq!(latest_msgs.update(&new_v1), true);
-
-        // LatestMsgs HashSet for sender 1 now has new_v1
-        assert_eq!(
-            latest_msgs.get(&1),
-            Some(&vec![v1, new_v1].into_iter().collect())
+            Some(&vec![v1, v1_prime].into_iter().collect())
         );
     }
 }
