@@ -912,12 +912,14 @@ mod test {
     fn latest_msgs_update_duplicate_msg() {
         let mut latest_msgs = LatestMsgs::empty();
         let v0 = VoteCount::create_vote_msg(0, true);
-        let sender_latest_msgs_hashset = vec![v0.clone()].into_iter().collect();
 
         assert!(latest_msgs.update(&v0));
-        assert_eq!(latest_msgs.get(&0), Some(&sender_latest_msgs_hashset));
-        assert!(!latest_msgs.update(&v0));
-        assert_eq!(latest_msgs.get(&0), Some(&sender_latest_msgs_hashset));
+        assert_eq!(
+            latest_msgs.get(&0),
+            Some(&vec![v0.clone()].into_iter().collect())
+        );
+        assert!(!latest_msgs.update(&v0.clone()));
+        assert_eq!(latest_msgs.get(&0), Some(&vec![v0].into_iter().collect()));
     }
 
     #[test]
