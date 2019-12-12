@@ -534,6 +534,7 @@ mod test {
             "$v0_prime$ conflicts with $v0$ through $m0$, but we should accept this fault as it \
              doesnt cross the fault threshold for the set"
         );
+        assert_eq!(justification.len(), 1);
         assert!(justification.contains(&v0_prime));
         assert!(state.latests_msgs().get(&0).unwrap().contains(&v0_prime));
         assert!(state.equivocators().contains(&0));
@@ -566,6 +567,7 @@ mod test {
             "$v0_prime$ conflicts with $v0$ through $m0$, and we should not accept this fault as \
              the fault threshold gets crossed for the set"
         );
+        assert!(justification.is_empty());
         assert!(!justification.contains(&v0_prime));
         assert!(
             state.latests_msgs().get(&0).unwrap().contains(&v0_prime),
@@ -601,6 +603,7 @@ mod test {
             "$v0_prime$ conflict with $v0$ through $m0$, but we should accept this fault as the \
              threshold doesnt get crossed for the set"
         );
+        assert!(!justification.is_empty());
         assert!(justification.contains(&v0_prime));
         assert!(state.latests_msgs().get(&0).unwrap().contains(&v0_prime));
         assert!(state.equivocators().contains(&0));
@@ -634,6 +637,7 @@ mod test {
             "$v0_prime$ conflict with $v0$ through $m0$, but we should NOT accept this fault as \
              we can't know the weight of the validator, which could be Infinity"
         );
+        assert!(justification.is_empty());
         assert!(!justification.contains(&v0_prime));
         assert!(
             state.latests_msgs().get(&0).unwrap().contains(&v0_prime),
