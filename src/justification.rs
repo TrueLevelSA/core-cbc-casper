@@ -921,17 +921,51 @@ mod test {
     }
 
     #[test]
-    fn latest_msgs_update_equivocation() {
-        let v1 = VoteCount::create_vote_msg(1, false);
-        let v1_prime = VoteCount::create_vote_msg(1, true);
+    fn latest_msgs_update_new_message() {
+        let v0 = VoteCount::create_vote_msg(0, false);
+        let mut justification = Justification::empty();
+        justification.insert(v0.clone());
+        let v0_prime = Message::new(0, justification, VoteCount { yes: 1, no: 0 });
 
         let mut latest_msgs = LatestMsgs::empty();
-        assert!(latest_msgs.update(&v1));
-        assert!(latest_msgs.update(&v1_prime));
+        assert!(latest_msgs.update(&v0));
+        assert!(latest_msgs.update(&v0_prime));
 
         assert_eq!(
-            latest_msgs.get(&1),
-            Some(&vec![v1, v1_prime].into_iter().collect())
+            latest_msgs.get(&0),
+            Some(&vec![v0_prime].into_iter().collect())
+        );
+    }
+
+    #[test]
+    fn latest_msgs_update_old_message() {
+        let v0 = VoteCount::create_vote_msg(0, false);
+        let mut justification = Justification::empty();
+        justification.insert(v0.clone());
+        let v0_prime = Message::new(0, justification, VoteCount { yes: 1, no: 0 });
+
+        let mut latest_msgs = LatestMsgs::empty();
+        assert!(latest_msgs.update(&v0_prime));
+        assert!(!latest_msgs.update(&v0));
+
+        assert_eq!(
+            latest_msgs.get(&0),
+            Some(&vec![v0_prime].into_iter().collect())
+        );
+    }
+
+    #[test]
+    fn latest_msgs_update_equivocation() {
+        let v0 = VoteCount::create_vote_msg(0, false);
+        let v0_prime = VoteCount::create_vote_msg(0, true);
+
+        let mut latest_msgs = LatestMsgs::empty();
+        assert!(latest_msgs.update(&v0));
+        assert!(latest_msgs.update(&v0_prime));
+
+        assert_eq!(
+            latest_msgs.get(&0),
+            Some(&vec![v0, v0_prime].into_iter().collect())
         );
     }
 }
