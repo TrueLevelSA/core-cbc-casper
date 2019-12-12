@@ -941,6 +941,7 @@ mod test {
 
     #[test]
     fn latest_msgs_update_old_message() {
+        // update will only return false in this case.
         let v0 = VoteCount::create_vote_msg(0, false);
         let mut justification = Justification::empty();
         justification.insert(v0.clone());
