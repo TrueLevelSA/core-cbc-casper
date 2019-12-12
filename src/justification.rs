@@ -798,9 +798,9 @@ mod test {
         );
 
         let v0 = VoteCount::create_vote_msg(0, true);
-        let v0_dup = VoteCount::create_vote_msg(0, true);
+        let v0_prime = VoteCount::create_vote_msg(0, true);
 
-        let initial_msgs = vec![v0, v0_dup];
+        let initial_msgs = vec![v0, v0_prime];
 
         let justification = Justification::from_msgs(initial_msgs, &mut validator_state);
         assert_eq!(
