@@ -710,6 +710,7 @@ mod test {
             *validator_state.latests_msgs().get(&0).unwrap(),
             HashSet::from_iter(vec![v0, v0_prime]),
         );
+        assert_eq!(*validator_state.equivocators(), HashSet::from_iter(vec![0]));
         float_eq!(
             validator_state.validators_weights().weight(&0).unwrap(),
             0.0
