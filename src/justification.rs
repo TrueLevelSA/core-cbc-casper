@@ -868,6 +868,36 @@ mod test {
     }
 
     #[test]
+    fn justification_mk_estimate_equivocator_at_threshold() {
+        let mut validator_state = validator::State::new(
+            validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
+            0.0,
+            LatestMsgs::empty(),
+            0.0,
+            HashSet::new(),
+        );
+
+        let v0 = VoteCount::create_vote_msg(0, true);
+        let v0_prime = VoteCount::create_vote_msg(0, false);
+        let v1 = VoteCount::create_vote_msg(1, false);
+        let v2 = VoteCount::create_vote_msg(2, false);
+
+        let initial_msgs = vec![v0, v1, v2];
+        let mut justification = Justification::from_msgs(initial_msgs, &mut validator_state);
+        justification.faulty_insert(&v0_prime, &mut validator_state);
+
+        let estimate = justification.mk_estimate(
+            validator_state.equivocators(),
+            validator_state.validators_weights(),
+        );
+
+        assert_eq!(
+            estimate.expect("Estimate failed"),
+            VoteCount { yes: 1, no: 2 }
+        );
+    }
+
+    #[test]
     fn latest_msgs_update_new_sender() {
         let mut latest_msgs = LatestMsgs::empty();
 
