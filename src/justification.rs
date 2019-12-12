@@ -848,13 +848,13 @@ mod test {
         );
 
         let v0 = VoteCount::create_vote_msg(0, true);
-        let v0_equivocated = VoteCount::create_vote_msg(0, false);
+        let v0_prime = VoteCount::create_vote_msg(0, false);
         let v1 = VoteCount::create_vote_msg(1, false);
         let v2 = VoteCount::create_vote_msg(2, false);
 
         let initial_msgs = vec![v0, v1, v2];
         let mut justification = Justification::from_msgs(initial_msgs, &mut validator_state);
-        justification.faulty_insert(&v0_equivocated, &mut validator_state);
+        justification.faulty_insert(&v0_prime, &mut validator_state);
 
         let estimate = justification.mk_estimate(
             validator_state.equivocators(),
