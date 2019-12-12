@@ -421,17 +421,18 @@ mod test {
             3.0,
             HashSet::new(),
         );
-        let mut j = Justification::empty();
+        let mut justification = Justification::empty();
         let sorted_msgs = validator_state
             .sort_by_faultweight(&vec![&v2_prime, &v1_prime, &v0_prime].into_iter().collect());
 
         sorted_msgs.iter().for_each(|&m| {
-            j.faulty_insert(m, &mut validator_state);
+            justification.faulty_insert(m, &mut validator_state);
         });
 
-        assert!(j.contains(&v0_prime));
-        assert!(j.contains(&v1_prime));
-        assert!(!j.contains(&v2_prime));
+        assert_eq!(
+            HashSet::<&Message<VoteCount>>::from_iter(justification.iter()),
+            HashSet::from_iter(vec![&v0_prime, &v1_prime])
+        );
         float_eq!(validator_state.fault_weight(), 3.0);
         assert_eq!(
             *validator_state.latests_msgs().get(&0).unwrap(),
@@ -468,15 +469,16 @@ mod test {
             3.0,
             HashSet::new(),
         );
-        let mut j = Justification::empty();
-        j.faulty_inserts(
+        let mut justification = Justification::empty();
+        justification.faulty_inserts(
             &vec![&v2_prime, &v1_prime, &v0_prime].into_iter().collect(),
             &mut validator_state,
         );
 
-        assert!(j.contains(&v0_prime));
-        assert!(j.contains(&v1_prime));
-        assert!(!j.contains(&v2_prime));
+        assert_eq!(
+            HashSet::<&Message<VoteCount>>::from_iter(justification.iter()),
+            HashSet::from_iter(vec![&v0_prime, &v1_prime])
+        );
         float_eq!(validator_state.fault_weight(), 3.0);
         assert_eq!(
             *validator_state.latests_msgs().get(&0).unwrap(),
@@ -548,7 +550,7 @@ mod test {
     }
 
     #[test]
-    fn faulty_insert_no_accept() {
+    fn faulty_insert_at_threshold() {
         let (v0_prime, validator_state) = faulty_insert_setup();
 
         let mut state = validator::State::new_with_default_state(
@@ -663,21 +665,22 @@ mod test {
             HashSet::new(),
         );
 
-        let v0 = &Message::new(0, Justification::empty(), IntegerWrapper::new(0));
-        let v0_prime = &Message::new(0, Justification::empty(), IntegerWrapper::new(1));
-        let v0_second = &Message::new(0, Justification::empty(), IntegerWrapper::new(2));
+        let v0 = Message::new(0, Justification::empty(), IntegerWrapper::new(0));
+        let v0_prime = Message::new(0, Justification::empty(), IntegerWrapper::new(1));
+        let v0_second = Message::new(0, Justification::empty(), IntegerWrapper::new(2));
 
         let mut justification = Justification::empty();
 
         // 0's equivocation can be registered as it would not cross the threshold. Its third
         // message would not change the fault weight and is also accepted.
-        assert!(justification.faulty_insert(v0, &mut validator_state));
-        assert!(justification.faulty_insert(v0_prime, &mut validator_state));
-        assert!(justification.faulty_insert(v0_second, &mut validator_state));
+        assert!(justification.faulty_insert(&v0, &mut validator_state));
+        assert!(justification.faulty_insert(&v0_prime, &mut validator_state));
+        assert!(justification.faulty_insert(&v0_second, &mut validator_state));
 
-        assert!(justification.contains(v0));
-        assert!(justification.contains(v0_prime));
-        assert!(justification.contains(v0_second));
+        assert_eq!(
+            HashSet::<&Message<IntegerWrapper>>::from_iter(justification.iter()),
+            HashSet::from_iter(vec![&v0, &v0_prime, &v0_second])
+        );
         assert!(validator_state.equivocators().contains(&0));
         float_eq!(validator_state.fault_weight(), 1.0);
     }
