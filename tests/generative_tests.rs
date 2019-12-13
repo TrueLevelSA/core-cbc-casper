@@ -684,7 +684,15 @@ proptest! {
         // total messages until unilateral consensus
         println!(
             "{} validators -> {:?} message(s)",
-            match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+            match chain
+                .last()
+                .unwrap()
+                .as_ref()
+                .unwrap_or(&HashMap::new())
+                .keys()
+                .len()
+                .to_string()
+                .as_ref()
             {
                 "0" => "Unknown",
                 x => x,
@@ -715,7 +723,15 @@ proptest! {
         // total messages until unilateral consensus
         println!(
             "{} validators -> {:?} message(s)",
-            match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+            match chain
+                .last()
+                .unwrap()
+                .as_ref()
+                .unwrap_or(&HashMap::new())
+                .keys()
+                .len()
+                .to_string()
+                .as_ref()
             {
                 "0" => "Unknown",
                 x => x,
@@ -742,7 +758,15 @@ proptest! {
         // total messages until unilateral consensus
         println!(
             "{} validators -> {:?} message(s)",
-            match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+            match chain
+                .last()
+                .unwrap()
+                .as_ref()
+                .unwrap_or(&HashMap::new())
+                .keys()
+                .len()
+                .to_string()
+                .as_ref()
             {
                 "0" => "Unknown",
                 x => x,
@@ -769,7 +793,15 @@ proptest! {
         // total messages until unilateral consensus
         println!(
             "{} validators -> {:?} message(s)",
-            match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+            match chain
+                .last()
+                .unwrap()
+                .as_ref()
+                .unwrap_or(&HashMap::new())
+                .keys()
+                .len()
+                .to_string()
+                .as_ref()
             {
                 "0" => "Unknown",
                  x => x,
@@ -796,7 +828,15 @@ proptest! {
         // total messages until unilateral consensus
         println!(
             "{} validators -> {:?} message(s)",
-            match chain.last().unwrap().as_ref().unwrap_or(&HashMap::new()).keys().len().to_string().as_ref()
+            match chain
+                .last()
+                .unwrap()
+                .as_ref()
+                .unwrap_or(&HashMap::new())
+                .keys()
+                .len()
+                .to_string()
+                .as_ref()
             {
                 "0" => "Unknown",
                 x => x,
@@ -856,7 +896,11 @@ proptest! {
         );
 
         // here, only take one equivocation
-        let single_equivocation: Vec<_> = messages[..=nodes].iter().map(|message| message).collect();
+        let single_equivocation: Vec<_> =
+            messages[..=nodes]
+                .iter()
+                .map(|message| message)
+                .collect();
         let equivocator = messages[nodes].sender();
         for m in single_equivocation.iter() {
             validator_state.update(&[&m]);
@@ -864,7 +908,11 @@ proptest! {
         let m0 =
             &Message::from_validator_state(0, &validator_state)
             .unwrap();
-        let equivocations: Vec<_> = single_equivocation.iter().filter(|message| message.equivocates(&m0)).collect();
+        let equivocations: Vec<_> =
+            single_equivocation
+                .iter()
+                .filter(|message| message.equivocates(&m0))
+                .collect();
         assert!(
             if *equivocator == 0 {equivocations.len() == 2} else {equivocations.is_empty()},
             "should detect both validator 0 equivocating messages if validator 0 equivocates",
@@ -983,7 +1031,11 @@ prop_compose! {
             messages.push(Message::new(validator as u32, Justification::empty(), *vote));
 
             if equivocations.contains(&validator) {
-                messages.push(Message::new(validator as u32, Justification::empty(), vote.toggled_vote()));
+                messages.push(Message::new(
+                    validator as u32,
+                    Justification::empty(),
+                    vote.toggled_vote(),
+                ));
             }
         }
 
