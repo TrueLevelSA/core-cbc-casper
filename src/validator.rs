@@ -184,9 +184,6 @@ where
                 .weight(sender)
                 .unwrap_or(U::INFINITY);
 
-            // TODO #49: investigate why LatestMsgs.update does not
-            // return as its documentation says and if the code or
-            // the documentation should be fixed.
             let a = self.latest_msgs.update(message);
 
             if self.latest_msgs.equivocate(message)
@@ -460,7 +457,7 @@ mod tests {
         let v0_prime = VoteCount::create_vote_msg(0, true);
         let v1 = VoteCount::create_vote_msg(1, true);
 
-        let _all_valid = validator_state.update(&[&v0, &v0_prime, &v1]);
+        let all_valid = validator_state.update(&[&v0, &v0_prime, &v1]);
 
         let hs0 = validator_state
             .latests_msgs()
@@ -471,10 +468,7 @@ mod tests {
             .get(&1)
             .expect("state should contain validator 1");
 
-        // TODO #49: investigate why LatestMsgs.update does not return as
-        // its documentation says and if the code or the documentation
-        // should be fixed.
-        //assert!(!all_valid, "messages should not be all valid messages");
+        assert!(all_valid, "messages should not be all valid messages");
         assert_eq!(
             hs0.len(),
             2,
@@ -516,7 +510,7 @@ mod tests {
         let v0_prime = VoteCount::create_vote_msg(0, true);
         let v1 = VoteCount::create_vote_msg(1, true);
 
-        let _all_valid = validator_state.update(&[&v0, &v0_prime, &v1]);
+        let all_valid = validator_state.update(&[&v0, &v0_prime, &v1]);
 
         let hs0 = validator_state
             .latests_msgs()
@@ -527,10 +521,7 @@ mod tests {
             .get(&1)
             .expect("state should contain validator 1");
 
-        // TODO #49: investigate why LatestMsgs.update does not return as
-        // its documentation says and if the code or the documentation
-        // should be fixed.
-        //assert!(!all_valid, "messages should not be all valid messages");
+        assert!(all_valid, "messages should not be all valid messages");
         assert_eq!(
             hs0.len(),
             2,
