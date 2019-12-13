@@ -266,7 +266,7 @@ impl<E: Estimator> LatestMsgs<E> {
     /// Get the set values, i.e. the messages.
     pub fn values(
         &self,
-    ) -> std::collections::hash_map::Values<'_, E::ValidatorName, HashSet<Message<E>>> {
+    ) -> std::collections::hash_map::Values<E::ValidatorName, HashSet<Message<E>>> {
         self.0.values()
     }
 
@@ -315,7 +315,7 @@ impl<E: Estimator> LatestMsgs<E> {
     }
 }
 
-impl<'z, E: Estimator> From<&'z Justification<E>> for LatestMsgs<E> {
+impl<E: Estimator> From<&Justification<E>> for LatestMsgs<E> {
     /// Extract the latest messages of each validator from a justification.
     fn from(j: &Justification<E>) -> Self {
         let mut latest_msgs: LatestMsgs<E> = LatestMsgs::empty();

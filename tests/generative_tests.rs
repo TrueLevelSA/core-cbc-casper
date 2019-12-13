@@ -57,8 +57,8 @@ use tools::ChainData;
 
 /// create a message for each validator in the validators_recipients_data vector
 /// messages are added to theirs validators state
-fn create_messages<'z, E, U>(
-    state: &'z mut HashMap<u32, validator::State<E, U>>,
+fn create_messages<E, U>(
+    state: &mut HashMap<u32, validator::State<E, U>>,
     validators_recipients_data: Vec<(u32, HashSet<u32>)>,
 ) -> Vec<(Message<E>, u32, HashSet<u32>)>
 where

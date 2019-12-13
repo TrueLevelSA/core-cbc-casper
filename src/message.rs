@@ -140,7 +140,7 @@ impl<E: Estimator> Message<E> {
         &self.0.estimate
     }
 
-    pub fn justification<'z>(&'z self) -> &'z Justification<E> {
+    pub fn justification(&self) -> &Justification<E> {
         &self.0.justification
     }
 

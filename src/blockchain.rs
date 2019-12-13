@@ -102,7 +102,7 @@ impl<V: validator::ValidatorName> From<ProtoBlock<V>> for Block<V> {
     }
 }
 
-impl<'z, V: validator::ValidatorName> From<&'z Message<V>> for Block<V> {
+impl<V: validator::ValidatorName> From<&Message<V>> for Block<V> {
     fn from(msg: &Message<V>) -> Self {
         msg.estimate().clone()
     }

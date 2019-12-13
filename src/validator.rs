@@ -121,7 +121,7 @@ pub enum Error<'rwlock, T> {
 impl<'rwlock, T> std::error::Error for Error<'rwlock, T> {}
 
 impl<'rwlock, T> std::fmt::Display for Error<'rwlock, T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Error::NotFound => writeln!(f, "Validator weight not found"),
             Error::WriteLockError(p_err) => std::fmt::Display::fmt(p_err, f),
