@@ -39,7 +39,8 @@
 //!                       has seen and acknowledged while generating that particular message. The
 //!                       justification is supposed to “justify” the proposed value.
 //!
-//! Source: [Casper CBC, Simplified!](https://medium.com/@aditya.asgaonkar/casper-cbc-simplified-2370922f9aa6),
+//! Source: [Casper CBC, Simplified!](
+//! https://medium.com/@aditya.asgaonkar/casper-cbc-simplified-2370922f9aa6),
 //! by Aditya Asgaonkar.
 
 use std::collections::HashSet;
@@ -279,7 +280,7 @@ impl<E: Estimator> std::hash::Hash for Message<E> {
 
 impl<E: Estimator> PartialEq for Message<E> {
     fn eq(&self, rhs: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &rhs.0) || self.getid() == rhs.getid() // should make this line unnecessary
+        Arc::ptr_eq(&self.0, &rhs.0) || self.getid() == rhs.getid()
     }
 }
 

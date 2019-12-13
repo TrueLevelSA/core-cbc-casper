@@ -25,12 +25,13 @@
 //! # Estimator Function
 //!
 //! The **estimator function takes the justification** (which is a set of messages) as input, and
-//! **returns the set of consensus values** that are “justified” by the input.  For example, in an
-//! integer consensus setting, the estimator will return integer values. In a blockchain setting,
-//! the the estimator will return blocks which can be added on top of the current tip detected from
-//! the blocks in the messages in the inputted justification.
+//! **returns the set of consensus values** that are “justified” by the input.  For example,
+//! in an integer consensus setting, the estimator will return integer values. In a blockchain
+//! setting, the the estimator will return blocks which can be added on top of the current tip
+//! detected from the blocks in the messages in the inputted justification.
 //!
-//! Source: [Casper CBC, Simplified!](https://medium.com/@aditya.asgaonkar/casper-cbc-simplified-2370922f9aa6),
+//! Source: [Casper CBC, Simplified!](
+//! https://medium.com/@aditya.asgaonkar/casper-cbc-simplified-2370922f9aa6),
 //! by Aditya Asgaonkar.
 
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -96,7 +97,8 @@ impl<E: Estimator> Justification<E> {
         }
     }
 
-    /// Run the estimator on the justification given the set of equivocators and validators' weights.
+    /// Run the estimator on the justification given the set of equivocators and validators'
+    /// weights.
     pub fn mk_estimate<U: WeightUnit>(
         &self,
         equivocators: &HashSet<E::ValidatorName>,
@@ -167,8 +169,8 @@ impl<E: Estimator> Justification<E> {
     }
 
     /// This function sets the weight of the equivocator to zero right away (returned in
-    /// `validator::State`) and add his message to the state, since now his equivocation doesnt count
-    /// to the state fault weight anymore
+    /// `validator::State`) and add his message to the state, since now his equivocation doesnt
+    /// count to the state fault weight anymore
     pub fn faulty_insert_with_slash<'a, U: WeightUnit>(
         &mut self,
         msg: &Message<E>,

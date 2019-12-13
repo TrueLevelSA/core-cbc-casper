@@ -77,8 +77,8 @@ where
                     acc.union(&lms).cloned().collect()
                 });
 
-            // remove all messages from latest that are contained in this validator's latest messages
-            // justification
+            // remove all messages from latest that are contained in this validator's latest
+            // messages justification
             let latest_delta = match state[&validator].latests_msgs().get(&validator) {
                 Some(msgs) => match msgs.len() {
                     1 => {
@@ -175,7 +175,8 @@ fn arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
     prop::collection::hash_set(prop::sample::select(val.clone()), 1).boxed()
 }
 
-/// validator strategy that picks some number of validators in the set at random, in a uniform manner
+/// validator strategy that picks some number of validators in the set at random, in a uniform
+/// manner
 fn parallel_arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
     let validators = val.clone();
     prop::sample::select((1..=validators.len()).collect::<Vec<usize>>())
@@ -185,7 +186,8 @@ fn parallel_arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> 
         .boxed()
 }
 
-/// receiver strategy that picks between 0 and n receivers at random, n being the number of validators
+/// receiver strategy that picks between 0 and n receivers at random, n being the number of
+/// validators
 fn some_receivers(_validator: u32, possible_validators: &[u32], rng: &mut TestRng) -> HashSet<u32> {
     let n = rng.gen_range(0, possible_validators.len());
     let mut receivers: HashSet<u32> = HashSet::new();
@@ -203,8 +205,8 @@ fn all_receivers(_sender: u32, possible_validators: &[u32], _rng: &mut TestRng) 
     HashSet::from_iter(possible_validators.iter().cloned())
 }
 
-/// maps each validator from the validator_strategy to a set of receivers, using the receivers_selector
-/// function
+/// maps each validator from the validator_strategy to a set of receivers, using the
+/// receivers_selector function
 fn create_receiver_strategy(
     validators: &[u32],
     validator_strategy: BoxedStrategy<HashSet<u32>>,

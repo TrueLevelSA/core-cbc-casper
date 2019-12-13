@@ -26,7 +26,8 @@
 //!
 //! ## Consensus Rules
 //!
-//! These rules classify two types of faults: the *invalid message* fault, and the *equivocation* fault.
+//! These rules classify two types of faults: the *invalid message* fault, and the *equivocation*
+//! fault.
 //!
 //!  1. The proposed value must be in the set of consensus values returned by the application of
 //!     the estimator function on the justification.
@@ -48,16 +49,17 @@
 //!     Byzantine failure which we call equivocation. We refer to the violation of this rule as
 //!     faults.
 //!
-//! When a node (`validator::ValidatorName`) equivocates, it is basically executing multiple separate
-//! instances of the protocol, and may attempt to show messages from a single instance of these
-//! executions to separate peers in the network. To clarify what separate instances of the protocol
-//! are: consider a validator who violates consensus *rule 2* by generating messages **A** and
-//! **B** that break the rule. The validator then starts maintaining two histories of protocol
+//! When a node (`validator::ValidatorName`) equivocates, it is basically executing multiple
+//! separate instances of the protocol, and may attempt to show messages from a single instance of
+//! these executions to separate peers in the network. To clarify what separate instances of the
+//! protocol are: consider a validator who violates consensus *rule 2* by generating messages **A**
+//! and **B** that break the rule. The validator then starts maintaining two histories of protocol
 //! execution, one in which only message **A** is generated, and the other in which only message
 //! **B** is generated. In each single version of protocol execution, the validator has not
 //! equivocated.
 //!
-//! Source: [Casper CBC, Simplified!](https://medium.com/@aditya.asgaonkar/casper-cbc-simplified-2370922f9aa6),
+//! Source: [Casper CBC, Simplified!](
+//! https://medium.com/@aditya.asgaonkar/casper-cbc-simplified-2370922f9aa6),
 //! by Aditya Asgaonkar.
 
 use std::collections::{HashMap, HashSet};
@@ -71,7 +73,8 @@ use crate::message::Message;
 use crate::util::id::Id;
 use crate::util::weight::{WeightUnit, Zero};
 
-/// All casper actors that send messages, aka validators, have to implement the validator name trait
+/// All casper actors that send messages, aka validators, have to implement the validator name
+/// trait
 pub trait ValidatorName: Hash + Clone + Ord + Eq + Send + Sync + Debug + serde::Serialize {}
 
 // Default implementations

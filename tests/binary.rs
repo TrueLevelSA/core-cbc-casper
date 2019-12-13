@@ -129,7 +129,8 @@ fn vote_swaying() {
         BoolWrapper(false)
     );
 
-    // assume validator 0 has seen messages from validator 1 and validator 2 and reveals this in a published message
+    // assume validator 0 has seen messages from validator 1 and validator 2 and reveals this in a
+    // published message
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[&m0, &m1, &m2]);
     let m5 = Message::from_validator_state(validators[0], &validator_state_clone).unwrap();

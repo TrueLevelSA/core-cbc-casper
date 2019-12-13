@@ -39,7 +39,8 @@
 //! ## Using the library
 //!
 //! To benefit from the CBC Casper safety proofs this library builds upon, developers have to
-//! implement `validator::ValidatorName` for validators, and the `Estimator` trait for the estimate.
+//! implement `validator::ValidatorName` for validators, and the `Estimator` trait for the
+//! estimate.
 //!
 //! We also present a basic blockchain implementation heavily under developement.  You can also
 //! find another implementation of an integer consensus in `tests/`.
@@ -59,7 +60,8 @@
 //! ## Example
 //!
 //! We present an example of naive consensus protocol: a ternary consensus that uses the generic
-//! type `message::Message<Estimator, validator::ValidatorName>` implementation to generate the protocol.
+//! type `message::Message<Estimator, validator::ValidatorName>` implementation to generate the
+//! protocol.
 //!
 //! ## Known limitations
 //!
@@ -112,8 +114,8 @@ mod tests_common;
 /// Implementation of basic types for a casper based blockchain consensus mechanism.
 pub mod blockchain;
 pub mod estimator;
-/// Justifications are supposed to “justify” the proposed values. Justifications of messages are
-/// sets of messages that validators has seen and acknowledged while generating messages.
+/// Justifications are supposed to “justify” the proposed values. Justifications of messages
+/// are sets of messages that validators has seen and acknowledged while generating messages.
 pub mod justification;
 /// Messages are generated and passed around by validators in the effort of trying to reach
 /// consensus.

@@ -719,8 +719,8 @@ mod tests {
         state.update(&[&m1]);
         let m2 = Message::from_validator_state(validators[0], &state).unwrap();
 
-        // no clique yet, since validators[1] has not seen validators[0] seeing validators[1] having
-        // proto_b0 in the chain
+        // no clique yet, since validators[1] has not seen validators[0] seeing validators[1]
+        // having proto_b0 in the chain
         assert_eq!(
             Block::safety_oracles(
                 proto_b0.clone(),
@@ -756,8 +756,8 @@ mod tests {
         state.update(&[&m4]);
         let m5 = Message::from_validator_state(validators[1], &state).unwrap();
 
-        // no second clique yet, since validators[2] has not seen validators[1] seeing validators[2] having
-        // proto_b0.clone() in the chain
+        // no second clique yet, since validators[2] has not seen validators[1] seeing
+        // validators[2] having proto_b0.clone() in the chain
         assert_eq!(
             Block::safety_oracles(
                 proto_b0.clone(),
