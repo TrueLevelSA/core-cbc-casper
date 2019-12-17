@@ -373,7 +373,7 @@ mod tests {
     #[test]
     fn weights_validators_exclude_nan_weights() {
         let weights = Weights::new(
-            vec![(0, ::std::f32::NAN), (1, 1.0), (2, 1.0)]
+            vec![(0, f32::NAN), (1, 1.0), (2, 1.0)]
                 .into_iter()
                 .collect(),
         );
@@ -387,7 +387,7 @@ mod tests {
     #[test]
     fn weights_validators_include_infinity_weighted_validators() {
         let weights = Weights::new(
-            vec![(0, ::std::f32::INFINITY), (1, 1.0), (2, 1.0)]
+            vec![(0, f32::INFINITY), (1, 1.0), (2, 1.0)]
                 .into_iter()
                 .collect(),
         );
