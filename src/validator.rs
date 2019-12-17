@@ -339,61 +339,59 @@ mod tests {
     use crate::VoteCount;
 
     #[test]
-    fn include_positive_weight() {
-        let weights = Weights::new([(0, 1.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+    fn weights_validators_include_positive_weight() {
+        let weights = Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect());
         assert_eq!(
-            Weights::validators(&weights).unwrap(),
-            [0, 1, 2].iter().cloned().collect(),
+            weights.validators().unwrap(),
+            vec![0, 1, 2].into_iter().collect(),
             "should include validators with valid, positive weight"
         );
     }
 
     #[test]
-    fn exclude_zero_weighted_validators() {
-        let weights = Weights::new([(0, 0.0), (1, 1.0), (2, 1.0)].iter().cloned().collect());
+    fn weights_validators_exclude_zero_weighted_validators() {
+        let weights = Weights::new(vec![(0, 0.0), (1, 1.0), (2, 1.0)].into_iter().collect());
         assert_eq!(
-            Weights::validators(&weights).unwrap(),
-            [1, 2].iter().cloned().collect(),
+            weights.validators().unwrap(),
+            vec![1, 2].into_iter().collect(),
             "should exclude validators with 0 weight"
         );
     }
 
     #[test]
-    fn exclude_negative_weights() {
-        let weights = Weights::new([(0, 1.0), (1, -1.0), (2, 1.0)].iter().cloned().collect());
+    fn weights_validators_exclude_negative_weights() {
+        let weights = Weights::new(vec![(0, 1.0), (1, -1.0), (2, 1.0)].into_iter().collect());
         assert_eq!(
-            Weights::validators(&weights).unwrap(),
-            [0, 2].iter().cloned().collect(),
+            weights.validators().unwrap(),
+            vec![0, 2].into_iter().collect(),
             "should exclude validators with negative weight"
         );
     }
 
     #[test]
-    fn exclude_nan_weights() {
+    fn weights_validators_exclude_nan_weights() {
         let weights = Weights::new(
-            [(0, ::std::f64::NAN), (1, 1.0), (2, 1.0)]
-                .iter()
-                .cloned()
+            vec![(0, ::std::f64::NAN), (1, 1.0), (2, 1.0)]
+                .into_iter()
                 .collect(),
         );
         assert_eq!(
-            Weights::validators(&weights).unwrap(),
-            [1, 2].iter().cloned().collect(),
+            weights.validators().unwrap(),
+            vec![1, 2].into_iter().collect(),
             "should exclude validators with NAN weight"
         );
     }
 
     #[test]
-    fn include_infinity_weighted_validators() {
+    fn weights_validators_include_infinity_weighted_validators() {
         let weights = Weights::new(
-            [(0, ::std::f64::INFINITY), (1, 1.0), (2, 1.0)]
-                .iter()
-                .cloned()
+            vec![(0, ::std::f64::INFINITY), (1, 1.0), (2, 1.0)]
+                .into_iter()
                 .collect(),
         );
         assert_eq!(
-            Weights::validators(&weights).unwrap(),
-            [0, 1, 2].iter().cloned().collect(),
+            weights.validators().unwrap(),
+            vec![0, 1, 2].into_iter().collect(),
             "should include validators with INFINITY weight"
         );
     }
