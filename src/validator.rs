@@ -275,29 +275,29 @@ impl<V: self::ValidatorName, U: WeightUnit> Weights<V, U> {
     /// Returns success of insertion. Failure happens if we cannot acquire the
     /// lock to write data.
     pub fn insert(&mut self, k: V, v: U) -> Result<bool, Error<HashMap<V, U>>> {
-        self.write().map_err(Error::WriteLockError).map(|mut h| {
-            h.insert(k, v);
-            true
-        })
+        self.write()
+            .map_err(Error::WriteLockError)
+            .map(|mut hash_map| {
+                hash_map.insert(k, v);
+                true
+            })
     }
 
     /// Picks validators with positive weights striclty greather than zero.
     /// Failure happens if we cannot acquire the lock to read data
     pub fn validators(&self) -> Result<HashSet<V>, Error<HashMap<V, U>>> {
-        self.read()
-            .map_err(Error::ReadLockError)
-            .map(|validators_weight| {
-                validators_weight
-                    .iter()
-                    .filter_map(|(validator, &weight)| {
-                        if weight > <U as Zero<U>>::ZERO {
-                            Some(validator.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect()
-            })
+        self.read().map_err(Error::ReadLockError).map(|hash_map| {
+            hash_map
+                .iter()
+                .filter_map(|(validator, &weight)| {
+                    if weight > <U as Zero<U>>::ZERO {
+                        Some(validator.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        })
     }
 
     /// Gets the weight of the validator. Returns an error in case there is a
@@ -305,8 +305,8 @@ impl<V: self::ValidatorName, U: WeightUnit> Weights<V, U> {
     pub fn weight(&self, validator: &V) -> Result<U, Error<HashMap<V, U>>> {
         self.read()
             .map_err(Error::ReadLockError)
-            .and_then(|weights| {
-                weights
+            .and_then(|hash_map| {
+                hash_map
                     .get(validator)
                     .map(Clone::clone)
                     .ok_or(Error::NotFound)
