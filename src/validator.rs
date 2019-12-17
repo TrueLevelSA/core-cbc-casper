@@ -338,6 +338,8 @@ mod tests {
 
     use crate::VoteCount;
 
+    use std::iter::FromIterator;
+
     #[test]
     fn weights_validators_include_positive_weight() {
         let weights = Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect());
@@ -371,7 +373,7 @@ mod tests {
     #[test]
     fn weights_validators_exclude_nan_weights() {
         let weights = Weights::new(
-            vec![(0, ::std::f64::NAN), (1, 1.0), (2, 1.0)]
+            vec![(0, ::std::f32::NAN), (1, 1.0), (2, 1.0)]
                 .into_iter()
                 .collect(),
         );
@@ -385,7 +387,7 @@ mod tests {
     #[test]
     fn weights_validators_include_infinity_weighted_validators() {
         let weights = Weights::new(
-            vec![(0, ::std::f64::INFINITY), (1, 1.0), (2, 1.0)]
+            vec![(0, ::std::f32::INFINITY), (1, 1.0), (2, 1.0)]
                 .into_iter()
                 .collect(),
         );
@@ -393,6 +395,61 @@ mod tests {
             weights.validators().unwrap(),
             vec![0, 1, 2].into_iter().collect(),
             "should include validators with INFINITY weight"
+        );
+    }
+
+    #[test]
+    fn weights_weight() {
+        let weights = Weights::new(
+            vec![(0, 1.0), (1, -1.0), (2, f32::INFINITY)]
+                .into_iter()
+                .collect(),
+        );
+        // Accessing the weights directly does not hide anything
+        float_eq!(weights.weight(&0).unwrap(), 1.0);
+        float_eq!(weights.weight(&1).unwrap(), -1.0);
+        assert!(weights.weight(&2).unwrap().is_infinite());
+    }
+
+    #[test]
+    fn weights_weight_not_found() {
+        let weights = Weights::<u32, f32>::new(vec![].into_iter().collect());
+        match weights.weight(&0) {
+            Err(Error::NotFound) => (),
+            _ => panic!("Expected Error::NotFound"),
+        };
+    }
+
+    #[test]
+    fn weights_sum_weight_validators() {
+        let weights = Weights::new(
+            vec![(0, 1.0), (1, -1.0), (2, 3.3), (3, f32::INFINITY)]
+                .into_iter()
+                .collect(),
+        );
+        assert!(weights
+            .sum_weight_validators(&HashSet::from_iter(vec![0, 1, 3]))
+            .is_infinite());
+        float_eq!(
+            weights.sum_weight_validators(&HashSet::from_iter(vec![0, 1])),
+            0.0
+        );
+        float_eq!(
+            weights.sum_weight_validators(&HashSet::from_iter(vec![0, 2])),
+            4.3
+        );
+        assert!(weights
+            .sum_weight_validators(&HashSet::from_iter(vec![4]))
+            .is_nan());
+    }
+
+    #[test]
+    fn weights_sum_all_weights() {
+        let weights = Weights::new(vec![(0, 2.0), (1, -1.0), (2, 3.3)].into_iter().collect());
+        // Does not account for negatively weigthed validators
+        float_eq!(
+            weights.sum_all_weights(),
+            weights.sum_weight_validators(&HashSet::from_iter(vec![0, 2]))
         );
     }
 
