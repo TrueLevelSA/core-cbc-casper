@@ -62,6 +62,7 @@
 //! https://medium.com/@aditya.asgaonkar/casper-cbc-simplified-2370922f9aa6),
 //! by Aditya Asgaonkar.
 
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -239,9 +240,9 @@ where
             })
             .collect();
 
-        msgs_sorted_by_faultw.sort_unstable_by(|(m0, w0), (m1, w1)| {
-            w0.partial_cmp(w1)
-                .unwrap_or_else(|| m0.getid().cmp(&m1.getid())) // tie breaker
+        msgs_sorted_by_faultw.sort_unstable_by(|(m0, w0), (m1, w1)| match w0.partial_cmp(w1) {
+            None | Some(Ordering::Equal) => m0.getid().cmp(&m1.getid()),
+            Some(ord) => ord,
         });
 
         msgs_sorted_by_faultw
@@ -648,12 +649,11 @@ mod tests {
         state.update(&[&v0, &v0_prime, &v1, &v1_prime, &v2, &v2_prime]);
 
         // As all three validators are known equivocators, they are sorted by the tie-breaker. This
-        // means they are supposed to be sorted by the messages' hash but this is broken at the
-        // moment.
-        // assert_eq!(
-        //     state.sort_by_faultweight(&HashSet::from_iter(vec![&v0, &v1, &v2])),
-        //     [&v0, &v1, &v2]
-        // );
+        // means they are sorted by the messages' hashes.
+        assert_eq!(
+            state.sort_by_faultweight(&HashSet::from_iter(vec![&v0, &v1, &v2])),
+            [&v2, &v0, &v1]
+        );
     }
 
     #[test]
@@ -671,11 +671,10 @@ mod tests {
         state.update(&[&v0, &v1, &v2]);
 
         // As all three validators haven't equivocated, they are sorted by the tie-breaker. This
-        // means they are supposed to be sorted by the messages' hash but this is broken at the
-        // moment.
-        // assert_eq!(
-        //     state.sort_by_faultweight(&HashSet::from_iter(vec![&v0, &v1, &v2])),
-        //     [&v0, &v1, &v2]
-        // );
+        // means they are sorted by the messages' hashes.
+        assert_eq!(
+            state.sort_by_faultweight(&HashSet::from_iter(vec![&v0, &v1, &v2])),
+            [&v2, &v0, &v1]
+        );
     }
 }
