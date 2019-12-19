@@ -313,10 +313,9 @@ mod test {
             HashSet::new(),
         );
 
-        // v0 and v0_prime are equivocating messages (first child of a fork).
         let v0 = &VoteCount::create_vote_msg(0, false);
         let v1 = &VoteCount::create_vote_msg(1, true);
-        let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
+        let v0_prime = &VoteCount::create_vote_msg(0, true);
         let v0_duplicate = &VoteCount::create_vote_msg(0, false);
 
         let mut validator_state_clone = validator_state.clone();
@@ -335,11 +334,11 @@ mod test {
         validator_state_clone.update(&[v0, &m0]);
         let msg3 = Message::from_validator_state(0, &validator_state_clone).unwrap();
 
-        assert!(v0 == v0_duplicate, "v0 and v0_duplicate should be equal");
-        assert!(v0 != v0_prime, "v0 and v0_prime should NOT be equal");
-        assert!(v0 != v1, "v0 and v1 should NOT be equal");
-        assert!(msg1 == msg2, "messages should be equal");
-        assert!(msg1 != msg3, "msg1 should be different than msg3");
+        assert_eq!(v0, v0_duplicate, "v0 and v0_duplicate should be equal");
+        assert_ne!(v0, v0_prime, "v0 and v0_prime should NOT be equal");
+        assert_ne!(v0, v1, "v0 and v1 should NOT be equal");
+        assert_eq!(msg1, msg2, "messages should be equal");
+        assert_ne!(msg1, msg3, "msg1 should be different than msg3");
     }
 
     #[test]
@@ -353,7 +352,7 @@ mod test {
         );
 
         let v0 = &VoteCount::create_vote_msg(0, false);
-        let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
+        let v0_prime = &VoteCount::create_vote_msg(0, true);
 
         let mut validator_state_clone = validator_state.clone();
         validator_state_clone.update(&[v0]);
@@ -369,15 +368,15 @@ mod test {
 
         assert!(
             !v0.depends(v0_prime),
-            "v0 does NOT depends on v0_prime as they are equivocating"
+            "v0 does NOT depend on v0_prime as they are equivocating"
         );
         assert!(
             !m0.depends(&m0),
-            "m0 does NOT depends on itself directly, by our impl choice"
+            "m0 does NOT depend on itself directly, by our impl choice"
         );
         assert!(!m0.depends(v0_prime), "m0 depends on v0 directly");
         assert!(m0.depends(v0), "m0 depends on v0 directly");
-        assert!(m1.depends(&m0), "m1 DOES depent on m0");
+        assert!(m1.depends(&m0), "m1 DOES depend on m0");
         assert!(!m0.depends(&m1), "but m0 does NOT depend on m1");
         assert!(m1.depends(v0), "m1 depends on v0 through m0");
     }
@@ -385,7 +384,7 @@ mod test {
     #[test]
     fn msg_equivocates() {
         let validator_state = validator::State::new(
-            validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
+            validator::Weights::new(vec![(0, 1.0), (1, 1.0)].into_iter().collect()),
             0.0,
             LatestMsgs::empty(),
             0.0,
@@ -393,7 +392,7 @@ mod test {
         );
 
         let v0 = &VoteCount::create_vote_msg(0, false);
-        let v0_prime = &VoteCount::create_vote_msg(0, true); // equivocating vote
+        let v0_prime = &VoteCount::create_vote_msg(0, true);
         let v1 = &VoteCount::create_vote_msg(1, true);
 
         let mut validator_state_clone = validator_state.clone();
@@ -412,6 +411,7 @@ mod test {
             m0.equivocates(v0_prime),
             "should be an indirect equivocation, equivocates to m0 through v0"
         );
+
         assert!(
             m1.equivocates_indirect(v0_prime, HashSet::new()).0,
             "should be an indirect equivocation, equivocates to m0 through v0"
