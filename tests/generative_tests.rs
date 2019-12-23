@@ -285,7 +285,7 @@ fn get_data_from_state(
     validator_state: &validator::State<blockchain::Block<u32>, f64>,
     max_height_of_oracle: u32,
     data: &mut ChainData,
-) -> (bool) {
+) -> bool {
     let latest_msgs_honest =
         LatestMsgsHonest::from_latest_msgs(validator_state.latests_msgs(), &HashSet::new());
 
