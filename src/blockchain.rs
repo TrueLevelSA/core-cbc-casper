@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::convert::From;
 use std::iter::Iterator;
@@ -406,18 +407,18 @@ impl<V: validator::ValidatorName> Block<V> {
                     let weight = weights.sum_weight_validators(&referred_validators);
                     let res = Some((Some(block.clone()), weight, children.clone()));
                     let b_res = Some((b_block.clone(), b_weight, b_children));
-                    if weight > b_weight {
-                        res
-                    } else if weight < b_weight {
-                        b_res
-                    } else {
-                        // break ties with blockhash
-                        let ord = b_block.as_ref().map(|b| b.getid().cmp(&block.getid()));
-                        match ord {
-                            Some(std::cmp::Ordering::Greater) => res,
-                            Some(std::cmp::Ordering::Less) => b_res,
-                            Some(std::cmp::Ordering::Equal) => b_res,
-                            None => None,
+                    match weight.partial_cmp(&b_weight) {
+                        Some(Ordering::Greater) => res,
+                        Some(Ordering::Less) => b_res,
+                        Some(Ordering::Equal) | None => {
+                            // break ties with blockhash
+                            let ord = b_block.as_ref().map(|b| b.getid().cmp(&block.getid()));
+                            match ord {
+                                Some(Ordering::Greater) => res,
+                                Some(Ordering::Less) => b_res,
+                                Some(Ordering::Equal) => b_res,
+                                None => None,
+                            }
                         }
                     }
                 })
