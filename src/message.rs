@@ -184,6 +184,15 @@ impl<E: Estimator> Message<E> {
         rhs: &Self,
         mut equivocators: HashSet<E::ValidatorName>,
     ) -> (bool, HashSet<E::ValidatorName>) {
+        //! equivocates_indirect parses every messages accessible from `self` and `rhs` by
+        //! iterating over messages' justifications and returns true if any of those messages is an
+        //! equivocation with another one. This method can only be used to know that a random
+        //! validator is equivocating but not which one.
+        //!
+        //! This method is currently broken as it does not always find equivocations that should be
+        //! accessible from the given messages. It is not commutative. It compares messages with
+        //! themselves.
+
         let is_equivocation = self.equivocates(rhs);
         let init = if is_equivocation {
             equivocators.insert(self.sender().clone());
@@ -383,7 +392,7 @@ mod test {
 
     #[test]
     fn msg_equivocates() {
-        let validator_state = validator::State::new(
+        let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0)].into_iter().collect()),
             0.0,
             LatestMsgs::empty(),
@@ -395,13 +404,8 @@ mod test {
         let v0_prime = &VoteCount::create_vote_msg(0, true);
         let v1 = &VoteCount::create_vote_msg(1, true);
 
-        let mut validator_state_clone = validator_state.clone();
-        validator_state_clone.update(&[&v0]);
-        let m0 = Message::from_validator_state(0, &validator_state_clone).unwrap();
-
-        let mut validator_state_clone = validator_state;
-        validator_state_clone.update(&[&v0]);
-        let m1 = Message::from_validator_state(1, &validator_state_clone).unwrap();
+        validator_state.update(&[&v0]);
+        let m0 = Message::from_validator_state(0, &validator_state).unwrap();
 
         assert!(!v0.equivocates(v0), "should be all good");
         assert!(!v1.equivocates(&m0), "should be all good");
@@ -411,11 +415,137 @@ mod test {
             m0.equivocates(v0_prime),
             "should be an indirect equivocation, equivocates to m0 through v0"
         );
+    }
 
-        assert!(
-            m1.equivocates_indirect(v0_prime, HashSet::new()).0,
-            "should be an indirect equivocation, equivocates to m0 through v0"
+    #[test]
+    fn msg_equivocates_indirect_direct_equivocation() {
+        let v0 = VoteCount::create_vote_msg(0, false);
+        let v0_prime = VoteCount::create_vote_msg(0, true);
+
+        assert!(v0.equivocates_indirect(&v0_prime, HashSet::new()).0);
+    }
+
+    #[test]
+    fn msg_equivocates_indirect_semi_direct() {
+        let mut validator_state = validator::State::new(
+            validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
+            0.0,
+            LatestMsgs::empty(),
+            0.0,
+            HashSet::new(),
         );
+
+        // v0   v1
+        //  |   |
+        // m1   |
+        //      m2
+        //
+        // validator 1 is equivocating
+
+        let v0 = VoteCount::create_vote_msg(0, false);
+        let v1 = VoteCount::create_vote_msg(1, true);
+
+        validator_state.update(&[&v0]);
+        let m1 = Message::from_validator_state(1, &validator_state).unwrap();
+
+        validator_state.update(&[&v1]);
+        let m2 = Message::from_validator_state(2, &validator_state).unwrap();
+
+        assert!(m2.equivocates_indirect(&m1, HashSet::new()).0);
+
+        // Cannot see future messages
+        assert!(!m2.equivocates_indirect(&v0, HashSet::new()).0);
+        assert!(!v0.equivocates_indirect(&v1, HashSet::new()).0);
+    }
+
+    #[test]
+    fn msg_equivocates_indirect_commutativity() {
+        let mut validator_state = validator::State::new(
+            validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
+            0.0,
+            LatestMsgs::empty(),
+            0.0,
+            HashSet::new(),
+        );
+
+        // v0   v1
+        //  |   |
+        // m1   |
+        //      m2
+        //
+        // validator 1 is equivocating
+
+        let v0 = VoteCount::create_vote_msg(0, false);
+        let v1 = VoteCount::create_vote_msg(1, true);
+
+        validator_state.update(&[&v0]);
+        let m1 = Message::from_validator_state(1, &validator_state).unwrap();
+
+        validator_state.update(&[&v1]);
+        let m2 = Message::from_validator_state(2, &validator_state).unwrap();
+
+        // Messages are tried for equivocation in the following order:
+        // 1. for m1.equivocates_indirect(m2):
+        //     1. m1 _|_ m2
+        //     2. m2 _|_ v0
+        //     3. v0 _|_ v0
+        //     4. v0 _|_ v1
+        //
+        // 2. for m2.equivocates_indirect(m1):
+        //     1. m2 _|_ m1
+        //     2. m1 _|_ v0
+        //     3. v0 _|_ v0
+        //     4. m1 _|_ v1
+        //     5. v1 _|_ v0
+        //
+        // We can see that:
+        // 1. The method is not commutative;
+        // 2. It does not try every combinations of messages;
+        // 3. It compares v0 with itself in both instances.
+
+        assert!(!m1.equivocates_indirect(&m2, HashSet::new()).0);
+        assert!(m2.equivocates_indirect(&m1, HashSet::new()).0);
+    }
+
+    #[test]
+    fn msg_equivocates_indirect_total_indirection() {
+        let mut validator_state = validator::State::new(
+            validator::Weights::new(
+                vec![(0, 1.0), (1, 1.0), (2, 1.0), (3, 1.0)]
+                    .into_iter()
+                    .collect(),
+            ),
+            0.0,
+            LatestMsgs::empty(),
+            0.0,
+            HashSet::new(),
+        );
+
+        // v0   v1
+        //  |   |
+        // m1   |
+        //  |   m2
+        // m3
+        //
+        // validator 1 is equivocating
+
+        let v0 = VoteCount::create_vote_msg(0, false);
+        let v1 = VoteCount::create_vote_msg(1, true);
+
+        let mut validator_state_clone = validator_state.clone();
+        validator_state_clone.update(&[&v0]);
+        let m1 = Message::from_validator_state(1, &validator_state_clone).unwrap();
+
+        validator_state_clone.update(&[&v1]);
+        let m2 = Message::from_validator_state(2, &validator_state_clone).unwrap();
+
+        validator_state.update(&[&m1]);
+        let m3 = Message::from_validator_state(3, &validator_state).unwrap();
+
+        // In this case, only 1 is equivocating. m1 and v1 are independant of each other. Neither
+        // m2 or m3 are faulty messages but they are on different protocol branches created by
+        // 1's equivocation.
+        assert!(m2.equivocates_indirect(&m3, HashSet::new()).0);
     }
 
     #[test]
