@@ -124,7 +124,7 @@ fn main() {
     );
 
     let validator_state = validator::State::new(
-        validators_weights.clone(),
+        validators_weights,
         0.0, // state fault weight
         LatestMsgs::empty(),
         1.0,            // subjective fault weight threshold
@@ -152,7 +152,7 @@ fn main() {
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[&msg7, &msg6]);
     let msg8 = Message::from_validator_state(3, &validator_state_clone).unwrap();
-    let mut validator_state_clone = validator_state.clone();
+    let mut validator_state_clone = validator_state;
     validator_state_clone.update(&[&msg4, &msg6]);
     let msg9 = Message::from_validator_state(4, &validator_state_clone).unwrap();
 

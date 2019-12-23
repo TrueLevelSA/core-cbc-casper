@@ -63,13 +63,8 @@ fn faulty_inserts_sorted() {
     latest_msgs.update(v1);
     latest_msgs.update(v2);
 
-    let mut validator_state = validator::State::new(
-        validators_weights.clone(),
-        0.0,
-        latest_msgs,
-        3.0,
-        HashSet::new(),
-    );
+    let mut validator_state =
+        validator::State::new(validators_weights, 0.0, latest_msgs, 3.0, HashSet::new());
     let mut j = Justification::empty();
     let sorted_msgs = validator_state
         .sort_by_faultweight(&vec![v2_prime, v1_prime, v0_prime].iter().cloned().collect());
@@ -92,7 +87,7 @@ fn faulty_inserts() {
     let mut j0 = Justification::empty();
 
     let mut validator_state = validator::State::new(
-        validators_weights.clone(),
+        validators_weights,
         0.0,
         LatestMsgs::empty(),
         0.0,
@@ -195,7 +190,7 @@ fn faulty_inserts() {
     let validators_weights = validator::Weights::new([].iter().cloned().collect());
     // bug found
     let mut state = validator::State::new_with_default_state(
-        validator_state.clone(),
+        validator_state,
         Some(validators_weights.clone()),
         Some(1.0),
         None,
@@ -209,13 +204,13 @@ fn faulty_inserts() {
     );
 
     let mut validator_state = validator::State::new(
-        validators_weights.clone(),
+        validators_weights,
         1.0,
         LatestMsgs::empty(),
         2.0,
         HashSet::new(),
     );
-    j1.clone().faulty_insert(v0_prime, &mut validator_state);
+    j1.faulty_insert(v0_prime, &mut validator_state);
     float_eq!(
         validator_state.fault_weight(),
         1.0,

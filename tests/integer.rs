@@ -69,8 +69,7 @@ fn equal_weight() {
     validator_state_clone.update(&[&m0, &m1, &m2]);
     let m3 = IntegerMsg::from_validator_state(validators[0], &validator_state_clone).unwrap();
 
-    let mut j0 =
-        Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut validator_state.clone());
+    let mut j0 = Justification::from_msgs(vec![m0, m1], &mut validator_state.clone());
     assert_eq!(
         j0.mk_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
@@ -132,8 +131,7 @@ fn uneven_weights_1() {
     validator_state_clone.update(&[&m0, &m1, &m2]);
     let m3 = IntegerMsg::from_validator_state(validators[0], &validator_state_clone).unwrap();
 
-    let mut j0 =
-        Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut validator_state.clone());
+    let mut j0 = Justification::from_msgs(vec![m0, m1], &mut validator_state.clone());
     assert_eq!(
         j0.mk_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
@@ -197,8 +195,7 @@ fn uneven_weights_4() {
     validator_state_clone.update(&[&m0, &m1, &m2, &m3]);
     let m4 = IntegerMsg::from_validator_state(validators[3], &validator_state_clone).unwrap();
 
-    let mut j0 =
-        Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut validator_state.clone());
+    let mut j0 = Justification::from_msgs(vec![m0, m1], &mut validator_state.clone());
     assert_eq!(
         j0.mk_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),

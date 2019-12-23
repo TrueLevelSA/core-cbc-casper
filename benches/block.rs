@@ -125,7 +125,7 @@ fn block_from_prevblock_msg(c: &mut Criterion) {
             );
 
             let mut weights = validator::State::new(
-                validators_weights.clone(),
+                validators_weights,
                 0.0, // state fault weight
                 LatestMsgs::empty(),
                 1.0,            // subjective fault weight threshold

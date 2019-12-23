@@ -70,8 +70,7 @@ fn equal_weight() {
         .unwrap(),
         BoolWrapper(true)
     );
-    let mut j0 =
-        Justification::from_msgs(vec![m0.clone(), m1.clone()], &mut validator_state.clone());
+    let mut j0 = Justification::from_msgs(vec![m0, m1], &mut validator_state.clone());
     // s0 and s1 vote. since tie-breaker is `true`, get `true`
     assert_eq!(
         j0.mk_estimate(validator_state.equivocators(), &validators_weights)
@@ -121,7 +120,7 @@ fn vote_swaying() {
     let m4 = Message::new(validators[4], Justification::empty(), BoolWrapper(false));
 
     let mut j0 = Justification::from_msgs(
-        vec![m0.clone(), m1.clone(), m2.clone(), m3.clone(), m4.clone()],
+        vec![m0.clone(), m1.clone(), m2.clone(), m3, m4],
         &mut validator_state.clone(),
     );
 

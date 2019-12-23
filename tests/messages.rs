@@ -92,7 +92,7 @@ fn msg_equality() {
     let msg2 = Message::from_validator_state(0, &validator_state_clone).unwrap();
     assert!(msg1 == msg2, "messages should be equal");
 
-    let mut validator_state_clone = validator_state.clone();
+    let mut validator_state_clone = validator_state;
     validator_state_clone.update(&[v0, &m0]);
     let msg3 = Message::from_validator_state(0, &validator_state_clone).unwrap();
     assert!(msg1 != msg3, "msg1 should be different than msg3");
@@ -168,7 +168,7 @@ fn msg_depends() {
         .is_empty();
     assert_eq!(failure, false);
 
-    let mut validator_state_clone = validator_state.clone();
+    let mut validator_state_clone = validator_state;
     validator_state_clone.update(&[v0, &m0]);
     let m1 = Message::from_validator_state(0, &validator_state_clone).unwrap();
 
@@ -206,7 +206,7 @@ fn msg_equivocates() {
     validator_state_clone.update(&[&v0]);
     let m0 = Message::from_validator_state(0, &validator_state_clone).unwrap();
 
-    let mut validator_state_clone = validator_state.clone();
+    let mut validator_state_clone = validator_state;
     validator_state_clone.update(&[&v0]);
     let m1 = Message::from_validator_state(1, &validator_state_clone).unwrap();
     assert!(!v0.equivocates(v0), "should be all good");

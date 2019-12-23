@@ -448,7 +448,7 @@ where
             validators.iter().for_each(|validator| {
                 let mut j = Justification::empty();
                 let m = Message::new(*validator, j.clone(), votes[*validator as usize].clone());
-                j.insert(m.clone());
+                j.insert(m);
                 state.insert(
                     *validator,
                     validator::State::new(
@@ -847,7 +847,7 @@ proptest! {
             (0..nodes as u32).zip(iter::repeat(1.0)).collect(),
         );
         let mut validator_state = validator::State::new(
-            validators_weights.clone(),
+            validators_weights,
             0.0,
             LatestMsgs::empty(),
             0.0,
@@ -882,7 +882,7 @@ proptest! {
             (0..nodes as u32).zip(iter::repeat(1.0)).collect(),
         );
         let mut validator_state = validator::State::new(
-            validators_weights.clone(),
+            validators_weights,
             0.0,
             LatestMsgs::empty(),
             0.0,

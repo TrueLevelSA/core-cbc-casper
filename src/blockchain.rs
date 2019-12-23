@@ -490,7 +490,7 @@ mod tests {
             .collect(),
         );
         let mut state = validator::State::new(
-            validators_weights.clone(),
+            validators_weights,
             0.0, // state fault weight
             LatestMsgs::empty(),
             1.0,            // subjective fault weight threshold
@@ -557,7 +557,7 @@ mod tests {
         );
 
         state.update(&[&m3, &m2]);
-        let m5 = Message::from_validator_state(validator0, &state.clone()).unwrap();
+        let m5 = Message::from_validator_state(validator0, &state).unwrap();
         // (s0, w=1.0)   gen               m5
         // (s1, w=1.0)    |\--m1-------\   |
         // (s2, w=2.0)    \---m2       |   |
@@ -599,7 +599,7 @@ mod tests {
         );
 
         let mut state = validator::State::new(
-            validators_weights.clone(),
+            validators_weights,
             0.0, // state fault weight
             LatestMsgs::empty(),
             1.0,            // subjective fault weight threshold
@@ -608,7 +608,7 @@ mod tests {
 
         let genesis_block = Block::from(ProtoBlock::new(None));
         let latest_msgs = Justification::empty();
-        let genesis_block_msg = Message::new(validatorg, latest_msgs, genesis_block.clone());
+        let genesis_block_msg = Message::new(validatorg, latest_msgs, genesis_block);
         // (sg, w=1.0)   gen
         // (s0, w=1.0)
         // (s1, w=1.0)
@@ -792,7 +792,7 @@ mod tests {
         // also have two cliques on proto_b1
         assert_eq!(
             Block::safety_oracles(
-                proto_b1.clone(),
+                proto_b1,
                 &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
                 state.equivocators(),
                 1.0,
@@ -830,7 +830,7 @@ mod tests {
         // now entire network is clique
         assert_eq!(
             Block::safety_oracles(
-                proto_b0.clone(),
+                proto_b0,
                 &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
                 state.equivocators(),
                 1.0,
@@ -844,7 +844,7 @@ mod tests {
         );
         assert_eq!(
             Block::safety_oracles(
-                proto_b2.clone(),
+                proto_b2,
                 &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
                 state.equivocators(),
                 1.0,
