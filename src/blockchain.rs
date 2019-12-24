@@ -468,31 +468,26 @@ mod tests {
     #[test]
     fn partial_view() {
         // Test cases where not all validators see all messages.
-        let (validator0, validator1, validator2, validator3, validator4) = (0, 1, 2, 3, 4);
-        let (weight0, weight1, weight2, weight3, weight4) = (1.0, 1.0, 2.0, 1.0, 1.1);
-        let validators_weights = validator::Weights::new(
-            [
-                (validator0, weight0),
-                (validator1, weight1),
-                (validator2, weight2),
-                (validator3, weight3),
-                (validator4, weight4),
-            ]
-            .iter()
-            .cloned()
-            .collect(),
-        );
+        let validators: Vec<u32> = (0..5).collect();
+        let weights = [1.0, 1.0, 2.0, 1.0, 1.1];
+
         let mut state = validator::State::new(
-            validators_weights,
-            0.0, // state fault weight
+            validator::Weights::new(
+                validators
+                    .iter()
+                    .cloned()
+                    .zip(weights.iter().cloned())
+                    .collect(),
+            ),
+            0.0,
             LatestMsgs::empty(),
-            1.0,            // subjective fault weight threshold
-            HashSet::new(), // equivocators
+            1.0,
+            HashSet::new(),
         );
 
         let genesis_block = Block::from(ProtoBlock::new(None));
         let latest_msgs = Justification::empty();
-        let genesis_block_msg = Message::new(validator0, latest_msgs, genesis_block.clone());
+        let genesis_block_msg = Message::new(validators[0], latest_msgs, genesis_block.clone());
         // (s0, w=1.0)   gen
         // (s1, w=1.0)
         // (s2, w=2.0)
@@ -506,7 +501,7 @@ mod tests {
         );
 
         state.update(&[&genesis_block_msg]);
-        let m1 = Message::from_validator_state(validator1, &state.clone()).unwrap();
+        let m1 = Message::from_validator_state(validators[1], &state.clone()).unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)     \--m1
         // (s2, w=2.0)
@@ -514,7 +509,7 @@ mod tests {
         // (s4, w=1.1)
 
         state.update(&[&genesis_block_msg]);
-        let m2 = Message::from_validator_state(validator2, &state.clone()).unwrap();
+        let m2 = Message::from_validator_state(validators[2], &state.clone()).unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)    |\--m1
         // (s2, w=2.0)    \---m2
@@ -522,7 +517,7 @@ mod tests {
         // (s4, w=1.1)
 
         state.update(&[&m1, &m2]);
-        let m3 = Message::from_validator_state(validator3, &state.clone()).unwrap();
+        let m3 = Message::from_validator_state(validators[3], &state.clone()).unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)    |\--m1
         // (s2, w=2.0)    \---m2
@@ -532,11 +527,11 @@ mod tests {
         assert_eq!(
             m3.estimate(),
             &Block::new(Some(Block::from(&m2))),
-            "should build on top of m2 as validator2 has more weight"
+            "should build on top of m2 as validators[2] has more weight"
         );
 
         state.update(&[&m1]);
-        let m4 = Message::from_validator_state(validator4, &state.clone()).unwrap();
+        let m4 = Message::from_validator_state(validators[4], &state.clone()).unwrap();
         // (s0, w=1.0)   gen
         // (s1, w=1.0)    |\--m1-------\
         // (s2, w=2.0)    \---m2       |
@@ -550,7 +545,7 @@ mod tests {
         );
 
         state.update(&[&m3, &m2]);
-        let m5 = Message::from_validator_state(validator0, &state).unwrap();
+        let m5 = Message::from_validator_state(validators[0], &state).unwrap();
         // (s0, w=1.0)   gen               m5
         // (s1, w=1.0)    |\--m1-------\   |
         // (s2, w=2.0)    \---m2       |   |
@@ -571,37 +566,26 @@ mod tests {
     fn full_view() {
         // Test a case where the last validator see all messages and build on top of the heaviest
         // one.
-        let (validatorg, validator0, validator1, validator2, validator3, validator4, validator5) =
-            (0, 1, 2, 3, 4, 5, 6);
-        let (weightg, weight0, weight1, weight2, weight3, weight4, weight5) =
-            (1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.0);
-
-        let validators_weights = validator::Weights::new(
-            [
-                (validatorg, weightg),
-                (validator0, weight0),
-                (validator1, weight1),
-                (validator2, weight2),
-                (validator3, weight3),
-                (validator4, weight4),
-                (validator5, weight5),
-            ]
-            .iter()
-            .cloned()
-            .collect(),
-        );
+        let validators: Vec<u32> = (0..7).collect();
+        let weights = [1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.0];
 
         let mut state = validator::State::new(
-            validators_weights,
-            0.0, // state fault weight
+            validator::Weights::new(
+                validators
+                    .iter()
+                    .cloned()
+                    .zip(weights.iter().cloned())
+                    .collect(),
+            ),
+            0.0,
             LatestMsgs::empty(),
-            1.0,            // subjective fault weight threshold
-            HashSet::new(), // equivocators
+            1.0,
+            HashSet::new(),
         );
 
         let genesis_block = Block::from(ProtoBlock::new(None));
         let latest_msgs = Justification::empty();
-        let genesis_block_msg = Message::new(validatorg, latest_msgs, genesis_block);
+        let genesis_block_msg = Message::new(validators[0], latest_msgs, genesis_block);
         // (sg, w=1.0)   gen
         // (s0, w=1.0)
         // (s1, w=1.0)
@@ -611,7 +595,7 @@ mod tests {
         // (s5, w=1.0)
 
         state.update(&[&genesis_block_msg]);
-        let m0 = Message::from_validator_state(validator0, &state).unwrap();
+        let m0 = Message::from_validator_state(validators[1], &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)     \--m0
         // (s1, w=1.0)
@@ -621,7 +605,7 @@ mod tests {
         // (s5, w=1.0)
 
         state.update(&[&m0]);
-        let m1 = Message::from_validator_state(validator1, &state).unwrap();
+        let m1 = Message::from_validator_state(validators[2], &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)     \--m0
         // (s1, w=1.0)         \--m1
@@ -631,7 +615,7 @@ mod tests {
         // (s5, w=1.0)
 
         state.update(&[&genesis_block_msg]);
-        let m2 = Message::from_validator_state(validator2, &state).unwrap();
+        let m2 = Message::from_validator_state(validators[3], &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -641,7 +625,7 @@ mod tests {
         // (s5, w=1.0)
 
         state.update(&[&m2]);
-        let m3 = Message::from_validator_state(validator3, &state).unwrap();
+        let m3 = Message::from_validator_state(validators[4], &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -651,7 +635,7 @@ mod tests {
         // (s5, w=1.0)
 
         state.update(&[&m2]);
-        let m4 = Message::from_validator_state(validator4, &state).unwrap();
+        let m4 = Message::from_validator_state(validators[5], &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -661,7 +645,7 @@ mod tests {
         // (s5, w=1.0)
 
         state.update(&[&m0, &m1, &m2, &m3, &m4]);
-        let m5 = Message::from_validator_state(validator5, &state).unwrap();
+        let m5 = Message::from_validator_state(validators[6], &state).unwrap();
         // (sg, w=1.0)   gen
         // (s0, w=1.0)    |\--m0
         // (s1, w=1.0)    |    \--m1
@@ -681,22 +665,16 @@ mod tests {
     fn safety_oracles() {
         let nodes = 3;
         let validators: Vec<u32> = (0..nodes).collect();
-        let weights: Vec<f64> = iter::repeat(1.0).take(nodes as usize).collect();
 
-        let validators_weights = validator::Weights::new(
-            validators
-                .iter()
-                .cloned()
-                .zip(weights.iter().cloned())
-                .collect(),
-        );
+        let validators_weights =
+            validator::Weights::new(validators.iter().cloned().zip(iter::repeat(1.0)).collect());
 
         let mut state = validator::State::new(
             validators_weights.clone(),
-            0.0, // state fault weight
+            0.0,
             LatestMsgs::empty(),
-            1.0,            // subjective fault weight threshold
-            HashSet::new(), // equivocators
+            1.0,
+            HashSet::new(),
         );
 
         // block dag
@@ -782,6 +760,7 @@ mod tests {
                 BTreeSet::from_iter(vec![validators[1], validators[2]]),
             ])
         );
+
         // also have two cliques on proto_b1
         assert_eq!(
             Block::safety_oracles(
@@ -796,6 +775,7 @@ mod tests {
                 BTreeSet::from_iter(vec![validators[1], validators[2]]),
             ])
         );
+
         // on proto_b2, only have clique {1, 2}
         assert_eq!(
             Block::safety_oracles(
