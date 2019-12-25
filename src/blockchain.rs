@@ -467,6 +467,64 @@ mod tests {
     use crate::validator;
 
     #[test]
+    fn from_prevblock_msg() {
+        let incomplete_block = Block::new(None);
+        let message = Message::new(
+            0,
+            Justification::empty(),
+            Block::from(ProtoBlock::new(None)),
+        );
+
+        assert_eq!(
+            Block::from_prevblock_msg(Some(message.clone()), incomplete_block),
+            Block::new(Some(Block::from(&message))),
+        );
+    }
+
+    #[test]
+    fn from_prevblock_msg_none() {
+        let incomplete_block = Block::<u32>::new(None);
+
+        assert_eq!(
+            Block::from_prevblock_msg(None, incomplete_block),
+            Block::new(None),
+        );
+    }
+
+    #[test]
+    fn is_member_self() {
+        let block = Block::new(Some(Block::from(&Message::new(
+            0,
+            Justification::empty(),
+            Block::new(None),
+        ))));
+        assert!(block.is_member(&block));
+        assert!(Block::<u32>::new(None).is_member(&Block::<u32>::new(None)));
+    }
+
+    #[test]
+    fn is_member_ancestor() {
+        let message = Message::new(0, Justification::empty(), Block::new(None));
+        let block_1 = Block::from(&message);
+        let block_2 = Block::new(Some(block_1.clone()));
+
+        assert_eq!(Block::<u32>::new(None), Block::<u32>::new(None));
+        assert!(block_1.is_member(&block_2));
+        assert!(Block::from(&message).is_member(&block_1));
+        assert!(Block::from(&message).is_member(&block_2));
+        assert!(Block::new(Some(Block::from(&message))).is_member(&block_2));
+    }
+
+    #[test]
+    fn from_message() {
+        let block_1 = Block::new(Some(Block::new(None)));
+        let message = Message::new(0, Justification::empty(), block_1.clone());
+        let block_2 = Block::from(&message);
+
+        assert_eq!(block_1, block_2);
+    }
+
+    #[test]
     fn safety_oracles() {
         let nodes = 3;
         let validators: Vec<u32> = (0..nodes).collect();
