@@ -146,10 +146,10 @@ impl<V: validator::ValidatorName> Block<V> {
     }
 
     /// Create a new block from a prevblock message and an incomplete block.
+    /// An incomplete_block is a block with a None prevblock (i.e., Estimator) AND is not a
+    /// genesis_block
     pub fn from_prevblock_msg(
         prevblock_msg: Option<Message<V>>,
-        // a incomplete_block is a block with a None prevblock (ie, Estimator) AND is not a
-        // genesis_block
         incomplete_block: Block<V>,
     ) -> Self {
         let prevblock = prevblock_msg.map(|m| Block::from(&m));
