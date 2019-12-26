@@ -21,8 +21,9 @@ extern crate casper;
 
 use std::collections::HashSet;
 
-use casper::blockchain::{Block, Message};
+use casper::blockchain::Block;
 use casper::justification::{Justification, LatestMsgs};
+use casper::message::Message;
 use casper::validator;
 
 #[test]

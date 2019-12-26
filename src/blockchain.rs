@@ -28,15 +28,11 @@ use serde_derive::Serialize;
 
 use crate::estimator::Estimator;
 use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest};
-use crate::message;
+use crate::message::Message;
 use crate::util::hash::Hash;
 use crate::util::id::Id;
 use crate::util::weight::{WeightUnit, Zero};
 use crate::validator;
-
-/// Casper message (`message::Message`) for a `Block` send by a validator `V:
-/// validator::ValidatorName`
-pub type Message<V> = message::Message<Block<V>>;
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize)]
 struct ProtoBlock<V: validator::ValidatorName> {
@@ -102,8 +98,8 @@ impl<V: validator::ValidatorName> From<ProtoBlock<V>> for Block<V> {
     }
 }
 
-impl<V: validator::ValidatorName> From<&Message<V>> for Block<V> {
-    fn from(msg: &Message<V>) -> Self {
+impl<V: validator::ValidatorName> From<&Message<Block<V>>> for Block<V> {
+    fn from(msg: &Message<Block<V>>) -> Self {
         msg.estimate().clone()
     }
 }
@@ -149,7 +145,7 @@ impl<V: validator::ValidatorName> Block<V> {
     /// An incomplete_block is a block with a None prevblock (i.e., Estimator) AND is not a
     /// genesis_block
     pub fn from_prevblock_msg(
-        prevblock_msg: Option<Message<V>>,
+        prevblock_msg: Option<Message<Block<V>>>,
         incomplete_block: Block<V>,
     ) -> Self {
         let prevblock = prevblock_msg.map(|m| Block::from(&m));
@@ -179,19 +175,19 @@ impl<V: validator::ValidatorName> Block<V> {
         fn latest_in_justification<V: validator::ValidatorName>(
             j: &Justification<Block<V>>,
             equivocators: &HashSet<V>,
-        ) -> HashMap<V, Message<V>> {
+        ) -> HashMap<V, Message<Block<V>>> {
             LatestMsgsHonest::from_latest_msgs(&LatestMsgs::from(j), equivocators)
                 .iter()
                 .map(|m| (m.sender().clone(), m.clone()))
                 .collect()
         }
 
-        let latest_containing_block: HashSet<&Message<V>> = latest_msgs_honest
+        let latest_containing_block: HashSet<&Message<Block<V>>> = latest_msgs_honest
             .iter()
             .filter(|&msg| block.is_member(&Block::from(msg)))
             .collect();
 
-        let latest_agreeing_in_validator_view: HashMap<V, HashMap<V, Message<V>>> =
+        let latest_agreeing_in_validator_view: HashMap<V, HashMap<V, Message<Block<V>>>> =
             latest_containing_block
                 .iter()
                 .map(|m| {

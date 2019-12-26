@@ -125,7 +125,7 @@ pub mod util;
 /// The consensus forming peers nodes in the network are called validators.
 pub mod validator;
 
-pub use blockchain::{Block, Message};
+pub use blockchain::Block;
 pub use justification::Justification;
 pub use validator::State;
 
