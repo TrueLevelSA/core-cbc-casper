@@ -525,6 +525,71 @@ mod tests {
     }
 
     #[test]
+    fn parse_blockchains() {
+        let genesis = Message::new(0, Justification::empty(), Block::new(None));
+        let mut justification = Justification::empty();
+        justification.insert(genesis.clone());
+        let block_1 = Message::new(
+            1,
+            justification.clone(),
+            Block::new(Some(genesis.estimate().clone())),
+        );
+        let block_2 = Message::new(
+            2,
+            justification,
+            Block::new(Some(genesis.estimate().clone())),
+        );
+
+        // Sadly, block_1 and block_2 are exactly the same blocks, even though they were created by
+        // two different validators. This means they have exactly the same hash and thus this test
+        // doesn't actually test anything useful. In fact, I suspect nothing in this file really
+        // makes any sense since `Block<V>` doesn't carry any data whatsoever.
+
+        let mut latest_msgs = LatestMsgs::empty();
+        latest_msgs.update(&genesis);
+        latest_msgs.update(&block_1);
+        latest_msgs.update(&block_2);
+        let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new());
+
+        let (children_map, genesis_set, _senders_map) =
+            Block::parse_blockchains(&latest_msgs_honest);
+
+        assert_eq!(
+            children_map,
+            vec![
+                (
+                    genesis.estimate().clone(),
+                    HashSet::from_iter(vec![
+                        block_1.estimate().clone(),
+                        block_2.estimate().clone()
+                    ])
+                ),
+                (block_1.estimate().clone(), HashSet::new()),
+                (block_2.estimate().clone(), HashSet::new()),
+            ]
+            .into_iter()
+            .collect(),
+        );
+        assert_eq!(
+            genesis_set,
+            HashSet::from_iter(vec![genesis.estimate().clone()]),
+        );
+
+        // `senders_map` randomly contains the tuple `(block_1, 1)` or `(block_2, 2)` since `block_1`
+        // and `block_2` have the same hash.
+        // assert_eq!(
+        //     senders_map,
+        //     vec![
+        //         (genesis.estimate().clone(), 0),
+        //         (block_1.estimate().clone(), 1),
+        //         (block_2.estimate().clone(), 2)
+        //     ]
+        //     .into_iter()
+        //     .collect(),
+        // );
+    }
+
+    #[test]
     fn safety_oracles() {
         let nodes = 3;
         let validators: Vec<u32> = (0..nodes).collect();
