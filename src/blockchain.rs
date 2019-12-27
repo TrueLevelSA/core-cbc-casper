@@ -276,12 +276,27 @@ impl<D: BlockData> Block<D> {
             .collect()
     }
 
+    /// Contrary to the paper's definition 4.24, this does not return Self for a genesis block but
+    /// None.
     pub fn prevblock(&self) -> Option<Self> {
         self.arc().prevblock.as_ref().cloned()
     }
 
     pub fn data(&self) -> D {
         self.arc().data.clone()
+    }
+
+    /// Contrary to the paper's definition 4.25, this does not return Self for a genesis block but
+    /// None.
+    pub fn ncestor(&self, n: u32) -> Option<Self> {
+        if n == 0 {
+            return Some(self.clone());
+        }
+
+        match self.prevblock() {
+            Some(b) => Block::ncestor(&b, n - 1),
+            None => None,
+        }
     }
 
     /// Parses latest_msgs to return a tuple containing:
@@ -475,6 +490,21 @@ mod tests {
     use crate::validator;
 
     use crate::ValidatorNameBlockData;
+
+    #[test]
+    fn ncestor() {
+        let genesis = Block::new(None, ValidatorNameBlockData::new(0));
+        let block_1 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(3));
+        let block_2 = Block::new(Some(block_1.clone()), ValidatorNameBlockData::new(5));
+
+        assert_eq!(genesis.ncestor(0), Some(genesis.clone()));
+        assert_eq!(genesis.ncestor(1), None);
+
+        assert_eq!(block_2.ncestor(0), Some(block_2.clone()));
+        assert_eq!(block_2.ncestor(1), Some(block_1));
+        assert_eq!(block_2.ncestor(2), Some(genesis));
+        assert_eq!(block_2.ncestor(3), None);
+    }
 
     #[test]
     fn from_prevblock_msg() {
