@@ -409,7 +409,7 @@ fn chain<E: 'static, F: 'static, H: 'static>(
     chain_id: u32,
 ) -> BoxedStrategy<Vec<Result<ValidatorStatesMap<E>, &'static str>>>
 where
-    E: Estimator<ValidatorName = u32> + From<u32>,
+    E: Estimator<ValidatorName = u32>,
     F: Fn(&mut Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
     //G: Fn(&Vec<u32>, BoxedStrategy<HashSet<u32>>) -> BoxedStrategy<HashMap<u32, HashSet<u32>>>,
     H: Fn(

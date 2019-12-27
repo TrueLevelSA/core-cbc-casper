@@ -57,13 +57,6 @@ impl<V: validator::ValidatorName> ProtoBlock<V> {
 #[derive(Clone, Eq)]
 pub struct Block<V: validator::ValidatorName>(Arc<ProtoBlock<V>>);
 
-#[cfg(feature = "integration_test")]
-impl<V: validator::ValidatorName + Into<V>> From<V> for Block<V> {
-    fn from(_validator: V) -> Self {
-        Block::from(ProtoBlock::new(None))
-    }
-}
-
 impl<V: validator::ValidatorName> std::fmt::Debug for Block<V> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
