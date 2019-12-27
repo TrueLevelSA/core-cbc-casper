@@ -21,7 +21,6 @@ use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::convert::From;
 use std::iter::Iterator;
-use std::marker::PhantomData;
 use std::sync::Arc;
 
 use serde_derive::Serialize;
@@ -34,26 +33,31 @@ use crate::util::id::Id;
 use crate::util::weight::{WeightUnit, Zero};
 use crate::validator;
 
-#[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize)]
-struct ProtoBlock<V: validator::ValidatorName> {
-    prevblock: Option<Block<V>>,
-    validator_type: PhantomData<V>,
+pub trait BlockData:
+    std::hash::Hash + Clone + Eq + Send + Sync + Default + serde::Serialize
+{
+    type ValidatorName: validator::ValidatorName;
+
+    fn validator_name(&self) -> &Self::ValidatorName;
 }
 
-impl<V: validator::ValidatorName> ProtoBlock<V> {
-    pub fn new(prevblock: Option<Block<V>>) -> ProtoBlock<V> {
-        ProtoBlock {
-            prevblock,
-            validator_type: PhantomData,
-        }
+#[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize)]
+struct ProtoBlock<D: BlockData> {
+    prevblock: Option<Block<D>>,
+    data: D,
+}
+
+impl<D: BlockData> ProtoBlock<D> {
+    pub fn new(prevblock: Option<Block<D>>, data: D) -> ProtoBlock<D> {
+        ProtoBlock { prevblock, data }
     }
 }
 
 /// Simplest structure of a block with a `prevblock` pointer for runing Casper on a blockchain.
 #[derive(Clone, Eq)]
-pub struct Block<V: validator::ValidatorName>(Arc<ProtoBlock<V>>);
+pub struct Block<D: BlockData>(Arc<ProtoBlock<D>>);
 
-impl<V: validator::ValidatorName> std::fmt::Debug for Block<V> {
+impl<D: BlockData> std::fmt::Debug for Block<D> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -67,39 +71,40 @@ impl<V: validator::ValidatorName> std::fmt::Debug for Block<V> {
     }
 }
 
-impl<V: validator::ValidatorName> serde::Serialize for Block<V> {
+impl<D: BlockData> serde::Serialize for Block<D> {
     fn serialize<T: serde::Serializer>(&self, rhs: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
         let mut msg = rhs.serialize_struct("Block", 1)?;
         msg.serialize_field("prevblock", &self.prevblock())?;
+        msg.serialize_field("data", &self.data())?;
         msg.end()
     }
 }
 
-impl<V: validator::ValidatorName> Id for Block<V> {
+impl<D: BlockData> Id for Block<D> {
     type ID = Hash;
 }
 
-impl<V: validator::ValidatorName> std::hash::Hash for Block<V> {
+impl<D: BlockData> std::hash::Hash for Block<D> {
     fn hash<H: std::hash::Hasher>(&self, hasher: &mut H) {
         self.0.hash(hasher);
     }
 }
 
-impl<V: validator::ValidatorName> PartialEq for Block<V> {
+impl<D: BlockData> PartialEq for Block<D> {
     fn eq(&self, rhs: &Self) -> bool {
         Arc::ptr_eq(self.arc(), rhs.arc()) || self.getid() == rhs.getid()
     }
 }
 
-impl<V: validator::ValidatorName> From<ProtoBlock<V>> for Block<V> {
-    fn from(protoblock: ProtoBlock<V>) -> Self {
+impl<D: BlockData> From<ProtoBlock<D>> for Block<D> {
+    fn from(protoblock: ProtoBlock<D>) -> Self {
         Block(Arc::new(protoblock))
     }
 }
 
-impl<V: validator::ValidatorName> From<&Message<Block<V>>> for Block<V> {
-    fn from(msg: &Message<Block<V>>) -> Self {
+impl<D: BlockData> From<&Message<Block<D>>> for Block<D> {
+    fn from(msg: &Message<Block<D>>) -> Self {
         msg.estimate().clone()
     }
 }
@@ -115,29 +120,29 @@ impl std::fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-impl<V: validator::ValidatorName> Estimator for Block<V> {
+impl<D: BlockData> Estimator for Block<D> {
     type Error = Error;
-    type ValidatorName = V;
+    type ValidatorName = D::ValidatorName;
 
     fn estimate<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Self>,
-        validators_weights: &validator::Weights<V, U>,
+        validators_weights: &validator::Weights<D::ValidatorName, U>,
     ) -> Result<Self, Self::Error> {
         let prevblock = Block::ghost(latest_msgs, validators_weights)?;
-        Ok(Block::from(ProtoBlock::new(Some(prevblock))))
+        Ok(Block::from(ProtoBlock::new(Some(prevblock), D::default())))
     }
 }
 
-type BlocksChildrenMap<V> = HashMap<Block<V>, HashSet<Block<V>>>;
-type GenesisBlocks<V> = HashSet<Block<V>>;
-type BlocksValidatorsMap<V> = HashMap<Block<V>, V>;
+type BlocksChildrenMap<D> = HashMap<Block<D>, HashSet<Block<D>>>;
+type GenesisBlocks<D> = HashSet<Block<D>>;
+type BlocksValidatorsMap<D> = HashMap<Block<D>, <D as BlockData>::ValidatorName>;
 
-impl<V: validator::ValidatorName> Block<V> {
-    pub fn new(prevblock: Option<Block<V>>) -> Self {
-        Block::from(ProtoBlock::new(prevblock))
+impl<D: BlockData> Block<D> {
+    pub fn new(prevblock: Option<Block<D>>, data: D) -> Self {
+        Block::from(ProtoBlock::new(prevblock, data))
     }
 
-    fn arc(&self) -> &Arc<ProtoBlock<V>> {
+    fn arc(&self) -> &Arc<ProtoBlock<D>> {
         &self.0
     }
 
@@ -145,8 +150,8 @@ impl<V: validator::ValidatorName> Block<V> {
     /// An incomplete_block is a block with a None prevblock (i.e., Estimator) AND is not a
     /// genesis_block
     pub fn from_prevblock_msg(
-        prevblock_msg: Option<Message<Block<V>>>,
-        incomplete_block: Block<V>,
+        prevblock_msg: Option<Message<Block<D>>>,
+        incomplete_block: Block<D>,
     ) -> Self {
         let prevblock = prevblock_msg.map(|m| Block::from(&m));
         Block::from(ProtoBlock {
@@ -166,28 +171,28 @@ impl<V: validator::ValidatorName> Block<V> {
     }
 
     pub fn safety_oracles<U: WeightUnit>(
-        block: Block<V>,
+        block: Block<D>,
         latest_msgs_honest: &LatestMsgsHonest<Self>,
-        equivocators: &HashSet<V>,
+        equivocators: &HashSet<D::ValidatorName>,
         safety_oracle_threshold: U,
-        weights: &validator::Weights<V, U>,
-    ) -> HashSet<BTreeSet<V>> {
-        fn latest_in_justification<V: validator::ValidatorName>(
-            j: &Justification<Block<V>>,
-            equivocators: &HashSet<V>,
-        ) -> HashMap<V, Message<Block<V>>> {
+        weights: &validator::Weights<D::ValidatorName, U>,
+    ) -> HashSet<BTreeSet<D::ValidatorName>> {
+        fn latest_in_justification<D: BlockData>(
+            j: &Justification<Block<D>>,
+            equivocators: &HashSet<D::ValidatorName>,
+        ) -> HashMap<D::ValidatorName, Message<Block<D>>> {
             LatestMsgsHonest::from_latest_msgs(&LatestMsgs::from(j), equivocators)
                 .iter()
                 .map(|m| (m.sender().clone(), m.clone()))
                 .collect()
         }
 
-        let latest_containing_block: HashSet<&Message<Block<V>>> = latest_msgs_honest
+        let latest_containing_block: HashSet<&Message<Block<D>>> = latest_msgs_honest
             .iter()
             .filter(|&msg| block.is_member(&Block::from(msg)))
             .collect();
 
-        let latest_agreeing_in_validator_view: HashMap<V, HashMap<V, Message<Block<V>>>> =
+        let latest_agreeing_in_validator_view: HashMap<_, HashMap<_, Message<Block<D>>>> =
             latest_containing_block
                 .iter()
                 .map(|m| {
@@ -201,35 +206,36 @@ impl<V: validator::ValidatorName> Block<V> {
                 })
                 .collect();
 
-        let neighbours: HashMap<&V, HashSet<&V>> = latest_agreeing_in_validator_view
-            .iter()
-            .map(|(validator, seen_agreeing)| {
-                (
-                    validator,
-                    seen_agreeing
-                        .keys()
-                        .filter(|validatorb| {
-                            if latest_agreeing_in_validator_view.contains_key(validatorb) {
-                                latest_agreeing_in_validator_view[validatorb]
-                                    .contains_key(&validator.clone())
-                            } else {
-                                false
-                            }
-                        })
-                        .collect(),
-                )
-            })
-            .collect();
+        let neighbours: HashMap<&D::ValidatorName, HashSet<&D::ValidatorName>> =
+            latest_agreeing_in_validator_view
+                .iter()
+                .map(|(validator, seen_agreeing)| {
+                    (
+                        validator,
+                        seen_agreeing
+                            .keys()
+                            .filter(|validatorb| {
+                                if latest_agreeing_in_validator_view.contains_key(validatorb) {
+                                    latest_agreeing_in_validator_view[validatorb]
+                                        .contains_key(&validator.clone())
+                                } else {
+                                    false
+                                }
+                            })
+                            .collect(),
+                    )
+                })
+                .collect();
 
-        fn bron_kerbosch<V: validator::ValidatorName>(
-            r: HashSet<&V>,
-            p: HashSet<&V>,
-            x: HashSet<&V>,
-            mx_clqs: &mut HashSet<BTreeSet<V>>,
-            neighbours: HashMap<&V, HashSet<&V>>,
+        fn bron_kerbosch<D: BlockData>(
+            r: HashSet<&D::ValidatorName>,
+            p: HashSet<&D::ValidatorName>,
+            x: HashSet<&D::ValidatorName>,
+            mx_clqs: &mut HashSet<BTreeSet<D::ValidatorName>>,
+            neighbours: HashMap<&D::ValidatorName, HashSet<&D::ValidatorName>>,
         ) {
             if p.is_empty() && x.is_empty() {
-                let rnew: BTreeSet<V> = r.into_iter().cloned().collect();
+                let rnew: BTreeSet<D::ValidatorName> = r.into_iter().cloned().collect();
                 mx_clqs.insert(rnew);
             } else {
                 let piter = p.clone();
@@ -239,10 +245,12 @@ impl<V: validator::ValidatorName> Block<V> {
                     p.remove(i);
                     let mut rnew = r.clone();
                     rnew.insert(i);
-                    let pnew: HashSet<&V> = p.intersection(&neighbours[i]).cloned().collect();
-                    let xnew: HashSet<&V> = x.intersection(&neighbours[i]).cloned().collect();
+                    let pnew: HashSet<&D::ValidatorName> =
+                        p.intersection(&neighbours[i]).cloned().collect();
+                    let xnew: HashSet<&D::ValidatorName> =
+                        x.intersection(&neighbours[i]).cloned().collect();
                     x.insert(i);
-                    bron_kerbosch(rnew, pnew, xnew, mx_clqs, neighbours.clone())
+                    bron_kerbosch::<D>(rnew, pnew, xnew, mx_clqs, neighbours.clone())
                 })
             }
         }
@@ -255,7 +263,7 @@ impl<V: validator::ValidatorName> Block<V> {
 
         let mut mx_clqs = HashSet::new();
 
-        bron_kerbosch(HashSet::new(), p, HashSet::new(), &mut mx_clqs, neighbours);
+        bron_kerbosch::<D>(HashSet::new(), p, HashSet::new(), &mut mx_clqs, neighbours);
 
         mx_clqs
             .into_iter()
@@ -272,6 +280,10 @@ impl<V: validator::ValidatorName> Block<V> {
         self.arc().prevblock.as_ref().cloned()
     }
 
+    pub fn data(&self) -> D {
+        self.arc().data.clone()
+    }
+
     /// Parses latest_msgs to return a tuple containing:
     /// * a HashMap mapping blocks to their children;
     /// * a HashSet containing blocks with None as their prevblock (aka genesis blocks or finalized
@@ -280,16 +292,16 @@ impl<V: validator::ValidatorName> Block<V> {
     pub fn parse_blockchains(
         latest_msgs: &LatestMsgsHonest<Self>,
     ) -> (
-        BlocksChildrenMap<V>,
-        GenesisBlocks<V>,
-        BlocksValidatorsMap<V>,
+        BlocksChildrenMap<D>,
+        GenesisBlocks<D>,
+        BlocksValidatorsMap<D>,
     ) {
-        let latest_blocks: HashMap<Block<V>, V> = latest_msgs
+        let latest_blocks: HashMap<Block<D>, D::ValidatorName> = latest_msgs
             .iter()
             .map(|msg| (Block::from(msg), msg.sender().clone()))
             .collect();
         // start at the tip of the blockchain
-        let mut visited_parents: HashMap<Block<V>, HashSet<Block<V>>> = latest_msgs
+        let mut visited_parents: HashMap<Block<D>, HashSet<Block<D>>> = latest_msgs
             .iter()
             .map(|msg| {
                 let parent = Block::from(msg);
@@ -298,8 +310,8 @@ impl<V: validator::ValidatorName> Block<V> {
             })
             .collect();
 
-        let mut queue: VecDeque<Block<V>> = visited_parents.keys().cloned().collect();
-        let mut genesis: HashSet<Block<V>> = HashSet::new();
+        let mut queue: VecDeque<Block<D>> = visited_parents.keys().cloned().collect();
+        let mut genesis: HashSet<Block<D>> = HashSet::new();
         let mut was_empty = false;
 
         // while there are still unvisited blocks
@@ -335,11 +347,11 @@ impl<V: validator::ValidatorName> Block<V> {
 
     /// Collects the validators that produced blocks for each side of a fork.
     fn collect_validators(
-        block: &Block<V>,
-        visited: &HashMap<Block<V>, HashSet<Block<V>>>,
-        latest_blocks: &HashMap<Block<V>, V>,
-        b_in_lms_validators: &mut HashMap<Block<V>, HashSet<V>>,
-    ) -> HashSet<V> {
+        block: &Block<D>,
+        visited: &HashMap<Block<D>, HashSet<Block<D>>>,
+        latest_blocks: &HashMap<Block<D>, D::ValidatorName>,
+        b_in_lms_validators: &mut HashMap<Block<D>, HashSet<D::ValidatorName>>,
+    ) -> HashSet<D::ValidatorName> {
         let mut validators = HashSet::new();
         // collect this validator if this block is his proposed one from his latest message
         latest_blocks
@@ -365,11 +377,11 @@ impl<V: validator::ValidatorName> Block<V> {
 
     /// Find heaviest block.
     fn pick_heaviest<U: WeightUnit>(
-        blocks: &HashSet<Block<V>>,
-        visited: &HashMap<Block<V>, HashSet<Block<V>>>,
-        weights: &validator::Weights<V, U>,
-        latest_blocks: &HashMap<Block<V>, V>,
-        b_in_lms_validators: &mut HashMap<Block<V>, HashSet<V>>,
+        blocks: &HashSet<Block<D>>,
+        visited: &HashMap<Block<D>, HashSet<Block<D>>>,
+        weights: &validator::Weights<D::ValidatorName, U>,
+        latest_blocks: &HashMap<Block<D>, D::ValidatorName>,
+        b_in_lms_validators: &mut HashMap<Block<D>, HashSet<D::ValidatorName>>,
     ) -> Option<(Option<Self>, U, HashSet<Self>)> {
         let init = Some((None, <U as Zero<U>>::ZERO, HashSet::new()));
         let heaviest_child = match blocks.len() {
@@ -433,11 +445,11 @@ impl<V: validator::ValidatorName> Block<V> {
 
     pub fn ghost<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Self>,
-        validators_weights: &validator::Weights<V, U>,
+        validators_weights: &validator::Weights<D::ValidatorName, U>,
     ) -> Result<Self, Error> {
         let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_msgs);
 
-        let mut b_in_lms_validators = HashMap::<Block<V>, HashSet<V>>::new();
+        let mut b_in_lms_validators = HashMap::<Block<D>, HashSet<D::ValidatorName>>::new();
 
         Block::pick_heaviest(
             &genesis,
@@ -462,58 +474,74 @@ mod tests {
     use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest};
     use crate::validator;
 
+    use crate::ValidatorNameBlockData;
+
     #[test]
     fn from_prevblock_msg() {
-        let incomplete_block = Block::new(None);
+        let incomplete_block = Block::new(None, ValidatorNameBlockData::new(0));
         let message = Message::new(
-            0,
+            1,
             Justification::empty(),
-            Block::from(ProtoBlock::new(None)),
+            Block::from(ProtoBlock::new(None, ValidatorNameBlockData::new(2))),
         );
 
         assert_eq!(
             Block::from_prevblock_msg(Some(message.clone()), incomplete_block),
-            Block::new(Some(Block::from(&message))),
+            Block::new(Some(Block::from(&message)), ValidatorNameBlockData::new(0)),
         );
     }
 
     #[test]
     fn from_prevblock_msg_none() {
-        let incomplete_block = Block::<u32>::new(None);
+        let incomplete_block = Block::new(None, ValidatorNameBlockData::new(0));
 
         assert_eq!(
             Block::from_prevblock_msg(None, incomplete_block),
-            Block::new(None),
+            Block::new(None, ValidatorNameBlockData::new(0)),
         );
     }
 
     #[test]
     fn is_member_self() {
-        let block = Block::new(Some(Block::from(&Message::new(
-            0,
-            Justification::empty(),
-            Block::new(None),
-        ))));
+        let block = Block::new(
+            Some(Block::from(&Message::new(
+                0,
+                Justification::empty(),
+                Block::new(None, ValidatorNameBlockData::new(1)),
+            ))),
+            ValidatorNameBlockData::new(2),
+        );
         assert!(block.is_member(&block));
-        assert!(Block::<u32>::new(None).is_member(&Block::<u32>::new(None)));
+        assert!(Block::new(None, ValidatorNameBlockData::new(0))
+            .is_member(&Block::new(None, ValidatorNameBlockData::new(0))));
+        assert!(!Block::new(None, ValidatorNameBlockData::new(0))
+            .is_member(&Block::new(None, ValidatorNameBlockData::new(1))));
     }
 
     #[test]
     fn is_member_ancestor() {
-        let message = Message::new(0, Justification::empty(), Block::new(None));
+        let message = Message::new(
+            0,
+            Justification::empty(),
+            Block::new(None, ValidatorNameBlockData::new(1)),
+        );
         let block_1 = Block::from(&message);
-        let block_2 = Block::new(Some(block_1.clone()));
+        let block_2 = Block::new(Some(block_1.clone()), ValidatorNameBlockData::new(2));
 
-        assert_eq!(Block::<u32>::new(None), Block::<u32>::new(None));
         assert!(block_1.is_member(&block_2));
         assert!(Block::from(&message).is_member(&block_1));
         assert!(Block::from(&message).is_member(&block_2));
-        assert!(Block::new(Some(Block::from(&message))).is_member(&block_2));
+
+        assert!(!block_2.is_member(&block_1));
+        assert!(!block_2.is_member(&Block::from(&message)));
     }
 
     #[test]
     fn from_message() {
-        let block_1 = Block::new(Some(Block::new(None)));
+        let block_1 = Block::new(
+            Some(Block::new(None, ValidatorNameBlockData::new(0))),
+            ValidatorNameBlockData::new(1),
+        );
         let message = Message::new(0, Justification::empty(), block_1.clone());
         let block_2 = Block::from(&message);
 
@@ -522,24 +550,29 @@ mod tests {
 
     #[test]
     fn parse_blockchains() {
-        let genesis = Message::new(0, Justification::empty(), Block::new(None));
+        let genesis = Message::new(
+            0,
+            Justification::empty(),
+            Block::new(None, ValidatorNameBlockData::new(0)),
+        );
         let mut justification = Justification::empty();
         justification.insert(genesis.clone());
         let block_1 = Message::new(
             1,
             justification.clone(),
-            Block::new(Some(genesis.estimate().clone())),
+            Block::new(
+                Some(genesis.estimate().clone()),
+                ValidatorNameBlockData::new(3),
+            ),
         );
         let block_2 = Message::new(
             2,
             justification,
-            Block::new(Some(genesis.estimate().clone())),
+            Block::new(
+                Some(genesis.estimate().clone()),
+                ValidatorNameBlockData::new(4),
+            ),
         );
-
-        // Sadly, block_1 and block_2 are exactly the same blocks, even though they were created by
-        // two different validators. This means they have exactly the same hash and thus this test
-        // doesn't actually test anything useful. In fact, I suspect nothing in this file really
-        // makes any sense since `Block<V>` doesn't carry any data whatsoever.
 
         let mut latest_msgs = LatestMsgs::empty();
         latest_msgs.update(&genesis);
@@ -547,7 +580,7 @@ mod tests {
         latest_msgs.update(&block_2);
         let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new());
 
-        let (children_map, genesis_set, _senders_map) =
+        let (children_map, genesis_set, senders_map) =
             Block::parse_blockchains(&latest_msgs_honest);
 
         assert_eq!(
@@ -571,18 +604,16 @@ mod tests {
             HashSet::from_iter(vec![genesis.estimate().clone()]),
         );
 
-        // `senders_map` randomly contains the tuple `(block_1, 1)` or `(block_2, 2)` since `block_1`
-        // and `block_2` have the same hash.
-        // assert_eq!(
-        //     senders_map,
-        //     vec![
-        //         (genesis.estimate().clone(), 0),
-        //         (block_1.estimate().clone(), 1),
-        //         (block_2.estimate().clone(), 2)
-        //     ]
-        //     .into_iter()
-        //     .collect(),
-        // );
+        assert_eq!(
+            senders_map,
+            vec![
+                (genesis.estimate().clone(), 0),
+                (block_1.estimate().clone(), 1),
+                (block_2.estimate().clone(), 2)
+            ]
+            .into_iter()
+            .collect(),
+        );
     }
 
     #[test]
@@ -602,15 +633,15 @@ mod tests {
         );
 
         // block dag
-        let proto_b0 = Block::from(ProtoBlock::new(None));
+        let proto_b0 = Block::from(ProtoBlock::new(None, ValidatorNameBlockData::new(0)));
         let latest_msgs = Justification::empty();
         let m0 = Message::new(validators[0], latest_msgs, proto_b0.clone());
 
-        let proto_b1 = Block::new(Some(proto_b0.clone()));
+        let proto_b1 = Block::new(Some(proto_b0.clone()), ValidatorNameBlockData::new(0));
         state.update(&[&m0]);
         let m1 = Message::from_validator_state(validators[1], &state).unwrap();
 
-        let proto_b2 = Block::new(Some(proto_b1.clone()));
+        let proto_b2 = Block::new(Some(proto_b1.clone()), ValidatorNameBlockData::new(0));
         state.update(&[&m1]);
         let m2 = Message::from_validator_state(validators[0], &state).unwrap();
 

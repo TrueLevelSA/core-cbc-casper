@@ -7,6 +7,7 @@ use casper::message;
 use casper::util::weight::{WeightUnit, Zero};
 use casper::validator;
 use casper::Block;
+use casper::ValidatorNameBlockData;
 use criterion::{black_box, Criterion};
 
 type Validator = u8;
@@ -95,9 +96,9 @@ fn block_new(c: &mut Criterion) {
         "Block::new",
         |b, loops| {
             b.iter(|| {
-                let mut block: Option<Block<u8>> = None;
+                let mut block = None;
                 for _ in 0..(**loops) {
-                    block = Some(Block::new(block));
+                    block = Some(Block::new(block, ValidatorNameBlockData::new(0)));
                 }
             });
         },
@@ -131,7 +132,7 @@ fn block_from_prevblock_msg(c: &mut Criterion) {
                 1.0,            // subjective fault weight threshold
                 HashSet::new(), // equivocators
             );
-            let block: Block<u8> = Block::new(None);
+            let block = Block::new(None, ValidatorNameBlockData::new(0));
             let mut msg = Message::new(1, Justification::empty(), Value::One);
             for _ in 0..=(**loops) {
                 weights.update(&[&msg]);
@@ -150,10 +151,10 @@ fn block_is_member(c: &mut Criterion) {
     c.bench_function_over_inputs(
         "Block::is_member",
         |b, loops| {
-            let first_block: Block<u8> = Block::new(None);
-            let mut block = Block::new(Some(first_block.clone()));
+            let first_block = Block::new(None, ValidatorNameBlockData::new(0));
+            let mut block = Block::new(Some(first_block.clone()), ValidatorNameBlockData::new(0));
             for _ in 0..(**loops) {
-                block = Block::new(Some(block));
+                block = Block::new(Some(block), ValidatorNameBlockData::new(0));
             }
             b.iter(|| first_block.is_member(&block));
         },

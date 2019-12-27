@@ -25,6 +25,7 @@ use casper::blockchain::Block;
 use casper::justification::{Justification, LatestMsgs};
 use casper::message::Message;
 use casper::validator;
+use casper::ValidatorNameBlockData;
 
 #[test]
 fn partial_view() {
@@ -46,7 +47,7 @@ fn partial_view() {
         HashSet::new(),
     );
 
-    let genesis_block = Block::new(None);
+    let genesis_block = Block::new(None, ValidatorNameBlockData::new(0));
     let latest_msgs = Justification::empty();
     let genesis_block_msg = Message::new(validators[0], latest_msgs, genesis_block.clone());
     // (s0, w=1.0)   gen
@@ -87,7 +88,7 @@ fn partial_view() {
 
     assert_eq!(
         m3.estimate(),
-        &Block::new(Some(Block::from(&m2))),
+        &Block::new(Some(Block::from(&m2)), ValidatorNameBlockData::new(0)),
         "should build on top of m2 as validators[2] has more weight"
     );
 
@@ -101,7 +102,7 @@ fn partial_view() {
 
     assert_eq!(
         m4.estimate(),
-        &Block::new(Some(Block::from(&m1))),
+        &Block::new(Some(Block::from(&m1)), ValidatorNameBlockData::new(0)),
         "should build on top of m1 as thats the only msg it saw"
     );
 
@@ -115,12 +116,15 @@ fn partial_view() {
 
     assert_eq!(
         m5.estimate(),
-        &Block::new(Some(Block::from(&m3))),
+        &Block::new(Some(Block::from(&m3)), ValidatorNameBlockData::new(0)),
         "should build on top of m3"
     );
 
     let block = Block::from(&m3);
-    assert_eq!(block, Block::new(Some(Block::from(&m2))));
+    assert_eq!(
+        block,
+        Block::new(Some(Block::from(&m2)), ValidatorNameBlockData::new(0))
+    );
 }
 
 #[test]
@@ -144,7 +148,7 @@ fn full_view() {
         HashSet::new(),
     );
 
-    let genesis_block = Block::new(None);
+    let genesis_block = Block::new(None, ValidatorNameBlockData::new(0));
     let latest_msgs = Justification::empty();
     let genesis_block_msg = Message::new(validators[0], latest_msgs, genesis_block);
     // (sg, w=1.0)   gen
@@ -217,7 +221,7 @@ fn full_view() {
 
     assert_eq!(
         m5.estimate(),
-        &Block::new(Some(Block::from(&m4))),
+        &Block::new(Some(Block::from(&m4)), ValidatorNameBlockData::new(0)),
         "should build on top of b4"
     );
 }

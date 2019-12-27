@@ -129,5 +129,6 @@ pub use blockchain::Block;
 pub use justification::Justification;
 pub use validator::State;
 
+pub use tests_common::blockdata::ValidatorNameBlockData;
 pub use tests_common::integer::IntegerWrapper;
 pub use tests_common::vote_count::VoteCount;

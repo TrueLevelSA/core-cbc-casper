@@ -42,6 +42,7 @@ use casper::util::weight::WeightUnit;
 use casper::validator;
 
 use casper::IntegerWrapper;
+use casper::ValidatorNameBlockData;
 use casper::VoteCount;
 
 mod common;
@@ -260,7 +261,7 @@ fn full_consensus<E>(
     _height_of_oracle: u32,
     _vec_data: &mut Vec<ChainData>,
     _chain_id: u32,
-    _received_msgs: &mut HashMap<u32, HashSet<Block<u32>>>,
+    _received_msgs: &mut HashMap<u32, HashSet<Block<ValidatorNameBlockData<u32>>>>,
 ) -> bool
 where
     E: Estimator<ValidatorName = u32>,
@@ -283,7 +284,7 @@ where
 /// return true if some safety oracle is detected at max_heaight_of_oracle
 /// the threshold for the safety oracle is set to half of the sum of the validators weights
 fn get_data_from_state(
-    validator_state: &validator::State<blockchain::Block<u32>, f64>,
+    validator_state: &validator::State<blockchain::Block<ValidatorNameBlockData<u32>>, f64>,
     max_height_of_oracle: u32,
     data: &mut ChainData,
 ) -> bool {
@@ -298,7 +299,7 @@ fn get_data_from_state(
     let safety_threshold = (validator_state.validators_weights().sum_all_weights()) / 2.0;
 
     let mut genesis_blocks = HashSet::new();
-    genesis_blocks.insert(Block::new(None));
+    genesis_blocks.insert(Block::new(None, ValidatorNameBlockData::new(0)));
 
     for height in 0..=max_height_of_oracle {
         let truc: Vec<bool> = genesis_blocks
@@ -342,11 +343,11 @@ fn get_data_from_state(
 /// adds a new data to vec_data for each new message that is sent
 /// uses received_msgs to take note of which validator received which messages
 fn safety_oracle_at_height(
-    state: &HashMap<u32, validator::State<blockchain::Block<u32>, f64>>,
+    state: &HashMap<u32, validator::State<blockchain::Block<ValidatorNameBlockData<u32>>, f64>>,
     height_of_oracle: u32,
     vec_data: &mut Vec<ChainData>,
     chain_id: u32,
-    received_msgs: &mut HashMap<u32, HashSet<Block<u32>>>,
+    received_msgs: &mut HashMap<u32, HashSet<Block<ValidatorNameBlockData<u32>>>>,
 ) -> bool {
     state.iter().for_each(|(id, validator_state)| {
         for (_, msgs) in validator_state.latests_msgs().iter() {
@@ -370,12 +371,12 @@ fn safety_oracle_at_height(
 }
 
 fn clique_collection(
-    state: HashMap<u32, validator::State<blockchain::Block<u32>, f64>>,
+    state: HashMap<u32, validator::State<blockchain::Block<ValidatorNameBlockData<u32>>, f64>>,
 ) -> Vec<Vec<Vec<u32>>> {
     state
         .iter()
         .map(|(_, validator_state)| {
-            let genesis_block = Block::new(None);
+            let genesis_block = Block::new(None, ValidatorNameBlockData::new(0));
             let latest_honest_msgs =
                 LatestMsgsHonest::from_latest_msgs(validator_state.latests_msgs(), &HashSet::new());
             let safety_oracles = Block::safety_oracles(
@@ -417,7 +418,7 @@ where
         u32,
         &mut Vec<ChainData>,
         u32,
-        &mut HashMap<u32, HashSet<Block<u32>>>,
+        &mut HashMap<u32, HashSet<Block<ValidatorNameBlockData<u32>>>>,
     ) -> bool,
 {
     (
@@ -433,7 +434,7 @@ where
         .prop_map(move |(votes, seed)| {
             let mut state = HashMap::new();
             let mut validators: Vec<u32> = (0..votes.len() as u32).collect();
-            let mut received_msgs: HashMap<u32, HashSet<Block<u32>>> =
+            let mut received_msgs: HashMap<u32, HashSet<Block<ValidatorNameBlockData<u32>>>> =
                 validators.iter().map(|v| (*v, HashSet::new())).collect();
 
             let weights: Vec<f64> = iter::repeat(1.0).take(votes.len() as usize).collect();
@@ -546,8 +547,8 @@ where
         .boxed()
 }
 
-fn arbitrary_blockchain() -> BoxedStrategy<Block<u32>> {
-    let genesis_block = Block::new(None);
+fn arbitrary_blockchain() -> BoxedStrategy<Block<ValidatorNameBlockData<u32>>> {
+    let genesis_block = Block::new(None, ValidatorNameBlockData::new(0));
     Just(genesis_block).boxed()
 }
 
