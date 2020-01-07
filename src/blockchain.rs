@@ -170,6 +170,24 @@ impl<D: BlockData> Block<D> {
                 .unwrap_or(false)
     }
 
+    // Contrary to the paper's definition, score directly uses the latest honest messages rather
+    // than the latest honest estimates and a protocol state.
+    pub fn score<U: WeightUnit>(
+        &self,
+        latest_msgs_honest: &LatestMsgsHonest<Self>,
+        weights: &validator::Weights<D::ValidatorName, U>,
+    ) -> U {
+        latest_msgs_honest
+            .iter()
+            .filter(|m| self.is_member(&m.estimate()))
+            .fold(<U as Zero<U>>::ZERO, |acc, m| {
+                match weights.weight(&m.sender()) {
+                    Err(_) => acc,
+                    Ok(w) => acc + w,
+                }
+            })
+    }
+
     pub fn safety_oracles<U: WeightUnit>(
         block: Block<D>,
         latest_msgs_honest: &LatestMsgsHonest<Self>,
@@ -564,6 +582,73 @@ mod tests {
 
         assert!(!block_2.is_member(&block_1));
         assert!(!block_2.is_member(&Block::from(&message)));
+    }
+
+    #[test]
+    fn score() {
+        let weights = validator::Weights::new(
+            vec![(0, 1.0), (1, 2.0), (2, 4.0), (3, 8.0), (4, 16.0)]
+                .into_iter()
+                .collect(),
+        );
+        let genesis = Block::new(None, ValidatorNameBlockData::new(0));
+        let block_1 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(1));
+        let block_2 = Block::new(Some(block_1.clone()), ValidatorNameBlockData::new(2));
+        let block_3 = Block::new(Some(block_1.clone()), ValidatorNameBlockData::new(3));
+        let block_4 = Block::new(Some(block_3.clone()), ValidatorNameBlockData::new(0));
+        let block_5 = Block::new(Some(block_4.clone()), ValidatorNameBlockData::new(4));
+
+        let mut justification = Justification::empty();
+        justification.insert(Message::new(0, justification.clone(), genesis.clone()));
+        justification.insert(Message::new(1, justification.clone(), block_1.clone()));
+        justification.insert(Message::new(2, justification.clone(), block_2.clone()));
+        justification.insert(Message::new(3, justification.clone(), block_3.clone()));
+        justification.insert(Message::new(0, justification.clone(), block_4.clone()));
+        justification.insert(Message::new(4, justification.clone(), block_5.clone()));
+        let latest_msgs = LatestMsgs::from(&justification);
+
+        float_eq!(
+            genesis.score(
+                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &weights
+            ),
+            31.0
+        );
+        float_eq!(
+            block_1.score(
+                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &weights
+            ),
+            31.0
+        );
+        float_eq!(
+            block_2.score(
+                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &weights
+            ),
+            4.0
+        );
+        float_eq!(
+            block_3.score(
+                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &weights
+            ),
+            25.0
+        );
+        float_eq!(
+            block_4.score(
+                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &weights
+            ),
+            17.0
+        );
+        float_eq!(
+            block_5.score(
+                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &weights
+            ),
+            16.0
+        );
     }
 
     #[test]
