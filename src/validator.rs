@@ -221,8 +221,9 @@ where
         self.state_fault_weight
     }
 
-    /// get msgs and fault weight overhead and equivocators overhead sorted
-    /// by fault weight overhead against the current validator_state
+    /// Returns a vector containing sorted messages. They are sorted by the fault weight they would
+    /// introduce in the state. If they would not be introduced because their validators are either
+    /// honest or already equivocating, they are tie-breaked using the messages' hashes.
     pub fn sort_by_faultweight<'z>(&self, msgs: &HashSet<&'z Message<E>>) -> Vec<&'z Message<E>> {
         let mut msgs_sorted_by_faultw: Vec<_> = msgs
             .iter()
@@ -610,71 +611,102 @@ mod tests {
 
     #[test]
     fn state_sort_by_faultweight_unknown_equivocators() {
-        let mut state = State::new(
-            Weights::new(vec![(0, 2.0), (1, 1.0), (2, 3.0)].into_iter().collect()),
-            0.0,
-            LatestMsgs::empty(),
-            10.0,
-            HashSet::new(),
-        );
-        let v0 = VoteCount::create_vote_msg(0, true);
         let v0_prime = VoteCount::create_vote_msg(0, false);
-        let v1 = VoteCount::create_vote_msg(1, false);
         let v1_prime = VoteCount::create_vote_msg(1, true);
-        let v2 = VoteCount::create_vote_msg(2, false);
         let v2_prime = VoteCount::create_vote_msg(2, true);
-        state.update(&[&v0, &v1, &v2]);
 
+        let get_sorted_vec_with_weights = |weights: Vec<(u32, f32)>| {
+            let mut state = State::new(
+                Weights::new(weights.into_iter().collect()),
+                0.0,
+                LatestMsgs::empty(),
+                10.0,
+                HashSet::new(),
+            );
+            let v0 = VoteCount::create_vote_msg(0, true);
+            let v1 = VoteCount::create_vote_msg(1, false);
+            let v2 = VoteCount::create_vote_msg(2, false);
+            state.update(&[&v0, &v1, &v2]);
+            state.sort_by_faultweight(&HashSet::from_iter(vec![&v0_prime, &v1_prime, &v2_prime]))
+        };
+
+        // As v0_prime, v1_prime and v2_prime would change the fault weight, the weight of their
+        // validators influence the sort.
         assert_eq!(
-            state.sort_by_faultweight(&HashSet::from_iter(vec![&v0_prime, &v1_prime, &v2_prime])),
+            get_sorted_vec_with_weights(vec![(0, 1.0), (1, 2.0), (2, 3.0)]),
+            [&v0_prime, &v1_prime, &v2_prime]
+        );
+        assert_eq!(
+            get_sorted_vec_with_weights(vec![(0, 2.0), (1, 1.0), (2, 3.0)]),
             [&v1_prime, &v0_prime, &v2_prime]
         );
     }
 
     #[test]
     fn state_sort_by_faultweight_known_equivocators() {
-        let mut state = State::new(
-            Weights::new(vec![(0, 2.0), (1, 1.0), (2, 3.0)].into_iter().collect()),
-            0.0,
-            LatestMsgs::empty(),
-            10.0,
-            HashSet::new(),
-        );
-        let v0 = VoteCount::create_vote_msg(0, true);
-        let v0_prime = VoteCount::create_vote_msg(0, false);
-        let v1 = VoteCount::create_vote_msg(1, false);
-        let v1_prime = VoteCount::create_vote_msg(1, true);
-        let v2 = VoteCount::create_vote_msg(2, false);
-        let v2_prime = VoteCount::create_vote_msg(2, true);
-        state.update(&[&v0, &v0_prime, &v1, &v1_prime, &v2, &v2_prime]);
+        fn test_with_weights(weights: Vec<(u32, f32)>) {
+            let mut state = State::new(
+                Weights::new(weights.into_iter().collect()),
+                0.0,
+                LatestMsgs::empty(),
+                10.0,
+                HashSet::new(),
+            );
+            let v0 = VoteCount::create_vote_msg(0, true);
+            let v0_prime = VoteCount::create_vote_msg(0, false);
+            let v1 = VoteCount::create_vote_msg(1, false);
+            let v1_prime = VoteCount::create_vote_msg(1, true);
+            let v2 = VoteCount::create_vote_msg(2, false);
+            let v2_prime = VoteCount::create_vote_msg(2, true);
+            state.update(&[&v0, &v0_prime, &v1, &v1_prime, &v2, &v2_prime]);
 
-        // As all three validators are known equivocators, they are sorted by the tie-breaker. This
-        // means they are sorted by the messages' hashes.
-        assert_eq!(
-            state.sort_by_faultweight(&HashSet::from_iter(vec![&v0, &v1, &v2])),
-            [&v2, &v0, &v1]
-        );
+            // As all three validators are known equivocators and they could not change the current
+            // fault weight, they are sorted by the tie-breaker. This means they are sorted by the
+            // messages' hashes.
+            assert_eq!(
+                state.sort_by_faultweight(&HashSet::from_iter(vec![&v0, &v1, &v2])),
+                [&v2, &v0, &v1]
+            );
+
+            // Comparing the hashes
+            assert!(v2.getid() < v0.getid());
+            assert!(v0.getid() < v1.getid());
+        }
+
+        // Weights have no influence
+        test_with_weights(vec![(0, 2.0), (1, 1.0), (2, 3.0)]);
+        test_with_weights(vec![(0, 2.0), (1, 4.0), (2, 3.0)]);
     }
 
     #[test]
     fn state_sort_by_faultweight_no_fault() {
-        let mut state = State::new(
-            Weights::new(vec![(0, 2.0), (1, 1.0), (2, 3.0)].into_iter().collect()),
-            0.0,
-            LatestMsgs::empty(),
-            1.0,
-            HashSet::new(),
-        );
-        let v0 = VoteCount::create_vote_msg(0, true);
-        let v1 = VoteCount::create_vote_msg(1, false);
-        let v2 = VoteCount::create_vote_msg(2, false);
-        state.update(&[&v0, &v1, &v2]);
+        fn test_with_weights(weights: Vec<(u32, f32)>) {
+            let mut state = State::new(
+                Weights::new(weights.into_iter().collect()),
+                0.0,
+                LatestMsgs::empty(),
+                1.0,
+                HashSet::new(),
+            );
+            let v0 = VoteCount::create_vote_msg(0, true);
+            let v1 = VoteCount::create_vote_msg(1, false);
+            let v2 = VoteCount::create_vote_msg(2, false);
+            state.update(&[&v0, &v1, &v2]);
 
-        // As all three validators haven't equivocated, they are sorted by the tie-breaker. This
-        // means they are sorted by the messages' hashes.
-        assert_eq!(
-            state.sort_by_faultweight(&HashSet::from_iter(vec![&v0, &v1, &v2])),
-            [&v2, &v0, &v1]
-        );
+            // As all three validators haven't equivocated, they are sorted by the tie-breaker.
+            // This means they are sorted by the messages' hashes.
+            assert_eq!(
+                state.sort_by_faultweight(&HashSet::from_iter(vec![&v0, &v1, &v2])),
+                [&v2, &v0, &v1]
+            );
+
+            // Comparing the hashes
+            assert!(v2.getid() < v0.getid());
+            assert!(v0.getid() < v1.getid());
+        }
+
+        // Weights have no influence
+        test_with_weights(vec![(0, 2.0), (1, 1.0), (2, 3.0)]);
+        test_with_weights(vec![(0, 2.0), (1, 4.0), (2, 3.0)]);
     }
 }
