@@ -198,6 +198,56 @@ impl<D: BlockData> Block<D> {
             .collect()
     }
 
+    pub fn best_children<'z, U: WeightUnit + std::cmp::PartialOrd>(
+        &self,
+        protocol_state: &HashSet<&'z Self>,
+        latest_msgs_honest: &LatestMsgsHonest<Self>,
+        weights: &validator::Weights<D::ValidatorName, U>,
+    ) -> HashSet<&'z Self> {
+        fn argmax<X, F, U>(items: HashSet<&X>, scoring_function: F) -> HashSet<&X>
+        where
+            X: Eq + std::hash::Hash,
+            F: std::ops::Fn(&X) -> U,
+            U: WeightUnit + std::cmp::PartialOrd,
+        {
+            let mut iterator = items.iter();
+
+            let item = iterator.next();
+            if item == None {
+                return HashSet::new();
+            }
+
+            let item = item.unwrap();
+
+            let mut max_score = scoring_function(item);
+            let mut max = HashSet::new();
+            max.insert(*item);
+
+            for item in iterator {
+                let block_score = scoring_function(*item);
+
+                match block_score.partial_cmp(&max_score) {
+                    Some(Ordering::Equal) => {
+                        max.insert(*item);
+                    }
+                    Some(Ordering::Greater) => max.clear(),
+                    Some(Ordering::Less) | None => (),
+                };
+
+                if max.is_empty() {
+                    max.insert(*item);
+                    max_score = block_score;
+                }
+            }
+
+            max
+        }
+
+        let scoring_function = |block: &Self| block.score(latest_msgs_honest, weights);
+
+        argmax(self.children(&protocol_state), scoring_function)
+    }
+
     pub fn safety_oracles<U: WeightUnit>(
         block: Block<D>,
         latest_msgs_honest: &LatestMsgsHonest<Self>,
@@ -714,6 +764,131 @@ mod tests {
         assert_eq!(
             block_1.children(&vec![&block_2, &block_4].into_iter().collect::<HashSet<_>>()),
             vec![&block_2].into_iter().collect::<HashSet<_>>()
+        );
+    }
+
+    #[test]
+    fn best_children_trivial() {
+        let weights = validator::Weights::new(
+            vec![(0, 3.0), (1, 2.0), (2, 4.0), (3, 8.0), (4, 1.0)]
+                .into_iter()
+                .collect(),
+        );
+        let genesis = Block::new(None, ValidatorNameBlockData::new(0));
+        let block_1 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(1));
+        let block_2 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(2));
+        let block_3 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(3));
+        let block_4 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(4));
+
+        let mut justification = Justification::empty();
+        justification.insert(Message::new(0, justification.clone(), genesis.clone()));
+        justification.insert(Message::new(1, justification.clone(), block_1.clone()));
+        justification.insert(Message::new(2, justification.clone(), block_2.clone()));
+        justification.insert(Message::new(3, justification.clone(), block_3.clone()));
+        justification.insert(Message::new(4, justification.clone(), block_4.clone()));
+        let latest_msgs = LatestMsgs::from(&justification);
+
+        assert_eq!(
+            genesis.best_children(
+                &vec![&block_1, &block_2, &block_3, &block_4]
+                    .into_iter()
+                    .collect::<HashSet<_>>(),
+                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &weights,
+            ),
+            vec![&block_3].into_iter().collect::<HashSet<_>>()
+        );
+    }
+
+    #[test]
+    fn best_children_indirect() {
+        let weights = validator::Weights::new(
+            vec![(0, 1.0), (1, 2.0), (2, 4.0), (3, 8.0), (4, 10.0)]
+                .into_iter()
+                .collect(),
+        );
+        let genesis = Block::new(None, ValidatorNameBlockData::new(0));
+        let block_1 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(1));
+        let block_2 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(2));
+        let block_3 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(3));
+        let block_4 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(4));
+        let block_5 = Block::new(Some(block_4.clone()), ValidatorNameBlockData::new(0));
+        let block_6 = Block::new(Some(block_2.clone()), ValidatorNameBlockData::new(3));
+
+        let mut justification = Justification::empty();
+        justification.insert(Message::new(0, justification.clone(), genesis.clone()));
+        justification.insert(Message::new(1, justification.clone(), block_1.clone()));
+        justification.insert(Message::new(2, justification.clone(), block_2.clone()));
+        justification.insert(Message::new(3, justification.clone(), block_3.clone()));
+        justification.insert(Message::new(4, justification.clone(), block_4.clone()));
+        justification.insert(Message::new(0, justification.clone(), block_5));
+        justification.insert(Message::new(3, justification.clone(), block_6));
+        let latest_msgs = LatestMsgs::from(&justification);
+
+        assert_eq!(
+            genesis.best_children(
+                &vec![&block_1, &block_2, &block_3, &block_4]
+                    .into_iter()
+                    .collect::<HashSet<_>>(),
+                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &weights,
+            ),
+            vec![&block_2].into_iter().collect::<HashSet<_>>()
+        );
+    }
+
+    #[test]
+    fn best_children_tie() {
+        let weights = validator::Weights::new(
+            vec![(0, 1.0), (1, 2.0), (2, 4.0), (3, 8.0), (4, 10.0)]
+                .into_iter()
+                .collect(),
+        );
+        let genesis = Block::new(None, ValidatorNameBlockData::new(0));
+        let block_1 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(1));
+        let block_2 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(2));
+        let block_3 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(3));
+        let block_4 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(4));
+        let block_5 = Block::new(Some(block_2.clone()), ValidatorNameBlockData::new(0));
+        let block_6 = Block::new(Some(block_1.clone()), ValidatorNameBlockData::new(3));
+
+        let mut justification = Justification::empty();
+        justification.insert(Message::new(0, justification.clone(), genesis.clone()));
+        justification.insert(Message::new(1, justification.clone(), block_1.clone()));
+        justification.insert(Message::new(2, justification.clone(), block_2.clone()));
+        justification.insert(Message::new(3, justification.clone(), block_3.clone()));
+        justification.insert(Message::new(4, justification.clone(), block_4.clone()));
+        justification.insert(Message::new(0, justification.clone(), block_5));
+        justification.insert(Message::new(3, justification.clone(), block_6));
+        let latest_msgs = LatestMsgs::from(&justification);
+
+        assert_eq!(
+            genesis.best_children(
+                &vec![&block_1, &block_2, &block_3, &block_4]
+                    .into_iter()
+                    .collect::<HashSet<_>>(),
+                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &weights,
+            ),
+            vec![&block_1, &block_4].into_iter().collect::<HashSet<_>>()
+        );
+    }
+
+    #[test]
+    fn best_children_empty() {
+        let weights = validator::Weights::new(
+            vec![(0, 1.0), (1, 2.0), (2, 4.0), (3, 8.0), (4, 10.0)]
+                .into_iter()
+                .collect(),
+        );
+        let genesis = Block::new(None, ValidatorNameBlockData::new(0));
+        assert_eq!(
+            genesis.best_children(
+                &HashSet::new(),
+                &LatestMsgsHonest::from_latest_msgs(&LatestMsgs::empty(), &HashSet::new()),
+                &weights,
+            ),
+            HashSet::new()
         );
     }
 
