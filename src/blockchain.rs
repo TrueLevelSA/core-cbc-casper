@@ -188,6 +188,16 @@ impl<D: BlockData> Block<D> {
             })
     }
 
+    /// Contrary to the paper's definition, we are directly parsing blocks to filter children out
+    /// of rather than taking the estimates out of messages.
+    pub fn children<'z>(&self, protocol_state: &HashSet<&'z Self>) -> HashSet<&'z Self> {
+        protocol_state
+            .iter()
+            .cloned()
+            .filter(|block| block.prevblock() == Some(self.clone()))
+            .collect()
+    }
+
     pub fn safety_oracles<U: WeightUnit>(
         block: Block<D>,
         latest_msgs_honest: &LatestMsgsHonest<Self>,
@@ -648,6 +658,62 @@ mod tests {
                 &weights
             ),
             16.0
+        );
+    }
+
+    #[test]
+    fn children() {
+        let genesis = Block::new(None, ValidatorNameBlockData::new(0));
+        let block_1 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(1));
+        let block_2 = Block::new(Some(block_1.clone()), ValidatorNameBlockData::new(2));
+        let block_3 = Block::new(Some(block_1.clone()), ValidatorNameBlockData::new(3));
+        let block_4 = Block::new(Some(block_3.clone()), ValidatorNameBlockData::new(0));
+
+        assert_eq!(
+            genesis.children(
+                &vec![&genesis, &block_1, &block_2, &block_3, &block_4]
+                    .into_iter()
+                    .collect::<HashSet<_>>()
+            ),
+            vec![&block_1].into_iter().collect::<HashSet<_>>()
+        );
+        assert_eq!(
+            block_1.children(
+                &vec![&genesis, &block_1, &block_2, &block_3, &block_4]
+                    .into_iter()
+                    .collect::<HashSet<_>>()
+            ),
+            vec![&block_2, &block_3].into_iter().collect::<HashSet<_>>()
+        );
+        assert_eq!(
+            block_2.children(
+                &vec![&genesis, &block_1, &block_2, &block_3, &block_4]
+                    .into_iter()
+                    .collect::<HashSet<_>>()
+            ),
+            vec![].into_iter().collect::<HashSet<_>>()
+        );
+        assert_eq!(
+            block_3.children(
+                &vec![&genesis, &block_1, &block_2, &block_3, &block_4]
+                    .into_iter()
+                    .collect::<HashSet<_>>()
+            ),
+            vec![&block_4].into_iter().collect::<HashSet<_>>()
+        );
+    }
+
+    #[test]
+    fn children_missing_children_are_not_included() {
+        let genesis = Block::new(None, ValidatorNameBlockData::new(0));
+        let block_1 = Block::new(Some(genesis), ValidatorNameBlockData::new(1));
+        let block_2 = Block::new(Some(block_1.clone()), ValidatorNameBlockData::new(2));
+        let block_3 = Block::new(Some(block_1.clone()), ValidatorNameBlockData::new(3));
+        let block_4 = Block::new(Some(block_3), ValidatorNameBlockData::new(0));
+
+        assert_eq!(
+            block_1.children(&vec![&block_2, &block_4].into_iter().collect::<HashSet<_>>()),
+            vec![&block_2].into_iter().collect::<HashSet<_>>()
         );
     }
 
