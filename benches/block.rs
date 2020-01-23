@@ -11,7 +11,6 @@ use casper::ValidatorNameBlockData;
 use criterion::{black_box, Criterion};
 
 type Validator = u8;
-type Message = message::Message<Value>;
 
 #[derive(Debug, Hash, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, serde_derive::Serialize)]
 pub enum Value {
@@ -107,6 +106,8 @@ fn block_new(c: &mut Criterion) {
 }
 
 fn block_from_prevblock_msg(c: &mut Criterion) {
+    type Message = message::Message<Value>;
+
     c.bench_function_over_inputs(
         "Block::from_prevblock_msg",
         |b, loops| {
@@ -162,10 +163,51 @@ fn block_is_member(c: &mut Criterion) {
     );
 }
 
+fn block_estimate(c: &mut Criterion) {
+    use casper::justification::{Justification, LatestMsgs};
+    use casper::message::Message;
+    use std::collections::HashSet;
+
+    let weights = validator::Weights::new(
+        vec![(0, 1.0), (1, 2.0), (2, 4.0), (3, 8.0), (4, 16.0)]
+            .into_iter()
+            .collect(),
+    );
+    let genesis = Block::new(None, ValidatorNameBlockData::new(0));
+    let block_1 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(1));
+    let block_2 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(2));
+    let block_3 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(3));
+    let block_4 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(4));
+
+    let block_5 = Block::new(Some(block_4.clone()), ValidatorNameBlockData::new(0));
+    let block_6 = Block::new(Some(block_2.clone()), ValidatorNameBlockData::new(3));
+
+    let block_7 = Block::new(Some(block_5.clone()), ValidatorNameBlockData::new(2));
+    let block_8 = Block::new(Some(block_6.clone()), ValidatorNameBlockData::new(4));
+
+    let mut justification = Justification::empty();
+    justification.insert(Message::new(0, justification.clone(), genesis));
+    justification.insert(Message::new(1, justification.clone(), block_1));
+    justification.insert(Message::new(2, justification.clone(), block_2));
+    justification.insert(Message::new(3, justification.clone(), block_3));
+    justification.insert(Message::new(4, justification.clone(), block_4));
+    justification.insert(Message::new(0, justification.clone(), block_5));
+    justification.insert(Message::new(3, justification.clone(), block_6));
+    justification.insert(Message::new(2, justification.clone(), block_7));
+    justification.insert(Message::new(4, justification.clone(), block_8));
+    let latest_msgs = LatestMsgs::from(&justification);
+    let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new());
+
+    c.bench_function("Block::estimate", move |b| {
+        b.iter(|| Block::estimate(black_box(&latest_honest_msgs), black_box(&weights)));
+    });
+}
+
 criterion_group!(
     benches,
     block_new,
     block_from_prevblock_msg,
-    block_is_member
+    block_is_member,
+    block_estimate,
 );
 criterion_main!(benches);
