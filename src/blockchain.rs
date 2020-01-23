@@ -248,37 +248,60 @@ impl<D: BlockData> Block<D> {
         argmax(self.children(&protocol_state), scoring_function)
     }
 
-    /// Returns a hashset containing the leaves with highest score according to the definition 4.30
-    /// of the paper.
-    /// * `blocks` are the blocks which we search the best children of; this function is intended
-    /// to be called with `blocks = {genesis}` in order to find the best leaf to construct on.
-    /// * `protocol_state` is a set containing every known message.
-    pub fn mathematical_ghost<'z, U: WeightUnit + std::cmp::PartialOrd>(
-        blocks: HashSet<&'z Self>,
-        protocol_state: &HashSet<&'z Self>,
+    /// This function reconstructs the blocks tree from `latest_msgs_honest` and uses those to
+    /// return the block with highest score according to the definition 4.30 of the paper. Contrary
+    /// to the paper's definition, it does not return a set in case of a tie but uses the blocks
+    /// hashes to tie break.
+    pub fn mathematical_ghost<U: WeightUnit + std::cmp::PartialOrd>(
         latest_msgs_honest: &LatestMsgsHonest<Self>,
         weights: &validator::Weights<D::ValidatorName, U>,
-    ) -> HashSet<&'z Block<D>> {
-        let indirect_best_leaves = blocks
-            .iter()
-            .cloned()
-            .filter(|block| !block.children(&protocol_state).is_empty())
-            .flat_map(|block| {
-                Self::mathematical_ghost(
-                    block.best_children(protocol_state, latest_msgs_honest, weights),
-                    protocol_state,
-                    latest_msgs_honest,
-                    weights,
-                )
-                .into_iter()
-            });
+    ) -> Result<Self, Error> {
+        fn internal<'z, D: BlockData, U: WeightUnit + std::cmp::PartialOrd>(
+            blocks: HashSet<&'z Block<D>>,
+            protocol_state: &HashSet<&'z Block<D>>,
+            latest_msgs_honest: &LatestMsgsHonest<Block<D>>,
+            weights: &validator::Weights<D::ValidatorName, U>,
+        ) -> HashSet<&'z Block<D>> {
+            let indirect_best_leaves = blocks
+                .iter()
+                .cloned()
+                .filter(|block| !block.children(&protocol_state).is_empty())
+                .flat_map(|block| {
+                    internal(
+                        block.best_children(protocol_state, latest_msgs_honest, weights),
+                        protocol_state,
+                        latest_msgs_honest,
+                        weights,
+                    )
+                    .into_iter()
+                });
 
-        let direct_child_leaves = blocks
-            .iter()
-            .cloned()
-            .filter(|block| block.children(&protocol_state).is_empty());
+            let direct_child_leaves = blocks
+                .iter()
+                .cloned()
+                .filter(|block| block.children(&protocol_state).is_empty());
 
-        indirect_best_leaves.chain(direct_child_leaves).collect()
+            indirect_best_leaves.chain(direct_child_leaves).collect()
+        }
+
+        let protocol_state = Self::find_all_accessible_blocks(latest_msgs_honest);
+        let genesis_blocks = protocol_state
+            .iter()
+            .filter(|block| block.prev_block_as_ref().is_none())
+            .collect();
+        let blocks = internal(
+            genesis_blocks,
+            &protocol_state.iter().collect(),
+            latest_msgs_honest,
+            weights,
+        );
+
+        // Tie breaker uses the blocks hashes.
+        blocks
+            .into_iter()
+            .max_by(|left, right| right.getid().cmp(&left.getid()))
+            .cloned()
+            .ok_or(Error)
     }
 
     pub fn safety_oracles<U: WeightUnit>(
@@ -393,6 +416,10 @@ impl<D: BlockData> Block<D> {
         self.arc().prevblock.as_ref().cloned()
     }
 
+    pub fn prev_block_as_ref(&self) -> Option<&Self> {
+        self.arc().prevblock.as_ref()
+    }
+
     pub fn data(&self) -> D {
         self.arc().data.clone()
     }
@@ -469,6 +496,23 @@ impl<D: BlockData> Block<D> {
             };
         }
         (visited_parents, genesis, latest_blocks)
+    }
+
+    fn find_all_accessible_blocks(latest_msgs: &LatestMsgsHonest<Self>) -> HashSet<Block<D>> {
+        let mut blocks = HashSet::new();
+
+        for message in latest_msgs.iter() {
+            let mut block = message.estimate().clone();
+
+            while let Some(prev_block) = block.prevblock() {
+                blocks.insert(block);
+                block = prev_block.clone();
+            }
+
+            blocks.insert(block);
+        }
+
+        blocks
     }
 
     /// Collects the validators that produced blocks for each side of a fork.
@@ -909,11 +953,7 @@ mod tests {
 
     #[test]
     fn best_children_empty() {
-        let weights = validator::Weights::new(
-            vec![(0, 1.0), (1, 2.0), (2, 4.0), (3, 8.0), (4, 10.0)]
-                .into_iter()
-                .collect(),
-        );
+        let weights = validator::Weights::new(vec![(0, 1.0)].into_iter().collect());
         let genesis = Block::new(None, ValidatorNameBlockData::new(0));
         assert_eq!(
             genesis.best_children(
@@ -928,7 +968,7 @@ mod tests {
     #[test]
     fn ghost() {
         let weights = validator::Weights::new(
-            vec![(0, 1.0), (1, 2.0), (2, 4.0), (3, 8.0), (4, 10.0)]
+            vec![(0, 1.0), (1, 2.0), (2, 4.0), (3, 8.0), (4, 16.0)]
                 .into_iter()
                 .collect(),
         );
@@ -945,28 +985,24 @@ mod tests {
         let block_8 = Block::new(Some(block_6.clone()), ValidatorNameBlockData::new(4));
 
         let mut justification = Justification::empty();
-        justification.insert(Message::new(0, justification.clone(), genesis.clone()));
-        justification.insert(Message::new(1, justification.clone(), block_1.clone()));
-        justification.insert(Message::new(2, justification.clone(), block_2.clone()));
-        justification.insert(Message::new(3, justification.clone(), block_3.clone()));
-        justification.insert(Message::new(4, justification.clone(), block_4.clone()));
-        justification.insert(Message::new(0, justification.clone(), block_5.clone()));
-        justification.insert(Message::new(3, justification.clone(), block_6.clone()));
-        justification.insert(Message::new(2, justification.clone(), block_7.clone()));
+        justification.insert(Message::new(0, justification.clone(), genesis));
+        justification.insert(Message::new(1, justification.clone(), block_1));
+        justification.insert(Message::new(2, justification.clone(), block_2));
+        justification.insert(Message::new(3, justification.clone(), block_3));
+        justification.insert(Message::new(4, justification.clone(), block_4));
+        justification.insert(Message::new(0, justification.clone(), block_5));
+        justification.insert(Message::new(3, justification.clone(), block_6));
+        justification.insert(Message::new(2, justification.clone(), block_7));
         justification.insert(Message::new(4, justification.clone(), block_8.clone()));
         let latest_msgs = LatestMsgs::from(&justification);
 
         assert_eq!(
             Block::mathematical_ghost(
-                HashSet::from_iter(vec![&genesis]),
-                &HashSet::from_iter(vec![
-                    &genesis, &block_1, &block_2, &block_3, &block_4, &block_5, &block_6, &block_7,
-                    &block_8,
-                ]),
                 &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
                 &weights,
-            ),
-            HashSet::from_iter(vec![&block_8])
+            )
+            .unwrap(),
+            block_8,
         );
     }
 
@@ -987,26 +1023,21 @@ mod tests {
         let block_7 = Block::new(Some(block_6.clone()), ValidatorNameBlockData::new(5));
 
         let mut justification = Justification::empty();
-        justification.insert(Message::new(0, justification.clone(), genesis.clone()));
-        justification.insert(Message::new(1, justification.clone(), block_1.clone()));
-        justification.insert(Message::new(2, justification.clone(), block_2.clone()));
-        justification.insert(Message::new(3, justification.clone(), block_3.clone()));
+        justification.insert(Message::new(0, justification.clone(), genesis));
+        justification.insert(Message::new(1, justification.clone(), block_1));
+        justification.insert(Message::new(2, justification.clone(), block_2));
+        justification.insert(Message::new(3, justification.clone(), block_3));
         justification.insert(Message::new(4, justification.clone(), block_4.clone()));
-        justification.insert(Message::new(0, justification.clone(), block_5.clone()));
-        justification.insert(Message::new(3, justification.clone(), block_6.clone()));
-        justification.insert(Message::new(5, justification.clone(), block_7.clone()));
+        justification.insert(Message::new(0, justification.clone(), block_5));
+        justification.insert(Message::new(3, justification.clone(), block_6));
+        justification.insert(Message::new(5, justification.clone(), block_7));
         let latest_msgs = LatestMsgs::from(&justification);
+        let latest_honest_msgs = &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new());
 
+        // block_4 and block_7 are tied but the hash based tie breaker chooses block_7.
         assert_eq!(
-            Block::mathematical_ghost(
-                HashSet::from_iter(vec![&genesis]),
-                &HashSet::from_iter(vec![
-                    &genesis, &block_1, &block_2, &block_3, &block_4, &block_5, &block_6, &block_7,
-                ]),
-                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
-                &weights,
-            ),
-            HashSet::from_iter(vec![&block_4, &block_7]),
+            Block::mathematical_ghost(latest_honest_msgs, &weights,).unwrap(),
+            block_4,
         );
     }
 
