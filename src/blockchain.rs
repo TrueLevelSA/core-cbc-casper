@@ -128,7 +128,7 @@ impl<D: BlockData> Estimator for Block<D> {
         latest_msgs: &LatestMsgsHonest<Self>,
         validators_weights: &validator::Weights<D::ValidatorName, U>,
     ) -> Result<Self, Self::Error> {
-        let prevblock = Block::old_ghost(latest_msgs, validators_weights)?;
+        let prevblock = Block::optimized_ghost(latest_msgs, validators_weights)?;
         Ok(Block::from(ProtoBlock::new(Some(prevblock), D::default())))
     }
 }
@@ -315,6 +315,76 @@ impl<D: BlockData> Block<D> {
         .max_by(|left, right| right.getid().cmp(&left.getid()))
         .cloned()
         .ok_or(Error)
+    }
+
+    /// This function reconstructs the blocks tree from `latest_msgs_honest` and uses those to
+    /// return the block with highest score according to the definition 4.30 of the paper. Contrary
+    /// to the paper's definition, it does not return a set in case of a tie but uses the blocks
+    /// hashes to tie break.
+    pub fn optimized_ghost<U: WeightUnit + std::cmp::PartialOrd>(
+        latest_msgs_honest: &LatestMsgsHonest<Self>,
+        weights: &validator::Weights<D::ValidatorName, U>,
+    ) -> Result<Self, Error> {
+        let protocol_state = Self::find_all_accessible_blocks(latest_msgs_honest);
+        let genesis_blocks: HashSet<&Block<D>> = protocol_state
+            .iter()
+            .filter(|block| block.prev_block_as_ref().is_none())
+            .collect();
+
+        // Generating a hashset for each block containing each latest honest message children of
+        // that block.
+        let mut latest_messages_validators = HashMap::new();
+        for message in latest_msgs_honest.iter() {
+            let mut iterator = message.estimate().clone();
+            while let Some(prev_block) = iterator.prevblock() {
+                let entry = latest_messages_validators
+                    .entry(iterator)
+                    .or_insert_with(HashSet::new);
+                entry.insert(message.sender().clone());
+
+                iterator = prev_block;
+            }
+            let entry = latest_messages_validators
+                .entry(iterator)
+                .or_insert_with(HashSet::new);
+            entry.insert(message.sender().clone());
+        }
+
+        let scores: HashMap<&Block<D>, U> = latest_messages_validators
+            .iter()
+            .map(|(block, validators)| {
+                (
+                    protocol_state.get(block).unwrap(),
+                    weights.sum_weight_validators(&validators),
+                )
+            })
+            .collect();
+
+        let scoring_function = |block: &Self| *scores.get(&block).unwrap();
+
+        let mut stack = vec![genesis_blocks.into_iter().next().unwrap()];
+        let mut result = HashSet::new();
+
+        // This while loop is an iterative ghost.
+        while let Some(block) = stack.pop() {
+            let children = block.children(&protocol_state.iter().collect());
+
+            if children.is_empty() {
+                result.insert(block.clone());
+            } else {
+                Block::argmax(children, scoring_function)
+                    .into_iter()
+                    .for_each(|block| {
+                        stack.push(block);
+                    });
+            }
+        }
+
+        // Tie breaker uses the blocks hashes.
+        result
+            .into_iter()
+            .max_by(|left, right| right.getid().cmp(&left.getid()))
+            .ok_or(Error)
     }
 
     pub fn safety_oracles<U: WeightUnit>(
@@ -1021,6 +1091,22 @@ mod tests {
             .unwrap(),
             block_8,
         );
+        assert_eq!(
+            Block::optimized_ghost(
+                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &weights,
+            )
+            .unwrap(),
+            block_8,
+        );
+        assert_eq!(
+            Block::old_ghost(
+                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &weights,
+            )
+            .unwrap(),
+            block_8,
+        );
     }
 
     #[test]
@@ -1051,9 +1137,17 @@ mod tests {
         let latest_msgs = LatestMsgs::from(&justification);
         let latest_honest_msgs = &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new());
 
-        // block_4 and block_7 are tied but the hash based tie breaker chooses block_7.
+        // block_4 and block_7 are tied but the hash based tie breaker chooses block_4.
         assert_eq!(
             Block::mathematical_ghost(latest_honest_msgs, &weights,).unwrap(),
+            block_4,
+        );
+        assert_eq!(
+            Block::optimized_ghost(latest_honest_msgs, &weights,).unwrap(),
+            block_4,
+        );
+        assert_eq!(
+            Block::old_ghost(latest_honest_msgs, &weights,).unwrap(),
             block_4,
         );
     }
