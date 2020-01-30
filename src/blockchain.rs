@@ -128,7 +128,7 @@ impl<D: BlockData> Estimator for Block<D> {
         latest_msgs: &LatestMsgsHonest<Self>,
         validators_weights: &validator::Weights<D::ValidatorName, U>,
     ) -> Result<Self, Self::Error> {
-        let prevblock = Block::ghost(latest_msgs, validators_weights)?;
+        let prevblock = Block::old_ghost(latest_msgs, validators_weights)?;
         Ok(Block::from(ProtoBlock::new(Some(prevblock), D::default())))
     }
 }
@@ -246,6 +246,39 @@ impl<D: BlockData> Block<D> {
         let scoring_function = |block: &Self| block.score(latest_msgs_honest, weights);
 
         argmax(self.children(&protocol_state), scoring_function)
+    }
+
+    /// Returns a hashset containing the leaves with highest score according to the definition 4.30
+    /// of the paper.
+    /// * `blocks` are the blocks which we search the best children of; this function is intended
+    /// to be called with `blocks = {genesis}` in order to find the best leaf to construct on.
+    /// * `protocol_state` is a set containing every known message.
+    pub fn mathematical_ghost<'z, U: WeightUnit + std::cmp::PartialOrd>(
+        blocks: HashSet<&'z Self>,
+        protocol_state: &HashSet<&'z Self>,
+        latest_msgs_honest: &LatestMsgsHonest<Self>,
+        weights: &validator::Weights<D::ValidatorName, U>,
+    ) -> HashSet<&'z Block<D>> {
+        let indirect_best_leaves = blocks
+            .iter()
+            .cloned()
+            .filter(|block| !block.children(&protocol_state).is_empty())
+            .flat_map(|block| {
+                Self::mathematical_ghost(
+                    block.best_children(protocol_state, latest_msgs_honest, weights),
+                    protocol_state,
+                    latest_msgs_honest,
+                    weights,
+                )
+                .into_iter()
+            });
+
+        let direct_child_leaves = blocks
+            .iter()
+            .cloned()
+            .filter(|block| block.children(&protocol_state).is_empty());
+
+        indirect_best_leaves.chain(direct_child_leaves).collect()
     }
 
     pub fn safety_oracles<U: WeightUnit>(
@@ -536,7 +569,7 @@ impl<D: BlockData> Block<D> {
         })
     }
 
-    pub fn ghost<U: WeightUnit>(
+    pub fn old_ghost<U: WeightUnit>(
         latest_msgs: &LatestMsgsHonest<Self>,
         validators_weights: &validator::Weights<D::ValidatorName, U>,
     ) -> Result<Self, Error> {
@@ -889,6 +922,91 @@ mod tests {
                 &weights,
             ),
             HashSet::new()
+        );
+    }
+
+    #[test]
+    fn ghost() {
+        let weights = validator::Weights::new(
+            vec![(0, 1.0), (1, 2.0), (2, 4.0), (3, 8.0), (4, 10.0)]
+                .into_iter()
+                .collect(),
+        );
+        let genesis = Block::new(None, ValidatorNameBlockData::new(0));
+        let block_1 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(1));
+        let block_2 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(2));
+        let block_3 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(3));
+        let block_4 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(4));
+
+        let block_5 = Block::new(Some(block_4.clone()), ValidatorNameBlockData::new(0));
+        let block_6 = Block::new(Some(block_2.clone()), ValidatorNameBlockData::new(3));
+
+        let block_7 = Block::new(Some(block_5.clone()), ValidatorNameBlockData::new(2));
+        let block_8 = Block::new(Some(block_6.clone()), ValidatorNameBlockData::new(4));
+
+        let mut justification = Justification::empty();
+        justification.insert(Message::new(0, justification.clone(), genesis.clone()));
+        justification.insert(Message::new(1, justification.clone(), block_1.clone()));
+        justification.insert(Message::new(2, justification.clone(), block_2.clone()));
+        justification.insert(Message::new(3, justification.clone(), block_3.clone()));
+        justification.insert(Message::new(4, justification.clone(), block_4.clone()));
+        justification.insert(Message::new(0, justification.clone(), block_5.clone()));
+        justification.insert(Message::new(3, justification.clone(), block_6.clone()));
+        justification.insert(Message::new(2, justification.clone(), block_7.clone()));
+        justification.insert(Message::new(4, justification.clone(), block_8.clone()));
+        let latest_msgs = LatestMsgs::from(&justification);
+
+        assert_eq!(
+            Block::mathematical_ghost(
+                HashSet::from_iter(vec![&genesis]),
+                &HashSet::from_iter(vec![
+                    &genesis, &block_1, &block_2, &block_3, &block_4, &block_5, &block_6, &block_7,
+                    &block_8,
+                ]),
+                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &weights,
+            ),
+            HashSet::from_iter(vec![&block_8])
+        );
+    }
+
+    #[test]
+    fn ghost_tie() {
+        let weights = validator::Weights::new(
+            vec![(0, 1.0), (1, 2.0), (2, 4.0), (3, 8.0), (4, 10.0), (5, 0.0)]
+                .into_iter()
+                .collect(),
+        );
+        let genesis = Block::new(None, ValidatorNameBlockData::new(0));
+        let block_1 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(1));
+        let block_2 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(2));
+        let block_3 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(3));
+        let block_4 = Block::new(Some(genesis.clone()), ValidatorNameBlockData::new(4));
+        let block_5 = Block::new(Some(block_2.clone()), ValidatorNameBlockData::new(0));
+        let block_6 = Block::new(Some(block_1.clone()), ValidatorNameBlockData::new(3));
+        let block_7 = Block::new(Some(block_6.clone()), ValidatorNameBlockData::new(5));
+
+        let mut justification = Justification::empty();
+        justification.insert(Message::new(0, justification.clone(), genesis.clone()));
+        justification.insert(Message::new(1, justification.clone(), block_1.clone()));
+        justification.insert(Message::new(2, justification.clone(), block_2.clone()));
+        justification.insert(Message::new(3, justification.clone(), block_3.clone()));
+        justification.insert(Message::new(4, justification.clone(), block_4.clone()));
+        justification.insert(Message::new(0, justification.clone(), block_5.clone()));
+        justification.insert(Message::new(3, justification.clone(), block_6.clone()));
+        justification.insert(Message::new(5, justification.clone(), block_7.clone()));
+        let latest_msgs = LatestMsgs::from(&justification);
+
+        assert_eq!(
+            Block::mathematical_ghost(
+                HashSet::from_iter(vec![&genesis]),
+                &HashSet::from_iter(vec![
+                    &genesis, &block_1, &block_2, &block_3, &block_4, &block_5, &block_6, &block_7,
+                ]),
+                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &weights,
+            ),
+            HashSet::from_iter(vec![&block_4, &block_7]),
         );
     }
 

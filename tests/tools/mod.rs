@@ -21,6 +21,7 @@ use std::collections::HashSet;
 use std::fmt;
 
 use casper::blockchain::Block;
+use casper::estimator::Estimator;
 use casper::justification::LatestMsgsHonest;
 use casper::validator;
 
@@ -75,7 +76,10 @@ pub fn get_height_selected_chain(
     latest_msgs_honest: &LatestMsgsHonest<Block<ValidatorNameBlockData<u32>>>,
     validator_state: &validator::State<Block<ValidatorNameBlockData<u32>>, f64>,
 ) -> u32 {
-    let selected_block = Block::ghost(&latest_msgs_honest, validator_state.validators_weights());
+    let selected_block = Block::estimate(&latest_msgs_honest, validator_state.validators_weights())
+        .unwrap()
+        .prevblock()
+        .ok_or(casper::blockchain::Error);
     fn reduce(b: &Block<ValidatorNameBlockData<u32>>, i: u32) -> u32 {
         match b.prevblock() {
             Some(_msg) => reduce(&_msg, i + 1),
