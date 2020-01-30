@@ -198,54 +198,52 @@ impl<D: BlockData> Block<D> {
             .collect()
     }
 
+    fn argmax<'z, F, U>(items: HashSet<&'z Block<D>>, scoring_function: F) -> HashSet<&'z Block<D>>
+    where
+        F: std::ops::Fn(&Block<D>) -> U,
+        U: WeightUnit + std::cmp::PartialOrd,
+    {
+        let mut iterator = items.iter();
+
+        let item = iterator.next();
+        if item == None {
+            return HashSet::new();
+        }
+
+        let item = item.unwrap();
+
+        let mut max_score = scoring_function(item);
+        let mut max = HashSet::new();
+        max.insert(*item);
+
+        for item in iterator {
+            let block_score = scoring_function(*item);
+
+            match block_score.partial_cmp(&max_score) {
+                Some(Ordering::Equal) => {
+                    max.insert(*item);
+                }
+                Some(Ordering::Greater) => max.clear(),
+                Some(Ordering::Less) | None => (),
+            };
+
+            if max.is_empty() {
+                max.insert(*item);
+                max_score = block_score;
+            }
+        }
+
+        max
+    }
+
     pub fn best_children<'z, U: WeightUnit + std::cmp::PartialOrd>(
         &self,
         protocol_state: &HashSet<&'z Self>,
         latest_msgs_honest: &LatestMsgsHonest<Self>,
         weights: &validator::Weights<D::ValidatorName, U>,
     ) -> HashSet<&'z Self> {
-        fn argmax<X, F, U>(items: HashSet<&X>, scoring_function: F) -> HashSet<&X>
-        where
-            X: Eq + std::hash::Hash,
-            F: std::ops::Fn(&X) -> U,
-            U: WeightUnit + std::cmp::PartialOrd,
-        {
-            let mut iterator = items.iter();
-
-            let item = iterator.next();
-            if item == None {
-                return HashSet::new();
-            }
-
-            let item = item.unwrap();
-
-            let mut max_score = scoring_function(item);
-            let mut max = HashSet::new();
-            max.insert(*item);
-
-            for item in iterator {
-                let block_score = scoring_function(*item);
-
-                match block_score.partial_cmp(&max_score) {
-                    Some(Ordering::Equal) => {
-                        max.insert(*item);
-                    }
-                    Some(Ordering::Greater) => max.clear(),
-                    Some(Ordering::Less) | None => (),
-                };
-
-                if max.is_empty() {
-                    max.insert(*item);
-                    max_score = block_score;
-                }
-            }
-
-            max
-        }
-
         let scoring_function = |block: &Self| block.score(latest_msgs_honest, weights);
-
-        argmax(self.children(&protocol_state), scoring_function)
+        Block::argmax(self.children(&protocol_state), &scoring_function)
     }
 
     /// This function reconstructs the blocks tree from `latest_msgs_honest` and uses those to
@@ -256,52 +254,67 @@ impl<D: BlockData> Block<D> {
         latest_msgs_honest: &LatestMsgsHonest<Self>,
         weights: &validator::Weights<D::ValidatorName, U>,
     ) -> Result<Self, Error> {
-        fn internal<'z, D: BlockData, U: WeightUnit + std::cmp::PartialOrd>(
+        fn internal<'z, D, U, F>(
             blocks: HashSet<&'z Block<D>>,
             protocol_state: &HashSet<&'z Block<D>>,
-            latest_msgs_honest: &LatestMsgsHonest<Block<D>>,
-            weights: &validator::Weights<D::ValidatorName, U>,
-        ) -> HashSet<&'z Block<D>> {
-            let indirect_best_leaves = blocks
+            scoring_function: F,
+        ) -> HashSet<&'z Block<D>>
+        where
+            D: BlockData,
+            U: WeightUnit + std::cmp::PartialOrd,
+            F: std::ops::Fn(&Block<D>) -> U + Copy,
+        {
+            let children: HashMap<&Block<D>, HashSet<&Block<D>>> = blocks
                 .iter()
-                .cloned()
-                .filter(|block| !block.children(&protocol_state).is_empty())
-                .flat_map(|block| {
+                .map(|block| (*block, block.children(&protocol_state)))
+                .collect();
+
+            let mut indirect_best_leaves = HashSet::new();
+            let mut direct_child_leaves = HashSet::new();
+
+            for block in blocks.iter() {
+                if children.get(*block).unwrap().is_empty() {
+                    direct_child_leaves.insert(*block);
+                } else {
                     internal(
-                        block.best_children(protocol_state, latest_msgs_honest, weights),
+                        Block::argmax(
+                            children.get(*block).unwrap().iter().cloned().collect(),
+                            scoring_function,
+                        ),
                         protocol_state,
-                        latest_msgs_honest,
-                        weights,
+                        scoring_function,
                     )
                     .into_iter()
-                });
+                    .for_each(|block| {
+                        indirect_best_leaves.insert(block);
+                    });
+                }
+            }
 
-            let direct_child_leaves = blocks
-                .iter()
+            indirect_best_leaves
+                .union(&direct_child_leaves)
                 .cloned()
-                .filter(|block| block.children(&protocol_state).is_empty());
-
-            indirect_best_leaves.chain(direct_child_leaves).collect()
+                .collect()
         }
+
+        let scoring_function = |block: &Self| block.score(latest_msgs_honest, weights);
 
         let protocol_state = Self::find_all_accessible_blocks(latest_msgs_honest);
         let genesis_blocks = protocol_state
             .iter()
             .filter(|block| block.prev_block_as_ref().is_none())
             .collect();
-        let blocks = internal(
-            genesis_blocks,
-            &protocol_state.iter().collect(),
-            latest_msgs_honest,
-            weights,
-        );
 
         // Tie breaker uses the blocks hashes.
-        blocks
-            .into_iter()
-            .max_by(|left, right| right.getid().cmp(&left.getid()))
-            .cloned()
-            .ok_or(Error)
+        internal(
+            genesis_blocks,
+            &protocol_state.iter().collect(),
+            scoring_function,
+        )
+        .into_iter()
+        .max_by(|left, right| right.getid().cmp(&left.getid()))
+        .cloned()
+        .ok_or(Error)
     }
 
     pub fn safety_oracles<U: WeightUnit>(
@@ -505,6 +518,10 @@ impl<D: BlockData> Block<D> {
             let mut block = message.estimate().clone();
 
             while let Some(prev_block) = block.prevblock() {
+                if blocks.contains(&block) {
+                    break;
+                }
+
                 blocks.insert(block);
                 block = prev_block.clone();
             }
