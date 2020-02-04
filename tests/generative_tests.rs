@@ -38,7 +38,6 @@ use casper::blockchain::Block;
 use casper::estimator::Estimator;
 use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
 use casper::message::{self, Message};
-use casper::util::weight::WeightUnit;
 use casper::validator;
 
 use casper::IntegerWrapper;
@@ -56,15 +55,16 @@ use std::time::Instant;
 mod tools;
 use tools::ChainData;
 
+type ValidatorStatesMap<E> = HashMap<u32, validator::State<E, f64>>;
+
 /// Creates a message for each validator in the validators_recipients_data vector.
 /// Messages are added to theirs validators state.
-fn create_messages<E, U>(
-    state: &mut HashMap<u32, validator::State<E, U>>,
+fn create_messages<E>(
+    state: &mut ValidatorStatesMap<E>,
     validators_recipients_data: Vec<(u32, HashSet<u32>)>,
 ) -> Vec<(Message<E>, u32, HashSet<u32>)>
 where
     E: Estimator<ValidatorName = u32>,
-    U: WeightUnit,
 {
     validators_recipients_data
         // into_iter because we dont want to clone data at the end
@@ -116,7 +116,7 @@ where
 /// Sends messages to the recipients they're meant to be sent to.
 /// States of the recipients are updated accordingly.
 fn add_messages<E>(
-    state: &mut HashMap<u32, validator::State<E, f64>>,
+    state: &mut ValidatorStatesMap<E>,
     messages_validators_recipients_data: Vec<(Message<E>, u32, HashSet<u32>)>,
 ) -> Result<(), &'static str>
 where
@@ -229,12 +229,10 @@ fn create_receiver_strategy(
         .boxed()
 }
 
-type SendersStatesMap<E> = HashMap<u32, validator::State<E, f64>>;
-
 fn message_events<E>(
-    state: SendersStatesMap<E>,
+    state: ValidatorStatesMap<E>,
     validator_receiver_strategy: BoxedStrategy<HashMap<u32, HashSet<u32>>>,
-) -> BoxedStrategy<Result<SendersStatesMap<E>, &'static str>>
+) -> BoxedStrategy<Result<ValidatorStatesMap<E>, &'static str>>
 where
     E: Estimator<ValidatorName = u32> + 'static,
 {
@@ -251,7 +249,7 @@ where
 }
 
 fn full_consensus<E>(
-    state: &SendersStatesMap<E>,
+    state: &ValidatorStatesMap<E>,
     _height_of_oracle: u32,
     _vec_data: &mut Vec<ChainData>,
     _chain_id: u32,
@@ -329,7 +327,7 @@ fn get_data_from_state(
 /// adds a new data to vec_data for each new message that is sent.
 /// Uses received_msgs to take note of which validator received which messages
 fn safety_oracle_at_height(
-    state: &HashMap<u32, validator::State<Block<ValidatorNameBlockData<u32>>, f64>>,
+    state: &ValidatorStatesMap<Block<ValidatorNameBlockData<u32>>>,
     height_of_oracle: u32,
     vec_data: &mut Vec<ChainData>,
     chain_id: u32,
@@ -353,7 +351,7 @@ fn safety_oracle_at_height(
 }
 
 fn clique_collection(
-    state: HashMap<u32, validator::State<Block<ValidatorNameBlockData<u32>>, f64>>,
+    state: ValidatorStatesMap<Block<ValidatorNameBlockData<u32>>>,
 ) -> Vec<Vec<Vec<u32>>> {
     state
         .iter()
@@ -377,8 +375,6 @@ fn clique_collection(
         .collect()
 }
 
-type ValidatorStatesMap<E> = HashMap<u32, validator::State<E, f64>>;
-
 fn chain<E: 'static, F: 'static, H: 'static>(
     consensus_value_strategy: BoxedStrategy<E>,
     validator_max_count: usize,
@@ -392,7 +388,7 @@ where
     E: Estimator<ValidatorName = u32>,
     F: Fn(&mut Vec<u32>) -> BoxedStrategy<HashSet<u32>>,
     H: Fn(
-        &HashMap<u32, validator::State<E, f64>>,
+        &ValidatorStatesMap<E>,
         u32,
         &mut Vec<ChainData>,
         u32,
