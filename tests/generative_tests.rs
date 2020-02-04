@@ -261,9 +261,12 @@ where
     let m: HashSet<_> = state
         .iter()
         .map(|(_validator, validator_state)| {
-            LatestMsgsHonest::from_latest_msgs(validator_state.latests_msgs(), &HashSet::new())
-                .mk_estimate(validator_state.validators_weights())
-                .unwrap()
+            LatestMsgsHonest::from_latest_msgs(
+                validator_state.latests_msgs(),
+                &validator_state.equivocators(),
+            )
+            .mk_estimate(validator_state.validators_weights())
+            .unwrap()
         })
         .collect();
     m.len() == 1
@@ -278,8 +281,10 @@ fn get_data_from_state(
     max_height_of_oracle: u32,
     data: &mut ChainData,
 ) -> bool {
-    let latest_msgs_honest =
-        LatestMsgsHonest::from_latest_msgs(validator_state.latests_msgs(), &HashSet::new());
+    let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(
+        validator_state.latests_msgs(),
+        &validator_state.equivocators(),
+    );
 
     let height_selected_chain =
         tools::get_height_selected_chain(&latest_msgs_honest, validator_state);
@@ -357,8 +362,10 @@ fn clique_collection(
         .iter()
         .map(|(_, validator_state)| {
             let genesis_block = Block::new(None, ValidatorNameBlockData::new(0));
-            let latest_honest_msgs =
-                LatestMsgsHonest::from_latest_msgs(validator_state.latests_msgs(), &HashSet::new());
+            let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
+                validator_state.latests_msgs(),
+                &validator_state.equivocators(),
+            );
             let safety_oracles = Block::safety_oracles(
                 genesis_block,
                 &latest_honest_msgs,
