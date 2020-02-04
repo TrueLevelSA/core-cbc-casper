@@ -593,7 +593,7 @@ impl<D: BlockData> Block<D> {
         (visited_parents, genesis, latest_blocks)
     }
 
-    fn find_all_accessible_blocks(latest_msgs: &LatestMsgsHonest<Self>) -> HashSet<Block<D>> {
+    pub fn find_all_accessible_blocks(latest_msgs: &LatestMsgsHonest<Self>) -> HashSet<Block<D>> {
         let mut blocks = HashSet::new();
 
         for message in latest_msgs.iter() {

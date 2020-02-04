@@ -285,13 +285,14 @@ fn get_data_from_state(
         validator_state.latests_msgs(),
         &validator_state.equivocators(),
     );
+    let protocol_state = Block::find_all_accessible_blocks(&latest_msgs_honest);
 
     let height_selected_chain =
         tools::get_height_selected_chain(&latest_msgs_honest, validator_state);
 
     let mut consensus_height: i64 = -1;
 
-    let safety_threshold = (validator_state.validators_weights().sum_all_weights()) / 2.0;
+    let safety_threshold = validator_state.validators_weights().sum_all_weights() / 2.0;
 
     let mut genesis_blocks = HashSet::new();
     genesis_blocks.insert(Block::new(None, ValidatorNameBlockData::new(0)));
@@ -315,9 +316,16 @@ fn get_data_from_state(
             break;
         };
 
-        genesis_blocks = tools::get_children_of_blocks(&latest_msgs_honest, genesis_blocks);
-        // cant have a consensus over children if there is none
-        if genesis_blocks.is_empty() {
+        let genesis_blocks_children = genesis_blocks
+            .iter()
+            .flat_map(|genesis_block| {
+                genesis_block
+                    .children(&protocol_state.iter().collect())
+                    .into_iter()
+            })
+            .collect::<HashSet<_>>();
+        // cant have a consensus over children if there are none
+        if genesis_blocks_children.is_empty() {
             break;
         }
     }

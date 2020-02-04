@@ -17,7 +17,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::HashSet;
 use std::fmt;
 
 use casper::blockchain::Block;
@@ -90,31 +89,4 @@ pub fn get_height_selected_chain(
         Ok(b) => reduce(&b, 1),
         _ => 0,
     }
-}
-
-pub fn get_children_of_blocks(
-    latest_msgs_honest: &LatestMsgsHonest<Block<ValidatorNameBlockData<u32>>>,
-    genesis_blocks: HashSet<Block<ValidatorNameBlockData<u32>>>,
-) -> HashSet<Block<ValidatorNameBlockData<u32>>> {
-    let mut children = HashSet::new();
-    fn reduce(
-        b: &Block<ValidatorNameBlockData<u32>>,
-        genesis_blocks: &HashSet<Block<ValidatorNameBlockData<u32>>>,
-        children: &mut HashSet<Block<ValidatorNameBlockData<u32>>>,
-    ) {
-        if let Some(_msg) = b.prevblock() {
-            if genesis_blocks.contains(&_msg) {
-                children.insert(b.clone());
-            } else {
-                reduce(&_msg, genesis_blocks, children)
-            }
-        }
-    }
-
-    latest_msgs_honest.iter().for_each(|latest_msg| {
-        let parent = Block::from(latest_msg);
-        reduce(&parent, &genesis_blocks, &mut children);
-    });
-
-    children
 }
