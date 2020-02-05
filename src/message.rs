@@ -179,7 +179,6 @@ impl<E: Estimator> Message<E> {
         }
     }
 
-    // FIXME: insanely expensive to compute
     pub fn equivocates_indirect(
         &self,
         other: &Self,

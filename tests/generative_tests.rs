@@ -194,14 +194,10 @@ fn parallel_arbitrary_in_set(values: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32
 /// validators.
 fn some_receivers(_validator: u32, possible_validators: &[u32], rng: &mut TestRng) -> HashSet<u32> {
     let n = rng.gen_range(0, possible_validators.len());
-    let mut receivers = HashSet::new();
-    // FIXME: this is constant time, however the number of receivers is not uniform as we always
-    // pick from the same vec of validators and put them in a hashset, there are some collisons
-    for _ in 0..n {
-        receivers.insert(possible_validators.choose(rng).unwrap().clone());
-    }
-
-    receivers
+    possible_validators
+        .choose_multiple(rng, n)
+        .cloned()
+        .collect()
 }
 
 /// Receiver strategy that picks all the receivers.

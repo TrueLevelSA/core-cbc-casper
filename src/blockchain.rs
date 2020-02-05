@@ -499,8 +499,9 @@ impl<D: BlockData> Block<D> {
             .into_iter()
             .filter(|x| {
                 x.iter().fold(<U as Zero<U>>::ZERO, |acc, validator| {
-                    // FIXME: U::default() or <U ...>::Zero? or U::NAN
-                    acc + weights.weight(validator).unwrap_or(U::NAN)
+                    // Having a non existing validator would be a fault we can not recover from
+                    // since we cannot know or invent the weight of an arbitrary validator.
+                    acc + weights.weight(validator).unwrap()
                 }) > safety_oracle_threshold
             })
             .collect()
