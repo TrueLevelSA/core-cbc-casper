@@ -17,51 +17,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! ## Validators
-//!
-//! Validators produce and receive messages (`message::Message`) from other validators in the
-//! network. When a validator want to produce a message he needs to collect his justification
-//! (`Justification`) and run an estimator (`Estimator`) to get a value. See [§ Estimator
-//! Function](../justification/index.html#estimator-function) in § Justification.
-//!
-//! ## Consensus Rules
-//!
-//! These rules classify two types of faults: the *invalid message* fault, and the *equivocation*
-//! fault.
-//!
-//!  1. The proposed value must be in the set of consensus values returned by the application of
-//!     the estimator function on the justification.
-//!  1. The validator cannot make two messages with
-//!     *  two different values, or
-//!     *  two different justifications,
-//!
-//! such that **_either message is not later than the other_**.
-//!
-//! ### Violation of Consensus Rules
-//!
-//!  1. **Invalid Message Faults:** The violation of the first rule results in the message being
-//!     invalid, and can be detected by everyone who receives the message. The receiver runs the
-//!     estimator function on the justification of the message, and checks whether the proposed
-//!     value is in the set of values returned by the estimator. All messages which do not violate
-//!     this rule are valid messages.
-//!  1. **Equivocation Faults:** The violation of the second rule cannot be detected by anyone who
-//!     receives only one of the two messages violating this rule. This violation is a type of
-//!     Byzantine failure which we call equivocation. We refer to the violation of this rule as
-//!     faults.
-//!
-//! When a node (`validator::ValidatorName`) equivocates, it is basically executing multiple
-//! separate instances of the protocol, and may attempt to show messages from a single instance of
-//! these executions to separate peers in the network. To clarify what separate instances of the
-//! protocol are: consider a validator who violates consensus *rule 2* by generating messages **A**
-//! and **B** that break the rule. The validator then starts maintaining two histories of protocol
-//! execution, one in which only message **A** is generated, and the other in which only message
-//! **B** is generated. In each single version of protocol execution, the validator has not
-//! equivocated.
-//!
-//! Source: [Casper CBC, Simplified!](
-//! https://medium.com/@aditya.asgaonkar/casper-cbc-simplified-2370922f9aa6),
-//! by Aditya Asgaonkar.
-
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
@@ -75,11 +30,10 @@ use crate::util::id::Id;
 use crate::util::weight::{WeightUnit, Zero};
 
 /// All casper actors that send messages, aka validators, have to implement the validator name
-/// trait
+/// trait.
 pub trait ValidatorName: Hash + Clone + Ord + Eq + Send + Sync + Debug + serde::Serialize {}
 
-// Default implementations
-
+// Default implementations for simple types.
 impl ValidatorName for u8 {}
 impl ValidatorName for u32 {}
 impl ValidatorName for u64 {}
@@ -87,19 +41,18 @@ impl ValidatorName for i8 {}
 impl ValidatorName for i32 {}
 impl ValidatorName for i64 {}
 
-/// Inner state of a validator. This represents the validator's view
-/// of the network.
+/// Inner state of a validator. This represents the validator's view of the network.
 #[derive(Debug, Clone)]
 pub struct State<E, U>
 where
     E: Estimator,
     U: WeightUnit,
 {
-    /// current state total fault weight
+    /// Current state total fault weight
     pub(crate) state_fault_weight: U,
-    /// fault tolerance threshold
+    /// Fault tolerance threshold
     pub(crate) thr: U,
-    /// current validator set, mapped to their respective weights
+    /// Current validator set, mapped to their respective weights
     pub(crate) validators_weights: Weights<E::ValidatorName, U>,
     pub(crate) latest_messages: LatestMessages<E>,
     pub(crate) equivocators: HashSet<E::ValidatorName>,
@@ -262,7 +215,7 @@ where
 pub struct Weights<V: self::ValidatorName, U: WeightUnit>(Arc<RwLock<HashMap<V, U>>>);
 
 impl<V: self::ValidatorName, U: WeightUnit> Weights<V, U> {
-    /// Creates a new weight set from a HashMap of validators to unit.
+    /// Creates a new `Weights` struct from a `HashMap` of `ValidatorName` to `WeightUnit`.
     pub fn new(weights: HashMap<V, U>) -> Self {
         Weights(Arc::new(RwLock::new(weights)))
     }
@@ -287,8 +240,8 @@ impl<V: self::ValidatorName, U: WeightUnit> Weights<V, U> {
             })
     }
 
-    /// Picks validators with positive weights striclty greather than zero.
-    /// Failure happens if we cannot acquire the lock to read data
+    /// Picks validators with positive weights strictly greater than zero.
+    /// Failure happens if we cannot acquire the lock to read data.
     pub fn validators(&self) -> Result<HashSet<V>, Error<HashMap<V, U>>> {
         self.read().map_err(Error::ReadLockError).map(|hash_map| {
             hash_map
@@ -326,7 +279,7 @@ impl<V: self::ValidatorName, U: WeightUnit> Weights<V, U> {
             })
     }
 
-    /// Returns the total weight of all the validators in the weights.
+    /// Returns the total weight of all the validators in `self`.
     pub fn sum_all_weights(&self) -> U {
         if let Ok(validators) = self.validators() {
             self.sum_weight_validators(&validators)

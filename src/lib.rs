@@ -17,7 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! CBC Casper Abstract Message Library
+//! Core CBC Casper
 //! ===
 //!
 //! **DISCLAIMER:** This library is experimental, under development, not reviewed, and might change
@@ -27,7 +27,7 @@
 //! the "minimal" CBC Casper Consensus Protocols](https://github.com/cbc-casper/cbc-casper-paper),
 //! message stucture and define functions for the construction and proper execution of protocols of
 //! the casper family. We aimed at pushing as much functionality as possible directly to the
-//! abstract message layer, in such a way that a developer can create a protocol fairly easy using
+//! abstract message layer, in such a way that a developer can create a protocol fairly easily using
 //! this library.
 //!
 //! The design decision is to be as general as possible, and leave all specifics for the
@@ -46,7 +46,7 @@
 //! find another implementation of an integer consensus in `tests/`.
 //!
 //! But in order to get started using the library, the best way is to study the examples folder
-//! (under development). It is also instructive to run the tests.
+//! (under development). It is also instructive to run and read the tests.
 //!
 //! ### Cargo
 //!
@@ -60,8 +60,7 @@
 //! ## Example
 //!
 //! We present an example of naive consensus protocol: a ternary consensus that uses the generic
-//! type `message::Message<Estimator, validator::ValidatorName>` implementation to generate the
-//! protocol.
+//! type `message::Message<Estimator>` implementation to generate the protocol.
 //!
 //! ## Known limitations
 //!
@@ -72,7 +71,7 @@
 //!
 //! ## Tests
 //!
-//! We use the crate `proptest` to generate properties tests. The library has a feature
+//! We use the crate `proptest` to generate property tests. The library has a feature
 //! `integration_test` used by the proptest framework. To run specifically the `proptest` tests
 //! use:
 //!
@@ -91,6 +90,19 @@
 //!
 //! We use `rustfmt` default configuration to ensure a coherent code format in the entire project.
 //! Install `rustfmt` with `rustup component add rustfmt`.
+//!
+//! ### Code Linting
+//!
+//! We use `clippy` to ensure the code base is as clean and functional as possible.
+//! Install it with `rustup component add clippy` and run it with `cargo clippy --all-targets
+//! --all-features -- -D warnings`.
+//!
+//! ## More on CBC Casper
+//!
+//! To read more about CBC Casper:
+//! * [Casper CBC, Simplified!](
+//! https://medium.com/@aditya.asgaonkar/casper-cbc-simplified-2370922f9aa6),
+//! by Aditya Asgaonkar.
 
 extern crate digest;
 #[cfg(feature = "integration_test")]
@@ -107,7 +119,7 @@ extern crate serde_derive;
 
 /// The tests_common module is privately exported to use the macros
 /// in tests_common/utils and to publicly export VoteCount for the
-/// integration tests.
+/// integration and property tests.
 #[macro_use]
 mod tests_common;
 

@@ -17,32 +17,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! ## Messages
-//!
-//! Messages are the pieces of information generated and passed around by validators while
-//! participating in the consensus forming process. In the Casper CBC consensus mechanism, messages
-//! have the following structure:
-//!
-//! ```text
-//! Message structure = (value, validator, justification)
-//! ```
-//!
-//! Let us break down the message structure:
-//!
-//!  * **Value:** The value is the item that the validator proposes the network to come to
-//!               consensus on. These values have to be from the set of consensus values. If we are
-//!               building an integer consensus algorithm, then the consensus values will be
-//!               integers. If we are building a blockchain consensus algorithm, then these
-//!               consensus values will be blocks.
-//!  * **Validator:** This is the validator who is generating the message.
-//!  * **Justification:** The justification of a message is the set of messages that the validator
-//!                       has seen and acknowledged while generating that particular message. The
-//!                       justification is supposed to “justify” the proposed value.
-//!
-//! Source: [Casper CBC, Simplified!](
-//! https://medium.com/@aditya.asgaonkar/casper-cbc-simplified-2370922f9aa6),
-//! by Aditya Asgaonkar.
-
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::sync::{Arc, RwLock};
@@ -74,7 +48,7 @@ impl<E: std::error::Error> std::fmt::Display for Error<E> {
 
 impl<E: std::error::Error> std::error::Error for Error<E> {}
 
-// Mathematical definition of a casper message with (value, validator, justification)
+// Mathematical definition of a casper message with (value, validator, justification).
 #[derive(Clone, Eq, PartialEq)]
 struct ProtoMessage<E: Estimator> {
     estimate: E,
@@ -104,7 +78,7 @@ impl<E: Estimator> Serialize for ProtoMessage<E> {
 ///
 /// # Example
 ///
-/// Declare a `Message` type that contains a `Value` as estimate/value, send by validators
+/// Declare a `Message` type that contains a `Value` as estimate/value, sent by validators
 /// represented with `u64`.
 ///
 /// ```
@@ -155,8 +129,8 @@ impl<E: Estimator> Message<E> {
         Message(Arc::new(proto), id)
     }
 
-    /// Create a message from newly received messages contained in
-    /// validator_state. Uses the latest honest messages.
+    /// Creates a message from newly received messages contained in
+    /// `validator_state`, which is used to compute the latest honest messages.
     pub fn from_validator_state<U: WeightUnit>(
         sender: E::ValidatorName,
         validator_state: &validator::State<E, U>,
@@ -179,20 +153,19 @@ impl<E: Estimator> Message<E> {
         }
     }
 
+    /// Parses every messages accessible from `self` and `rhs` by iterating over messages'
+    /// justifications and returns true if any of those messages is an equivocation with
+    /// another one. This method can only be used to know that a random validator is
+    /// equivocating but not which one.
+    ///
+    /// This method is currently broken as it does not always find equivocations that should be
+    /// accessible from the given messages. It is not commutative. It compares messages with
+    /// themselves.
     pub fn equivocates_indirect(
         &self,
         other: &Self,
         mut equivocators: HashSet<E::ValidatorName>,
     ) -> (bool, HashSet<E::ValidatorName>) {
-        //! equivocates_indirect parses every messages accessible from `self` and `rhs` by
-        //! iterating over messages' justifications and returns true if any of those messages is an
-        //! equivocation with another one. This method can only be used to know that a random
-        //! validator is equivocating but not which one.
-        //!
-        //! This method is currently broken as it does not always find equivocations that should be
-        //! accessible from the given messages. It is not commutative. It compares messages with
-        //! themselves.
-
         let is_equivocation = self.equivocates(other);
         let init = if is_equivocation {
             equivocators.insert(self.sender().clone());
@@ -296,7 +269,7 @@ impl<E: Estimator> PartialEq for Message<E> {
 }
 
 impl<E: Estimator> Debug for Message<E> {
-    // Note: format used for rendering illustrative gifs from generative tests; modify with care
+    // Note: format used for rendering illustrative gifs from generative tests; modify with care.
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "M{:?}({:?})", self.sender(), self.estimate().clone())
     }

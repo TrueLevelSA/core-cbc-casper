@@ -17,23 +17,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! # Later Messages
-//!
-//! If message *A* is in the justification of message *B*, then message *B* is **later** than
-//! message *A*.
-//!
-//! # Estimator Function
-//!
-//! The **estimator function takes the justification** (which is a set of messages) as input, and
-//! **returns the set of consensus values** that are “justified” by the input.  For example,
-//! in an integer consensus setting, the estimator will return integer values. In a blockchain
-//! setting, the the estimator will return blocks which can be added on top of the current tip
-//! detected from the blocks in the messages in the inputted justification.
-//!
-//! Source: [Casper CBC, Simplified!](
-//! https://medium.com/@aditya.asgaonkar/casper-cbc-simplified-2370922f9aa6),
-//! by Aditya Asgaonkar.
-
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Debug, Formatter};
 
@@ -44,13 +27,13 @@ use crate::message::Message;
 use crate::util::weight::{WeightUnit, Zero};
 use crate::validator;
 
-/// Struct that holds the set of the `message::Message` that justify
-/// the current message. Works like a `vec`.
+/// This struct holds the set of the `message::Message` that justify
+/// the current message. It works like a `Vec`.
 #[derive(Eq, PartialEq, Clone, Hash)]
 pub struct Justification<E: Estimator>(Vec<Message<E>>);
 
 impl<E: Estimator> Justification<E> {
-    /// Create an empty justification.
+    /// Creates an empty justification.
     pub fn empty() -> Self {
         Justification(Vec::new())
     }
@@ -88,6 +71,9 @@ impl<E: Estimator> Justification<E> {
         self.0.is_empty()
     }
 
+    /// This function checks if the message is already contained into the underlying `Vec`. If it
+    /// is, it does nothing and returns false. Else, it will push the message in the `Vec` and
+    /// returns true.
     pub fn insert(&mut self, message: Message<E>) -> bool {
         if self.contains(&message) {
             false
@@ -97,7 +83,7 @@ impl<E: Estimator> Justification<E> {
         }
     }
 
-    /// Run the estimator on the justification given the set of equivocators and validators'
+    /// Runs the estimator on the justification given the set of equivocators and validators'
     /// weights.
     pub fn make_estimate<U: WeightUnit>(
         &self,
@@ -110,8 +96,10 @@ impl<E: Estimator> Justification<E> {
         Estimator::estimate(&latest_messages_honest, validators_weights)
     }
 
-    /// Insert messages to the justification, accepting up to the threshold faults by weight.
-    /// Returns a HashSet of messages that got successfully included in the justification.
+    /// Inserts messages to the justification, accepting up to the threshold faults by weight.
+    /// In ordering to insert as much messages as possible, the input messages are sorted
+    /// ascendingly by their validators' weight.
+    /// Returns a `HashSet` of messages that got successfully included in the justification.
     pub fn faulty_inserts<'a, U: WeightUnit>(
         &mut self,
         messages: &HashSet<&'a Message<E>>,
@@ -125,8 +113,8 @@ impl<E: Estimator> Justification<E> {
             .collect()
     }
 
-    /// This function makes no assumption on how to treat the equivocator. it adds the message to the
-    /// justification only if it will not cross the fault tolerance threshold.
+    /// This function makes no assumption on how to treat the equivocator. It adds the message to
+    /// the justification only if it will not cross the fault tolerance threshold.
     pub fn faulty_insert<U: WeightUnit>(
         &mut self,
         message: &Message<E>,
@@ -170,9 +158,9 @@ impl<E: Estimator> Justification<E> {
         }
     }
 
-    /// This function sets the weight of the equivocator to zero right away (returned in
-    /// `validator::State`) and add his message to the state, since now his equivocation doesnt
-    /// count to the state fault weight anymore
+    /// This function sets the weight of an equivocator to zero right away (returned in
+    /// `validator::State`) and add his message to the state, since his weight is null and doesn't
+    /// count to the state fault weight anymore.
     pub fn faulty_insert_with_slash<'a, U: WeightUnit>(
         &mut self,
         message: &Message<E>,
@@ -219,7 +207,7 @@ impl<E: Estimator> LatestMessages<E> {
         LatestMessages(HashMap::new())
     }
 
-    /// Insert a new set of messages for a sender.
+    /// Insert a new set of messages for a validator.
     pub fn insert(
         &mut self,
         validator: E::ValidatorName,
@@ -238,7 +226,7 @@ impl<E: Estimator> LatestMessages<E> {
         self.0.get(validator)
     }
 
-    /// Get a mutable set of messages sent by the sender.
+    /// Get a mutable set of messages sent by the validator.
     pub fn get_mut(
         &mut self,
         validator: &<E as Estimator>::ValidatorName,
@@ -246,12 +234,12 @@ impl<E: Estimator> LatestMessages<E> {
         self.0.get_mut(validator)
     }
 
-    /// Get an iterator on the set.
+    /// Get an iterator over the map.
     pub fn iter(&self) -> std::collections::hash_map::Iter<E::ValidatorName, HashSet<Message<E>>> {
         self.0.iter()
     }
 
-    /// Get the set size.
+    /// Get the map size.
     pub fn len(&self) -> usize {
         self.0.len()
     }
@@ -260,19 +248,19 @@ impl<E: Estimator> LatestMessages<E> {
         self.0.is_empty()
     }
 
-    /// Get the set keys, i.e. the senders.
+    /// Get the map keys, i.e. the validators.
     pub fn keys(&self) -> std::collections::hash_map::Keys<E::ValidatorName, HashSet<Message<E>>> {
         self.0.keys()
     }
 
-    /// Get the set values, i.e. the messages.
+    /// Get the map values, i.e. the messages.
     pub fn values(
         &self,
     ) -> std::collections::hash_map::Values<E::ValidatorName, HashSet<Message<E>>> {
         self.0.values()
     }
 
-    /// Update the data structure by adding a new message. Return true if the new message is a
+    /// Updates the data structure by adding a new message. Returns true if the new message is a
     /// valid latest message, i.e. the first message of a validator or a message that is not in the
     /// justification of the existing latest messages.
     pub fn update(&mut self, new_message: &Message<E>) -> bool {
@@ -314,7 +302,7 @@ impl<E: Estimator> LatestMessages<E> {
         }
     }
 
-    /// Checks whether the new message equivocates with latest messages.
+    /// Checks whether the new message equivocates with any of the latest messages.
     pub(crate) fn equivocate(&self, message_new: &Message<E>) -> bool {
         self.get(message_new.sender())
             .map(|latest_messages| {
@@ -353,17 +341,17 @@ impl<E: Estimator> LatestMessagesHonest<E> {
         LatestMessagesHonest(HashSet::new())
     }
 
-    /// Insert message to the set.
+    /// Inserts a message in the set.
     fn insert(&mut self, message: Message<E>) -> bool {
         self.0.insert(message)
     }
 
-    /// Remove messages of a validator.
+    /// Removes the messages from a validator.
     pub fn remove(&mut self, validator: &E::ValidatorName) {
         self.0.retain(|message| message.sender() != validator);
     }
 
-    /// Filters the latest messages to retreive the latest honest messages and remove equivocators.
+    /// Filters the latest messages to retrieve the latest honest messages and remove equivocators.
     pub fn from_latest_messages(
         latest_messages: &LatestMessages<E>,
         equivocators: &HashSet<E::ValidatorName>,

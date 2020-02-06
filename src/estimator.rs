@@ -32,7 +32,7 @@ pub trait Estimator: Hash + Eq + Clone + Send + Sync + Debug + serde::Serialize 
     type ValidatorName: validator::ValidatorName;
     type Error: Error;
 
-    /// Choses an estimate from a set of latest messages.
+    /// Chooses an estimate from a set of latest messages.
     fn estimate<U: WeightUnit>(
         latest_messages: &LatestMessagesHonest<Self>,
         validators_weights: &validator::Weights<Self::ValidatorName, U>,
