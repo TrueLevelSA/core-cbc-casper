@@ -53,7 +53,7 @@ impl<D: BlockData> ProtoBlock<D> {
     }
 }
 
-/// Simplest structure of a block with a `prevblock` pointer for runing Casper on a blockchain.
+/// Simplest structure of a block with a `prevblock` pointer for running Casper on a blockchain.
 #[derive(Clone, Eq)]
 pub struct Block<D: BlockData>(Arc<ProtoBlock<D>>);
 
@@ -146,7 +146,7 @@ impl<D: BlockData> Block<D> {
         &self.0
     }
 
-    /// Create a new block from a prevblock message and an incomplete block.
+    /// Creates a new block from a prevblock message and an incomplete block.
     /// An incomplete_block is a block with a None prevblock (i.e., Estimator) AND is not a
     /// genesis_block
     pub fn from_prevblock_msg(
@@ -170,8 +170,10 @@ impl<D: BlockData> Block<D> {
                 .unwrap_or(false)
     }
 
-    // Contrary to the paper's definition, score directly uses the latest honest messages rather
-    // than the latest honest estimates and a protocol state.
+    /// Direct implementation of the score function from the paper. Contrary to the paper's
+    /// definition, score directly uses the latest honest messages rather than the latest honest
+    /// estimates and a protocol state. Source:
+    /// https://github.com/cbc-casper/cbc-casper-paper/blob/acc66e2ba4461a005262e2d5f434fd2e30ef0ff3/examples.tex#L568
     pub fn score<U: WeightUnit>(
         &self,
         latest_msgs_honest: &LatestMsgsHonest<Self>,
@@ -188,8 +190,10 @@ impl<D: BlockData> Block<D> {
             })
     }
 
-    /// Contrary to the paper's definition, we are directly parsing blocks to filter children out
-    /// of rather than taking the estimates out of messages.
+    /// Direct implementation of the children function from the paper. Contrary to the paper's
+    /// definition, we are directly parsing blocks to filter children out of rather than taking
+    /// the estimates out of messages. Source:
+    /// https://github.com/cbc-casper/cbc-casper-paper/blob/acc66e2ba4461a005262e2d5f434fd2e30ef0ff3/examples.tex#L578
     pub fn children<'z>(&self, protocol_state: &HashSet<&'z Self>) -> HashSet<&'z Self> {
         protocol_state
             .iter()
@@ -198,6 +202,8 @@ impl<D: BlockData> Block<D> {
             .collect()
     }
 
+    /// Direct implementation of the argmax function from the paper. Source:
+    /// https://github.com/cbc-casper/cbc-casper-paper/blob/acc66e2ba4461a005262e2d5f434fd2e30ef0ff3/examples.tex#L395
     fn argmax<'z, F, U>(items: HashSet<&'z Block<D>>, scoring_function: F) -> HashSet<&'z Block<D>>
     where
         F: std::ops::Fn(&Block<D>) -> U,
@@ -236,6 +242,8 @@ impl<D: BlockData> Block<D> {
         max
     }
 
+    /// Direct implementation of the best children function from the paper. Source:
+    /// https://github.com/cbc-casper/cbc-casper-paper/blob/acc66e2ba4461a005262e2d5f434fd2e30ef0ff3/examples.tex#L587
     pub fn best_children<'z, U: WeightUnit + std::cmp::PartialOrd>(
         &self,
         protocol_state: &HashSet<&'z Self>,
@@ -249,7 +257,8 @@ impl<D: BlockData> Block<D> {
     /// This function reconstructs the blocks tree from `latest_msgs_honest` and uses those to
     /// return the block with highest score according to the definition 4.30 of the paper. Contrary
     /// to the paper's definition, it does not return a set in case of a tie but uses the blocks
-    /// hashes to tie break.
+    /// hashes to tie break. Source:
+    /// https://github.com/cbc-casper/cbc-casper-paper/blob/acc66e2ba4461a005262e2d5f434fd2e30ef0ff3/examples.tex#L596
     pub fn mathematical_ghost<U: WeightUnit + std::cmp::PartialOrd>(
         latest_msgs_honest: &LatestMsgsHonest<Self>,
         weights: &validator::Weights<D::ValidatorName, U>,
@@ -320,7 +329,7 @@ impl<D: BlockData> Block<D> {
     /// This function reconstructs the blocks tree from `latest_msgs_honest` and uses those to
     /// return the block with highest score according to the definition 4.30 of the paper. Contrary
     /// to the paper's definition, it does not return a set in case of a tie but uses the blocks
-    /// hashes to tie break.
+    /// hashes to tie break. It is an optimized version of `mathematical_ghost`.
     pub fn optimized_ghost<U: WeightUnit + std::cmp::PartialOrd>(
         latest_msgs_honest: &LatestMsgsHonest<Self>,
         weights: &validator::Weights<D::ValidatorName, U>,
@@ -331,8 +340,9 @@ impl<D: BlockData> Block<D> {
             .filter(|block| block.prev_block_as_ref().is_none())
             .collect();
 
-        // Generating a hashset for each block containing each latest honest message children of
-        // that block.
+        // Generating a hashset for each block containing each latest honest message child of
+        // that block. This will let us compute the scores of each block easily since the score is
+        // the sum of the validators having a latest message child of that block.
         let mut latest_messages_validators = HashMap::new();
         for message in latest_msgs_honest.iter() {
             let mut iterator = message.estimate().clone();
@@ -494,7 +504,8 @@ impl<D: BlockData> Block<D> {
     }
 
     /// Contrary to the paper's definition 4.24, this does not return Self for a genesis block but
-    /// None.
+    /// None. Source:
+    /// https://github.com/cbc-casper/cbc-casper-paper/blob/acc66e2ba4461a005262e2d5f434fd2e30ef0ff3/examples.tex#L525
     pub fn prevblock(&self) -> Option<Self> {
         self.arc().prevblock.as_ref().cloned()
     }
@@ -508,7 +519,8 @@ impl<D: BlockData> Block<D> {
     }
 
     /// Contrary to the paper's definition 4.25, this does not return Self for a genesis block but
-    /// None.
+    /// None. Source:
+    /// https://github.com/cbc-casper/cbc-casper-paper/blob/acc66e2ba4461a005262e2d5f434fd2e30ef0ff3/examples.tex#L544
     pub fn ncestor(&self, n: u32) -> Option<Self> {
         if n == 0 {
             return Some(self.clone());
@@ -610,7 +622,7 @@ impl<D: BlockData> Block<D> {
         b_in_lms_validators: &mut HashMap<Block<D>, HashSet<D::ValidatorName>>,
     ) -> HashSet<D::ValidatorName> {
         let mut validators = HashSet::new();
-        // collect this validator if this block is his proposed one from his latest message
+        // Collect this validator if this block is his proposed one from his latest message.
         latest_blocks
             .get(block)
             .map(|validator| validators.insert(validator.clone()));
