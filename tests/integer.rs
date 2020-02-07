@@ -89,7 +89,7 @@ fn equal_weight() {
     );
 }
 
-/// the 1st validator has most of the weight
+/// The first validator has most of the weight.
 #[test]
 fn uneven_weights_1() {
     let validators: Vec<u32> = (0..4).collect();
@@ -151,7 +151,7 @@ fn uneven_weights_1() {
     );
 }
 
-/// the 4th validator has most of the weight
+/// The fourth validator has most of the weight.
 #[test]
 fn uneven_weights_4() {
     let validators: Vec<u32> = (0..4).collect();

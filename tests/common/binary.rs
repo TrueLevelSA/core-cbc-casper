@@ -71,12 +71,12 @@ impl Estimator for BoolWrapper {
         let (true_w, false_w) = latest_messages.iter().fold(
             (<U as Zero<U>>::ZERO, <U as Zero<U>>::ZERO),
             |(true_w, false_w), message| {
-                // get the weight for the validator
+                // Get the weight for the validator
                 let validator_weight = validators_weights
                     .weight(message.sender())
                     .unwrap_or(U::NAN);
 
-                // add the weight to the right accumulator
+                // Add the weight to the right accumulator
                 if message.estimate().0 {
                     (true_w + validator_weight, false_w)
                 } else {

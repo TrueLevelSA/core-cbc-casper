@@ -70,7 +70,7 @@ impl ChainData {
     }
 }
 
-/// returns the height of the GHOST-selected chain
+/// Returns the height of the GHOST-selected chain.
 pub fn get_height_selected_chain(
     latest_messages_honest: &LatestMessagesHonest<Block<ValidatorNameBlockData<u32>>>,
     validator_state: &validator::State<Block<ValidatorNameBlockData<u32>>, f64>,

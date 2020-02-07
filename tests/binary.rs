@@ -122,21 +122,21 @@ fn vote_swaying() {
         &mut validator_state.clone(),
     );
 
-    // honest result of vote: false
+    // Honest result of vote: false
     assert_eq!(
         j0.make_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         BoolWrapper(false)
     );
 
-    // assume validator 0 has seen messages from validator 1 and validator 2 and reveals this in a
-    // published message
+    // Assume validator 0 has seen messages from validator 1 and validator 2 and reveals this in a
+    // published message.
     let mut validator_state_clone = validator_state.clone();
     validator_state_clone.update(&[&m0, &m1, &m2]);
     let m5 = Message::from_validator_state(validators[0], &validator_state_clone).unwrap();
 
     j0.faulty_insert(&m5, &mut validator_state.clone());
-    // validator 0 now "votes" in the other direction and sways the result: true
+    // Validator 0 now "votes" in the other direction and sways the result: true
     assert_eq!(
         j0.make_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
