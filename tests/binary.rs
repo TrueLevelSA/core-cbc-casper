@@ -25,7 +25,7 @@ use common::binary::*;
 use std::collections::HashSet;
 
 use casper::estimator::Estimator;
-use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
+use casper::justification::{Justification, LatestMessages, LatestMessagesHonest};
 use casper::message::Message;
 use casper::validator;
 
@@ -44,10 +44,10 @@ fn equal_weight() {
 
     let validator_state = validator::State::new(
         validators_weights.clone(),
-        0.0, // state fault weight
-        LatestMsgs::empty(),
-        1.0,            // subjective fault weight threshold
-        HashSet::new(), // equivocators
+        0.0,
+        LatestMessages::empty(),
+        1.0,
+        HashSet::new(),
     );
 
     let m0 = Message::new(validators[0], Justification::empty(), BoolWrapper(false));
@@ -59,8 +59,8 @@ fn equal_weight() {
 
     assert_eq!(
         BoolWrapper::estimate(
-            &LatestMsgsHonest::from_latest_msgs(
-                &LatestMsgs::from(&Justification::empty()),
+            &LatestMessagesHonest::from_latest_messages(
+                &LatestMessages::from(&Justification::empty()),
                 validator_state.equivocators()
             ),
             &validators_weights,
@@ -68,7 +68,7 @@ fn equal_weight() {
         .unwrap(),
         BoolWrapper(true)
     );
-    let mut j0 = Justification::from_msgs(vec![m0, m1], &mut validator_state.clone());
+    let mut j0 = Justification::from_messages(vec![m0, m1], &mut validator_state.clone());
     // s0 and s1 vote. since tie-breaker is `true`, get `true`
     assert_eq!(
         j0.make_estimate(validator_state.equivocators(), &validators_weights)
@@ -105,10 +105,10 @@ fn vote_swaying() {
 
     let validator_state = validator::State::new(
         validators_weights.clone(),
-        0.0, // state fault weight
-        LatestMsgs::empty(),
-        1.0,            // subjective fault weight threshold
-        HashSet::new(), // equivocators
+        0.0,
+        LatestMessages::empty(),
+        1.0,
+        HashSet::new(),
     );
 
     let m0 = Message::new(validators[0], Justification::empty(), BoolWrapper(false));
@@ -117,7 +117,7 @@ fn vote_swaying() {
     let m3 = Message::new(validators[3], Justification::empty(), BoolWrapper(false));
     let m4 = Message::new(validators[4], Justification::empty(), BoolWrapper(false));
 
-    let mut j0 = Justification::from_msgs(
+    let mut j0 = Justification::from_messages(
         vec![m0.clone(), m1.clone(), m2.clone(), m3, m4],
         &mut validator_state.clone(),
     );

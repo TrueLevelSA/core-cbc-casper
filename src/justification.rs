@@ -58,7 +58,7 @@ impl<E: Estimator> Justification<E> {
     /// Creates and returns a new justification from a vector of
     /// `message::Message` and mutates the given `validator::State`
     /// with the updated state.
-    pub fn from_msgs<U: WeightUnit>(
+    pub fn from_messages<U: WeightUnit>(
         messages: Vec<Message<E>>,
         state: &mut validator::State<E, U>,
     ) -> Self {
@@ -76,8 +76,8 @@ impl<E: Estimator> Justification<E> {
         self.0.par_iter()
     }
 
-    pub fn contains(&self, msg: &Message<E>) -> bool {
-        self.0.contains(msg)
+    pub fn contains(&self, message: &Message<E>) -> bool {
+        self.0.contains(message)
     }
 
     pub fn len(&self) -> usize {
@@ -88,11 +88,11 @@ impl<E: Estimator> Justification<E> {
         self.0.is_empty()
     }
 
-    pub fn insert(&mut self, msg: Message<E>) -> bool {
-        if self.contains(&msg) {
+    pub fn insert(&mut self, message: Message<E>) -> bool {
+        if self.contains(&message) {
             false
         } else {
-            self.0.push(msg);
+            self.0.push(message);
             true
         }
     }
@@ -104,35 +104,37 @@ impl<E: Estimator> Justification<E> {
         equivocators: &HashSet<E::ValidatorName>,
         validators_weights: &validator::Weights<E::ValidatorName, U>,
     ) -> Result<E, E::Error> {
-        let latest_msgs = LatestMsgs::from(self);
-        let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(&latest_msgs, equivocators);
-        Estimator::estimate(&latest_msgs_honest, validators_weights)
+        let latest_messages = LatestMessages::from(self);
+        let latest_messages_honest =
+            LatestMessagesHonest::from_latest_messages(&latest_messages, equivocators);
+        Estimator::estimate(&latest_messages_honest, validators_weights)
     }
 
     /// Insert messages to the justification, accepting up to the threshold faults by weight.
     /// Returns a HashSet of messages that got successfully included in the justification.
     pub fn faulty_inserts<'a, U: WeightUnit>(
         &mut self,
-        msgs: &HashSet<&'a Message<E>>,
+        messages: &HashSet<&'a Message<E>>,
         state: &mut validator::State<E, U>,
     ) -> HashSet<&'a Message<E>> {
-        let msgs = state.sort_by_faultweight(msgs);
+        let messages = state.sort_by_faultweight(messages);
         // do the actual insertions to the state
-        msgs.into_iter()
-            .filter(|msg| self.faulty_insert(msg, state))
+        messages
+            .into_iter()
+            .filter(|message| self.faulty_insert(message, state))
             .collect()
     }
 
-    /// This function makes no assumption on how to treat the equivocator. it adds the msg to the
+    /// This function makes no assumption on how to treat the equivocator. it adds the message to the
     /// justification only if it will not cross the fault tolerance threshold.
     pub fn faulty_insert<U: WeightUnit>(
         &mut self,
-        msg: &Message<E>,
+        message: &Message<E>,
         state: &mut validator::State<E, U>,
     ) -> bool {
-        let is_equivocation = state.latest_msgs.equivocate(msg);
+        let is_equivocation = state.latest_messages.equivocate(message);
 
-        let sender = msg.sender();
+        let sender = message.sender();
         let validator_weight = state
             .validators_weights
             .weight(sender)
@@ -144,18 +146,18 @@ impl<E: Estimator> Justification<E> {
             // if it's already equivocating and listed as such, or not equivocating at all, an
             // insertion can be done without more checks
             (false, _) | (true, true) => {
-                let success = self.insert(msg.clone());
+                let success = self.insert(message.clone());
                 if success {
-                    state.latest_msgs.update(msg);
+                    state.latest_messages.update(message);
                 }
                 success
             }
             // in the other case, we have to check that the threshold is not reached
             (true, false) => {
                 if validator_weight + state.state_fault_weight <= state.thr {
-                    let success = self.insert(msg.clone());
+                    let success = self.insert(message.clone());
                     if success {
-                        state.latest_msgs.update(msg);
+                        state.latest_messages.update(message);
                         if state.equivocators.insert(sender.clone()) {
                             state.state_fault_weight += validator_weight;
                         }
@@ -173,25 +175,25 @@ impl<E: Estimator> Justification<E> {
     /// count to the state fault weight anymore
     pub fn faulty_insert_with_slash<'a, U: WeightUnit>(
         &mut self,
-        msg: &Message<E>,
+        message: &Message<E>,
         state: &'a mut validator::State<E, U>,
     ) -> Result<bool, validator::Error<'a, HashMap<E::ValidatorName, U>>> {
-        let is_equivocation = state.latest_msgs.equivocate(msg);
+        let is_equivocation = state.latest_messages.equivocate(message);
         if is_equivocation {
-            let sender = msg.sender();
+            let sender = message.sender();
             state.equivocators.insert(sender.clone());
             state
                 .validators_weights
                 .insert(sender.clone(), <U as Zero<U>>::ZERO)?;
         }
-        state.latest_msgs.update(msg);
-        let success = self.insert(msg.clone());
+        state.latest_messages.update(message);
+        let success = self.insert(message.clone());
         Ok(success)
     }
 }
 
-impl<E: Estimator> From<LatestMsgsHonest<E>> for Justification<E> {
-    fn from(lmh: LatestMsgsHonest<E>) -> Self {
+impl<E: Estimator> From<LatestMessagesHonest<E>> for Justification<E> {
+    fn from(lmh: LatestMessagesHonest<E>) -> Self {
         let mut j = Self::empty();
         for m in lmh.iter() {
             j.insert(m.clone());
@@ -209,12 +211,12 @@ impl<E: Estimator> Debug for Justification<E> {
 /// Mapping between validators and their latests messages. Latest messages from a validator are all
 /// their messages that are not in the dependency of another of their messages.
 #[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LatestMsgs<E: Estimator>(HashMap<E::ValidatorName, HashSet<Message<E>>>);
+pub struct LatestMessages<E: Estimator>(HashMap<E::ValidatorName, HashSet<Message<E>>>);
 
-impl<E: Estimator> LatestMsgs<E> {
+impl<E: Estimator> LatestMessages<E> {
     /// Create an empty set of latest messages.
     pub fn empty() -> Self {
-        LatestMsgs(HashMap::new())
+        LatestMessages(HashMap::new())
     }
 
     /// Insert a new set of messages for a sender.
@@ -273,18 +275,18 @@ impl<E: Estimator> LatestMsgs<E> {
     /// Update the data structure by adding a new message. Return true if the new message is a
     /// valid latest message, i.e. the first message of a validator or a message that is not in the
     /// justification of the existing latest messages.
-    pub fn update(&mut self, new_msg: &Message<E>) -> bool {
-        let sender = new_msg.sender();
-        if let Some(latest_msgs_from_sender) = self.get(sender).cloned() {
-            latest_msgs_from_sender
+    pub fn update(&mut self, new_message: &Message<E>) -> bool {
+        let sender = new_message.sender();
+        if let Some(latest_messages_from_sender) = self.get(sender).cloned() {
+            latest_messages_from_sender
                 .iter()
-                .filter(|&old_msg| new_msg != old_msg)
-                .fold(false, |acc, old_msg| {
-                    let new_independent_from_old = !new_msg.depends(old_msg);
+                .filter(|&old_message| new_message != old_message)
+                .fold(false, |acc, old_message| {
+                    let new_independent_from_old = !new_message.depends(old_message);
                     // equivocation, old and new do not depend on each other
-                    if new_independent_from_old && !old_msg.depends(new_msg) {
+                    if new_independent_from_old && !old_message.depends(new_message) {
                         self.get_mut(sender)
-                            .map(|msgs| msgs.insert(new_msg.clone()))
+                            .map(|messages| messages.insert(new_message.clone()))
                             .unwrap_or(false)
                             || acc
                     }
@@ -295,78 +297,84 @@ impl<E: Estimator> LatestMsgs<E> {
                     // new newer than old
                     else {
                         self.get_mut(sender)
-                            .map(|msgs| msgs.remove(old_msg) && msgs.insert(new_msg.clone()))
+                            .map(|messages| {
+                                messages.remove(old_message) && messages.insert(new_message.clone())
+                            })
                             .unwrap_or(false)
                             || acc
                     }
                 })
         } else {
-            // no message found for this validator, so new_msg is the latest
-            self.insert(sender.clone(), [new_msg.clone()].iter().cloned().collect());
+            // no message found for this validator, so new_message is the latest
+            self.insert(
+                sender.clone(),
+                [new_message.clone()].iter().cloned().collect(),
+            );
             true
         }
     }
 
     /// Checks whether the new message equivocates with latest messages.
-    pub(crate) fn equivocate(&self, msg_new: &Message<E>) -> bool {
-        self.get(msg_new.sender())
-            .map(|latest_msgs| latest_msgs.iter().any(|m| m.equivocates(&msg_new)))
+    pub(crate) fn equivocate(&self, message_new: &Message<E>) -> bool {
+        self.get(message_new.sender())
+            .map(|latest_messages| latest_messages.iter().any(|m| m.equivocates(&message_new)))
             .unwrap_or(false)
     }
 }
 
-impl<E: Estimator> From<&Justification<E>> for LatestMsgs<E> {
+impl<E: Estimator> From<&Justification<E>> for LatestMessages<E> {
     /// Extract the latest messages of each validator from a justification.
     fn from(j: &Justification<E>) -> Self {
-        let mut latest_msgs: LatestMsgs<E> = LatestMsgs::empty();
+        let mut latest_messages: LatestMessages<E> = LatestMessages::empty();
         let mut queue: VecDeque<Message<E>> = j.iter().cloned().collect();
-        while let Some(msg) = queue.pop_front() {
-            if latest_msgs.update(&msg) {
-                msg.justification()
+        while let Some(message) = queue.pop_front() {
+            if latest_messages.update(&message) {
+                message
+                    .justification()
                     .iter()
                     .for_each(|m| queue.push_back(m.clone()));
             }
         }
-        latest_msgs
+        latest_messages
     }
 }
 
 /// Set of latest honest messages for each validator.
 #[derive(Clone)]
-pub struct LatestMsgsHonest<E: Estimator>(HashSet<Message<E>>);
+pub struct LatestMessagesHonest<E: Estimator>(HashSet<Message<E>>);
 
-impl<E: Estimator> LatestMsgsHonest<E> {
+impl<E: Estimator> LatestMessagesHonest<E> {
     /// Create an empty latest honest messages set.
     fn empty() -> Self {
-        LatestMsgsHonest(HashSet::new())
+        LatestMessagesHonest(HashSet::new())
     }
 
     /// Insert message to the set.
-    fn insert(&mut self, msg: Message<E>) -> bool {
-        self.0.insert(msg)
+    fn insert(&mut self, message: Message<E>) -> bool {
+        self.0.insert(message)
     }
 
     /// Remove messages of a validator.
     pub fn remove(&mut self, validator: &E::ValidatorName) {
-        self.0.retain(|msg| msg.sender() != validator);
+        self.0.retain(|message| message.sender() != validator);
     }
 
     /// Filters the latest messages to retreive the latest honest messages and remove equivocators.
-    pub fn from_latest_msgs(
-        latest_msgs: &LatestMsgs<E>,
+    pub fn from_latest_messages(
+        latest_messages: &LatestMessages<E>,
         equivocators: &HashSet<E::ValidatorName>,
     ) -> Self {
-        latest_msgs
+        latest_messages
             .iter()
-            .filter_map(|(validator, msgs)| {
-                if equivocators.contains(validator) || msgs.len() != 1 {
+            .filter_map(|(validator, messages)| {
+                if equivocators.contains(validator) || messages.len() != 1 {
                     None
                 } else {
-                    msgs.iter().next()
+                    messages.iter().next()
                 }
             })
-            .fold(LatestMsgsHonest::empty(), |mut acc, msg| {
-                acc.insert(msg.clone());
+            .fold(LatestMessagesHonest::empty(), |mut acc, message| {
+                acc.insert(message.clone());
                 acc
             })
     }
@@ -398,36 +406,36 @@ mod test {
     use std::collections::HashSet;
     use std::iter::FromIterator;
 
-    use crate::justification::{Justification, LatestMsgs};
+    use crate::justification::{Justification, LatestMessages};
     use crate::message::Message;
     use crate::validator;
 
     #[test]
     fn faulty_insert_sorted() {
-        let v0 = VoteCount::create_vote_msg(0, false);
-        let v0_prime = VoteCount::create_vote_msg(0, true);
-        let v1 = VoteCount::create_vote_msg(1, true);
-        let v1_prime = VoteCount::create_vote_msg(1, false);
-        let v2 = VoteCount::create_vote_msg(2, true);
-        let v2_prime = VoteCount::create_vote_msg(2, false);
+        let v0 = VoteCount::create_vote_message(0, false);
+        let v0_prime = VoteCount::create_vote_message(0, true);
+        let v1 = VoteCount::create_vote_message(1, true);
+        let v1_prime = VoteCount::create_vote_message(1, false);
+        let v2 = VoteCount::create_vote_message(2, true);
+        let v2_prime = VoteCount::create_vote_message(2, false);
 
-        let mut latest_msgs = LatestMsgs::empty();
-        latest_msgs.update(&v0);
-        latest_msgs.update(&v1);
-        latest_msgs.update(&v2);
+        let mut latest_messages = LatestMessages::empty();
+        latest_messages.update(&v0);
+        latest_messages.update(&v1);
+        latest_messages.update(&v2);
 
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 2.0), (2, 3.0)].into_iter().collect()),
             0.0,
-            latest_msgs,
+            latest_messages,
             3.0,
             HashSet::new(),
         );
         let mut justification = Justification::empty();
-        let sorted_msgs = validator_state
+        let sorted_messages = validator_state
             .sort_by_faultweight(&vec![&v2_prime, &v1_prime, &v0_prime].into_iter().collect());
 
-        sorted_msgs.iter().for_each(|&m| {
+        sorted_messages.iter().for_each(|&m| {
             justification.faulty_insert(m, &mut validator_state);
         });
 
@@ -437,37 +445,37 @@ mod test {
         );
         float_eq!(validator_state.fault_weight(), 3.0);
         assert_eq!(
-            *validator_state.latests_msgs().get(&0).unwrap(),
+            *validator_state.latests_messages().get(&0).unwrap(),
             HashSet::from_iter(vec![v0, v0_prime]),
         );
         assert_eq!(
-            *validator_state.latests_msgs().get(&1).unwrap(),
+            *validator_state.latests_messages().get(&1).unwrap(),
             HashSet::from_iter(vec![v1, v1_prime]),
         );
         assert_eq!(
-            *validator_state.latests_msgs().get(&2).unwrap(),
+            *validator_state.latests_messages().get(&2).unwrap(),
             HashSet::from_iter(vec![v2]),
         );
     }
 
     #[test]
     fn faulty_inserts() {
-        let v0 = VoteCount::create_vote_msg(0, false);
-        let v0_prime = VoteCount::create_vote_msg(0, true);
-        let v1 = VoteCount::create_vote_msg(1, true);
-        let v1_prime = VoteCount::create_vote_msg(1, false);
-        let v2 = VoteCount::create_vote_msg(2, true);
-        let v2_prime = VoteCount::create_vote_msg(2, false);
+        let v0 = VoteCount::create_vote_message(0, false);
+        let v0_prime = VoteCount::create_vote_message(0, true);
+        let v1 = VoteCount::create_vote_message(1, true);
+        let v1_prime = VoteCount::create_vote_message(1, false);
+        let v2 = VoteCount::create_vote_message(2, true);
+        let v2_prime = VoteCount::create_vote_message(2, false);
 
-        let mut latest_msgs = LatestMsgs::empty();
-        latest_msgs.update(&v0);
-        latest_msgs.update(&v1);
-        latest_msgs.update(&v2);
+        let mut latest_messages = LatestMessages::empty();
+        latest_messages.update(&v0);
+        latest_messages.update(&v1);
+        latest_messages.update(&v2);
 
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 2.0), (2, 3.0)].into_iter().collect()),
             0.0,
-            latest_msgs,
+            latest_messages,
             3.0,
             HashSet::new(),
         );
@@ -483,15 +491,15 @@ mod test {
         );
         float_eq!(validator_state.fault_weight(), 3.0);
         assert_eq!(
-            *validator_state.latests_msgs().get(&0).unwrap(),
+            *validator_state.latests_messages().get(&0).unwrap(),
             HashSet::from_iter(vec![v0, v0_prime]),
         );
         assert_eq!(
-            *validator_state.latests_msgs().get(&1).unwrap(),
+            *validator_state.latests_messages().get(&1).unwrap(),
             HashSet::from_iter(vec![v1, v1_prime]),
         );
         assert_eq!(
-            *validator_state.latests_msgs().get(&2).unwrap(),
+            *validator_state.latests_messages().get(&2).unwrap(),
             HashSet::from_iter(vec![v2]),
         );
     }
@@ -500,14 +508,14 @@ mod test {
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             0.0,
             HashSet::new(),
         );
 
-        let v0 = VoteCount::create_vote_msg(0, false);
-        let v0_prime = VoteCount::create_vote_msg(0, true); // equivocating vote
-        let v1 = VoteCount::create_vote_msg(1, true);
+        let v0 = VoteCount::create_vote_message(0, false);
+        let v0_prime = VoteCount::create_vote_message(0, true); // equivocating vote
+        let v1 = VoteCount::create_vote_message(1, true);
 
         let mut validator_state_clone = validator_state.clone();
         validator_state_clone.update(&[&v0]);
@@ -540,7 +548,11 @@ mod test {
         );
         assert_eq!(justification.len(), 1);
         assert!(justification.contains(&v0_prime));
-        assert!(state.latests_msgs().get(&0).unwrap().contains(&v0_prime));
+        assert!(state
+            .latests_messages()
+            .get(&0)
+            .unwrap()
+            .contains(&v0_prime));
         assert!(state.equivocators().contains(&0));
         float_eq!(
             state.fault_weight(),
@@ -574,8 +586,12 @@ mod test {
         assert!(justification.is_empty());
         assert!(!justification.contains(&v0_prime));
         assert!(
-            state.latests_msgs().get(&0).unwrap().contains(&v0_prime),
-            "$v0_prime$ should still be contained in $state.latests_msgs()$",
+            state
+                .latests_messages()
+                .get(&0)
+                .unwrap()
+                .contains(&v0_prime),
+            "$v0_prime$ should still be contained in $state.latests_messages()$",
         );
         assert!(!state.equivocators().contains(&0));
         float_eq!(
@@ -609,7 +625,11 @@ mod test {
         );
         assert!(!justification.is_empty());
         assert!(justification.contains(&v0_prime));
-        assert!(state.latests_msgs().get(&0).unwrap().contains(&v0_prime));
+        assert!(state
+            .latests_messages()
+            .get(&0)
+            .unwrap()
+            .contains(&v0_prime));
         assert!(state.equivocators().contains(&0));
         float_eq!(
             state.fault_weight(),
@@ -644,8 +664,12 @@ mod test {
         assert!(justification.is_empty());
         assert!(!justification.contains(&v0_prime));
         assert!(
-            state.latests_msgs().get(&0).unwrap().contains(&v0_prime),
-            "$v0_prime$ should still be contained in $state.latests_msgs()$",
+            state
+                .latests_messages()
+                .get(&0)
+                .unwrap()
+                .contains(&v0_prime),
+            "$v0_prime$ should still be contained in $state.latests_messages()$",
         );
         assert!(!state.equivocators().contains(&0));
         float_eq!(
@@ -662,7 +686,7 @@ mod test {
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             1.0,
             HashSet::new(),
         );
@@ -692,7 +716,7 @@ mod test {
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             1.0,
             HashSet::new(),
         );
@@ -712,7 +736,7 @@ mod test {
         assert!(justification.contains(&v0));
         assert!(justification.contains(&v0_prime));
         assert_eq!(
-            *validator_state.latests_msgs().get(&0).unwrap(),
+            *validator_state.latests_messages().get(&0).unwrap(),
             HashSet::from_iter(vec![v0, v0_prime]),
         );
         assert_eq!(*validator_state.equivocators(), HashSet::from_iter(vec![0]));
@@ -728,37 +752,37 @@ mod test {
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             0.0,
             HashSet::new(),
         );
 
-        let v0 = VoteCount::create_vote_msg(0, true);
-        let v0_prime = VoteCount::create_vote_msg(0, false);
+        let v0 = VoteCount::create_vote_message(0, true);
+        let v0_prime = VoteCount::create_vote_message(0, false);
 
         validator_state.update(&[&v0]);
         let v0_second = Message::from_validator_state(0, &validator_state).unwrap();
 
-        assert!(validator_state.latests_msgs().equivocate(&v0_prime));
-        assert!(!validator_state.latests_msgs().equivocate(&v0_second));
+        assert!(validator_state.latests_messages().equivocate(&v0_prime));
+        assert!(!validator_state.latests_messages().equivocate(&v0_second));
     }
 
     #[test]
-    fn from_msgs() {
+    fn from_messages() {
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             0.0,
             HashSet::new(),
         );
 
-        let v0 = VoteCount::create_vote_msg(0, true);
-        let v1 = VoteCount::create_vote_msg(1, true);
-        let v2 = VoteCount::create_vote_msg(2, false);
+        let v0 = VoteCount::create_vote_message(0, true);
+        let v1 = VoteCount::create_vote_message(1, true);
+        let v2 = VoteCount::create_vote_message(2, false);
 
-        let initial_msgs = vec![v0.clone(), v1.clone(), v2.clone()];
-        let justification = Justification::from_msgs(initial_msgs, &mut validator_state);
+        let initial_messages = vec![v0.clone(), v1.clone(), v2.clone()];
+        let justification = Justification::from_messages(initial_messages, &mut validator_state);
 
         assert_eq!(
             HashSet::<&Message<VoteCount>>::from_iter(justification.iter()),
@@ -767,22 +791,23 @@ mod test {
     }
 
     #[test]
-    fn from_msgs_equivocation() {
+    fn from_messages_equivocation() {
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             0.0,
             HashSet::new(),
         );
 
-        let v0 = VoteCount::create_vote_msg(0, true);
-        let v1 = VoteCount::create_vote_msg(1, true);
-        let v2 = VoteCount::create_vote_msg(2, false);
-        let v0_prime = VoteCount::create_vote_msg(0, false);
+        let v0 = VoteCount::create_vote_message(0, true);
+        let v1 = VoteCount::create_vote_message(1, true);
+        let v2 = VoteCount::create_vote_message(2, false);
+        let v0_prime = VoteCount::create_vote_message(0, false);
 
-        let initial_msgs = vec![v0.clone(), v1.clone(), v2.clone()];
-        let mut justification = Justification::from_msgs(initial_msgs, &mut validator_state);
+        let initial_messages = vec![v0.clone(), v1.clone(), v2.clone()];
+        let mut justification =
+            Justification::from_messages(initial_messages, &mut validator_state);
 
         justification.faulty_insert(&v0_prime, &mut validator_state);
 
@@ -793,21 +818,21 @@ mod test {
     }
 
     #[test]
-    fn from_msgs_duplicate() {
+    fn from_messages_duplicate() {
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             0.0,
             HashSet::new(),
         );
 
-        let v0 = VoteCount::create_vote_msg(0, true);
-        let v0_prime = VoteCount::create_vote_msg(0, true);
+        let v0 = VoteCount::create_vote_message(0, true);
+        let v0_prime = VoteCount::create_vote_message(0, true);
 
-        let initial_msgs = vec![v0, v0_prime];
+        let initial_messages = vec![v0, v0_prime];
 
-        let justification = Justification::from_msgs(initial_msgs, &mut validator_state);
+        let justification = Justification::from_messages(initial_messages, &mut validator_state);
         assert_eq!(
             justification.len(),
             1,
@@ -820,17 +845,17 @@ mod test {
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             1.0,
             HashSet::new(),
         );
 
-        let v0 = VoteCount::create_vote_msg(0, true);
-        let v1 = VoteCount::create_vote_msg(1, true);
-        let v2 = VoteCount::create_vote_msg(2, false);
+        let v0 = VoteCount::create_vote_message(0, true);
+        let v1 = VoteCount::create_vote_message(1, true);
+        let v2 = VoteCount::create_vote_message(2, false);
 
-        let initial_msgs = vec![v0, v1, v2];
-        let justification = Justification::from_msgs(initial_msgs, &mut validator_state);
+        let initial_messages = vec![v0, v1, v2];
+        let justification = Justification::from_messages(initial_messages, &mut validator_state);
 
         let estimate = justification.make_estimate(
             validator_state.equivocators(),
@@ -848,18 +873,19 @@ mod test {
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             1.0,
             HashSet::new(),
         );
 
-        let v0 = VoteCount::create_vote_msg(0, true);
-        let v0_prime = VoteCount::create_vote_msg(0, false);
-        let v1 = VoteCount::create_vote_msg(1, false);
-        let v2 = VoteCount::create_vote_msg(2, false);
+        let v0 = VoteCount::create_vote_message(0, true);
+        let v0_prime = VoteCount::create_vote_message(0, false);
+        let v1 = VoteCount::create_vote_message(1, false);
+        let v2 = VoteCount::create_vote_message(2, false);
 
-        let initial_msgs = vec![v0, v1, v2];
-        let mut justification = Justification::from_msgs(initial_msgs, &mut validator_state);
+        let initial_messages = vec![v0, v1, v2];
+        let mut justification =
+            Justification::from_messages(initial_messages, &mut validator_state);
         justification.faulty_insert(&v0_prime, &mut validator_state);
 
         let estimate = justification.make_estimate(
@@ -878,18 +904,19 @@ mod test {
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             0.0,
             HashSet::new(),
         );
 
-        let v0 = VoteCount::create_vote_msg(0, true);
-        let v0_prime = VoteCount::create_vote_msg(0, false);
-        let v1 = VoteCount::create_vote_msg(1, false);
-        let v2 = VoteCount::create_vote_msg(2, false);
+        let v0 = VoteCount::create_vote_message(0, true);
+        let v0_prime = VoteCount::create_vote_message(0, false);
+        let v1 = VoteCount::create_vote_message(1, false);
+        let v2 = VoteCount::create_vote_message(2, false);
 
-        let initial_msgs = vec![v0, v1, v2];
-        let mut justification = Justification::from_msgs(initial_msgs, &mut validator_state);
+        let initial_messages = vec![v0, v1, v2];
+        let mut justification =
+            Justification::from_messages(initial_messages, &mut validator_state);
         justification.faulty_insert(&v0_prime, &mut validator_state);
 
         let estimate = justification.make_estimate(
@@ -904,76 +931,82 @@ mod test {
     }
 
     #[test]
-    fn latest_msgs_update_new_sender() {
-        let mut latest_msgs = LatestMsgs::empty();
+    fn latest_messages_update_new_sender() {
+        let mut latest_messages = LatestMessages::empty();
 
-        let v0 = VoteCount::create_vote_msg(0, true);
+        let v0 = VoteCount::create_vote_message(0, true);
 
-        let sender_latest_msgs_hashset = vec![v0.clone()].into_iter().collect();
-        assert!(latest_msgs.update(&v0));
-        assert_eq!(latest_msgs.get(&0), Some(&sender_latest_msgs_hashset));
+        let sender_latest_messages_hashset = vec![v0.clone()].into_iter().collect();
+        assert!(latest_messages.update(&v0));
+        assert_eq!(
+            latest_messages.get(&0),
+            Some(&sender_latest_messages_hashset)
+        );
     }
 
     #[test]
-    fn latest_msgs_update_duplicate_msg() {
-        let mut latest_msgs = LatestMsgs::empty();
-        let v0 = VoteCount::create_vote_msg(0, true);
+    fn latest_messages_update_duplicate_message() {
+        let mut latest_messages = LatestMessages::empty();
+        let v0 = VoteCount::create_vote_message(0, true);
 
-        assert!(latest_msgs.update(&v0));
+        assert!(latest_messages.update(&v0));
         assert_eq!(
-            latest_msgs.get(&0),
+            latest_messages.get(&0),
             Some(&vec![v0.clone()].into_iter().collect())
         );
-        assert!(!latest_msgs.update(&v0.clone()));
-        assert_eq!(latest_msgs.get(&0), Some(&vec![v0].into_iter().collect()));
+        assert!(!latest_messages.update(&v0.clone()));
+        assert_eq!(
+            latest_messages.get(&0),
+            Some(&vec![v0].into_iter().collect())
+        );
     }
 
     #[test]
-    fn latest_msgs_update_new_message() {
-        let v0 = VoteCount::create_vote_msg(0, false);
+    fn latest_messages_update_new_message() {
+        let v0 = VoteCount::create_vote_message(0, false);
         let mut justification = Justification::empty();
         justification.insert(v0.clone());
         let v0_prime = Message::new(0, justification, VoteCount { yes: 1, no: 0 });
 
-        let mut latest_msgs = LatestMsgs::empty();
-        assert!(latest_msgs.update(&v0));
-        assert!(latest_msgs.update(&v0_prime));
+        let mut latest_messages = LatestMessages::empty();
+        assert!(latest_messages.update(&v0));
+        assert!(latest_messages.update(&v0_prime));
 
         assert_eq!(
-            latest_msgs.get(&0),
+            latest_messages.get(&0),
             Some(&vec![v0_prime].into_iter().collect())
         );
     }
 
     #[test]
-    fn latest_msgs_update_old_message() {
+    fn latest_messages_update_old_message() {
         // update will only return false in this case.
-        let v0 = VoteCount::create_vote_msg(0, false);
+        let v0 = VoteCount::create_vote_message(0, false);
         let mut justification = Justification::empty();
         justification.insert(v0.clone());
         let v0_prime = Message::new(0, justification, VoteCount { yes: 1, no: 0 });
 
-        let mut latest_msgs = LatestMsgs::empty();
-        assert!(latest_msgs.update(&v0_prime));
-        assert!(!latest_msgs.update(&v0));
+        let mut latest_messages = LatestMessages::empty();
+        assert!(latest_messages.update(&v0_prime));
+        assert!(!latest_messages.update(&v0));
 
         assert_eq!(
-            latest_msgs.get(&0),
+            latest_messages.get(&0),
             Some(&vec![v0_prime].into_iter().collect())
         );
     }
 
     #[test]
-    fn latest_msgs_update_equivocation() {
-        let v0 = VoteCount::create_vote_msg(0, false);
-        let v0_prime = VoteCount::create_vote_msg(0, true);
+    fn latest_messages_update_equivocation() {
+        let v0 = VoteCount::create_vote_message(0, false);
+        let v0_prime = VoteCount::create_vote_message(0, true);
 
-        let mut latest_msgs = LatestMsgs::empty();
-        assert!(latest_msgs.update(&v0));
-        assert!(latest_msgs.update(&v0_prime));
+        let mut latest_messages = LatestMessages::empty();
+        assert!(latest_messages.update(&v0));
+        assert!(latest_messages.update(&v0_prime));
 
         assert_eq!(
-            latest_msgs.get(&0),
+            latest_messages.get(&0),
             Some(&vec![v0, v0_prime].into_iter().collect())
         );
     }

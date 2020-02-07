@@ -22,7 +22,7 @@ extern crate casper;
 use std::convert::From;
 
 use casper::estimator::Estimator;
-use casper::justification::LatestMsgsHonest;
+use casper::justification::LatestMessagesHonest;
 use casper::message;
 use casper::util::weight::{WeightUnit, Zero};
 use casper::validator;
@@ -83,12 +83,17 @@ impl Estimator for Value {
     type Error = Error;
 
     fn estimate<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<Value>,
+        latest_messages: &LatestMessagesHonest<Value>,
         validators_weights: &validator::Weights<Validator, U>,
     ) -> Result<Self, Self::Error> {
-        let res: Self = latest_msgs
+        let res: Self = latest_messages
             .iter()
-            .map(|msg| (msg.estimate(), validators_weights.weight(msg.sender())))
+            .map(|message| {
+                (
+                    message.estimate(),
+                    validators_weights.weight(message.sender()),
+                )
+            })
             .fold(
                 (
                     (Value::Zero, <U as Zero<U>>::ZERO),
@@ -110,7 +115,7 @@ impl Estimator for Value {
 fn main() {
     use std::collections::HashSet;
 
-    use casper::justification::{Justification, LatestMsgs};
+    use casper::justification::{Justification, LatestMessages};
 
     let validators: Vec<u32> = (1..=4).collect();
     let weights = [0.6, 1.0, 2.0, 1.3];
@@ -125,10 +130,10 @@ fn main() {
 
     let validator_state = validator::State::new(
         validators_weights,
-        0.0, // state fault weight
-        LatestMsgs::empty(),
-        1.0,            // subjective fault weight threshold
-        HashSet::new(), // equivocators
+        0.0,
+        LatestMessages::empty(),
+        1.0,
+        HashSet::new(),
     );
 
     // 1: (1)  (2)
@@ -136,29 +141,29 @@ fn main() {
     // 3: (0)  (0)       (0)
     // 4: (1)  (0)
 
-    let msg1 = Message::new(1, Justification::empty(), Value::One);
-    let msg2 = Message::new(2, Justification::empty(), Value::Two);
-    let msg3 = Message::new(3, Justification::empty(), Value::Zero);
-    let msg4 = Message::new(4, Justification::empty(), Value::One);
+    let message1 = Message::new(1, Justification::empty(), Value::One);
+    let message2 = Message::new(2, Justification::empty(), Value::Two);
+    let message3 = Message::new(3, Justification::empty(), Value::Zero);
+    let message4 = Message::new(4, Justification::empty(), Value::One);
     let mut validator_state_clone = validator_state.clone();
-    validator_state_clone.update(&[&msg1, &msg2]);
-    let msg5 = Message::from_validator_state(1, &validator_state_clone).unwrap();
+    validator_state_clone.update(&[&message1, &message2]);
+    let message5 = Message::from_validator_state(1, &validator_state_clone).unwrap();
     let mut validator_state_clone = validator_state.clone();
-    validator_state_clone.update(&[&msg3, &msg4]);
-    let msg6 = Message::from_validator_state(3, &validator_state_clone).unwrap();
+    validator_state_clone.update(&[&message3, &message4]);
+    let message6 = Message::from_validator_state(3, &validator_state_clone).unwrap();
     let mut validator_state_clone = validator_state.clone();
-    validator_state_clone.update(&[&msg2, &msg5, &msg6]);
-    let msg7 = Message::from_validator_state(2, &validator_state_clone).unwrap();
+    validator_state_clone.update(&[&message2, &message5, &message6]);
+    let message7 = Message::from_validator_state(2, &validator_state_clone).unwrap();
     let mut validator_state_clone = validator_state.clone();
-    validator_state_clone.update(&[&msg7, &msg6]);
-    let msg8 = Message::from_validator_state(3, &validator_state_clone).unwrap();
+    validator_state_clone.update(&[&message7, &message6]);
+    let message8 = Message::from_validator_state(3, &validator_state_clone).unwrap();
     let mut validator_state_clone = validator_state;
-    validator_state_clone.update(&[&msg4, &msg6]);
-    let msg9 = Message::from_validator_state(4, &validator_state_clone).unwrap();
+    validator_state_clone.update(&[&message4, &message6]);
+    let message9 = Message::from_validator_state(4, &validator_state_clone).unwrap();
 
-    assert_eq!(msg5.estimate(), &Value::Two);
-    assert_eq!(msg6.estimate(), &Value::Zero);
-    assert_eq!(msg7.estimate(), &Value::Zero);
-    assert_eq!(msg8.estimate(), &Value::Zero);
-    assert_eq!(msg9.estimate(), &Value::Zero);
+    assert_eq!(message5.estimate(), &Value::Two);
+    assert_eq!(message6.estimate(), &Value::Zero);
+    assert_eq!(message7.estimate(), &Value::Zero);
+    assert_eq!(message8.estimate(), &Value::Zero);
+    assert_eq!(message9.estimate(), &Value::Zero);
 }

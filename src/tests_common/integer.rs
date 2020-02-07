@@ -21,7 +21,7 @@ use std::collections::HashSet;
 use std::iter::FromIterator;
 
 use crate::estimator::Estimator;
-use crate::justification::LatestMsgsHonest;
+use crate::justification::LatestMessagesHonest;
 use crate::message::Message;
 use crate::util::weight::{WeightUnit, Zero};
 use crate::validator;
@@ -70,36 +70,36 @@ impl Estimator for IntegerWrapper {
     type Error = Error;
 
     fn estimate<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<Self>,
+        latest_messages: &LatestMessagesHonest<Self>,
         validators_weights: &validator::Weights<Validator, U>,
     ) -> Result<Self, Self::Error> {
-        let mut msgs_sorted_by_estimate = Vec::from_iter(latest_msgs.iter().fold(
+        let mut messages_sorted_by_estimate = Vec::from_iter(latest_messages.iter().fold(
             HashSet::new(),
             |mut latest, latest_from_validator| {
                 latest.insert(latest_from_validator);
                 latest
             },
         ));
-        msgs_sorted_by_estimate.sort_unstable_by(|a, b| a.estimate().cmp(&b.estimate()));
+        messages_sorted_by_estimate.sort_unstable_by(|a, b| a.estimate().cmp(&b.estimate()));
 
         // get the total weight of the validators of the messages
         // in the set
-        let total_weight = msgs_sorted_by_estimate
+        let total_weight = messages_sorted_by_estimate
             .iter()
             .fold(<U as Zero<U>>::ZERO, |acc, x| {
                 acc + validators_weights.weight(x.sender()).unwrap_or(U::NAN)
             });
 
         let mut running_weight = <U as Zero<U>>::ZERO;
-        let mut msg_iter = msgs_sorted_by_estimate.iter();
-        let mut current_msg: Result<&&Message<IntegerWrapper>, &str> = Err("no msg");
+        let mut message_iter = messages_sorted_by_estimate.iter();
+        let mut current_message: Result<&&Message<IntegerWrapper>, &str> = Err("no message");
 
         // since the messages are ordered according to their estimates,
         // whichever estimate is found after iterating over half of the total weight
         // is the consensus
         while running_weight + running_weight < total_weight {
-            current_msg = msg_iter.next().ok_or("no next msg");
-            running_weight += current_msg
+            current_message = message_iter.next().ok_or("no next message");
+            running_weight += current_message
                 .and_then(|m| {
                     validators_weights
                         .weight(m.sender())
@@ -109,7 +109,7 @@ impl Estimator for IntegerWrapper {
         }
 
         // return said estimate
-        current_msg
+        current_message
             .map(|m| m.estimate().clone())
             .map_err(From::from)
     }

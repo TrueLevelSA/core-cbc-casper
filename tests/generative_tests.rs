@@ -36,7 +36,7 @@ use rand::thread_rng;
 
 use casper::blockchain::Block;
 use casper::estimator::Estimator;
-use casper::justification::{Justification, LatestMsgs, LatestMsgsHonest};
+use casper::justification::{Justification, LatestMessages, LatestMessagesHonest};
 use casper::message::{self, Message};
 use casper::validator;
 
@@ -72,7 +72,7 @@ where
         .map(|(validator, recipients)| {
             // get all latest messages
             let latest: HashSet<Message<E>> = state[&validator]
-                .latests_msgs()
+                .latests_messages()
                 .iter()
                 .fold(HashSet::new(), |acc, (_, lms)| {
                     acc.union(&lms).cloned().collect()
@@ -80,10 +80,10 @@ where
 
             // remove all messages from latest that are contained in this validator's latest
             // messages justification
-            let latest_delta = match state[&validator].latests_msgs().get(&validator) {
-                Some(msgs) => match msgs.len() {
+            let latest_delta = match state[&validator].latests_messages().get(&validator) {
+                Some(messages) => match messages.len() {
                     1 => {
-                        let m = msgs.iter().next().unwrap();
+                        let m = messages.iter().next().unwrap();
                         latest
                             .iter()
                             .filter(|lm| !m.justification().contains(lm))
@@ -105,7 +105,7 @@ where
             state
                 .get_mut(&validator)
                 .unwrap()
-                .latests_msgs_as_mut()
+                .latests_messages_as_mut()
                 .update(&m);
 
             (m, validator, recipients)
@@ -131,7 +131,7 @@ where
                     let mut validator_state_reconstructed = validator::State::new(
                         state[&recipient].validators_weights().clone(),
                         0.0,
-                        LatestMsgs::from(m.justification()),
+                        LatestMessages::from(m.justification()),
                         0.0,
                         HashSet::new(),
                     );
@@ -149,7 +149,8 @@ where
                                     from its justification and the justification only.");
                     }
 
-                    let state_to_update = state.get_mut(&recipient).unwrap().latests_msgs_as_mut();
+                    let state_to_update =
+                        state.get_mut(&recipient).unwrap().latests_messages_as_mut();
                     state_to_update.update(&m);
                     m.justification().iter().for_each(|m| {
                         state_to_update.update(m);
@@ -253,7 +254,7 @@ fn full_consensus<E>(
     _height_of_oracle: u32,
     _vec_data: &mut Vec<ChainData>,
     _chain_id: u32,
-    _received_msgs: &mut HashMap<u32, HashSet<Block<ValidatorNameBlockData<u32>>>>,
+    _received_messages: &mut HashMap<u32, HashSet<Block<ValidatorNameBlockData<u32>>>>,
 ) -> bool
 where
     E: Estimator<ValidatorName = u32>,
@@ -261,8 +262,8 @@ where
     let m: HashSet<_> = state
         .iter()
         .map(|(_validator, validator_state)| {
-            LatestMsgsHonest::from_latest_msgs(
-                validator_state.latests_msgs(),
+            LatestMessagesHonest::from_latest_messages(
+                validator_state.latests_messages(),
                 &validator_state.equivocators(),
             )
             .make_estimate(validator_state.validators_weights())
@@ -281,14 +282,14 @@ fn get_data_from_state(
     max_height_of_oracle: u32,
     data: &mut ChainData,
 ) -> bool {
-    let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(
-        validator_state.latests_msgs(),
+    let latest_messages_honest = LatestMessagesHonest::from_latest_messages(
+        validator_state.latests_messages(),
         &validator_state.equivocators(),
     );
-    let protocol_state = Block::find_all_accessible_blocks(&latest_msgs_honest);
+    let protocol_state = Block::find_all_accessible_blocks(&latest_messages_honest);
 
     let height_selected_chain =
-        tools::get_height_selected_chain(&latest_msgs_honest, validator_state);
+        tools::get_height_selected_chain(&latest_messages_honest, validator_state);
 
     let mut consensus_height: i64 = -1;
 
@@ -303,7 +304,7 @@ fn get_data_from_state(
             // the set is not empty, there is at least one clique
             Block::safety_oracles(
                 genesis_block,
-                &latest_msgs_honest,
+                &latest_messages_honest,
                 &HashSet::new(),
                 safety_threshold,
                 validator_state.validators_weights(),
@@ -338,18 +339,21 @@ fn get_data_from_state(
 
 /// Returns true if at least a safety oracle for a block at height_of_oracle
 /// adds a new data to vec_data for each new message that is sent.
-/// Uses received_msgs to take note of which validator received which messages
+/// Uses received_messages to take note of which validator received which messages
 fn safety_oracle_at_height(
     state: &ValidatorStatesMap<Block<ValidatorNameBlockData<u32>>>,
     height_of_oracle: u32,
     vec_data: &mut Vec<ChainData>,
     chain_id: u32,
-    received_msgs: &mut HashMap<u32, HashSet<Block<ValidatorNameBlockData<u32>>>>,
+    received_messages: &mut HashMap<u32, HashSet<Block<ValidatorNameBlockData<u32>>>>,
 ) -> bool {
     state.iter().for_each(|(id, validator_state)| {
-        for (_, msgs) in validator_state.latests_msgs().iter() {
-            for msg in msgs.iter() {
-                received_msgs.get_mut(id).unwrap().insert(Block::from(msg));
+        for (_, messages) in validator_state.latests_messages().iter() {
+            for message in messages.iter() {
+                received_messages
+                    .get_mut(id)
+                    .unwrap()
+                    .insert(Block::from(message));
             }
         }
     });
@@ -357,7 +361,7 @@ fn safety_oracle_at_height(
         let mut data = ChainData::new(chain_id, state.len() as u32, *validator_id, 0, 0, 0);
         let is_consensus_satisfied =
             get_data_from_state(validator_state, height_of_oracle, &mut data);
-        data.nb_messages = received_msgs.get(validator_id).unwrap().len();
+        data.nb_messages = received_messages.get(validator_id).unwrap().len();
         vec_data.push(data);
         is_consensus_satisfied
     })
@@ -370,13 +374,13 @@ fn clique_collection(
         .iter()
         .map(|(_, validator_state)| {
             let genesis_block = Block::new(None, ValidatorNameBlockData::new(0));
-            let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(
-                validator_state.latests_msgs(),
+            let latest_honest_messages = LatestMessagesHonest::from_latest_messages(
+                validator_state.latests_messages(),
                 &validator_state.equivocators(),
             );
             let safety_oracles = Block::safety_oracles(
                 genesis_block,
-                &latest_honest_msgs,
+                &latest_honest_messages,
                 &HashSet::new(),
                 // cliques, not safety oracles, because our threshold is 0
                 0.0,
@@ -422,7 +426,7 @@ where
         })
         .prop_map(move |(votes, seed)| {
             let mut validators: Vec<u32> = (0..votes.len() as u32).collect();
-            let mut received_msgs = validators.iter().map(|v| (*v, HashSet::new())).collect();
+            let mut received_messages = validators.iter().map(|v| (*v, HashSet::new())).collect();
 
             let weights: Vec<f64> = iter::repeat(1.0).take(votes.len() as usize).collect();
 
@@ -444,7 +448,7 @@ where
                         validator::State::new(
                             validators_weights.clone(),
                             0.0,
-                            LatestMsgs::from(&justification),
+                            LatestMessages::from(&justification),
                             0.0,
                             HashSet::new(),
                         ),
@@ -512,7 +516,7 @@ where
                                 consensus_satisfied_value,
                                 &mut vec_data,
                                 chain_id,
-                                &mut received_msgs,
+                                &mut received_messages,
                             ) {
                                 have_consensus = true
                             }
@@ -591,7 +595,7 @@ fn blockchain() {
                             "{{lms: {:?},",
                             state
                                 .iter()
-                                .map(|(_, validator_state)| validator_state.latests_msgs())
+                                .map(|(_, validator_state)| validator_state.latests_messages())
                                 .collect::<Vec<_>>()
                         )
                         .unwrap();
@@ -857,13 +861,13 @@ prop_compose! {
             .iter()
             .enumerate()
             .for_each(|(validator, vote)| {
-                messages.push(VoteCount::create_vote_msg(validator as u32, *vote))
+                messages.push(VoteCount::create_vote_message(validator as u32, *vote))
             });
         equivocators
             .iter()
             .for_each(|equivocator| {
                 let vote = !votes[*equivocator as usize];
-                messages.push(VoteCount::create_vote_msg(*equivocator as u32, vote))
+                messages.push(VoteCount::create_vote_message(*equivocator as u32, vote))
             });
         (messages, equivocators, validators)
     }
@@ -882,7 +886,7 @@ proptest! {
         let mut validator_state = validator::State::new(
             validators_weights,
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             0.0,
             HashSet::new(),
         );
@@ -925,7 +929,7 @@ proptest! {
         let mut validator_state = validator::State::new(
             validators_weights,
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             0.0,
             HashSet::new(),
         );
@@ -938,7 +942,7 @@ proptest! {
             Err(message::Error::NoNewMessage) => (),
             _ => panic!(
                 "from_validator_state should return NoNewMessage when \
-                state.latest_msgs contains only equivocating messages"
+                state.latest_messages contains only equivocating messages"
             ),
         };
         assert!(
@@ -961,7 +965,7 @@ proptest! {
         let mut validator_state = validator::State::new(
             validators_weights,
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             equivocators.len() as f64,
             HashSet::new(),
         );
@@ -973,7 +977,7 @@ proptest! {
             Err(message::Error::NoNewMessage) => (),
             _ => panic!(
                 "from_validator_state should return NoNewMessage when \
-                state.latest_msgs contains only equivocating messages"
+                state.latest_messages contains only equivocating messages"
             ),
         };
         assert_eq!(
@@ -986,12 +990,12 @@ proptest! {
 }
 
 prop_compose! {
-    /// `latest_msgs` produces a `LatestMsgs<VoteCount>` and a `HashSet<u32>`
+    /// `latest_messages` produces a `LatestMessages<VoteCount>` and a `HashSet<u32>`
     /// (equivocators). To produce that we create a `validator::State` and a
-    /// `Justification` and use `Justification::from_msg` to populate the
-    /// `latest_msgs` and `equivocators` field in the state, which we then
+    /// `Justification` and use `Justification::from_message` to populate the
+    /// `latest_messages` and `equivocators` field in the state, which we then
     /// return here.
-    fn latest_msgs(validators_count: usize)
+    fn latest_messages(validators_count: usize)
         (
             equivocations in prop::collection::vec(
                 0..validators_count,
@@ -1003,9 +1007,9 @@ prop_compose! {
             ),
             validators_count in Just(validators_count),
         )
-        -> (LatestMsgs<VoteCount>, HashSet<u32>)
+        -> (LatestMessages<VoteCount>, HashSet<u32>)
     {
-        let latest_msgs = LatestMsgs::empty();
+        let latest_messages = LatestMessages::empty();
         let equivocators = HashSet::new();
 
         let validators_weights = validator::Weights::new(
@@ -1018,7 +1022,7 @@ prop_compose! {
         let mut validator_state = validator::State::new(
             validators_weights,
             0.0,
-            latest_msgs,
+            latest_messages,
             4.0,
             equivocators,
         );
@@ -1036,24 +1040,27 @@ prop_compose! {
             }
         }
 
-        Justification::from_msgs(messages, &mut validator_state);
+        Justification::from_messages(messages, &mut validator_state);
 
-        (validator_state.latests_msgs().clone(), validator_state.equivocators().clone())
+        (validator_state.latests_messages().clone(), validator_state.equivocators().clone())
     }
 }
 
 proptest! {
     #[test]
-    fn latest_msgs_honest_from_latest_msgs((latest_msgs, equivocators) in latest_msgs(10)) {
-        let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(&latest_msgs, &equivocators);
+    fn latest_messages_honest_from_latest_messages(
+        (latest_messages, equivocators) in latest_messages(10),
+    ) {
+        let latest_messages_honest =
+            LatestMessagesHonest::from_latest_messages(&latest_messages, &equivocators);
         assert!(
-            !latest_msgs_honest
+            !latest_messages_honest
                 .iter()
-                .any(|msg| equivocators.contains(&msg.sender()))
+                .any(|message| equivocators.contains(&message.sender()))
         );
         assert_eq!(
-            latest_msgs_honest.len(),
-            latest_msgs.len() - equivocators.len(),
+            latest_messages_honest.len(),
+            latest_messages.len() - equivocators.len(),
             "Latest honest messages length should be the same as latest messages minus equivocators"
         );
     }

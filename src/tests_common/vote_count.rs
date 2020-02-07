@@ -25,7 +25,7 @@ use std::ops::Add;
 use proptest::prelude::*;
 
 use crate::estimator::Estimator;
-use crate::justification::{Justification, LatestMsgsHonest};
+use crate::justification::{Justification, LatestMessagesHonest};
 use crate::message;
 use crate::util::weight::{WeightUnit, Zero};
 use crate::validator;
@@ -77,7 +77,7 @@ impl VoteCount {
     // makes sure nobody adds more than one vote to their unjustified VoteCount
     // object. if they did, their vote is invalid and will be ignored
     fn is_valid(self) -> bool {
-        // these two are the only allowed votes (unjustified msgs)
+        // these two are the only allowed votes (unjustified messages)
         match self {
             VoteCount { yes: 1, no: 0 } => true,
             VoteCount { yes: 0, no: 1 } => true,
@@ -87,7 +87,7 @@ impl VoteCount {
 
     // used to create an equivocation vote
     pub fn toggled_vote(self) -> Self {
-        // these two are the only allowed votes (unjustified msgs)
+        // these two are the only allowed votes (unjustified messages)
         match self {
             VoteCount { yes: 1, no: 0 } => VoteCount { yes: 0, no: 1 },
             VoteCount { yes: 0, no: 1 } => VoteCount { yes: 1, no: 0 },
@@ -97,7 +97,7 @@ impl VoteCount {
 
     /// Creates a new empty vote message, issued by the validator
     /// with no justification
-    pub fn create_vote_msg(validator: u32, vote: bool) -> message::Message<Self> {
+    pub fn create_vote_message(validator: u32, vote: bool) -> message::Message<Self> {
         let justification = Justification::empty();
         let estimate = if vote {
             VoteCount { yes: 1, no: 0 }
@@ -108,12 +108,14 @@ impl VoteCount {
         message::Message::new(validator, justification, estimate)
     }
 
-    fn get_vote_msgs(latest_msgs: &LatestMsgsHonest<Self>) -> HashSet<message::Message<Self>> {
+    fn get_vote_messages(
+        latest_messages: &LatestMessagesHonest<Self>,
+    ) -> HashSet<message::Message<Self>> {
         fn recursor(
-            latest_msgs: &Justification<VoteCount>,
+            latest_messages: &Justification<VoteCount>,
             acc: HashSet<message::Message<VoteCount>>,
         ) -> HashSet<message::Message<VoteCount>> {
-            latest_msgs.iter().fold(acc, |mut acc_prime, m| {
+            latest_messages.iter().fold(acc, |mut acc_prime, m| {
                 match m.justification().len() {
                     0 => {
                         // vote found, vote is a message with 0 justification
@@ -124,7 +126,7 @@ impl VoteCount {
                                 m.justification().clone(),
                                 estimate.toggled_vote(),
                             );
-                            // search for the equivocation of the current latest_msgs
+                            // search for the equivocation of the current latest_messages
                             match acc_prime.get(&equivocation) {
                                 // remove the equivoted vote, none of the pair
                                 // will stay on the set
@@ -146,7 +148,7 @@ impl VoteCount {
             })
         }
 
-        let j = latest_msgs
+        let j = latest_messages
             .iter()
             .fold(Justification::empty(), |mut acc, m| {
                 acc.insert(m.clone());
@@ -180,7 +182,7 @@ impl std::convert::From<&'static str> for Error {
 
 impl Estimator for VoteCount {
     // the estimator just counts votes, which in this case are the unjustified
-    // msgs
+    // messages
     type ValidatorName = Voter;
     type Error = Error;
 
@@ -189,13 +191,13 @@ impl Estimator for VoteCount {
     // type Data = Self;
 
     fn estimate<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<VoteCount>,
+        latest_messages: &LatestMessagesHonest<VoteCount>,
         _weights: &validator::Weights<Voter, U>, // all voters have same weight
     ) -> Result<Self, Self::Error> {
         // the estimates are actually the original votes of each of the voters /
         // validators
 
-        let votes = Self::get_vote_msgs(latest_msgs);
+        let votes = Self::get_vote_messages(latest_messages);
         let votes = votes
             .iter()
             .fold(Self::ZERO, |acc, vote| acc + *vote.estimate());

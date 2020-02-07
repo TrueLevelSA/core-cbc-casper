@@ -26,7 +26,7 @@ use std::sync::Arc;
 use serde_derive::Serialize;
 
 use crate::estimator::Estimator;
-use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest};
+use crate::justification::{Justification, LatestMessages, LatestMessagesHonest};
 use crate::message::Message;
 use crate::util::hash::Hash;
 use crate::util::id::Id;
@@ -74,10 +74,10 @@ impl<D: BlockData> std::fmt::Debug for Block<D> {
 impl<D: BlockData> serde::Serialize for Block<D> {
     fn serialize<T: serde::Serializer>(&self, rhs: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
-        let mut msg = rhs.serialize_struct("Block", 1)?;
-        msg.serialize_field("prevblock", &self.prevblock())?;
-        msg.serialize_field("data", &self.data())?;
-        msg.end()
+        let mut message = rhs.serialize_struct("Block", 1)?;
+        message.serialize_field("prevblock", &self.prevblock())?;
+        message.serialize_field("data", &self.data())?;
+        message.end()
     }
 }
 
@@ -104,8 +104,8 @@ impl<D: BlockData> From<ProtoBlock<D>> for Block<D> {
 }
 
 impl<D: BlockData> From<&Message<Block<D>>> for Block<D> {
-    fn from(msg: &Message<Block<D>>) -> Self {
-        msg.estimate().clone()
+    fn from(message: &Message<Block<D>>) -> Self {
+        message.estimate().clone()
     }
 }
 
@@ -125,10 +125,10 @@ impl<D: BlockData> Estimator for Block<D> {
     type ValidatorName = D::ValidatorName;
 
     fn estimate<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<Self>,
+        latest_messages: &LatestMessagesHonest<Self>,
         validators_weights: &validator::Weights<D::ValidatorName, U>,
     ) -> Result<Self, Self::Error> {
-        let prevblock = Block::optimized_ghost(latest_msgs, validators_weights)?;
+        let prevblock = Block::optimized_ghost(latest_messages, validators_weights)?;
         Ok(Block::from(ProtoBlock::new(Some(prevblock), D::default())))
     }
 }
@@ -149,11 +149,11 @@ impl<D: BlockData> Block<D> {
     /// Creates a new block from a prevblock message and an incomplete block.
     /// An incomplete_block is a block with a None prevblock (i.e., Estimator) AND is not a
     /// genesis_block
-    pub fn from_prevblock_msg(
-        prevblock_msg: Option<Message<Block<D>>>,
+    pub fn from_prevblock_message(
+        prevblock_message: Option<Message<Block<D>>>,
         incomplete_block: Block<D>,
     ) -> Self {
-        let prevblock = prevblock_msg.map(|m| Block::from(&m));
+        let prevblock = prevblock_message.map(|m| Block::from(&m));
         Block::from(ProtoBlock {
             prevblock,
             ..((**incomplete_block.arc()).clone())
@@ -176,10 +176,10 @@ impl<D: BlockData> Block<D> {
     /// https://github.com/cbc-casper/cbc-casper-paper/blob/acc66e2ba4461a005262e2d5f434fd2e30ef0ff3/examples.tex#L568
     pub fn score<U: WeightUnit>(
         &self,
-        latest_msgs_honest: &LatestMsgsHonest<Self>,
+        latest_messages_honest: &LatestMessagesHonest<Self>,
         weights: &validator::Weights<D::ValidatorName, U>,
     ) -> U {
-        latest_msgs_honest
+        latest_messages_honest
             .iter()
             .filter(|m| self.is_member(&m.estimate()))
             .fold(<U as Zero<U>>::ZERO, |acc, m| {
@@ -247,20 +247,20 @@ impl<D: BlockData> Block<D> {
     pub fn best_children<'z, U: WeightUnit + std::cmp::PartialOrd>(
         &self,
         protocol_state: &HashSet<&'z Self>,
-        latest_msgs_honest: &LatestMsgsHonest<Self>,
+        latest_messages_honest: &LatestMessagesHonest<Self>,
         weights: &validator::Weights<D::ValidatorName, U>,
     ) -> HashSet<&'z Self> {
-        let scoring_function = |block: &Self| block.score(latest_msgs_honest, weights);
+        let scoring_function = |block: &Self| block.score(latest_messages_honest, weights);
         Block::argmax(self.children(&protocol_state), &scoring_function)
     }
 
-    /// This function reconstructs the blocks tree from `latest_msgs_honest` and uses those to
+    /// This function reconstructs the blocks tree from `latest_messages_honest` and uses those to
     /// return the block with highest score according to the definition 4.30 of the paper. Contrary
     /// to the paper's definition, it does not return a set in case of a tie but uses the blocks
     /// hashes to tie break. Source:
     /// https://github.com/cbc-casper/cbc-casper-paper/blob/acc66e2ba4461a005262e2d5f434fd2e30ef0ff3/examples.tex#L596
     pub fn mathematical_ghost<U: WeightUnit + std::cmp::PartialOrd>(
-        latest_msgs_honest: &LatestMsgsHonest<Self>,
+        latest_messages_honest: &LatestMessagesHonest<Self>,
         weights: &validator::Weights<D::ValidatorName, U>,
     ) -> Result<Self, Error> {
         fn internal<'z, D, U, F>(
@@ -306,9 +306,9 @@ impl<D: BlockData> Block<D> {
                 .collect()
         }
 
-        let scoring_function = |block: &Self| block.score(latest_msgs_honest, weights);
+        let scoring_function = |block: &Self| block.score(latest_messages_honest, weights);
 
-        let protocol_state = Self::find_all_accessible_blocks(latest_msgs_honest);
+        let protocol_state = Self::find_all_accessible_blocks(latest_messages_honest);
         let genesis_blocks = protocol_state
             .iter()
             .filter(|block| block.prev_block_as_ref().is_none())
@@ -326,15 +326,15 @@ impl<D: BlockData> Block<D> {
         .ok_or(Error)
     }
 
-    /// This function reconstructs the blocks tree from `latest_msgs_honest` and uses those to
+    /// This function reconstructs the blocks tree from `latest_messages_honest` and uses those to
     /// return the block with highest score according to the definition 4.30 of the paper. Contrary
     /// to the paper's definition, it does not return a set in case of a tie but uses the blocks
     /// hashes to tie break. It is an optimized version of `mathematical_ghost`.
     pub fn optimized_ghost<U: WeightUnit + std::cmp::PartialOrd>(
-        latest_msgs_honest: &LatestMsgsHonest<Self>,
+        latest_messages_honest: &LatestMessagesHonest<Self>,
         weights: &validator::Weights<D::ValidatorName, U>,
     ) -> Result<Self, Error> {
-        let protocol_state = Self::find_all_accessible_blocks(latest_msgs_honest);
+        let protocol_state = Self::find_all_accessible_blocks(latest_messages_honest);
         let genesis_blocks: HashSet<&Block<D>> = protocol_state
             .iter()
             .filter(|block| block.prev_block_as_ref().is_none())
@@ -344,7 +344,7 @@ impl<D: BlockData> Block<D> {
         // that block. This will let us compute the scores of each block easily since the score is
         // the sum of the validators having a latest message child of that block.
         let mut latest_messages_validators = HashMap::new();
-        for message in latest_msgs_honest.iter() {
+        for message in latest_messages_honest.iter() {
             let mut iterator = message.estimate().clone();
             while let Some(prev_block) = iterator.prevblock() {
                 let entry = latest_messages_validators
@@ -399,7 +399,7 @@ impl<D: BlockData> Block<D> {
 
     pub fn safety_oracles<U: WeightUnit>(
         block: Block<D>,
-        latest_msgs_honest: &LatestMsgsHonest<Self>,
+        latest_messages_honest: &LatestMessagesHonest<Self>,
         equivocators: &HashSet<D::ValidatorName>,
         safety_oracle_threshold: U,
         weights: &validator::Weights<D::ValidatorName, U>,
@@ -408,15 +408,15 @@ impl<D: BlockData> Block<D> {
             j: &Justification<Block<D>>,
             equivocators: &HashSet<D::ValidatorName>,
         ) -> HashMap<D::ValidatorName, Message<Block<D>>> {
-            LatestMsgsHonest::from_latest_msgs(&LatestMsgs::from(j), equivocators)
+            LatestMessagesHonest::from_latest_messages(&LatestMessages::from(j), equivocators)
                 .iter()
                 .map(|m| (m.sender().clone(), m.clone()))
                 .collect()
         }
 
-        let latest_containing_block: HashSet<&Message<Block<D>>> = latest_msgs_honest
+        let latest_containing_block: HashSet<&Message<Block<D>>> = latest_messages_honest
             .iter()
-            .filter(|&msg| block.is_member(&Block::from(msg)))
+            .filter(|&message| block.is_member(&Block::from(message)))
             .collect();
 
         let latest_agreeing_in_validator_view: HashMap<_, HashMap<_, Message<Block<D>>>> =
@@ -427,7 +427,7 @@ impl<D: BlockData> Block<D> {
                         m.sender().clone(),
                         latest_in_justification(m.justification(), equivocators)
                             .into_iter()
-                            .filter(|(_validator, msg)| block.is_member(&Block::from(msg)))
+                            .filter(|(_validator, message)| block.is_member(&Block::from(message)))
                             .collect(),
                     )
                 })
@@ -532,27 +532,27 @@ impl<D: BlockData> Block<D> {
         }
     }
 
-    /// Parses latest_msgs to return a tuple containing:
+    /// Parses latest_messages to return a tuple containing:
     /// * a HashMap mapping blocks to their children;
     /// * a HashSet containing blocks with None as their prevblock (aka genesis blocks or finalized
     /// blocks);
     /// * a HashMap mapping blocks to their senders.
     pub fn parse_blockchains(
-        latest_msgs: &LatestMsgsHonest<Self>,
+        latest_messages: &LatestMessagesHonest<Self>,
     ) -> (
         BlocksChildrenMap<D>,
         GenesisBlocks<D>,
         BlocksValidatorsMap<D>,
     ) {
-        let latest_blocks: HashMap<Block<D>, D::ValidatorName> = latest_msgs
+        let latest_blocks: HashMap<Block<D>, D::ValidatorName> = latest_messages
             .iter()
-            .map(|msg| (Block::from(msg), msg.sender().clone()))
+            .map(|message| (Block::from(message), message.sender().clone()))
             .collect();
         // start at the tip of the blockchain
-        let mut visited_parents: HashMap<Block<D>, HashSet<Block<D>>> = latest_msgs
+        let mut visited_parents: HashMap<Block<D>, HashSet<Block<D>>> = latest_messages
             .iter()
-            .map(|msg| {
-                let parent = Block::from(msg);
+            .map(|message| {
+                let parent = Block::from(message);
                 let children = HashSet::new();
                 (parent, children)
             })
@@ -593,10 +593,12 @@ impl<D: BlockData> Block<D> {
         (visited_parents, genesis, latest_blocks)
     }
 
-    pub fn find_all_accessible_blocks(latest_msgs: &LatestMsgsHonest<Self>) -> HashSet<Block<D>> {
+    pub fn find_all_accessible_blocks(
+        latest_messages: &LatestMessagesHonest<Self>,
+    ) -> HashSet<Block<D>> {
         let mut blocks = HashSet::new();
 
-        for message in latest_msgs.iter() {
+        for message in latest_messages.iter() {
             let mut block = message.estimate().clone();
 
             while let Some(prev_block) = block.prevblock() {
@@ -713,10 +715,10 @@ impl<D: BlockData> Block<D> {
     }
 
     pub fn old_ghost<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<Self>,
+        latest_messages: &LatestMessagesHonest<Self>,
         validators_weights: &validator::Weights<D::ValidatorName, U>,
     ) -> Result<Self, Error> {
-        let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_msgs);
+        let (visited, genesis, latest_blocks) = Self::parse_blockchains(latest_messages);
 
         let mut b_in_lms_validators = HashMap::<Block<D>, HashSet<D::ValidatorName>>::new();
 
@@ -740,7 +742,7 @@ mod tests {
     use std::iter;
     use std::iter::FromIterator;
 
-    use crate::justification::{Justification, LatestMsgs, LatestMsgsHonest};
+    use crate::justification::{Justification, LatestMessages, LatestMessagesHonest};
     use crate::validator;
 
     use crate::ValidatorNameBlockData;
@@ -761,7 +763,7 @@ mod tests {
     }
 
     #[test]
-    fn from_prevblock_msg() {
+    fn from_prevblock_message() {
         let incomplete_block = Block::new(None, ValidatorNameBlockData::new(0));
         let message = Message::new(
             1,
@@ -770,17 +772,17 @@ mod tests {
         );
 
         assert_eq!(
-            Block::from_prevblock_msg(Some(message.clone()), incomplete_block),
+            Block::from_prevblock_message(Some(message.clone()), incomplete_block),
             Block::new(Some(Block::from(&message)), ValidatorNameBlockData::new(0)),
         );
     }
 
     #[test]
-    fn from_prevblock_msg_none() {
+    fn from_prevblock_message_none() {
         let incomplete_block = Block::new(None, ValidatorNameBlockData::new(0));
 
         assert_eq!(
-            Block::from_prevblock_msg(None, incomplete_block),
+            Block::from_prevblock_message(None, incomplete_block),
             Block::new(None, ValidatorNameBlockData::new(0)),
         );
     }
@@ -841,46 +843,46 @@ mod tests {
         justification.insert(Message::new(3, justification.clone(), block_3.clone()));
         justification.insert(Message::new(0, justification.clone(), block_4.clone()));
         justification.insert(Message::new(4, justification.clone(), block_5.clone()));
-        let latest_msgs = LatestMsgs::from(&justification);
+        let latest_messages = LatestMessages::from(&justification);
 
         float_eq!(
             genesis.score(
-                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &LatestMessagesHonest::from_latest_messages(&latest_messages, &HashSet::new()),
                 &weights
             ),
             31.0
         );
         float_eq!(
             block_1.score(
-                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &LatestMessagesHonest::from_latest_messages(&latest_messages, &HashSet::new()),
                 &weights
             ),
             31.0
         );
         float_eq!(
             block_2.score(
-                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &LatestMessagesHonest::from_latest_messages(&latest_messages, &HashSet::new()),
                 &weights
             ),
             4.0
         );
         float_eq!(
             block_3.score(
-                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &LatestMessagesHonest::from_latest_messages(&latest_messages, &HashSet::new()),
                 &weights
             ),
             25.0
         );
         float_eq!(
             block_4.score(
-                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &LatestMessagesHonest::from_latest_messages(&latest_messages, &HashSet::new()),
                 &weights
             ),
             17.0
         );
         float_eq!(
             block_5.score(
-                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &LatestMessagesHonest::from_latest_messages(&latest_messages, &HashSet::new()),
                 &weights
             ),
             16.0
@@ -962,14 +964,14 @@ mod tests {
         justification.insert(Message::new(2, justification.clone(), block_2.clone()));
         justification.insert(Message::new(3, justification.clone(), block_3.clone()));
         justification.insert(Message::new(4, justification.clone(), block_4.clone()));
-        let latest_msgs = LatestMsgs::from(&justification);
+        let latest_messages = LatestMessages::from(&justification);
 
         assert_eq!(
             genesis.best_children(
                 &vec![&block_1, &block_2, &block_3, &block_4]
                     .into_iter()
                     .collect::<HashSet<_>>(),
-                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &LatestMessagesHonest::from_latest_messages(&latest_messages, &HashSet::new()),
                 &weights,
             ),
             vec![&block_3].into_iter().collect::<HashSet<_>>()
@@ -999,14 +1001,14 @@ mod tests {
         justification.insert(Message::new(4, justification.clone(), block_4.clone()));
         justification.insert(Message::new(0, justification.clone(), block_5));
         justification.insert(Message::new(3, justification.clone(), block_6));
-        let latest_msgs = LatestMsgs::from(&justification);
+        let latest_messages = LatestMessages::from(&justification);
 
         assert_eq!(
             genesis.best_children(
                 &vec![&block_1, &block_2, &block_3, &block_4]
                     .into_iter()
                     .collect::<HashSet<_>>(),
-                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &LatestMessagesHonest::from_latest_messages(&latest_messages, &HashSet::new()),
                 &weights,
             ),
             vec![&block_2].into_iter().collect::<HashSet<_>>()
@@ -1036,14 +1038,14 @@ mod tests {
         justification.insert(Message::new(4, justification.clone(), block_4.clone()));
         justification.insert(Message::new(0, justification.clone(), block_5));
         justification.insert(Message::new(3, justification.clone(), block_6));
-        let latest_msgs = LatestMsgs::from(&justification);
+        let latest_messages = LatestMessages::from(&justification);
 
         assert_eq!(
             genesis.best_children(
                 &vec![&block_1, &block_2, &block_3, &block_4]
                     .into_iter()
                     .collect::<HashSet<_>>(),
-                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &LatestMessagesHonest::from_latest_messages(&latest_messages, &HashSet::new()),
                 &weights,
             ),
             vec![&block_1, &block_4].into_iter().collect::<HashSet<_>>()
@@ -1057,7 +1059,10 @@ mod tests {
         assert_eq!(
             genesis.best_children(
                 &HashSet::new(),
-                &LatestMsgsHonest::from_latest_msgs(&LatestMsgs::empty(), &HashSet::new()),
+                &LatestMessagesHonest::from_latest_messages(
+                    &LatestMessages::empty(),
+                    &HashSet::new()
+                ),
                 &weights,
             ),
             HashSet::new()
@@ -1093,11 +1098,11 @@ mod tests {
         justification.insert(Message::new(3, justification.clone(), block_6));
         justification.insert(Message::new(2, justification.clone(), block_7));
         justification.insert(Message::new(4, justification.clone(), block_8.clone()));
-        let latest_msgs = LatestMsgs::from(&justification);
+        let latest_messages = LatestMessages::from(&justification);
 
         assert_eq!(
             Block::mathematical_ghost(
-                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &LatestMessagesHonest::from_latest_messages(&latest_messages, &HashSet::new()),
                 &weights,
             )
             .unwrap(),
@@ -1105,7 +1110,7 @@ mod tests {
         );
         assert_eq!(
             Block::optimized_ghost(
-                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &LatestMessagesHonest::from_latest_messages(&latest_messages, &HashSet::new()),
                 &weights,
             )
             .unwrap(),
@@ -1113,7 +1118,7 @@ mod tests {
         );
         assert_eq!(
             Block::old_ghost(
-                &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new()),
+                &LatestMessagesHonest::from_latest_messages(&latest_messages, &HashSet::new()),
                 &weights,
             )
             .unwrap(),
@@ -1146,20 +1151,21 @@ mod tests {
         justification.insert(Message::new(0, justification.clone(), block_5));
         justification.insert(Message::new(3, justification.clone(), block_6));
         justification.insert(Message::new(5, justification.clone(), block_7));
-        let latest_msgs = LatestMsgs::from(&justification);
-        let latest_honest_msgs = &LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new());
+        let latest_messages = LatestMessages::from(&justification);
+        let latest_honest_messages =
+            &LatestMessagesHonest::from_latest_messages(&latest_messages, &HashSet::new());
 
         // block_4 and block_7 are tied but the hash based tie breaker chooses block_4.
         assert_eq!(
-            Block::mathematical_ghost(latest_honest_msgs, &weights,).unwrap(),
+            Block::mathematical_ghost(latest_honest_messages, &weights,).unwrap(),
             block_4,
         );
         assert_eq!(
-            Block::optimized_ghost(latest_honest_msgs, &weights,).unwrap(),
+            Block::optimized_ghost(latest_honest_messages, &weights,).unwrap(),
             block_4,
         );
         assert_eq!(
-            Block::old_ghost(latest_honest_msgs, &weights,).unwrap(),
+            Block::old_ghost(latest_honest_messages, &weights,).unwrap(),
             block_4,
         );
     }
@@ -1202,14 +1208,15 @@ mod tests {
             ),
         );
 
-        let mut latest_msgs = LatestMsgs::empty();
-        latest_msgs.update(&genesis);
-        latest_msgs.update(&block_1);
-        latest_msgs.update(&block_2);
-        let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new());
+        let mut latest_messages = LatestMessages::empty();
+        latest_messages.update(&genesis);
+        latest_messages.update(&block_1);
+        latest_messages.update(&block_2);
+        let latest_messages_honest =
+            LatestMessagesHonest::from_latest_messages(&latest_messages, &HashSet::new());
 
         let (children_map, genesis_set, senders_map) =
-            Block::parse_blockchains(&latest_msgs_honest);
+            Block::parse_blockchains(&latest_messages_honest);
 
         assert_eq!(
             children_map,
@@ -1255,15 +1262,15 @@ mod tests {
         let mut state = validator::State::new(
             validators_weights.clone(),
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             1.0,
             HashSet::new(),
         );
 
         // block dag
         let proto_b0 = Block::from(ProtoBlock::new(None, ValidatorNameBlockData::new(0)));
-        let latest_msgs = Justification::empty();
-        let m0 = Message::new(validators[0], latest_msgs, proto_b0.clone());
+        let latest_messages = Justification::empty();
+        let m0 = Message::new(validators[0], latest_messages, proto_b0.clone());
 
         let proto_b1 = Block::new(Some(proto_b0.clone()), ValidatorNameBlockData::new(0));
         state.update(&[&m0]);
@@ -1278,7 +1285,10 @@ mod tests {
         assert_eq!(
             Block::safety_oracles(
                 proto_b0.clone(),
-                &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
+                &LatestMessagesHonest::from_latest_messages(
+                    state.latests_messages(),
+                    state.equivocators()
+                ),
                 state.equivocators(),
                 2.0,
                 &validators_weights
@@ -1293,7 +1303,10 @@ mod tests {
         assert_eq!(
             Block::safety_oracles(
                 proto_b0.clone(),
-                &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
+                &LatestMessagesHonest::from_latest_messages(
+                    state.latests_messages(),
+                    state.equivocators()
+                ),
                 state.equivocators(),
                 1.0,
                 &validators_weights
@@ -1315,7 +1328,10 @@ mod tests {
         assert_eq!(
             Block::safety_oracles(
                 proto_b0.clone(),
-                &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
+                &LatestMessagesHonest::from_latest_messages(
+                    state.latests_messages(),
+                    state.equivocators()
+                ),
                 state.equivocators(),
                 1.0,
                 &validators_weights
@@ -1333,7 +1349,10 @@ mod tests {
         assert_eq!(
             Block::safety_oracles(
                 proto_b0.clone(),
-                &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
+                &LatestMessagesHonest::from_latest_messages(
+                    state.latests_messages(),
+                    state.equivocators()
+                ),
                 state.equivocators(),
                 1.0,
                 &validators_weights
@@ -1348,7 +1367,10 @@ mod tests {
         assert_eq!(
             Block::safety_oracles(
                 proto_b1,
-                &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
+                &LatestMessagesHonest::from_latest_messages(
+                    state.latests_messages(),
+                    state.equivocators()
+                ),
                 state.equivocators(),
                 1.0,
                 &validators_weights
@@ -1363,7 +1385,10 @@ mod tests {
         assert_eq!(
             Block::safety_oracles(
                 proto_b2.clone(),
-                &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
+                &LatestMessagesHonest::from_latest_messages(
+                    state.latests_messages(),
+                    state.equivocators()
+                ),
                 state.equivocators(),
                 1.0,
                 &validators_weights
@@ -1387,7 +1412,10 @@ mod tests {
         assert_eq!(
             Block::safety_oracles(
                 proto_b0,
-                &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
+                &LatestMessagesHonest::from_latest_messages(
+                    state.latests_messages(),
+                    state.equivocators()
+                ),
                 state.equivocators(),
                 1.0,
                 &validators_weights
@@ -1401,7 +1429,10 @@ mod tests {
         assert_eq!(
             Block::safety_oracles(
                 proto_b2,
-                &LatestMsgsHonest::from_latest_msgs(state.latests_msgs(), state.equivocators()),
+                &LatestMessagesHonest::from_latest_messages(
+                    state.latests_messages(),
+                    state.equivocators()
+                ),
                 state.equivocators(),
                 1.0,
                 &validators_weights

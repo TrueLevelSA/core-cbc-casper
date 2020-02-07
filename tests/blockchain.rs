@@ -22,7 +22,7 @@ extern crate casper;
 use std::collections::HashSet;
 
 use casper::blockchain::Block;
-use casper::justification::{Justification, LatestMsgs};
+use casper::justification::{Justification, LatestMessages};
 use casper::message::Message;
 use casper::validator;
 use casper::ValidatorNameBlockData;
@@ -42,14 +42,14 @@ fn partial_view() {
                 .collect(),
         ),
         0.0,
-        LatestMsgs::empty(),
+        LatestMessages::empty(),
         1.0,
         HashSet::new(),
     );
 
     let genesis_block = Block::new(None, ValidatorNameBlockData::new(0));
-    let latest_msgs = Justification::empty();
-    let genesis_block_msg = Message::new(validators[0], latest_msgs, genesis_block.clone());
+    let latest_messages = Justification::empty();
+    let genesis_block_message = Message::new(validators[0], latest_messages, genesis_block.clone());
     // (s0, w=1.0)   gen
     // (s1, w=1.0)
     // (s2, w=2.0)
@@ -57,12 +57,12 @@ fn partial_view() {
     // (s4, w=1.1)
 
     assert_eq!(
-        &Block::from(&genesis_block_msg),
+        &Block::from(&genesis_block_message),
         &genesis_block,
         "genesis block with None as prevblock"
     );
 
-    state.update(&[&genesis_block_msg]);
+    state.update(&[&genesis_block_message]);
     let m1 = Message::from_validator_state(validators[1], &state.clone()).unwrap();
     // (s0, w=1.0)   gen
     // (s1, w=1.0)     \--m1
@@ -70,7 +70,7 @@ fn partial_view() {
     // (s3, w=1.0)
     // (s4, w=1.1)
 
-    state.update(&[&genesis_block_msg]);
+    state.update(&[&genesis_block_message]);
     let m2 = Message::from_validator_state(validators[2], &state.clone()).unwrap();
     // (s0, w=1.0)   gen
     // (s1, w=1.0)    |\--m1
@@ -103,7 +103,7 @@ fn partial_view() {
     assert_eq!(
         m4.estimate(),
         &Block::new(Some(Block::from(&m1)), ValidatorNameBlockData::new(0)),
-        "should build on top of m1 as thats the only msg it saw"
+        "should build on top of m1 as thats the only message it saw"
     );
 
     state.update(&[&m3, &m2]);
@@ -143,14 +143,14 @@ fn full_view() {
                 .collect(),
         ),
         0.0,
-        LatestMsgs::empty(),
+        LatestMessages::empty(),
         1.0,
         HashSet::new(),
     );
 
     let genesis_block = Block::new(None, ValidatorNameBlockData::new(0));
-    let latest_msgs = Justification::empty();
-    let genesis_block_msg = Message::new(validators[0], latest_msgs, genesis_block);
+    let latest_messages = Justification::empty();
+    let genesis_block_message = Message::new(validators[0], latest_messages, genesis_block);
     // (sg, w=1.0)   gen
     // (s0, w=1.0)
     // (s1, w=1.0)
@@ -159,7 +159,7 @@ fn full_view() {
     // (s4, w=1.1)
     // (s5, w=1.0)
 
-    state.update(&[&genesis_block_msg]);
+    state.update(&[&genesis_block_message]);
     let m0 = Message::from_validator_state(validators[1], &state).unwrap();
     // (sg, w=1.0)   gen
     // (s0, w=1.0)     \--m0
@@ -179,7 +179,7 @@ fn full_view() {
     // (s4, w=1.1)
     // (s5, w=1.0)
 
-    state.update(&[&genesis_block_msg]);
+    state.update(&[&genesis_block_message]);
     let m2 = Message::from_validator_state(validators[3], &state).unwrap();
     // (sg, w=1.0)   gen
     // (s0, w=1.0)    |\--m0

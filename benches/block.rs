@@ -2,7 +2,7 @@
 extern crate criterion;
 
 use casper::estimator::Estimator;
-use casper::justification::LatestMsgsHonest;
+use casper::justification::LatestMessagesHonest;
 use casper::message;
 use casper::util::weight::{WeightUnit, Zero};
 use casper::validator;
@@ -66,12 +66,17 @@ impl Estimator for Value {
     type Error = Error;
 
     fn estimate<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<Self>,
+        latest_messages: &LatestMessagesHonest<Self>,
         validators_weights: &validator::Weights<Validator, U>,
     ) -> Result<Self, Self::Error> {
-        let res: Self = latest_msgs
+        let res: Self = latest_messages
             .iter()
-            .map(|msg| (msg.estimate(), validators_weights.weight(msg.sender())))
+            .map(|message| {
+                (
+                    message.estimate(),
+                    validators_weights.weight(message.sender()),
+                )
+            })
             .fold(
                 (
                     (Value::Zero, <U as Zero<U>>::ZERO),
@@ -105,15 +110,15 @@ fn block_new(c: &mut Criterion) {
     );
 }
 
-fn block_from_prevblock_msg(c: &mut Criterion) {
+fn block_from_prevblock_message(c: &mut Criterion) {
     type Message = message::Message<Value>;
 
     c.bench_function_over_inputs(
-        "Block::from_prevblock_msg",
+        "Block::from_prevblock_message",
         |b, loops| {
             use std::collections::HashSet;
 
-            use casper::justification::{Justification, LatestMsgs};
+            use casper::justification::{Justification, LatestMessages};
 
             let validators: Vec<u8> = (1..=4).collect();
             let weights = [0.6, 1.0, 2.0, 1.3];
@@ -128,20 +133,20 @@ fn block_from_prevblock_msg(c: &mut Criterion) {
 
             let mut weights = validator::State::new(
                 validators_weights,
-                0.0, // state fault weight
-                LatestMsgs::empty(),
-                1.0,            // subjective fault weight threshold
-                HashSet::new(), // equivocators
+                0.0,
+                LatestMessages::empty(),
+                1.0,
+                HashSet::new(),
             );
             let block = Block::new(None, ValidatorNameBlockData::new(0));
-            let mut msg = Message::new(1, Justification::empty(), Value::One);
+            let mut message = Message::new(1, Justification::empty(), Value::One);
             for _ in 0..=(**loops) {
-                weights.update(&[&msg]);
-                msg = Message::from_validator_state(1, &weights).unwrap();
+                weights.update(&[&message]);
+                message = Message::from_validator_state(1, &weights).unwrap();
             }
 
             b.iter(|| {
-                Block::from_prevblock_msg(black_box(None), black_box(block.clone()));
+                Block::from_prevblock_message(black_box(None), black_box(block.clone()));
             });
         },
         &[100, 1_000, 10_000],
@@ -164,7 +169,7 @@ fn block_is_member(c: &mut Criterion) {
 }
 
 fn block_estimate(c: &mut Criterion) {
-    use casper::justification::{Justification, LatestMsgs};
+    use casper::justification::{Justification, LatestMessages};
     use casper::message::Message;
     use std::collections::HashSet;
 
@@ -195,18 +200,19 @@ fn block_estimate(c: &mut Criterion) {
     justification.insert(Message::new(3, justification.clone(), block_6));
     justification.insert(Message::new(2, justification.clone(), block_7));
     justification.insert(Message::new(4, justification.clone(), block_8));
-    let latest_msgs = LatestMsgs::from(&justification);
-    let latest_honest_msgs = LatestMsgsHonest::from_latest_msgs(&latest_msgs, &HashSet::new());
+    let latest_messages = LatestMessages::from(&justification);
+    let latest_honest_messages =
+        LatestMessagesHonest::from_latest_messages(&latest_messages, &HashSet::new());
 
     c.bench_function("Block::estimate", move |b| {
-        b.iter(|| Block::estimate(black_box(&latest_honest_msgs), black_box(&weights)));
+        b.iter(|| Block::estimate(black_box(&latest_honest_messages), black_box(&weights)));
     });
 }
 
 criterion_group!(
     benches,
     block_new,
-    block_from_prevblock_msg,
+    block_from_prevblock_message,
     block_is_member,
     block_estimate,
 );

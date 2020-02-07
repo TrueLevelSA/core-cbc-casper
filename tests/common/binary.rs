@@ -18,7 +18,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use casper::estimator::Estimator;
-use casper::justification::LatestMsgsHonest;
+use casper::justification::LatestMessagesHonest;
 use casper::util::weight::{WeightUnit, Zero};
 use casper::validator;
 
@@ -64,18 +64,20 @@ impl Estimator for BoolWrapper {
 
     /// Weighted count of the votes contained in the latest messages.
     fn estimate<U: WeightUnit>(
-        latest_msgs: &LatestMsgsHonest<BoolWrapper>,
+        latest_messages: &LatestMessagesHonest<BoolWrapper>,
         validators_weights: &validator::Weights<Validator, U>,
     ) -> Result<Self, Self::Error> {
         // loop over all the latest messages
-        let (true_w, false_w) = latest_msgs.iter().fold(
+        let (true_w, false_w) = latest_messages.iter().fold(
             (<U as Zero<U>>::ZERO, <U as Zero<U>>::ZERO),
-            |(true_w, false_w), msg| {
+            |(true_w, false_w), message| {
                 // get the weight for the validator
-                let validator_weight = validators_weights.weight(msg.sender()).unwrap_or(U::NAN);
+                let validator_weight = validators_weights
+                    .weight(message.sender())
+                    .unwrap_or(U::NAN);
 
                 // add the weight to the right accumulator
-                if msg.estimate().0 {
+                if message.estimate().0 {
                     (true_w + validator_weight, false_w)
                 } else {
                     (true_w, false_w + validator_weight)

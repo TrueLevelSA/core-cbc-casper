@@ -51,7 +51,7 @@ use rayon::prelude::*;
 use serde::Serialize;
 
 use crate::estimator::Estimator;
-use crate::justification::{Justification, LatestMsgsHonest};
+use crate::justification::{Justification, LatestMessagesHonest};
 use crate::util::hash::Hash;
 use crate::util::id::Id;
 use crate::util::weight::WeightUnit;
@@ -76,26 +76,26 @@ impl<E: std::error::Error> std::error::Error for Error<E> {}
 
 // Mathematical definition of a casper message with (value, validator, justification)
 #[derive(Clone, Eq, PartialEq)]
-struct ProtoMsg<E: Estimator> {
+struct ProtoMessage<E: Estimator> {
     estimate: E,
     sender: E::ValidatorName,
     justification: Justification<E>,
 }
 
-impl<E: Estimator> Id for ProtoMsg<E> {
+impl<E: Estimator> Id for ProtoMessage<E> {
     type ID = Hash;
 }
 
-impl<E: Estimator> Serialize for ProtoMsg<E> {
+impl<E: Estimator> Serialize for ProtoMessage<E> {
     fn serialize<T: serde::Serializer>(&self, serializer: T) -> Result<T::Ok, T::Error> {
         use serde::ser::SerializeStruct;
 
-        let mut msg = serializer.serialize_struct("Message", 3)?;
+        let mut message = serializer.serialize_struct("Message", 3)?;
         let j: Vec<_> = self.justification.iter().map(Message::getid).collect();
-        msg.serialize_field("sender", &self.sender)?;
-        msg.serialize_field("estimate", &self.estimate)?;
-        msg.serialize_field("justification", &j)?;
-        msg.end()
+        message.serialize_field("sender", &self.sender)?;
+        message.serialize_field("estimate", &self.estimate)?;
+        message.serialize_field("justification", &j)?;
+        message.end()
     }
 }
 
@@ -129,7 +129,7 @@ impl<E: Estimator> Serialize for ProtoMsg<E> {
 /// `Value` must implement `Estimator` to be valid for a `message::Message` and to produce
 /// estimates.
 #[derive(Eq, Clone)]
-pub struct Message<E: Estimator>(Arc<ProtoMsg<E>>, Hash);
+pub struct Message<E: Estimator>(Arc<ProtoMessage<E>>, Hash);
 
 impl<E: Estimator> Message<E> {
     pub fn sender(&self) -> &E::ValidatorName {
@@ -145,7 +145,7 @@ impl<E: Estimator> Message<E> {
     }
 
     pub fn new(sender: E::ValidatorName, justification: Justification<E>, estimate: E) -> Self {
-        let proto = ProtoMsg {
+        let proto = ProtoMessage {
             sender,
             justification,
             estimate,
@@ -161,17 +161,18 @@ impl<E: Estimator> Message<E> {
         sender: E::ValidatorName,
         validator_state: &validator::State<E, U>,
     ) -> Result<Self, Error<E::Error>> {
-        let latest_msgs_honest = LatestMsgsHonest::from_latest_msgs(
-            validator_state.latests_msgs(),
+        let latest_messages_honest = LatestMessagesHonest::from_latest_messages(
+            validator_state.latests_messages(),
             validator_state.equivocators(),
         );
 
-        if latest_msgs_honest.is_empty() {
+        if latest_messages_honest.is_empty() {
             Err(Error::NoNewMessage)
         } else {
-            let justification = Justification::from(latest_msgs_honest.clone());
+            let justification = Justification::from(latest_messages_honest.clone());
 
-            let estimate = latest_msgs_honest.make_estimate(&validator_state.validators_weights());
+            let estimate =
+                latest_messages_honest.make_estimate(&validator_state.validators_weights());
             estimate
                 .map(|e| Self::new(sender, justification, e))
                 .map_err(Error::Estimator)
@@ -309,23 +310,23 @@ mod test {
     use std::collections::HashSet;
     use std::iter::FromIterator;
 
-    use crate::justification::LatestMsgs;
+    use crate::justification::LatestMessages;
     use crate::validator;
 
     #[test]
-    fn msg_equality() {
+    fn message_equality() {
         let validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             0.0,
             HashSet::new(),
         );
 
-        let v0 = &VoteCount::create_vote_msg(0, false);
-        let v1 = &VoteCount::create_vote_msg(1, true);
-        let v0_prime = &VoteCount::create_vote_msg(0, true);
-        let v0_duplicate = &VoteCount::create_vote_msg(0, false);
+        let v0 = &VoteCount::create_vote_message(0, false);
+        let v1 = &VoteCount::create_vote_message(1, true);
+        let v0_prime = &VoteCount::create_vote_message(0, true);
+        let v0_duplicate = &VoteCount::create_vote_message(0, false);
 
         let mut validator_state_clone = validator_state.clone();
         validator_state_clone.update(&[v0]);
@@ -333,35 +334,38 @@ mod test {
 
         let mut validator_state_clone = validator_state.clone();
         validator_state_clone.update(&[v0]);
-        let msg1 = Message::from_validator_state(0, &validator_state_clone).unwrap();
+        let message1 = Message::from_validator_state(0, &validator_state_clone).unwrap();
 
         let mut validator_state_clone = validator_state.clone();
         validator_state_clone.update(&[v0]);
-        let msg2 = Message::from_validator_state(0, &validator_state_clone).unwrap();
+        let message2 = Message::from_validator_state(0, &validator_state_clone).unwrap();
 
         let mut validator_state_clone = validator_state;
         validator_state_clone.update(&[v0, &m0]);
-        let msg3 = Message::from_validator_state(0, &validator_state_clone).unwrap();
+        let message3 = Message::from_validator_state(0, &validator_state_clone).unwrap();
 
         assert_eq!(v0, v0_duplicate, "v0 and v0_duplicate should be equal");
         assert_ne!(v0, v0_prime, "v0 and v0_prime should NOT be equal");
         assert_ne!(v0, v1, "v0 and v1 should NOT be equal");
-        assert_eq!(msg1, msg2, "messages should be equal");
-        assert_ne!(msg1, msg3, "msg1 should be different than msg3");
+        assert_eq!(message1, message2, "messages should be equal");
+        assert_ne!(
+            message1, message3,
+            "message1 should be different than message3"
+        );
     }
 
     #[test]
-    fn msg_depends() {
+    fn message_depends() {
         let validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             0.0,
             HashSet::new(),
         );
 
-        let v0 = &VoteCount::create_vote_msg(0, false);
-        let v0_prime = &VoteCount::create_vote_msg(0, true);
+        let v0 = &VoteCount::create_vote_message(0, false);
+        let v0_prime = &VoteCount::create_vote_message(0, true);
 
         let mut validator_state_clone = validator_state.clone();
         validator_state_clone.update(&[v0]);
@@ -391,18 +395,18 @@ mod test {
     }
 
     #[test]
-    fn msg_equivocates() {
+    fn message_equivocates() {
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             0.0,
             HashSet::new(),
         );
 
-        let v0 = &VoteCount::create_vote_msg(0, false);
-        let v0_prime = &VoteCount::create_vote_msg(0, true);
-        let v1 = &VoteCount::create_vote_msg(1, true);
+        let v0 = &VoteCount::create_vote_message(0, false);
+        let v0_prime = &VoteCount::create_vote_message(0, true);
+        let v1 = &VoteCount::create_vote_message(1, true);
 
         validator_state.update(&[&v0]);
         let m0 = Message::from_validator_state(0, &validator_state).unwrap();
@@ -418,19 +422,19 @@ mod test {
     }
 
     #[test]
-    fn msg_equivocates_indirect_direct_equivocation() {
-        let v0 = VoteCount::create_vote_msg(0, false);
-        let v0_prime = VoteCount::create_vote_msg(0, true);
+    fn message_equivocates_indirect_direct_equivocation() {
+        let v0 = VoteCount::create_vote_message(0, false);
+        let v0_prime = VoteCount::create_vote_message(0, true);
 
         assert!(v0.equivocates_indirect(&v0_prime, HashSet::new()).0);
     }
 
     #[test]
-    fn msg_equivocates_indirect_semi_direct() {
+    fn message_equivocates_indirect_semi_direct() {
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             0.0,
             HashSet::new(),
         );
@@ -442,8 +446,8 @@ mod test {
         //
         // validator 1 is equivocating
 
-        let v0 = VoteCount::create_vote_msg(0, false);
-        let v1 = VoteCount::create_vote_msg(1, true);
+        let v0 = VoteCount::create_vote_message(0, false);
+        let v1 = VoteCount::create_vote_message(1, true);
 
         validator_state.update(&[&v0]);
         let m1 = Message::from_validator_state(1, &validator_state).unwrap();
@@ -459,11 +463,11 @@ mod test {
     }
 
     #[test]
-    fn msg_equivocates_indirect_commutativity() {
+    fn message_equivocates_indirect_commutativity() {
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             0.0,
             HashSet::new(),
         );
@@ -475,8 +479,8 @@ mod test {
         //
         // validator 1 is equivocating
 
-        let v0 = VoteCount::create_vote_msg(0, false);
-        let v1 = VoteCount::create_vote_msg(1, true);
+        let v0 = VoteCount::create_vote_message(0, false);
+        let v1 = VoteCount::create_vote_message(1, true);
 
         validator_state.update(&[&v0]);
         let m1 = Message::from_validator_state(1, &validator_state).unwrap();
@@ -508,7 +512,7 @@ mod test {
     }
 
     #[test]
-    fn msg_equivocates_indirect_total_indirection() {
+    fn message_equivocates_indirect_total_indirection() {
         let mut validator_state = validator::State::new(
             validator::Weights::new(
                 vec![(0, 1.0), (1, 1.0), (2, 1.0), (3, 1.0)]
@@ -516,7 +520,7 @@ mod test {
                     .collect(),
             ),
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             0.0,
             HashSet::new(),
         );
@@ -529,8 +533,8 @@ mod test {
         //
         // validator 1 is equivocating
 
-        let v0 = VoteCount::create_vote_msg(0, false);
-        let v1 = VoteCount::create_vote_msg(1, true);
+        let v0 = VoteCount::create_vote_message(0, false);
+        let v1 = VoteCount::create_vote_message(1, true);
 
         let mut validator_state_clone = validator_state.clone();
         validator_state_clone.update(&[&v0]);
@@ -550,21 +554,21 @@ mod test {
 
     #[test]
     fn from_validator_state() {
-        let v0 = VoteCount::create_vote_msg(0, false);
-        let v1 = VoteCount::create_vote_msg(1, false);
-        let v2 = VoteCount::create_vote_msg(2, true);
+        let v0 = VoteCount::create_vote_message(0, false);
+        let v1 = VoteCount::create_vote_message(1, false);
+        let v2 = VoteCount::create_vote_message(2, true);
 
-        let mut latest_msgs = LatestMsgs::empty();
-        latest_msgs.update(&v0);
-        latest_msgs.update(&v1);
-        latest_msgs.update(&v2);
+        let mut latest_messages = LatestMessages::empty();
+        latest_messages.update(&v0);
+        latest_messages.update(&v1);
+        latest_messages.update(&v2);
 
         let res = Message::from_validator_state(
             0,
             &validator::State::new(
                 validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
                 0.0,
-                latest_msgs,
+                latest_messages,
                 0.0,
                 HashSet::new(),
             ),
@@ -581,19 +585,19 @@ mod test {
 
     #[test]
     fn from_validator_state_duplicates() {
-        let v0 = VoteCount::create_vote_msg(0, true);
-        let v0_prime = VoteCount::create_vote_msg(0, true);
+        let v0 = VoteCount::create_vote_message(0, true);
+        let v0_prime = VoteCount::create_vote_message(0, true);
 
-        let mut latest_msgs = LatestMsgs::empty();
-        latest_msgs.update(&v0);
-        latest_msgs.update(&v0_prime);
+        let mut latest_messages = LatestMessages::empty();
+        latest_messages.update(&v0);
+        latest_messages.update(&v0_prime);
 
         let res = Message::from_validator_state(
             0,
             &validator::State::new(
                 validator::Weights::new(vec![(0, 1.0)].into_iter().collect()),
                 0.0,
-                latest_msgs,
+                latest_messages,
                 0.0,
                 HashSet::new(),
             ),
@@ -610,21 +614,21 @@ mod test {
 
     #[test]
     fn from_validator_state_equivocator() {
-        let v0 = VoteCount::create_vote_msg(0, false);
-        let v0_prime = VoteCount::create_vote_msg(0, true);
-        let v1 = VoteCount::create_vote_msg(1, true);
+        let v0 = VoteCount::create_vote_message(0, false);
+        let v0_prime = VoteCount::create_vote_message(0, true);
+        let v1 = VoteCount::create_vote_message(1, true);
 
-        let mut latest_msgs = LatestMsgs::empty();
-        latest_msgs.update(&v0);
-        latest_msgs.update(&v0_prime);
-        latest_msgs.update(&v1);
+        let mut latest_messages = LatestMessages::empty();
+        latest_messages.update(&v0);
+        latest_messages.update(&v0_prime);
+        latest_messages.update(&v1);
 
         let res = Message::from_validator_state(
             2,
             &validator::State::new(
                 validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
                 0.0,
-                latest_msgs,
+                latest_messages,
                 4.0,
                 HashSet::new(),
             ),
@@ -644,21 +648,21 @@ mod test {
 
     #[test]
     fn from_validator_state_equivocator_at_threshhold() {
-        let v0 = VoteCount::create_vote_msg(0, false);
-        let v0_prime = VoteCount::create_vote_msg(0, true);
-        let v1 = VoteCount::create_vote_msg(1, true);
+        let v0 = VoteCount::create_vote_message(0, false);
+        let v0_prime = VoteCount::create_vote_message(0, true);
+        let v1 = VoteCount::create_vote_message(1, true);
 
-        let mut latest_msgs = LatestMsgs::empty();
-        latest_msgs.update(&v0);
-        latest_msgs.update(&v0_prime);
-        latest_msgs.update(&v1);
+        let mut latest_messages = LatestMessages::empty();
+        latest_messages.update(&v0);
+        latest_messages.update(&v0_prime);
+        latest_messages.update(&v1);
 
         let res = Message::from_validator_state(
             2,
             &validator::State::new(
                 validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
                 0.0,
-                latest_msgs,
+                latest_messages,
                 0.0,
                 HashSet::new(),
             ),
@@ -679,19 +683,19 @@ mod test {
         // With an equivocator and only his messages in the State,
         // from_validator_state returns an error.
 
-        let v0 = VoteCount::create_vote_msg(0, false);
-        let v0_prime = VoteCount::create_vote_msg(0, true);
+        let v0 = VoteCount::create_vote_message(0, false);
+        let v0_prime = VoteCount::create_vote_message(0, true);
 
-        let mut latest_msgs = LatestMsgs::empty();
-        latest_msgs.update(&v0);
-        latest_msgs.update(&v0_prime);
+        let mut latest_messages = LatestMessages::empty();
+        latest_messages.update(&v0);
+        latest_messages.update(&v0_prime);
 
         let res = Message::<VoteCount>::from_validator_state(
             0,
             &validator::State::new(
                 validator::Weights::new(vec![(0, 1.0)].into_iter().collect()),
                 0.0,
-                latest_msgs,
+                latest_messages,
                 0.0,
                 HashSet::new(),
             ),

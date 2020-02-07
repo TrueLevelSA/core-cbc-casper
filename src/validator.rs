@@ -69,7 +69,7 @@ use std::hash::Hash;
 use std::sync::{Arc, LockResult, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::estimator::Estimator;
-use crate::justification::LatestMsgs;
+use crate::justification::LatestMessages;
 use crate::message::Message;
 use crate::util::id::Id;
 use crate::util::weight::{WeightUnit, Zero};
@@ -101,7 +101,7 @@ where
     pub(crate) thr: U,
     /// current validator set, mapped to their respective weights
     pub(crate) validators_weights: Weights<E::ValidatorName, U>,
-    pub(crate) latest_msgs: LatestMsgs<E>,
+    pub(crate) latest_messages: LatestMessages<E>,
     pub(crate) equivocators: HashSet<E::ValidatorName>,
 }
 
@@ -148,7 +148,7 @@ where
     pub fn new(
         validators_weights: Weights<E::ValidatorName, U>,
         state_fault_weight: U,
-        latest_msgs: LatestMsgs<E>,
+        latest_messages: LatestMessages<E>,
         thr: U,
         equivocators: HashSet<E::ValidatorName>,
     ) -> Self {
@@ -157,7 +157,7 @@ where
             equivocators,
             state_fault_weight,
             thr,
-            latest_msgs,
+            latest_messages,
         }
     }
 
@@ -165,20 +165,20 @@ where
         default_state: Self,
         validators_weights: Option<Weights<E::ValidatorName, U>>,
         state_fault_weight: Option<U>,
-        latest_msgs: Option<LatestMsgs<E>>,
+        latest_messages: Option<LatestMessages<E>>,
         thr: Option<U>,
         equivocators: Option<HashSet<E::ValidatorName>>,
     ) -> Self {
         State {
             validators_weights: validators_weights.unwrap_or(default_state.validators_weights),
             state_fault_weight: state_fault_weight.unwrap_or(default_state.state_fault_weight),
-            latest_msgs: latest_msgs.unwrap_or(default_state.latest_msgs),
+            latest_messages: latest_messages.unwrap_or(default_state.latest_messages),
             thr: thr.unwrap_or(default_state.thr),
             equivocators: equivocators.unwrap_or(default_state.equivocators),
         }
     }
 
-    /// Adds messages to the state's latests_msgs. Returns true if
+    /// Adds messages to the state's latests_messages. Returns true if
     /// all messages added are valid latest messages.
     pub fn update(&mut self, messages: &[&Message<E>]) -> bool {
         messages.iter().fold(true, |acc, message| {
@@ -188,9 +188,9 @@ where
                 .weight(sender)
                 .unwrap_or(U::INFINITY);
 
-            let a = self.latest_msgs.update(message);
+            let a = self.latest_messages.update(message);
 
-            if self.latest_msgs.equivocate(message)
+            if self.latest_messages.equivocate(message)
                 && weight + self.state_fault_weight <= self.thr
                 && self.equivocators.insert(sender.clone())
             {
@@ -209,12 +209,12 @@ where
         &self.validators_weights
     }
 
-    pub fn latests_msgs(&self) -> &LatestMsgs<E> {
-        &self.latest_msgs
+    pub fn latests_messages(&self) -> &LatestMessages<E> {
+        &self.latest_messages
     }
 
-    pub fn latests_msgs_as_mut(&mut self) -> &mut LatestMsgs<E> {
-        &mut self.latest_msgs
+    pub fn latests_messages_as_mut(&mut self) -> &mut LatestMessages<E> {
+        &mut self.latest_messages
     }
 
     pub fn fault_weight(&self) -> U {
@@ -224,29 +224,32 @@ where
     /// Returns a vector containing sorted messages. They are sorted by the fault weight they would
     /// introduce in the state. If they would not be introduced because their validators are either
     /// honest or already equivocating, they are tie-breaked using the messages' hashes.
-    pub fn sort_by_faultweight<'z>(&self, msgs: &HashSet<&'z Message<E>>) -> Vec<&'z Message<E>> {
-        let mut msgs_sorted_by_faultw: Vec<_> = msgs
+    pub fn sort_by_faultweight<'z>(
+        &self,
+        messages: &HashSet<&'z Message<E>>,
+    ) -> Vec<&'z Message<E>> {
+        let mut messages_sorted_by_faultw: Vec<_> = messages
             .iter()
-            .filter_map(|&msg| {
+            .filter_map(|&message| {
                 // equivocations in relation to state
-                let sender = msg.sender();
-                if !self.equivocators.contains(sender) && self.latest_msgs.equivocate(msg) {
+                let sender = message.sender();
+                if !self.equivocators.contains(sender) && self.latest_messages.equivocate(message) {
                     self.validators_weights
                         .weight(sender)
-                        .map(|w| (msg, w))
+                        .map(|w| (message, w))
                         .ok()
                 } else {
-                    Some((msg, <U as Zero<U>>::ZERO))
+                    Some((message, <U as Zero<U>>::ZERO))
                 }
             })
             .collect();
 
-        msgs_sorted_by_faultw.sort_unstable_by(|(m0, w0), (m1, w1)| match w0.partial_cmp(w1) {
+        messages_sorted_by_faultw.sort_unstable_by(|(m0, w0), (m1, w1)| match w0.partial_cmp(w1) {
             None | Some(Ordering::Equal) => m0.getid().cmp(&m1.getid()),
             Some(ord) => ord,
         });
 
-        msgs_sorted_by_faultw
+        messages_sorted_by_faultw
             .iter()
             .map(|(m, _)| m)
             .cloned()
@@ -460,22 +463,22 @@ mod tests {
         let mut validator_state = State::new(
             Weights::new(vec![(0, 1.0), (1, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             2.0,
             HashSet::new(),
         );
 
-        let v0 = VoteCount::create_vote_msg(0, false);
-        let v1 = VoteCount::create_vote_msg(1, true);
+        let v0 = VoteCount::create_vote_message(0, false);
+        let v1 = VoteCount::create_vote_message(1, true);
 
         let all_valid = validator_state.update(&[&v0, &v1]);
 
         let hs0 = validator_state
-            .latests_msgs()
+            .latests_messages()
             .get(&0)
             .expect("state should contain validator 0");
         let hs1 = validator_state
-            .latests_msgs()
+            .latests_messages()
             .get(&1)
             .expect("state should contain validator 1");
 
@@ -508,23 +511,23 @@ mod tests {
         let mut validator_state = State::new(
             Weights::new(vec![(0, 1.0), (1, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             2.0,
             HashSet::new(),
         );
 
-        let v0 = VoteCount::create_vote_msg(0, false);
-        let v0_prime = VoteCount::create_vote_msg(0, true);
-        let v1 = VoteCount::create_vote_msg(1, true);
+        let v0 = VoteCount::create_vote_message(0, false);
+        let v0_prime = VoteCount::create_vote_message(0, true);
+        let v1 = VoteCount::create_vote_message(1, true);
 
         let all_valid = validator_state.update(&[&v0, &v0_prime, &v1]);
 
         let hs0 = validator_state
-            .latests_msgs()
+            .latests_messages()
             .get(&0)
             .expect("state should contain validator 0");
         let hs1 = validator_state
-            .latests_msgs()
+            .latests_messages()
             .get(&1)
             .expect("state should contain validator 1");
 
@@ -561,23 +564,23 @@ mod tests {
         let mut validator_state = State::new(
             Weights::new(vec![(0, 1.0), (1, 1.0)].into_iter().collect()),
             0.0,
-            LatestMsgs::empty(),
+            LatestMessages::empty(),
             0.0,
             HashSet::new(),
         );
 
-        let v0 = VoteCount::create_vote_msg(0, false);
-        let v0_prime = VoteCount::create_vote_msg(0, true);
-        let v1 = VoteCount::create_vote_msg(1, true);
+        let v0 = VoteCount::create_vote_message(0, false);
+        let v0_prime = VoteCount::create_vote_message(0, true);
+        let v1 = VoteCount::create_vote_message(1, true);
 
         let all_valid = validator_state.update(&[&v0, &v0_prime, &v1]);
 
         let hs0 = validator_state
-            .latests_msgs()
+            .latests_messages()
             .get(&0)
             .expect("state should contain validator 0");
         let hs1 = validator_state
-            .latests_msgs()
+            .latests_messages()
             .get(&1)
             .expect("state should contain validator 1");
 
@@ -611,21 +614,21 @@ mod tests {
 
     #[test]
     fn state_sort_by_faultweight_unknown_equivocators() {
-        let v0_prime = VoteCount::create_vote_msg(0, false);
-        let v1_prime = VoteCount::create_vote_msg(1, true);
-        let v2_prime = VoteCount::create_vote_msg(2, true);
+        let v0_prime = VoteCount::create_vote_message(0, false);
+        let v1_prime = VoteCount::create_vote_message(1, true);
+        let v2_prime = VoteCount::create_vote_message(2, true);
 
         let get_sorted_vec_with_weights = |weights: Vec<(u32, f32)>| {
             let mut state = State::new(
                 Weights::new(weights.into_iter().collect()),
                 0.0,
-                LatestMsgs::empty(),
+                LatestMessages::empty(),
                 10.0,
                 HashSet::new(),
             );
-            let v0 = VoteCount::create_vote_msg(0, true);
-            let v1 = VoteCount::create_vote_msg(1, false);
-            let v2 = VoteCount::create_vote_msg(2, false);
+            let v0 = VoteCount::create_vote_message(0, true);
+            let v1 = VoteCount::create_vote_message(1, false);
+            let v2 = VoteCount::create_vote_message(2, false);
             state.update(&[&v0, &v1, &v2]);
             state.sort_by_faultweight(&HashSet::from_iter(vec![&v0_prime, &v1_prime, &v2_prime]))
         };
@@ -648,16 +651,16 @@ mod tests {
             let mut state = State::new(
                 Weights::new(weights.into_iter().collect()),
                 0.0,
-                LatestMsgs::empty(),
+                LatestMessages::empty(),
                 10.0,
                 HashSet::new(),
             );
-            let v0 = VoteCount::create_vote_msg(0, true);
-            let v0_prime = VoteCount::create_vote_msg(0, false);
-            let v1 = VoteCount::create_vote_msg(1, false);
-            let v1_prime = VoteCount::create_vote_msg(1, true);
-            let v2 = VoteCount::create_vote_msg(2, false);
-            let v2_prime = VoteCount::create_vote_msg(2, true);
+            let v0 = VoteCount::create_vote_message(0, true);
+            let v0_prime = VoteCount::create_vote_message(0, false);
+            let v1 = VoteCount::create_vote_message(1, false);
+            let v1_prime = VoteCount::create_vote_message(1, true);
+            let v2 = VoteCount::create_vote_message(2, false);
+            let v2_prime = VoteCount::create_vote_message(2, true);
             state.update(&[&v0, &v0_prime, &v1, &v1_prime, &v2, &v2_prime]);
 
             // As all three validators are known equivocators and they could not change the current
@@ -684,13 +687,13 @@ mod tests {
             let mut state = State::new(
                 Weights::new(weights.into_iter().collect()),
                 0.0,
-                LatestMsgs::empty(),
+                LatestMessages::empty(),
                 1.0,
                 HashSet::new(),
             );
-            let v0 = VoteCount::create_vote_msg(0, true);
-            let v1 = VoteCount::create_vote_msg(1, false);
-            let v2 = VoteCount::create_vote_msg(2, false);
+            let v0 = VoteCount::create_vote_message(0, true);
+            let v1 = VoteCount::create_vote_message(1, false);
+            let v2 = VoteCount::create_vote_message(2, false);
             state.update(&[&v0, &v1, &v2]);
 
             // As all three validators haven't equivocated, they are sorted by the tie-breaker.
