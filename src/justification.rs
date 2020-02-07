@@ -99,7 +99,7 @@ impl<E: Estimator> Justification<E> {
 
     /// Run the estimator on the justification given the set of equivocators and validators'
     /// weights.
-    pub fn mk_estimate<U: WeightUnit>(
+    pub fn make_estimate<U: WeightUnit>(
         &self,
         equivocators: &HashSet<E::ValidatorName>,
         validators_weights: &validator::Weights<E::ValidatorName, U>,
@@ -383,7 +383,7 @@ impl<E: Estimator> LatestMsgsHonest<E> {
         self.0.is_empty()
     }
 
-    pub fn mk_estimate<U: WeightUnit>(
+    pub fn make_estimate<U: WeightUnit>(
         &self,
         validators_weights: &validator::Weights<E::ValidatorName, U>,
     ) -> Result<E, E::Error> {
@@ -816,7 +816,7 @@ mod test {
     }
 
     #[test]
-    fn justification_mk_estimate() {
+    fn justification_make_estimate() {
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
@@ -832,7 +832,7 @@ mod test {
         let initial_msgs = vec![v0, v1, v2];
         let justification = Justification::from_msgs(initial_msgs, &mut validator_state);
 
-        let estimate = justification.mk_estimate(
+        let estimate = justification.make_estimate(
             validator_state.equivocators(),
             validator_state.validators_weights(),
         );
@@ -844,7 +844,7 @@ mod test {
     }
 
     #[test]
-    fn justification_mk_estimate_equivocator_not_at_threshold() {
+    fn justification_make_estimate_equivocator_not_at_threshold() {
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
@@ -862,7 +862,7 @@ mod test {
         let mut justification = Justification::from_msgs(initial_msgs, &mut validator_state);
         justification.faulty_insert(&v0_prime, &mut validator_state);
 
-        let estimate = justification.mk_estimate(
+        let estimate = justification.make_estimate(
             validator_state.equivocators(),
             validator_state.validators_weights(),
         );
@@ -874,7 +874,7 @@ mod test {
     }
 
     #[test]
-    fn justification_mk_estimate_equivocator_at_threshold() {
+    fn justification_make_estimate_equivocator_at_threshold() {
         let mut validator_state = validator::State::new(
             validator::Weights::new(vec![(0, 1.0), (1, 1.0), (2, 1.0)].into_iter().collect()),
             0.0,
@@ -892,7 +892,7 @@ mod test {
         let mut justification = Justification::from_msgs(initial_msgs, &mut validator_state);
         justification.faulty_insert(&v0_prime, &mut validator_state);
 
-        let estimate = justification.mk_estimate(
+        let estimate = justification.make_estimate(
             validator_state.equivocators(),
             validator_state.validators_weights(),
         );

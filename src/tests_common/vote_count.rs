@@ -185,7 +185,7 @@ impl Estimator for VoteCount {
     type Error = Error;
 
     // Data could be anything, as it will not be used, will just pass None to
-    // mk_estimate, as it takes an Option
+    // make_estimate, as it takes an Option
     // type Data = Self;
 
     fn estimate<U: WeightUnit>(

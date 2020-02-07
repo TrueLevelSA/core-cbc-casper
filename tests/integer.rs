@@ -69,21 +69,21 @@ fn equal_weight() {
 
     let mut j0 = Justification::from_msgs(vec![m0, m1], &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
+        j0.make_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         IntegerWrapper(1)
     );
 
     j0.faulty_insert(&m2, &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
+        j0.make_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         IntegerWrapper(2)
     );
 
     j0.faulty_insert(&m3, &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
+        j0.make_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         IntegerWrapper(2)
     );
@@ -131,21 +131,21 @@ fn uneven_weights_1() {
 
     let mut j0 = Justification::from_msgs(vec![m0, m1], &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
+        j0.make_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         IntegerWrapper(1)
     );
 
     j0.faulty_insert(&m2, &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
+        j0.make_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         IntegerWrapper(1)
     );
 
     j0.faulty_insert(&m3, &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
+        j0.make_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         IntegerWrapper(1)
     );
@@ -195,28 +195,28 @@ fn uneven_weights_4() {
 
     let mut j0 = Justification::from_msgs(vec![m0, m1], &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
+        j0.make_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         IntegerWrapper(1)
     );
 
     j0.faulty_insert(&m2, &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
+        j0.make_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         IntegerWrapper(2)
     );
 
     j0.faulty_insert(&m3, &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
+        j0.make_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         IntegerWrapper(4)
     );
 
     j0.faulty_insert(&m4, &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
+        j0.make_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         IntegerWrapper(4)
     );

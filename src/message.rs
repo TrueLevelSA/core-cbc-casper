@@ -171,7 +171,7 @@ impl<E: Estimator> Message<E> {
         } else {
             let justification = Justification::from(latest_msgs_honest.clone());
 
-            let estimate = latest_msgs_honest.mk_estimate(&validator_state.validators_weights());
+            let estimate = latest_msgs_honest.make_estimate(&validator_state.validators_weights());
             estimate
                 .map(|e| Self::new(sender, justification, e))
                 .map_err(Error::Estimator)

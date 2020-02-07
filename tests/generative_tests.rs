@@ -265,7 +265,7 @@ where
                 validator_state.latests_msgs(),
                 &validator_state.equivocators(),
             )
-            .mk_estimate(validator_state.validators_weights())
+            .make_estimate(validator_state.validators_weights())
             .unwrap()
         })
         .collect();

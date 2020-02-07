@@ -71,20 +71,20 @@ fn equal_weight() {
     let mut j0 = Justification::from_msgs(vec![m0, m1], &mut validator_state.clone());
     // s0 and s1 vote. since tie-breaker is `true`, get `true`
     assert_eq!(
-        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
+        j0.make_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         BoolWrapper(true)
     );
     j0.faulty_insert(&m2, &mut validator_state.clone());
     // `false` now has weight 2.0, while true has weight `1.0`
     assert_eq!(
-        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
+        j0.make_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         BoolWrapper(false)
     );
     j0.faulty_insert(&m3, &mut validator_state.clone());
     assert_eq!(
-        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
+        j0.make_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         BoolWrapper(true)
     );
@@ -124,7 +124,7 @@ fn vote_swaying() {
 
     // honest result of vote: false
     assert_eq!(
-        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
+        j0.make_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         BoolWrapper(false)
     );
@@ -138,7 +138,7 @@ fn vote_swaying() {
     j0.faulty_insert(&m5, &mut validator_state.clone());
     // validator 0 now "votes" in the other direction and sways the result: true
     assert_eq!(
-        j0.mk_estimate(validator_state.equivocators(), &validators_weights)
+        j0.make_estimate(validator_state.equivocators(), &validators_weights)
             .unwrap(),
         BoolWrapper(true)
     );
