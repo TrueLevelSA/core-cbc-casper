@@ -59,8 +59,8 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {}
 
 impl std::convert::From<&'static str> for Error {
-    fn from(e: &'static str) -> Self {
-        Error(e)
+    fn from(string: &'static str) -> Self {
+        Error(string)
     }
 }
 
@@ -86,8 +86,8 @@ impl Estimator for IntegerWrapper {
         // in the set
         let total_weight = messages_sorted_by_estimate
             .iter()
-            .fold(<U as Zero<U>>::ZERO, |acc, x| {
-                acc + validators_weights.weight(x.sender()).unwrap_or(U::NAN)
+            .fold(<U as Zero<U>>::ZERO, |acc, weight| {
+                acc + validators_weights.weight(weight.sender()).unwrap_or(U::NAN)
             });
 
         let mut running_weight = <U as Zero<U>>::ZERO;
@@ -100,9 +100,9 @@ impl Estimator for IntegerWrapper {
         while running_weight + running_weight < total_weight {
             current_message = message_iter.next().ok_or("no next message");
             running_weight += current_message
-                .and_then(|m| {
+                .and_then(|message| {
                     validators_weights
-                        .weight(m.sender())
+                        .weight(message.sender())
                         .map_err(|_| "Can't unwrap weight")
                 })
                 .unwrap_or(U::NAN)
@@ -110,7 +110,7 @@ impl Estimator for IntegerWrapper {
 
         // return said estimate
         current_message
-            .map(|m| m.estimate().clone())
+            .map(|message| message.estimate().clone())
             .map_err(From::from)
     }
 }

@@ -32,12 +32,12 @@ impl<U: WeightUnit> From<((Value, U), (Value, U), (Value, U))> for Value {
     fn from(val: ((Value, U), (Value, U), (Value, U))) -> Self {
         let ((v1, w1), (v2, w2), (v3, w3)) = val;
         let mut max = v3;
-        let mut w = w3;
-        if w2 > w {
+        let mut weight = w3;
+        if w2 > weight {
             max = v2;
-            w = w2;
+            weight = w2;
         }
-        if w1 > w {
+        if w1 > weight {
             max = v1;
         }
         max
@@ -56,8 +56,8 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {}
 
 impl std::convert::From<&'static str> for Error {
-    fn from(e: &'static str) -> Self {
-        Error(e)
+    fn from(string: &'static str) -> Self {
+        Error(string)
     }
 }
 
@@ -83,7 +83,7 @@ impl Estimator for Value {
                     (Value::One, <U as Zero<U>>::ZERO),
                     (Value::Two, <U as Zero<U>>::ZERO),
                 ),
-                |acc, t| match t {
+                |acc, tuple| match tuple {
                     (Value::Zero, Ok(weight)) => (((acc.0).0, (acc.0).1 + weight), acc.1, acc.2),
                     (Value::One, Ok(weight)) => (acc.0, ((acc.1).0, (acc.1).1 + weight), acc.2),
                     (Value::Two, Ok(weight)) => (acc.0, acc.1, ((acc.2).0, (acc.2).1 + weight)),

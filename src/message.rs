@@ -91,10 +91,10 @@ impl<E: Estimator> Serialize for ProtoMessage<E> {
         use serde::ser::SerializeStruct;
 
         let mut message = serializer.serialize_struct("Message", 3)?;
-        let j: Vec<_> = self.justification.iter().map(Message::getid).collect();
+        let justification: Vec<_> = self.justification.iter().map(Message::getid).collect();
         message.serialize_field("sender", &self.sender)?;
         message.serialize_field("estimate", &self.estimate)?;
-        message.serialize_field("justification", &j)?;
+        message.serialize_field("justification", &justification)?;
         message.end()
     }
 }
@@ -174,7 +174,7 @@ impl<E: Estimator> Message<E> {
             let estimate =
                 latest_messages_honest.make_estimate(&validator_state.validators_weights());
             estimate
-                .map(|e| Self::new(sender, justification, e))
+                .map(|estimate| Self::new(sender, justification, estimate))
                 .map_err(Error::Estimator)
         }
     }

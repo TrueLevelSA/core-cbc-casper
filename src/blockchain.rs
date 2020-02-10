@@ -65,7 +65,7 @@ impl<D: BlockData> std::fmt::Debug for Block<D> {
             self.getid(),
             self.prevblock()
                 .as_ref()
-                .map(|p| p.getid())
+                .map(|previous_block| previous_block.getid())
                 .unwrap_or_default()
         )
     }
@@ -153,7 +153,7 @@ impl<D: BlockData> Block<D> {
         prevblock_message: Option<Message<Block<D>>>,
         incomplete_block: Block<D>,
     ) -> Self {
-        let prevblock = prevblock_message.map(|m| Block::from(&m));
+        let prevblock = prevblock_message.map(|message| Block::from(&message));
         Block::from(ProtoBlock {
             prevblock,
             ..((**incomplete_block.arc()).clone())
@@ -181,11 +181,11 @@ impl<D: BlockData> Block<D> {
     ) -> U {
         latest_messages_honest
             .iter()
-            .filter(|m| self.is_member(&m.estimate()))
-            .fold(<U as Zero<U>>::ZERO, |acc, m| {
-                match weights.weight(&m.sender()) {
+            .filter(|message| self.is_member(&message.estimate()))
+            .fold(<U as Zero<U>>::ZERO, |acc, message| {
+                match weights.weight(&message.sender()) {
                     Err(_) => acc,
-                    Ok(w) => acc + w,
+                    Ok(weight) => acc + weight,
                 }
             })
     }
@@ -405,13 +405,16 @@ impl<D: BlockData> Block<D> {
         weights: &validator::Weights<D::ValidatorName, U>,
     ) -> HashSet<BTreeSet<D::ValidatorName>> {
         fn latest_in_justification<D: BlockData>(
-            j: &Justification<Block<D>>,
+            justification: &Justification<Block<D>>,
             equivocators: &HashSet<D::ValidatorName>,
         ) -> HashMap<D::ValidatorName, Message<Block<D>>> {
-            LatestMessagesHonest::from_latest_messages(&LatestMessages::from(j), equivocators)
-                .iter()
-                .map(|m| (m.sender().clone(), m.clone()))
-                .collect()
+            LatestMessagesHonest::from_latest_messages(
+                &LatestMessages::from(justification),
+                equivocators,
+            )
+            .iter()
+            .map(|message| (message.sender().clone(), message.clone()))
+            .collect()
         }
 
         let latest_containing_block: HashSet<&Message<Block<D>>> = latest_messages_honest
@@ -422,10 +425,10 @@ impl<D: BlockData> Block<D> {
         let latest_agreeing_in_validator_view: HashMap<_, HashMap<_, Message<Block<D>>>> =
             latest_containing_block
                 .iter()
-                .map(|m| {
+                .map(|message| {
                     (
-                        m.sender().clone(),
-                        latest_in_justification(m.justification(), equivocators)
+                        message.sender().clone(),
+                        latest_in_justification(message.justification(), equivocators)
                             .into_iter()
                             .filter(|(_validator, message)| block.is_member(&Block::from(message)))
                             .collect(),
@@ -527,7 +530,7 @@ impl<D: BlockData> Block<D> {
         }
 
         match self.prevblock() {
-            Some(b) => Block::ncestor(&b, n - 1),
+            Some(block) => Block::ncestor(&block, n - 1),
             None => None,
         }
     }
@@ -657,13 +660,13 @@ impl<D: BlockData> Block<D> {
         let init = Some((None, <U as Zero<U>>::ZERO, HashSet::new()));
         let heaviest_child = match blocks.len() {
             // only one choice, no need to compute anything
-            l if l == 1 => blocks.iter().next().cloned().and_then(|block| {
+            length if length == 1 => blocks.iter().next().cloned().and_then(|block| {
                 visited
                     .get(&block)
                     .map(|children| (Some(block), <U as Zero<U>>::ZERO, children.clone()))
             }),
             // fork, need to find best block
-            l if l > 1 => blocks.iter().fold(init, |best, block| {
+            length if length > 1 => blocks.iter().fold(init, |best, block| {
                 let best_children =
                     best.and_then(|best| visited.get(&block).map(|children| (best, children)));
                 best_children.and_then(|((b_block, b_weight, b_children), children)| {

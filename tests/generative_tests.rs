@@ -83,10 +83,12 @@ where
             let latest_delta = match state[&validator].latests_messages().get(&validator) {
                 Some(messages) => match messages.len() {
                     1 => {
-                        let m = messages.iter().next().unwrap();
+                        let message = messages.iter().next().unwrap();
                         latest
                             .iter()
-                            .filter(|lm| !m.justification().contains(lm))
+                            .filter(|latest_message| {
+                                !message.justification().contains(latest_message)
+                            })
                             .cloned()
                             .collect()
                     }
@@ -96,19 +98,19 @@ where
             };
 
             let mut validator_state = state[&validator].clone();
-            for m in latest_delta.iter() {
-                validator_state.update(&[&m]);
+            for message in latest_delta.iter() {
+                validator_state.update(&[&message]);
             }
-            let m = Message::from_validator_state(validator, &validator_state).unwrap();
+            let message = Message::from_validator_state(validator, &validator_state).unwrap();
 
             state.insert(validator, validator_state);
             state
                 .get_mut(&validator)
                 .unwrap()
                 .latests_messages_as_mut()
-                .update(&m);
+                .update(&message);
 
-            (m, validator, recipients)
+            (message, validator, recipients)
         })
         .collect()
 }
@@ -124,23 +126,23 @@ where
 {
     messages_validators_recipients_data
         .into_iter()
-        .map(|(m, validator, recipients)| {
+        .map(|(message, validator, recipients)| {
             recipients
                 .into_iter()
                 .map(|recipient| {
                     let mut validator_state_reconstructed = validator::State::new(
                         state[&recipient].validators_weights().clone(),
                         0.0,
-                        LatestMessages::from(m.justification()),
+                        LatestMessages::from(message.justification()),
                         0.0,
                         HashSet::new(),
                     );
 
-                    for justification_message in m.justification().iter() {
+                    for justification_message in message.justification().iter() {
                         validator_state_reconstructed.update(&[&justification_message]);
                     }
 
-                    if m.estimate()
+                    if message.estimate()
                         != Message::from_validator_state(validator, &validator_state_reconstructed)
                             .unwrap()
                             .estimate()
@@ -151,9 +153,9 @@ where
 
                     let state_to_update =
                         state.get_mut(&recipient).unwrap().latests_messages_as_mut();
-                    state_to_update.update(&m);
-                    m.justification().iter().for_each(|m| {
-                        state_to_update.update(m);
+                    state_to_update.update(&message);
+                    message.justification().iter().for_each(|message| {
+                        state_to_update.update(message);
                     });
 
                     Ok(())
@@ -164,23 +166,23 @@ where
 }
 
 /// Validator strategy that selects one validator at each step, in a round robin manner.
-fn round_robin(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
-    let v = val.pop().unwrap();
-    val.insert(0, v);
+fn round_robin(values: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
+    let value = values.pop().unwrap();
+    values.insert(0, value);
     let mut hashset = HashSet::new();
-    hashset.insert(v);
+    hashset.insert(value);
     Just(hashset).boxed()
 }
 
 /// Validator strategy that picks one validator in the set at random, in a uniform manner.
-fn arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
-    prop::collection::hash_set(prop::sample::select(val.clone()), 1).boxed()
+fn arbitrary_in_set(values: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
+    prop::collection::hash_set(prop::sample::select(values.clone()), 1).boxed()
 }
 
 /// Validator strategy that picks some number of validators in the set at random, in a uniform
 /// manner.
-fn parallel_arbitrary_in_set(val: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
-    let validators = val.clone();
+fn parallel_arbitrary_in_set(values: &mut Vec<u32>) -> BoxedStrategy<HashSet<u32>> {
+    let validators = values.clone();
     prop::sample::select((1..=validators.len()).collect::<Vec<usize>>())
         .prop_flat_map(move |val_count| {
             prop::collection::hash_set(prop::sample::select(validators.to_owned()), val_count)
@@ -214,14 +216,14 @@ fn create_receiver_strategy(
     validator_strategy: BoxedStrategy<HashSet<u32>>,
     receivers_selector: fn(u32, &[u32], &mut TestRng) -> HashSet<u32>,
 ) -> BoxedStrategy<HashMap<u32, HashSet<u32>>> {
-    let v = validators.to_owned();
+    let owned_validators = validators.to_owned();
     validator_strategy
         // prop_perturb uses a Rng based on the proptest seed, it can therefore safely be used to
         // create random data as they can be re-obtained
         .prop_perturb(move |validators, mut rng| {
             let mut hashmap: HashMap<u32, HashSet<u32>> = HashMap::new();
             validators.iter().for_each(|validator| {
-                let hs = receivers_selector(*validator, &v, &mut rng);
+                let hs = receivers_selector(*validator, &owned_validators, &mut rng);
                 hashmap.insert(*validator, hs);
             });
 
@@ -259,7 +261,7 @@ fn full_consensus<E>(
 where
     E: Estimator<ValidatorName = u32>,
 {
-    let m: HashSet<_> = state
+    let estimates: HashSet<_> = state
         .iter()
         .map(|(_validator, validator_state)| {
             LatestMessagesHonest::from_latest_messages(
@@ -270,7 +272,7 @@ where
             .unwrap()
         })
         .collect();
-    m.len() == 1
+    estimates.len() == 1
 }
 
 /// Performs safety oracle search and adds information to the data parameter.
@@ -426,7 +428,10 @@ where
         })
         .prop_map(move |(votes, seed)| {
             let mut validators: Vec<u32> = (0..votes.len() as u32).collect();
-            let mut received_messages = validators.iter().map(|v| (*v, HashSet::new())).collect();
+            let mut received_messages = validators
+                .iter()
+                .map(|validator| (*validator, HashSet::new()))
+                .collect();
 
             let weights: Vec<f64> = iter::repeat(1.0).take(votes.len() as usize).collect();
 
@@ -502,7 +507,7 @@ where
             let mut vec_data = vec![];
 
             writeln!(timestamp_file, "start").unwrap();
-            let v = Vec::from_iter(chain.take_while(|state| {
+            let vec = Vec::from_iter(chain.take_while(|state| {
                 writeln!(timestamp_file, "{:?}", start.elapsed().subsec_micros()).unwrap();
 
                 start = Instant::now();
@@ -535,7 +540,7 @@ where
                 writeln!(stats_file, "{}", chain_data).unwrap();
             }
 
-            v
+            vec
         })
         .boxed()
 }
@@ -898,8 +903,8 @@ proptest! {
                 .map(|message| message)
                 .collect();
         let equivocator = messages[nodes].sender();
-        for m in single_equivocation.iter() {
-            validator_state.update(&[&m]);
+        for message in single_equivocation.iter() {
+            validator_state.update(&[&message]);
         }
         let m0 =
             &Message::from_validator_state(0, &validator_state)
@@ -1014,7 +1019,7 @@ prop_compose! {
 
         let validators_weights = validator::Weights::new(
             (0..validators_count)
-                .map(|s| s as u32)
+                .map(|validator| validator as u32)
                 .zip(std::iter::repeat(1.0))
                 .collect(),
         );

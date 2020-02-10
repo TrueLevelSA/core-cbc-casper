@@ -194,11 +194,11 @@ impl<E: Estimator> Justification<E> {
 
 impl<E: Estimator> From<LatestMessagesHonest<E>> for Justification<E> {
     fn from(lmh: LatestMessagesHonest<E>) -> Self {
-        let mut j = Self::empty();
-        for m in lmh.iter() {
-            j.insert(m.clone());
+        let mut justification = Self::empty();
+        for message in lmh.iter() {
+            justification.insert(message.clone());
         }
-        j
+        justification
     }
 }
 
@@ -222,28 +222,28 @@ impl<E: Estimator> LatestMessages<E> {
     /// Insert a new set of messages for a sender.
     pub fn insert(
         &mut self,
-        k: E::ValidatorName,
-        v: HashSet<Message<E>>,
+        validator: E::ValidatorName,
+        messages: HashSet<Message<E>>,
     ) -> Option<HashSet<Message<E>>> {
-        self.0.insert(k, v)
+        self.0.insert(validator, messages)
     }
 
     /// Checks whether a sender is already contained in the map.
-    pub fn contains_key(&self, k: &E::ValidatorName) -> bool {
-        self.0.contains_key(k)
+    pub fn contains_key(&self, validator: &E::ValidatorName) -> bool {
+        self.0.contains_key(validator)
     }
 
-    /// Get a set of messages sent by the sender.
-    pub fn get(&self, k: &E::ValidatorName) -> Option<&HashSet<Message<E>>> {
-        self.0.get(k)
+    /// Get a set of messages sent by the validator.
+    pub fn get(&self, validator: &E::ValidatorName) -> Option<&HashSet<Message<E>>> {
+        self.0.get(validator)
     }
 
     /// Get a mutable set of messages sent by the sender.
     pub fn get_mut(
         &mut self,
-        k: &<E as Estimator>::ValidatorName,
+        validator: &<E as Estimator>::ValidatorName,
     ) -> Option<&mut HashSet<Message<E>>> {
-        self.0.get_mut(k)
+        self.0.get_mut(validator)
     }
 
     /// Get an iterator on the set.
@@ -317,22 +317,26 @@ impl<E: Estimator> LatestMessages<E> {
     /// Checks whether the new message equivocates with latest messages.
     pub(crate) fn equivocate(&self, message_new: &Message<E>) -> bool {
         self.get(message_new.sender())
-            .map(|latest_messages| latest_messages.iter().any(|m| m.equivocates(&message_new)))
+            .map(|latest_messages| {
+                latest_messages
+                    .iter()
+                    .any(|message| message.equivocates(&message_new))
+            })
             .unwrap_or(false)
     }
 }
 
 impl<E: Estimator> From<&Justification<E>> for LatestMessages<E> {
-    /// Extract the latest messages of each validator from a justification.
-    fn from(j: &Justification<E>) -> Self {
+    /// Extracts the latest messages of each validator from a justification.
+    fn from(justification: &Justification<E>) -> Self {
         let mut latest_messages: LatestMessages<E> = LatestMessages::empty();
-        let mut queue: VecDeque<Message<E>> = j.iter().cloned().collect();
+        let mut queue: VecDeque<Message<E>> = justification.iter().cloned().collect();
         while let Some(message) = queue.pop_front() {
             if latest_messages.update(&message) {
                 message
                     .justification()
                     .iter()
-                    .for_each(|m| queue.push_back(m.clone()));
+                    .for_each(|message| queue.push_back(message.clone()));
             }
         }
         latest_messages
@@ -435,8 +439,8 @@ mod test {
         let sorted_messages = validator_state
             .sort_by_faultweight(&vec![&v2_prime, &v1_prime, &v0_prime].into_iter().collect());
 
-        sorted_messages.iter().for_each(|&m| {
-            justification.faulty_insert(m, &mut validator_state);
+        sorted_messages.iter().for_each(|&message| {
+            justification.faulty_insert(message, &mut validator_state);
         });
 
         assert_eq!(

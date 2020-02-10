@@ -188,7 +188,7 @@ where
                 .weight(sender)
                 .unwrap_or(U::INFINITY);
 
-            let a = self.latest_messages.update(message);
+            let update_success = self.latest_messages.update(message);
 
             if self.latest_messages.equivocate(message)
                 && weight + self.state_fault_weight <= self.thr
@@ -197,7 +197,7 @@ where
                 self.state_fault_weight += weight;
             }
 
-            acc && a
+            acc && update_success
         })
     }
 
@@ -236,7 +236,7 @@ where
                 if !self.equivocators.contains(sender) && self.latest_messages.equivocate(message) {
                     self.validators_weights
                         .weight(sender)
-                        .map(|w| (message, w))
+                        .map(|weight| (message, weight))
                         .ok()
                 } else {
                     Some((message, <U as Zero<U>>::ZERO))
@@ -251,7 +251,7 @@ where
 
         messages_sorted_by_faultw
             .iter()
-            .map(|(m, _)| m)
+            .map(|(message, _)| message)
             .cloned()
             .collect()
     }
@@ -277,13 +277,12 @@ impl<V: self::ValidatorName, U: WeightUnit> Weights<V, U> {
         self.0.write()
     }
 
-    /// Returns success of insertion. Failure happens if we cannot acquire the
-    /// lock to write data.
-    pub fn insert(&mut self, k: V, v: U) -> Result<bool, Error<HashMap<V, U>>> {
+    /// Returns success of insertion. Failure happens if we cannot acquire the lock to write data.
+    pub fn insert(&mut self, validator: V, weight: U) -> Result<bool, Error<HashMap<V, U>>> {
         self.write()
             .map_err(Error::WriteLockError)
             .map(|mut hash_map| {
-                hash_map.insert(k, v);
+                hash_map.insert(validator, weight);
                 true
             })
     }

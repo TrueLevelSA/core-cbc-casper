@@ -45,16 +45,16 @@ impl<V: validator::ValidatorName> From<V> for BoolWrapper {
 pub struct Error(&'static str);
 
 impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "{}", self.0)
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(formatter, "{}", self.0)
     }
 }
 
 impl std::error::Error for Error {}
 
 impl std::convert::From<&'static str> for Error {
-    fn from(e: &'static str) -> Self {
-        Error(e)
+    fn from(string: &'static str) -> Self {
+        Error(string)
     }
 }
 

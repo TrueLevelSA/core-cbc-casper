@@ -40,12 +40,12 @@ impl Id for Example {
 }
 
 fn main() {
-    let s = Example { count: 10, int: -4 };
-    println!("{:?}", s);
-    println!("ID {:?}", s.getid());
-    let ser = s.serialize();
-    println!("BIN {:?}", ser);
-    let de = Example::deserialize(&ser[..]);
-    println!("{:?}", de);
-    assert_eq!(s, de.unwrap());
+    let example = Example { count: 10, int: -4 };
+    println!("{:?}", example);
+    println!("ID {:?}", example.getid());
+    let serialized = example.serialize();
+    println!("BIN {:?}", serialized);
+    let deserialized = Example::deserialize(&serialized[..]);
+    println!("{:?}", deserialized);
+    assert_eq!(example, deserialized.unwrap());
 }

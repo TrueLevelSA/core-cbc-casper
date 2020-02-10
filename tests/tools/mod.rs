@@ -82,14 +82,14 @@ pub fn get_height_selected_chain(
     .unwrap()
     .prevblock()
     .ok_or(casper::blockchain::Error);
-    fn reduce(b: &Block<ValidatorNameBlockData<u32>>, i: u32) -> u32 {
-        match b.prevblock() {
-            Some(_message) => reduce(&_message, i + 1),
+    fn reduce(block: &Block<ValidatorNameBlockData<u32>>, i: u32) -> u32 {
+        match block.prevblock() {
+            Some(previous_block) => reduce(&previous_block, i + 1),
             None => i,
         }
     }
     match selected_block {
-        Ok(b) => reduce(&b, 1),
+        Ok(block) => reduce(&block, 1),
         _ => 0,
     }
 }

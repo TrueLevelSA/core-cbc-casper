@@ -115,15 +115,15 @@ impl VoteCount {
             latest_messages: &Justification<VoteCount>,
             acc: HashSet<message::Message<VoteCount>>,
         ) -> HashSet<message::Message<VoteCount>> {
-            latest_messages.iter().fold(acc, |mut acc_prime, m| {
-                match m.justification().len() {
+            latest_messages.iter().fold(acc, |mut acc_prime, message| {
+                match message.justification().len() {
                     0 => {
                         // vote found, vote is a message with 0 justification
-                        let estimate = *m.estimate();
+                        let estimate = *message.estimate();
                         if estimate.is_valid() {
                             let equivocation = message::Message::new(
-                                *m.sender(),
-                                m.justification().clone(),
+                                *message.sender(),
+                                message.justification().clone(),
                                 estimate.toggled_vote(),
                             );
                             // search for the equivocation of the current latest_messages
@@ -137,25 +137,26 @@ impl VoteCount {
                                 // add the vote
                                 None => {
                                     // println!("no_equiv: {:?}", equivocation);
-                                    acc_prime.insert((*m).clone())
+                                    acc_prime.insert((*message).clone())
                                 }
                             };
                         }
                         acc_prime // returns it
                     }
-                    _ => recursor(m.justification(), acc_prime),
+                    _ => recursor(message.justification(), acc_prime),
                 }
             })
         }
 
-        let j = latest_messages
-            .iter()
-            .fold(Justification::empty(), |mut acc, m| {
-                acc.insert(m.clone());
-                acc
-            });
+        let justification =
+            latest_messages
+                .iter()
+                .fold(Justification::empty(), |mut acc, message| {
+                    acc.insert(message.clone());
+                    acc
+                });
         // start recursion
-        recursor(&j, HashSet::new())
+        recursor(&justification, HashSet::new())
     }
 }
 
@@ -175,8 +176,8 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {}
 
 impl std::convert::From<&'static str> for Error {
-    fn from(e: &'static str) -> Self {
-        Error(e)
+    fn from(string: &'static str) -> Self {
+        Error(string)
     }
 }
 
