@@ -182,7 +182,7 @@ impl<E: Estimator> Message<E> {
     // FIXME: insanely expensive to compute
     pub fn equivocates_indirect(
         &self,
-        rhs: &Self,
+        other: &Self,
         mut equivocators: HashSet<E::ValidatorName>,
     ) -> (bool, HashSet<E::ValidatorName>) {
         //! equivocates_indirect parses every messages accessible from `self` and `rhs` by
@@ -194,7 +194,7 @@ impl<E: Estimator> Message<E> {
         //! accessible from the given messages. It is not commutative. It compares messages with
         //! themselves.
 
-        let is_equivocation = self.equivocates(rhs);
+        let is_equivocation = self.equivocates(other);
         let init = if is_equivocation {
             equivocators.insert(self.sender().clone());
             (true, equivocators)
@@ -204,37 +204,39 @@ impl<E: Estimator> Message<E> {
         self.justification().iter().fold(
             init,
             |(acc_has_equivocations, acc_equivocators), self_prime| {
-                // note the rotation between rhs and self, done because descending only on self,
-                // thus rhs has to become self on the recursion to get its justification visited
+                // Note the rotation between other and self, done because descending only on self,
+                // thus other has to become self on the recursion to get its justification visited.
                 let (has_equivocation, equivocators) =
-                    rhs.equivocates_indirect(self_prime, acc_equivocators.clone());
+                    other.equivocates_indirect(self_prime, acc_equivocators.clone());
                 let acc_equivocators = acc_equivocators.union(&equivocators).cloned().collect();
                 (acc_has_equivocations || has_equivocation, acc_equivocators)
             },
         )
     }
 
-    /// Math definition of the equivocation
-    pub fn equivocates(&self, rhs: &Self) -> bool {
-        self != rhs && self.sender() == rhs.sender() && !rhs.depends(self) && !self.depends(rhs)
+    /// Math definition of the equivocation.
+    pub fn equivocates(&self, other: &Self) -> bool {
+        self != other
+            && self.sender() == other.sender()
+            && !other.depends(self)
+            && !self.depends(other)
     }
 
-    /// Checks whether self depends on rhs or not. Returns true if rhs is somewhere in the
-    /// justification of self. This check is heavy and work well only with messages where the
-    /// dependency is found on the surface, which what it was designed for.
-    pub fn depends(&self, rhs: &Self) -> bool {
-        // although the recursion ends supposedly only at genesis message, the
-        // trick is the following: it short-circuits while descending on the
-        // dependency tree, if it finds a dependent message. when dealing with
-        // honest validators, this would return true very fast. all the new
-        // derived branches of the justification will be evaluated in parallel.
-        // say if a msg is justified by 2 other msgs, then the 2 other msgs will
-        // be processed on different threads. this applies recursively, so if
-        // each of the 2 msgs have say 3 justifications, then each of the 2
-        // threads will spawn 3 new threads to process each of the messages.
-        // thus, highly parallelizable. when it shortcuts, because in one thread
-        // a dependency was found, the function returns true and all the
-        // computation on the other threads will be canceled.
+    /// Checks whether self depends on other or not. Returns true if other is somewhere in the
+    /// justification of self. Then recursively checks the justifications of the messages in the
+    /// justification of self.  This check is heavy and works well only with messages where the
+    /// dependency is found on the surface, which is what it was designed for.
+    pub fn depends(&self, other: &Self) -> bool {
+        // Although the recursion ends supposedly only at genesis message, the trick is the
+        // following: it short-circuits while descending on the dependency tree, if it finds a
+        // dependent message. when dealing with honest validators, this would return true very
+        // fast. all the new derived branches of the justification will be evaluated in parallel.
+        // Say a message is justified by two other messages, then the two other messages will be
+        // processed on different threads. This applies recursively, so if each of the two
+        // messages have say three messages in their justifications, then each of the two threads
+        // will spawn three new threads to process each of the messages.  Thus, highly
+        // parallelizable. When it shortcuts because in one thread a dependency was found, the
+        // function returns true and all the computation on the other threads will be cancelled.
         fn recurse<E: Estimator>(
             lhs: &Message<E>,
             rhs: &Message<E>,
@@ -263,7 +265,7 @@ impl<E: Estimator> Message<E> {
                     })
         }
         let visited = Arc::new(RwLock::new(HashSet::new()));
-        recurse(self, rhs, visited)
+        recurse(self, other, visited)
     }
 }
 
@@ -289,8 +291,8 @@ impl<E: Estimator> std::hash::Hash for Message<E> {
 }
 
 impl<E: Estimator> PartialEq for Message<E> {
-    fn eq(&self, rhs: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &rhs.0) || self.getid() == rhs.getid()
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0) || self.getid() == other.getid()
     }
 }
 

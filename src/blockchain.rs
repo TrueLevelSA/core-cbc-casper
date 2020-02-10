@@ -72,9 +72,9 @@ impl<D: BlockData> std::fmt::Debug for Block<D> {
 }
 
 impl<D: BlockData> serde::Serialize for Block<D> {
-    fn serialize<T: serde::Serializer>(&self, rhs: T) -> Result<T::Ok, T::Error> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
-        let mut message = rhs.serialize_struct("Block", 1)?;
+        let mut message = serializer.serialize_struct("Block", 1)?;
         message.serialize_field("prevblock", &self.prevblock())?;
         message.serialize_field("data", &self.data())?;
         message.end()
@@ -92,8 +92,8 @@ impl<D: BlockData> std::hash::Hash for Block<D> {
 }
 
 impl<D: BlockData> PartialEq for Block<D> {
-    fn eq(&self, rhs: &Self) -> bool {
-        Arc::ptr_eq(self.arc(), rhs.arc()) || self.getid() == rhs.getid()
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(self.arc(), other.arc()) || self.getid() == other.getid()
     }
 }
 
@@ -161,9 +161,9 @@ impl<D: BlockData> Block<D> {
     }
 
     /// Mathematical definition of blockchain membership.
-    pub fn is_member(&self, rhs: &Self) -> bool {
-        self == rhs
-            || rhs
+    pub fn is_member(&self, other: &Self) -> bool {
+        self == other
+            || other
                 .prevblock()
                 .as_ref()
                 .map(|prevblock| self.is_member(prevblock))
