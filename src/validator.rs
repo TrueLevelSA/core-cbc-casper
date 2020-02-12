@@ -199,7 +199,7 @@ where
             .collect();
 
         messages_sorted_by_faultw.sort_unstable_by(|(m0, w0), (m1, w1)| match w0.partial_cmp(w1) {
-            None | Some(Ordering::Equal) => m0.getid().cmp(&m1.getid()),
+            None | Some(Ordering::Equal) => m0.id().cmp(&m1.id()),
             Some(ord) => ord,
         });
 
@@ -625,8 +625,8 @@ mod tests {
             );
 
             // Comparing the hashes
-            assert!(v2.getid() < v0.getid());
-            assert!(v0.getid() < v1.getid());
+            assert!(v2.id() < v0.id());
+            assert!(v0.id() < v1.id());
         }
 
         // Weights have no influence
@@ -657,8 +657,8 @@ mod tests {
             );
 
             // Comparing the hashes
-            assert!(v2.getid() < v0.getid());
-            assert!(v0.getid() < v1.getid());
+            assert!(v2.id() < v0.id());
+            assert!(v0.id() < v1.id());
         }
 
         // Weights have no influence

@@ -66,7 +66,7 @@ impl<E: Estimator> Serialize for ProtoMessage<E> {
         use serde::ser::SerializeStruct;
 
         let mut message = serializer.serialize_struct("Message", 3)?;
-        let justification: Vec<_> = self.justification.iter().map(Message::getid).collect();
+        let justification: Vec<_> = self.justification.iter().map(Message::id).collect();
         message.serialize_field("sender", &self.sender)?;
         message.serialize_field("estimate", &self.estimate)?;
         message.serialize_field("justification", &justification)?;
@@ -126,7 +126,7 @@ impl<E: Estimator> Message<E> {
             estimate,
         };
         // Message is not mutable, id is computed only once at creation
-        let id = proto.getid();
+        let id = proto.id();
         Message(Arc::new(proto), id)
     }
 
@@ -245,8 +245,8 @@ impl<E: Estimator> Message<E> {
 impl<E: Estimator> Id for Message<E> {
     type ID = Hash;
 
-    // Redefine getid to not recompute the hash every time
-    fn getid(&self) -> Self::ID {
+    // Redefine id to not recompute the hash every time
+    fn id(&self) -> Self::ID {
         self.1
     }
 }
@@ -259,13 +259,13 @@ impl<E: Estimator> Serialize for Message<E> {
 
 impl<E: Estimator> std::hash::Hash for Message<E> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.getid().hash(state)
+        self.id().hash(state)
     }
 }
 
 impl<E: Estimator> PartialEq for Message<E> {
     fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &other.0) || self.getid() == other.getid()
+        Arc::ptr_eq(&self.0, &other.0) || self.id() == other.id()
     }
 }
 

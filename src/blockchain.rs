@@ -63,10 +63,10 @@ impl<D: BlockData> std::fmt::Debug for Block<D> {
         write!(
             f,
             "{:?} -> {:?}",
-            self.getid(),
+            self.id(),
             self.prevblock()
                 .as_ref()
-                .map(|previous_block| previous_block.getid())
+                .map(|previous_block| previous_block.id())
                 .unwrap_or_default()
         )
     }
@@ -94,7 +94,7 @@ impl<D: BlockData> std::hash::Hash for Block<D> {
 
 impl<D: BlockData> PartialEq for Block<D> {
     fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(self.arc(), other.arc()) || self.getid() == other.getid()
+        Arc::ptr_eq(self.arc(), other.arc()) || self.id() == other.id()
     }
 }
 
@@ -322,7 +322,7 @@ impl<D: BlockData> Block<D> {
             scoring_function,
         )
         .into_iter()
-        .max_by(|left, right| right.getid().cmp(&left.getid()))
+        .max_by(|left, right| right.id().cmp(&left.id()))
         .cloned()
         .ok_or(Error)
     }
@@ -394,7 +394,7 @@ impl<D: BlockData> Block<D> {
         // Tie breaker uses the blocks hashes.
         result
             .into_iter()
-            .max_by(|left, right| right.getid().cmp(&left.getid()))
+            .max_by(|left, right| right.id().cmp(&left.id()))
             .ok_or(Error)
     }
 
@@ -689,7 +689,7 @@ impl<D: BlockData> Block<D> {
                         Some(Ordering::Less) => b_res,
                         Some(Ordering::Equal) | None => {
                             // break ties with blockhash
-                            let ord = b_block.as_ref().map(|b| b.getid().cmp(&block.getid()));
+                            let ord = b_block.as_ref().map(|b| b.id().cmp(&block.id()));
                             match ord {
                                 Some(Ordering::Greater) => res,
                                 Some(Ordering::Less) => b_res,

@@ -43,7 +43,7 @@ impl Id for Example {
 fn main() {
     let example = Example { count: 10, int: -4 };
     println!("{:?}", example);
-    println!("ID {:?}", example.getid());
+    println!("ID {:?}", example.id());
     let serialized = example.serialize();
     println!("BIN {:?}", serialized);
     let deserialized = Example::deserialize(&serialized[..]);
