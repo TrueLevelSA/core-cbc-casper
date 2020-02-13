@@ -28,14 +28,12 @@ use crate::message::Message;
 use crate::util::weight::{WeightUnit, Zero};
 use crate::validator;
 
-/// This struct holds the set of the `message::Message` that justify
+/// This struct holds the set of the [`Message`] that justify
 /// the current message. It works like a `Vec`.
 ///
 /// # Example
 ///
 /// Using the [`VoteCount`] type message type for brevity's sake.
-///
-/// [`VoteCount`]: ../struct.VoteCount.html
 ///
 /// ```
 /// use core_cbc_casper::justification::Justification;
@@ -53,6 +51,9 @@ use crate::validator;
 ///     VoteCount { yes: 1, no: 0 },
 /// );
 /// ```
+///
+/// [`Message`]: ../message/struct.Message.html
+/// [`VoteCount`]: ../struct.VoteCount.html
 #[derive(Eq, PartialEq, Clone, Hash)]
 pub struct Justification<E: Estimator>(Vec<Message<E>>);
 
@@ -63,8 +64,11 @@ impl<E: Estimator> Justification<E> {
     }
 
     /// Creates and returns a new justification from a vector of
-    /// `message::Message` and mutates the given `validator::State`
+    /// [`Message`] and mutates the given [`validator::State`]
     /// with the updated state.
+    ///
+    /// [`Message`]: ../message/struct.Message.html
+    /// [`validator::State`]: ../validator/struct.State.html
     pub fn from_messages<U: WeightUnit>(
         messages: Vec<Message<E>>,
         state: &mut validator::State<E, U>,
@@ -95,9 +99,11 @@ impl<E: Estimator> Justification<E> {
         self.0.is_empty()
     }
 
-    /// This function checks if the message is already contained into the underlying `Vec`. If it
+    /// This function checks if the [`message`] is already contained into the underlying `Vec`. If it
     /// is, it does nothing and returns false. Else, it will push the message in the `Vec` and
     /// returns true.
+    ///
+    /// [`message`]: ../message/struct.Message.html
     pub fn insert(&mut self, message: Message<E>) -> bool {
         if self.contains(&message) {
             false
@@ -107,8 +113,11 @@ impl<E: Estimator> Justification<E> {
         }
     }
 
-    /// Runs the estimator on the justification given the set of equivocators and validators'
-    /// weights.
+    /// Runs the [`estimator`] on the justification given the set of equivocators and [`validators'
+    /// weights`].
+    ///
+    /// [`estimator`]: ../estimator/trait.Estimator.html
+    /// [`validators' weights`]: ../validator/struct.Weights.html
     pub fn make_estimate<U: WeightUnit>(
         &self,
         equivocators: &HashSet<E::ValidatorName>,
@@ -120,10 +129,13 @@ impl<E: Estimator> Justification<E> {
         Estimator::estimate(&latest_messages_honest, validators_weights)
     }
 
-    /// Inserts messages to the justification, accepting up to the threshold faults by weight.
+    /// Inserts [`messages`] to the justification, accepting up to the threshold faults by weight.
     /// In ordering to insert as much messages as possible, the input messages are sorted
-    /// ascendingly by their validators' weight.
+    /// ascendingly by their [`validators' weight`].
     /// Returns a `HashSet` of messages that got successfully included in the justification.
+    ///
+    /// [`messages`]: ../message/struct.Message.html
+    /// [`validators' weight`]: ../validator/struct.Weights.html
     pub fn faulty_inserts<'a, U: WeightUnit>(
         &mut self,
         messages: &HashSet<&'a Message<E>>,
@@ -183,8 +195,10 @@ impl<E: Estimator> Justification<E> {
     }
 
     /// This function sets the weight of an equivocator to zero right away (returned in
-    /// `validator::State`) and add his message to the state, since his weight is null and doesn't
+    /// [`validator::State`]) and add his message to the state, since his weight is null and doesn't
     /// count to the state fault weight anymore.
+    ///
+    /// [`validator::State`]: ../validator/struct.State.html
     pub fn faulty_insert_with_slash<'a, U: WeightUnit>(
         &mut self,
         message: &Message<E>,
@@ -220,14 +234,12 @@ impl<E: Estimator> Debug for Justification<E> {
     }
 }
 
-/// LatestMessages is a map between validators and their latests messages. Latest messages from a
+/// LatestMessages is a map between [`validators`] and their latests [`messages`]. Latest messages from a
 /// validator are all their messages that are not in the dependency of another of their messages.
 ///
 /// # Example
 ///
 /// Using the [`VoteCount`] type message type for brevity's sake.
-///
-/// [`VoteCount`]: ../struct.VoteCount.html
 ///
 /// ```
 /// use core_cbc_casper::justification::{Justification, LatestMessages};
@@ -265,6 +277,10 @@ impl<E: Estimator> Debug for Justification<E> {
 ///     HashSet::from_iter(vec![message_2, message_3]),
 /// );
 /// ```
+///
+/// [`VoteCount`]: ../struct.VoteCount.html
+/// [`validators`]: ../validator/trait.ValidatorName.html
+/// [`messages`]: ../message/struct.Message.html
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct LatestMessages<E: Estimator>(HashMap<E::ValidatorName, HashSet<Message<E>>>);
 
@@ -329,7 +345,9 @@ impl<E: Estimator> LatestMessages<E> {
 
     /// Updates the data structure by adding a new message. Returns true if the new message is a
     /// valid latest message, i.e. the first message of a validator or a message that is not in the
-    /// justification of the existing latest messages.
+    /// [`justification`] of the existing latest messages.
+    ///
+    /// [`justification`]: ../justification/struct.Justification.html
     pub fn update(&mut self, new_message: &Message<E>) -> bool {
         let sender = new_message.sender();
         if let Some(latest_messages_from_sender) = self.get(sender).cloned() {
@@ -382,7 +400,9 @@ impl<E: Estimator> LatestMessages<E> {
 }
 
 impl<E: Estimator> From<&Justification<E>> for LatestMessages<E> {
-    /// Extracts the latest messages of each validator from a justification.
+    /// Extracts the latest messages of each validator from a [`justification`].
+    ///
+    /// [`justification`]: ../justification/struct.Justification.html
     fn from(justification: &Justification<E>) -> Self {
         let mut latest_messages: LatestMessages<E> = LatestMessages::empty();
         let mut queue: VecDeque<Message<E>> = justification.iter().cloned().collect();
@@ -398,14 +418,12 @@ impl<E: Estimator> From<&Justification<E>> for LatestMessages<E> {
     }
 }
 
-/// Set of latest honest messages for each validator. Works like LatestMessages but ignores
+/// Set of latest honest [`messages`] for each [`validator`]. Works like [`LatestMessages`] but ignores
 /// equivocations.
 ///
 /// # Example
 ///
 /// Using the [`VoteCount`] type message type for brevity's sake.
-///
-/// [`VoteCount`]: ../struct.VoteCount.html
 ///
 /// ```
 /// use core_cbc_casper::justification::{Justification, LatestMessages, LatestMessagesHonest};
@@ -451,6 +469,11 @@ impl<E: Estimator> From<&Justification<E>> for LatestMessages<E> {
 ///     HashSet::from_iter(vec![]),
 /// );
 /// ```
+///
+/// [`messages`]: ../message/struct.Message.html
+/// [`validator`]: ../validator/trait.ValidatorName.html
+/// [`LatestMessages`]: struct.LatestMessages.html
+/// [`VoteCount`]: ../struct.VoteCount.html
 #[derive(Clone)]
 pub struct LatestMessagesHonest<E: Estimator>(HashSet<Message<E>>);
 

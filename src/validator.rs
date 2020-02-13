@@ -30,10 +30,12 @@ use crate::message::Message;
 use crate::util::id::Id;
 use crate::util::weight::{WeightUnit, Zero};
 
-/// All casper actors that send messages, aka validators, have to implement the validator name
+/// All casper actors that send [`messages`], aka validators, have to implement the validator name
 /// trait. This trait serves as an identifier for validators.
 ///
 /// The basic types u8, u32, u64, i8, i32, and i64 implement ValidatorName trivially.
+///
+/// [`messages`]: ../message/struct.Message.html
 ///
 /// # Example
 ///
@@ -69,7 +71,9 @@ impl ValidatorName for i8 {}
 impl ValidatorName for i32 {}
 impl ValidatorName for i64 {}
 
-/// Inner state of a validator. This represents the validator's view of the network.
+/// Inner state of a [`validator`]. This represents the validator's view of the network.
+///
+/// [`validator`]: trait.ValidatorName.html
 ///
 /// # Example
 ///
@@ -199,8 +203,10 @@ where
         }
     }
 
-    /// Adds messages to the state's latests_messages. Returns true if
+    /// Adds messages to the state's [`latests_messages`]. Returns true if
     /// all messages added are valid latest messages.
+    ///
+    /// [`latests_messages`]: ../justification/struct.LatestMessages.html
     pub fn update(&mut self, messages: &[&Message<E>]) -> bool {
         messages.iter().fold(true, |acc, message| {
             let sender = message.sender();
@@ -278,10 +284,10 @@ where
     }
 }
 
-/// This type maps validators ([`ValidatorName`]) with their weights ([`WeightUnit`]).
+/// This type maps [`validators`] with their [`weights`].
 ///
-/// [`ValidatorName`]: trait.ValidatorName.html
-/// [`WeightUnit`]: ../util/weight/trait.WeightUnit.html
+/// [`validators`]: trait.ValidatorName.html
+/// [`weights`]: ../util/weight/trait.WeightUnit.html
 ///
 /// # Example
 ///
@@ -299,7 +305,10 @@ where
 pub struct Weights<V: self::ValidatorName, U: WeightUnit>(Arc<RwLock<HashMap<V, U>>>);
 
 impl<V: self::ValidatorName, U: WeightUnit> Weights<V, U> {
-    /// Creates a new `Weights` struct from a `HashMap` of `ValidatorName` to `WeightUnit`.
+    /// Creates a new `Weights` struct from a `HashMap` of [`ValidatorName`] to [`WeightUnit`].
+    ///
+    /// [`ValidatorName`]: trait.ValidatorName.html
+    /// [`WeightUnit`]: ../util/weight/trait.WeightUnit.html
     pub fn new(weights: HashMap<V, U>) -> Self {
         Weights(Arc::new(RwLock::new(weights)))
     }

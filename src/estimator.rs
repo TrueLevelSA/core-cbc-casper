@@ -27,8 +27,12 @@ use crate::util::weight::WeightUnit;
 use crate::validator;
 
 /// Describes an estimate, or a value of the consensus at a certain time. Implementing this trait
-/// allows to produce an estimate given the set of latest messages and the set of validators and
-/// their weights.
+/// allows to produce an estimate given the set of [`latest messages`] and the set of [`validators`] and
+/// their [`weights`].
+///
+/// [`latest messages`]: ../justification/struct.LatestMessages.html
+/// [`validators`]: ../validator/trait.ValidatorName.html
+/// [`weights`]: ../validator/struct.Weights.html
 ///
 /// # Example
 ///

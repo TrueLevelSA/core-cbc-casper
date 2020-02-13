@@ -97,7 +97,7 @@ impl_weight_float!(f64, 0f64);
 ///
 /// The best example is the implementation of [`Weight`].
 ///
-/// [`Weight`]: struct.Weight.html
+/// [`Weight`]: enum.Weight.html
 pub trait WeightUnit
 where
     Self: Zero<Self>

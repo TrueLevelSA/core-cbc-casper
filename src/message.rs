@@ -74,14 +74,12 @@ impl<E: Estimator> Serialize for ProtoMessage<E> {
     }
 }
 
-/// Concrete Casper message containing a value as `Estimator`, a
-/// validator as `validator::ValidatorName`, and a justification as `Justification`.
+/// Concrete Casper message containing a value as [`Estimator`], a
+/// validator as [`ValidatorName`], and a justification as [`Justification`].
 ///
 /// # Example
 ///
 /// Using the [`VoteCount`] type message type for brevity's sake.
-///
-/// [`VoteCount`]: ../struct.VoteCount.html
 ///
 /// ```
 /// use core_cbc_casper::VoteCount;
@@ -95,8 +93,13 @@ impl<E: Estimator> Serialize for ProtoMessage<E> {
 /// assert_eq!(vote_message.estimate(), &VoteCount { yes: 1, no: 0 });
 /// ```
 ///
-/// Message values must implement `Estimator` to be valid for a `message::Message` and to produce
+/// Message values must implement [`Estimator`] to be valid for a `message::Message` and to produce
 /// estimates.
+///
+/// [`Estimator`]: ../estimator/trait.Estimator.html
+/// [`ValidatorName`]: ../validator/trait.ValidatorName.html
+/// [`Justification`]: ../justification/struct.Justification.html
+/// [`VoteCount`]: ../struct.VoteCount.html
 #[derive(Eq, Clone)]
 pub struct Message<E: Estimator>(Arc<ProtoMessage<E>>, Hash);
 
@@ -125,7 +128,10 @@ impl<E: Estimator> Message<E> {
     }
 
     /// Creates a message from newly received messages contained in
-    /// `validator_state`, which is used to compute the latest honest messages.
+    /// [`validator_state`], which is used to compute the [`latest honest messages`].
+    ///
+    /// [`validator_state`]: ../validator/struct.State.html
+    /// [`latest honest messages`]: ../justification/struct.LatestMessagesHonest.html
     pub fn from_validator_state<U: WeightUnit>(
         sender: E::ValidatorName,
         validator_state: &validator::State<E, U>,
@@ -148,14 +154,16 @@ impl<E: Estimator> Message<E> {
         }
     }
 
-    /// Parses every messages accessible from `self` and `rhs` by iterating over messages'
-    /// justifications and returns true if any of those messages is an equivocation with
+    /// Parses every messages accessible from `self` and `other` by iterating over messages'
+    /// [`justifications`] and returns true if any of those messages is an equivocation with
     /// another one. This method can only be used to know that a random validator is
     /// equivocating but not which one.
     ///
     /// This method is currently broken as it does not always find equivocations that should be
     /// accessible from the given messages. It is not commutative. It compares messages with
     /// themselves.
+    ///
+    /// [`justifications`]: ../justification/struct.Justification.html
     pub fn equivocates_indirect(
         &self,
         other: &Self,
@@ -190,9 +198,11 @@ impl<E: Estimator> Message<E> {
     }
 
     /// Checks whether self depends on other or not. Returns true if other is somewhere in the
-    /// justification of self. Then recursively checks the justifications of the messages in the
-    /// justification of self.  This check is heavy and works well only with messages where the
+    /// [`justification`] of self. Then recursively checks the justifications of the messages in the
+    /// [`justification`] of self.  This check is heavy and works well only with messages where the
     /// dependency is found on the surface, which is what it was designed for.
+    ///
+    /// [`justification`]: ../justification/struct.Justification.html
     pub fn depends(&self, other: &Self) -> bool {
         // Although the recursion ends supposedly only at genesis message, the trick is the
         // following: it short-circuits while descending on the dependency tree, if it finds a
