@@ -23,6 +23,25 @@ use crate::validator::ValidatorName;
 
 /// This block data structure contains the name of the validator that created that block. This is
 /// used by the tests in order to have a simple data structure.
+///
+/// Implements [`BlockData`].
+///
+/// [`BlockData`]: blockchain/trait.BlockData.html
+///
+/// # Example
+///
+/// ```
+/// use core_cbc_casper::blockchain::BlockData;
+/// use core_cbc_casper::ValidatorNameBlockData;
+/// use core_cbc_casper::validator::ValidatorName;
+///
+/// // Using u32 as the ValidatorName, which is implemented in `core_cbc_casper::validator`.
+/// let data = ValidatorNameBlockData::<u32>::new(13);
+/// assert_eq!(
+///     *data.validator_name(),
+///     13
+/// );
+/// ```
 #[derive(std::hash::Hash, Clone, Eq, PartialEq, Default)]
 pub struct ValidatorNameBlockData<V: ValidatorName + Default> {
     validator_name: V,

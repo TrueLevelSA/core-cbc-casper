@@ -34,11 +34,47 @@ use crate::util::id::Id;
 use crate::util::weight::{WeightUnit, Zero};
 use crate::validator;
 
+/// This trait must be implemented on a data type that is to be held by a [`Block<D>`].
+///
+/// [`Block<D>`]: ./struct.Block.html
+///
+/// # Example
+///
+/// ```
+/// use core_cbc_casper::blockchain::{Block, BlockData};
+/// use core_cbc_casper::validator;
+///
+/// type ValidatorName = i32;
+///
+/// #[derive(Hash, Clone, PartialEq, Eq, Default, Debug, serde_derive::Serialize)]
+/// struct StringBlockData {
+///     data: String,
+///     validator: ValidatorName,
+/// }
+///
+/// impl BlockData for StringBlockData {
+///     type ValidatorName = ValidatorName;
+///
+///     fn validator_name(&self) -> &Self::ValidatorName {
+///         &self.validator
+///     }
+/// }
+///
+/// assert_eq!(
+///     Block::new(
+///         None,
+///         StringBlockData { data: "Hello, World!".to_string(), validator: 0 },
+///     ).data(),
+///     StringBlockData { data: "Hello, World!".to_string(), validator: 0 },
+/// );
+/// ```
 pub trait BlockData:
     std::hash::Hash + Clone + Eq + Send + Sync + Default + serde::Serialize
 {
+    /// The type of validators that can produce data of this type.
     type ValidatorName: validator::ValidatorName;
 
+    /// The name of the validator that produced the block containing this data.
     fn validator_name(&self) -> &Self::ValidatorName;
 }
 
@@ -55,6 +91,39 @@ impl<D: BlockData> ProtoBlock<D> {
 }
 
 /// Simplest structure of a block with a `prevblock` pointer for running Casper on a blockchain.
+/// The data contained in these blocks must implement the [`BlockData`] trait.
+///
+/// This structure implements the [`Estimator`] trait and uses the GHOST algorithm defined in
+/// the paper for the estimate function.
+///
+/// [`BlockData`]: ./trait.BlockData.html
+/// [`Estimator`]: ../estimator/trait.Estimator.html
+///
+/// # Example
+///
+/// Using the [`ValidatorNameBlockData`] type message type for brevity's sake.
+///
+/// [`ValidatorNameBlockData`]: ../struct.ValidatorNameBlockData.html
+///
+/// ```
+/// use core_cbc_casper::blockchain::Block;
+/// use core_cbc_casper::justification::Justification;
+/// use core_cbc_casper::message::Message;
+/// use core_cbc_casper::ValidatorNameBlockData;
+///
+/// let message = Message::new(
+///     0,
+///     Justification::empty(),
+///     Block::new(None, ValidatorNameBlockData::new(1)),
+/// );
+/// let block_1 = Block::from(&message);
+/// let block_2 = Block::new(Some(block_1.clone()), ValidatorNameBlockData::new(2));
+/// assert!(block_1.is_member(&block_2));
+/// assert!(Block::from(&message).is_member(&block_1));
+/// assert!(Block::from(&message).is_member(&block_2));
+/// assert!(!block_2.is_member(&block_1));
+/// assert!(!block_2.is_member(&Block::from(&message)));
+/// ```
 #[derive(Clone, Eq)]
 pub struct Block<D: BlockData>(Arc<ProtoBlock<D>>);
 

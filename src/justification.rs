@@ -30,6 +30,29 @@ use crate::validator;
 
 /// This struct holds the set of the `message::Message` that justify
 /// the current message. It works like a `Vec`.
+///
+/// # Example
+///
+/// Using the [`VoteCount`] type message type for brevity's sake.
+///
+/// [`VoteCount`]: ../struct.VoteCount.html
+///
+/// ```
+/// use core_cbc_casper::justification::Justification;
+/// use core_cbc_casper::message::Message;
+/// use core_cbc_casper::VoteCount;
+///
+/// let message = VoteCount::create_vote_message(0, true);
+///
+/// let mut justification = Justification::empty();
+///
+/// justification.insert(message.clone());
+///
+/// assert_eq!(
+///     *justification.iter().next().unwrap().estimate(),
+///     VoteCount { yes: 1, no: 0 },
+/// );
+/// ```
 #[derive(Eq, PartialEq, Clone, Hash)]
 pub struct Justification<E: Estimator>(Vec<Message<E>>);
 
@@ -197,8 +220,51 @@ impl<E: Estimator> Debug for Justification<E> {
     }
 }
 
-/// Mapping between validators and their latests messages. Latest messages from a validator are all
-/// their messages that are not in the dependency of another of their messages.
+/// LatestMessages is a map between validators and their latests messages. Latest messages from a
+/// validator are all their messages that are not in the dependency of another of their messages.
+///
+/// # Example
+///
+/// Using the [`VoteCount`] type message type for brevity's sake.
+///
+/// [`VoteCount`]: ../struct.VoteCount.html
+///
+/// ```
+/// use core_cbc_casper::justification::{Justification, LatestMessages};
+/// use core_cbc_casper::message::Message;
+/// use core_cbc_casper::VoteCount;
+///
+/// use std::collections::HashSet;
+/// use std::iter::FromIterator;
+///
+/// let mut justification = Justification::empty();
+///
+/// let message_0 = Message::new(0, justification.clone(), VoteCount { yes: 1, no: 0 });
+/// justification.insert(message_0.clone());
+/// assert_eq!(
+///     *LatestMessages::from(&justification).get(&0).unwrap(),
+///     HashSet::from_iter(vec![message_0]),
+/// );
+///
+/// // message_1 will replace message_0 in the LatestMessages.
+/// let message_1 = Message::new(0, justification.clone(), VoteCount { yes: 2, no: 0 });
+/// justification.insert(message_1.clone());
+/// assert_eq!(
+///     *LatestMessages::from(&justification).get(&0).unwrap(),
+///     HashSet::from_iter(vec![message_1]),
+/// );
+///
+/// // Equivocating messages will all be contained in the LatestMessages as they're not contained
+/// // in the justification of other messages.
+/// let message_2 = Message::new(0, justification.clone(), VoteCount { yes: 3, no: 0 });
+/// let message_3 = Message::new(0, justification.clone(), VoteCount { yes: 2, no: 1 });
+/// justification.insert(message_2.clone());
+/// justification.insert(message_3.clone());
+/// assert_eq!(
+///     *LatestMessages::from(&justification).get(&0).unwrap(),
+///     HashSet::from_iter(vec![message_2, message_3]),
+/// );
+/// ```
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct LatestMessages<E: Estimator>(HashMap<E::ValidatorName, HashSet<Message<E>>>);
 
@@ -332,7 +398,59 @@ impl<E: Estimator> From<&Justification<E>> for LatestMessages<E> {
     }
 }
 
-/// Set of latest honest messages for each validator.
+/// Set of latest honest messages for each validator. Works like LatestMessages but ignores
+/// equivocations.
+///
+/// # Example
+///
+/// Using the [`VoteCount`] type message type for brevity's sake.
+///
+/// [`VoteCount`]: ../struct.VoteCount.html
+///
+/// ```
+/// use core_cbc_casper::justification::{Justification, LatestMessages, LatestMessagesHonest};
+/// use core_cbc_casper::message::Message;
+/// use core_cbc_casper::VoteCount;
+///
+/// use std::collections::HashSet;
+/// use std::iter::FromIterator;
+///
+/// let mut justification = Justification::empty();
+///
+/// let message_0 = Message::new(0, justification.clone(), VoteCount { yes: 1, no: 0 });
+/// justification.insert(message_0.clone());
+/// assert_eq!(
+///     HashSet::<&Message<_>>::from_iter(LatestMessagesHonest::from_latest_messages(
+///         &LatestMessages::from(&justification),
+///         &HashSet::new(),
+///     ).iter()),
+///     HashSet::from_iter(vec![&message_0]),
+/// );
+///
+/// // message_1 will replace message_0 in the LatestMessagesHonest.
+/// let message_1 = Message::new(0, justification.clone(), VoteCount { yes: 2, no: 0 });
+/// justification.insert(message_1.clone());
+/// assert_eq!(
+///     HashSet::<&Message<_>>::from_iter(LatestMessagesHonest::from_latest_messages(
+///         &LatestMessages::from(&justification),
+///         &HashSet::new(),
+///     ).iter()),
+///     HashSet::from_iter(vec![&message_1]),
+/// );
+///
+/// // As the validator is no longer honest, his messages are ignored.
+/// let message_2 = Message::new(0, justification.clone(), VoteCount { yes: 3, no: 0 });
+/// let message_3 = Message::new(0, justification.clone(), VoteCount { yes: 2, no: 1 });
+/// justification.insert(message_2.clone());
+/// justification.insert(message_3.clone());
+/// assert_eq!(
+///     HashSet::<&Message<_>>::from_iter(LatestMessagesHonest::from_latest_messages(
+///         &LatestMessages::from(&justification),
+///         &HashSet::new(),
+///     ).iter()),
+///     HashSet::from_iter(vec![]),
+/// );
+/// ```
 #[derive(Clone)]
 pub struct LatestMessagesHonest<E: Estimator>(HashSet<Message<E>>);
 

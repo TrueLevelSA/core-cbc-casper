@@ -22,7 +22,25 @@ use std::cmp::Ordering;
 use std::fmt::{self, Display};
 use std::ops::{Add, AddAssign, Sub, SubAssign};
 
-/// Define how to compare the trait type to zero
+/// Defines how to compare the trait type to zero.
+///
+/// This trait is implemented for the basic types u8, u16, u32, u64, i8, i16, i32, and i64.
+/// # Example
+///
+/// ```
+/// use core_cbc_casper::util::weight::Zero;
+///
+/// #[derive(Copy, Clone, PartialEq)]
+/// struct IntWrapper {
+///     value: i32,
+/// }
+///
+/// impl Zero<IntWrapper> for IntWrapper {
+///     const ZERO: Self = Self { value: 0 };
+/// }
+///
+/// assert!(IntWrapper::is_zero(&IntWrapper { value: 0 }));
+/// ```
 pub trait Zero<T: PartialEq + Copy> {
     const ZERO: T;
 
@@ -73,6 +91,13 @@ macro_rules! impl_weight_float {
 impl_weight_float!(f32, 0f32);
 impl_weight_float!(f64, 0f64);
 
+/// Weight units for the validators.
+///
+/// # Example
+///
+/// The best example is the implementation of [`Weight`].
+///
+/// [`Weight`]: struct.Weight.html
 pub trait WeightUnit
 where
     Self: Zero<Self>
@@ -91,8 +116,24 @@ where
     const INFINITY: Self;
 }
 
-// Generic implement of weight with any units that can be added and substracted. This wraps the
-// unit in a system with an infinity point and a "not a number" point used in the algorithmes.
+/// Generic implementation of weight with any units that implement `std::ops::Add` and
+/// `std::ops::Sub`. This type wraps the unit in a system with an infinity point and a
+/// "not a number" point used by the algorithms.
+///
+/// Implements [`WeightUnit`] and [`Zero`].
+///
+/// [`WeightUnit`]: trait.WeightUnit.html
+/// [`Zero`]: trait.Zero.html
+///
+/// # Example
+///
+/// ```
+/// use core_cbc_casper::util::weight::Weight::{self, *};
+///
+/// assert_eq!(Unit(2), Unit(1) + Unit(1));
+/// assert_eq!(Infinity, Unit(1) + Infinity);
+/// assert_eq!(Weight::<u32>::NaN.to_string(), (Unit(1) + NaN).to_string());
+/// ```
 #[derive(Clone, Copy)]
 pub enum Weight<T>
 where

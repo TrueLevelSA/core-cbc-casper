@@ -79,29 +79,23 @@ impl<E: Estimator> Serialize for ProtoMessage<E> {
 ///
 /// # Example
 ///
-/// Declare a `Message` type that contains a `Value` as estimate/value, sent by validators
-/// represented with `u64`.
+/// Using the [`VoteCount`] type message type for brevity's sake.
+///
+/// [`VoteCount`]: ../struct.VoteCount.html
 ///
 /// ```
-/// extern crate core_cbc_casper;
+/// use core_cbc_casper::VoteCount;
+/// use core_cbc_casper::justification::Justification;
 ///
-/// use core_cbc_casper::message;
+/// // Creating a vote message
+/// let vote_message = VoteCount::create_vote_message(0, true);
 ///
-/// #[derive(Debug, Hash, Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
-/// enum Value {
-///     Zero = 0,
-///     One = 1,
-///     Two = 2,
-/// };
-///
-/// // Implement Estimator for Value...
-///
-/// type Validator = u64;
-///
-/// type Message = message::Message<Value>;
+/// assert_eq!(vote_message.sender(), &(0 as u32));
+/// assert_eq!(vote_message.justification(), &Justification::empty());
+/// assert_eq!(vote_message.estimate(), &VoteCount { yes: 1, no: 0 });
 /// ```
 ///
-/// `Value` must implement `Estimator` to be valid for a `message::Message` and to produce
+/// Message values must implement `Estimator` to be valid for a `message::Message` and to produce
 /// estimates.
 #[derive(Eq, Clone)]
 pub struct Message<E: Estimator>(Arc<ProtoMessage<E>>, Hash);

@@ -31,6 +31,22 @@ use crate::message;
 use crate::util::weight::{WeightUnit, Zero};
 use crate::validator;
 
+/// This structure represents votes count values. It implements the [`Estimator`] trait.
+/// Its purpose is to have a simple type (but complex enough) for the different tests and examples
+/// of this crate.
+///
+/// [`Estimator`]: ../estimator/trait.Estimator.html
+///
+/// # Example
+///
+/// ```
+/// use core_cbc_casper::VoteCount;
+///
+/// assert_eq!(
+///     *VoteCount::create_vote_message(0, true).estimate(),
+///     VoteCount { yes: 1, no: 0 },
+/// );
+/// ```
 #[derive(Clone, Copy, Eq, Ord, PartialOrd, PartialEq, Hash, Default, serde_derive::Serialize)]
 pub struct VoteCount {
     pub yes: u32,

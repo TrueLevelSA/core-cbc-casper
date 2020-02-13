@@ -31,7 +31,34 @@ use crate::util::id::Id;
 use crate::util::weight::{WeightUnit, Zero};
 
 /// All casper actors that send messages, aka validators, have to implement the validator name
-/// trait.
+/// trait. This trait serves as an identifier for validators.
+///
+/// The basic types u8, u32, u64, i8, i32, and i64 implement ValidatorName trivially.
+///
+/// # Example
+///
+/// ```
+/// use core_cbc_casper::validator::Weights;
+/// use core_cbc_casper::validator::ValidatorName;
+///
+/// #[derive(Hash, Clone, PartialOrd, Ord, PartialEq, Eq, Debug, serde_derive::Serialize)]
+/// struct StringName {
+///     name: String,
+/// }
+///
+/// // Implementing the ValidatorName trait for a string wrapper.
+/// impl ValidatorName for StringName {};
+///
+/// let weights = Weights::new(
+///     vec![(StringName { name: "John".to_string() }, 1.0)].into_iter().collect(),
+/// );
+///
+/// // We can find the weight a validator in a Weights structure using its name.
+/// assert_eq!(
+///     weights.weight(&StringName { name: "John".to_string() }).unwrap(),
+///     1.0,
+/// );
+/// ```
 pub trait ValidatorName: Hash + Clone + Ord + Eq + Send + Sync + Debug + serde::Serialize {}
 
 // Default implementations for simple types.
@@ -43,6 +70,46 @@ impl ValidatorName for i32 {}
 impl ValidatorName for i64 {}
 
 /// Inner state of a validator. This represents the validator's view of the network.
+///
+/// # Example
+///
+/// Using the [`VoteCount`] type message type for brevity's sake.
+///
+/// [`VoteCount`]: ../struct.VoteCount.html
+///
+/// ```
+/// use core_cbc_casper::justification::LatestMessages;
+/// use core_cbc_casper::validator::{State, Weights};
+/// use core_cbc_casper::VoteCount;
+///
+/// use std::collections::HashSet;
+/// use std::iter::FromIterator;
+///
+/// let mut state = State::new(
+///     Weights::new(vec![(0, 1.0)].into_iter().collect()),
+///     0.0,
+///     LatestMessages::empty(),
+///     2.0,
+///     HashSet::new(),
+/// );
+///
+/// state.update(&[
+///     &VoteCount::create_vote_message(0, true),
+///     &VoteCount::create_vote_message(0, false),
+/// ]);
+///
+/// assert_eq!(
+///     *state.latests_messages().get(&0).unwrap(),
+///     HashSet::from_iter(vec![
+///         VoteCount::create_vote_message(0, true),
+///         VoteCount::create_vote_message(0, false),
+///     ]),
+/// );
+/// assert_eq!(
+///     *state.equivocators(),
+///     HashSet::from_iter(vec![0]),
+/// );
+/// ```
 #[derive(Debug, Clone)]
 pub struct State<E, U>
 where
@@ -211,7 +278,23 @@ where
     }
 }
 
-// Note: RwLock locks only before writing, while Mutex locks to both read and write
+/// This type maps validators ([`ValidatorName`]) with their weights ([`WeightUnit`]).
+///
+/// [`ValidatorName`]: trait.ValidatorName.html
+/// [`WeightUnit`]: ../util/weight/trait.WeightUnit.html
+///
+/// # Example
+///
+/// ```
+/// use core_cbc_casper::validator::Weights;
+///
+/// let weights = Weights::new(vec![(0, 1.0), (1, 2.0), (2, 4.0)].into_iter().collect());
+///
+/// assert_eq!(
+///     weights.sum_all_weights(),
+///     7.0,
+/// );
+/// ```
 #[derive(Clone, Debug)]
 pub struct Weights<V: self::ValidatorName, U: WeightUnit>(Arc<RwLock<HashMap<V, U>>>);
 
