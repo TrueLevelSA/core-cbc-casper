@@ -18,17 +18,17 @@
 // You should have received a copy of the GNU Affero General Public License along with the Core CBC
 // Rust Library. If not, see <https://www.gnu.org/licenses/>.
 
-extern crate casper;
+extern crate core_cbc_casper;
 
 mod common;
 use common::binary::*;
 
 use std::collections::HashSet;
 
-use casper::estimator::Estimator;
-use casper::justification::{Justification, LatestMessages, LatestMessagesHonest};
-use casper::message::Message;
-use casper::validator;
+use core_cbc_casper::estimator::Estimator;
+use core_cbc_casper::justification::{Justification, LatestMessages, LatestMessagesHonest};
+use core_cbc_casper::message::Message;
+use core_cbc_casper::validator;
 
 #[test]
 fn equal_weight() {

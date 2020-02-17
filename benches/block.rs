@@ -21,13 +21,13 @@
 #[macro_use]
 extern crate criterion;
 
-use casper::estimator::Estimator;
-use casper::justification::LatestMessagesHonest;
-use casper::message;
-use casper::util::weight::{WeightUnit, Zero};
-use casper::validator;
-use casper::Block;
-use casper::ValidatorNameBlockData;
+use core_cbc_casper::estimator::Estimator;
+use core_cbc_casper::justification::LatestMessagesHonest;
+use core_cbc_casper::message;
+use core_cbc_casper::util::weight::{WeightUnit, Zero};
+use core_cbc_casper::validator;
+use core_cbc_casper::Block;
+use core_cbc_casper::ValidatorNameBlockData;
 use criterion::{black_box, Criterion};
 
 type Validator = u8;
@@ -138,7 +138,7 @@ fn block_from_prevblock_message(c: &mut Criterion) {
         |b, loops| {
             use std::collections::HashSet;
 
-            use casper::justification::{Justification, LatestMessages};
+            use core_cbc_casper::justification::{Justification, LatestMessages};
 
             let validators: Vec<u8> = (1..=4).collect();
             let weights = [0.6, 1.0, 2.0, 1.3];
@@ -189,8 +189,8 @@ fn block_is_member(c: &mut Criterion) {
 }
 
 fn block_estimate(c: &mut Criterion) {
-    use casper::justification::{Justification, LatestMessages};
-    use casper::message::Message;
+    use core_cbc_casper::justification::{Justification, LatestMessages};
+    use core_cbc_casper::message::Message;
     use std::collections::HashSet;
 
     let weights = validator::Weights::new(

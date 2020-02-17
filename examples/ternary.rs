@@ -18,15 +18,15 @@
 // You should have received a copy of the GNU Affero General Public License along with the Core CBC
 // Rust Library. If not, see <https://www.gnu.org/licenses/>.
 
-extern crate casper;
+extern crate core_cbc_casper;
 
 use std::convert::From;
 
-use casper::estimator::Estimator;
-use casper::justification::LatestMessagesHonest;
-use casper::message;
-use casper::util::weight::{WeightUnit, Zero};
-use casper::validator;
+use core_cbc_casper::estimator::Estimator;
+use core_cbc_casper::justification::LatestMessagesHonest;
+use core_cbc_casper::message;
+use core_cbc_casper::util::weight::{WeightUnit, Zero};
+use core_cbc_casper::validator;
 
 type Validator = u32;
 
@@ -116,7 +116,7 @@ impl Estimator for Value {
 fn main() {
     use std::collections::HashSet;
 
-    use casper::justification::{Justification, LatestMessages};
+    use core_cbc_casper::justification::{Justification, LatestMessages};
 
     let validators: Vec<u32> = (1..=4).collect();
     let weights = [0.6, 1.0, 2.0, 1.3];

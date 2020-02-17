@@ -23,12 +23,12 @@ extern crate serde_derive;
 
 extern crate bincode;
 extern crate blake2;
-extern crate casper;
+extern crate core_cbc_casper;
 extern crate itertools;
 extern crate serde;
 
-use casper::util::hash::Hash;
-use casper::util::id::Id;
+use core_cbc_casper::util::hash::Hash;
+use core_cbc_casper::util::id::Id;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 struct Example {

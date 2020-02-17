@@ -83,9 +83,9 @@ impl<E: Estimator> Serialize for ProtoMessage<E> {
 /// represented with `u64`.
 ///
 /// ```
-/// extern crate casper;
+/// extern crate core_cbc_casper;
 ///
-/// use casper::message;
+/// use core_cbc_casper::message;
 ///
 /// #[derive(Debug, Hash, Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
 /// enum Value {

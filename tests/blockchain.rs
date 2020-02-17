@@ -18,15 +18,15 @@
 // You should have received a copy of the GNU Affero General Public License along with the Core CBC
 // Rust Library. If not, see <https://www.gnu.org/licenses/>.
 
-extern crate casper;
+extern crate core_cbc_casper;
 
 use std::collections::HashSet;
 
-use casper::blockchain::Block;
-use casper::justification::{Justification, LatestMessages};
-use casper::message::Message;
-use casper::validator;
-use casper::ValidatorNameBlockData;
+use core_cbc_casper::blockchain::Block;
+use core_cbc_casper::justification::{Justification, LatestMessages};
+use core_cbc_casper::message::Message;
+use core_cbc_casper::validator;
+use core_cbc_casper::ValidatorNameBlockData;
 
 #[test]
 fn partial_view() {

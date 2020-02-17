@@ -19,7 +19,7 @@
 // Rust Library. If not, see <https://www.gnu.org/licenses/>.
 
 #![cfg(feature = "integration_test")]
-extern crate casper;
+extern crate core_cbc_casper;
 extern crate proptest;
 extern crate rand;
 
@@ -35,15 +35,15 @@ use proptest::test_runner::{RngAlgorithm, TestRng, TestRunner};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
-use casper::blockchain::Block;
-use casper::estimator::Estimator;
-use casper::justification::{Justification, LatestMessages, LatestMessagesHonest};
-use casper::message::{self, Message};
-use casper::validator;
+use core_cbc_casper::blockchain::Block;
+use core_cbc_casper::estimator::Estimator;
+use core_cbc_casper::justification::{Justification, LatestMessages, LatestMessagesHonest};
+use core_cbc_casper::message::{self, Message};
+use core_cbc_casper::validator;
 
-use casper::IntegerWrapper;
-use casper::ValidatorNameBlockData;
-use casper::VoteCount;
+use core_cbc_casper::IntegerWrapper;
+use core_cbc_casper::ValidatorNameBlockData;
+use core_cbc_casper::VoteCount;
 
 mod common;
 use common::binary::BoolWrapper;

@@ -20,12 +20,12 @@
 
 use std::fmt;
 
-use casper::blockchain::Block;
-use casper::estimator::Estimator;
-use casper::justification::LatestMessagesHonest;
-use casper::validator;
+use core_cbc_casper::blockchain::Block;
+use core_cbc_casper::estimator::Estimator;
+use core_cbc_casper::justification::LatestMessagesHonest;
+use core_cbc_casper::validator;
 
-use casper::ValidatorNameBlockData;
+use core_cbc_casper::ValidatorNameBlockData;
 
 pub struct ChainData {
     pub chain_id: u32,
@@ -82,7 +82,7 @@ pub fn get_height_selected_chain(
     )
     .unwrap()
     .prevblock()
-    .ok_or(casper::blockchain::Error);
+    .ok_or(core_cbc_casper::blockchain::Error);
     fn reduce(block: &Block<ValidatorNameBlockData<u32>>, i: u32) -> u32 {
         match block.prevblock() {
             Some(previous_block) => reduce(&previous_block, i + 1),

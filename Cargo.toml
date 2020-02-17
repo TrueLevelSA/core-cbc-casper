@@ -19,7 +19,7 @@
 # Rust Library. If not, see <https://www.gnu.org/licenses/>.
 
 [package]
-name = "casper"
+name = "core_cbc_casper"
 description = "Abstractly define the CBC Casper message stucture and define functions for the construction and proper execution of protocols of the Casper family."
 version = "0.0.0"
 license-file = "LICENSE"

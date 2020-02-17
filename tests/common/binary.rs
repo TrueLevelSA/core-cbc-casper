@@ -18,10 +18,10 @@
 // You should have received a copy of the GNU Affero General Public License along with the Core CBC
 // Rust Library. If not, see <https://www.gnu.org/licenses/>.
 
-use casper::estimator::Estimator;
-use casper::justification::LatestMessagesHonest;
-use casper::util::weight::{WeightUnit, Zero};
-use casper::validator;
+use core_cbc_casper::estimator::Estimator;
+use core_cbc_casper::justification::LatestMessagesHonest;
+use core_cbc_casper::util::weight::{WeightUnit, Zero};
+use core_cbc_casper::validator;
 
 type Validator = u32;
 
