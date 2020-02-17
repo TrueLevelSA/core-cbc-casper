@@ -1,7 +1,9 @@
 [![pipeline status](https://gitlab.com/TrueLevel/casper/core-cbc/badges/master/pipeline.svg)](https://gitlab.com/TrueLevel/casper/core-cbc/commits/master) [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
-CBC Casper Abstract Message Library
+Core CBC Casper
 ===
+
+Abstract message library for CBC Casper, written in Rust.
 
 **DISCLAIMER:** This library is experimental, under development, not reviewed,
 and might change dramatically.
