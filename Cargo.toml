@@ -24,7 +24,7 @@ description = "Abstractly defines the CBC Casper message stucture and defines fu
 version = "0.1.0"
 license-file = "LICENSE"
 authors = ["pZ4 <pz4@protonmail.ch>", "Lederstrumpf", "h4sh3d <h4sh3d@truelevel.io>", "roflolilolmao <q@truelevel.ch>"]
-repository = "https://github.com/TrueLevelSA/cbc-casper-msg"
+repository = "https://github.com/TrueLevelSA/core-cbc-casper"
 readme = "README.md"
 keywords = ["CBC", "Casper", "Blockchain"]
 
