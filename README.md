@@ -26,34 +26,29 @@ comparing with efficient implementations.
 ## Using the library
 
 To benefit from the CBC Casper safety proofs this library builds upon,
-developers have to implement `message::Trait`. This trait in turn requires
-implementing other traits in this library, such as the `validator::Trait` trait for
-validators, and the `Estimator` trait for the estimate.
-
-One generic type implements the `message::Trait`, namely
-`message::Message<Estimator, validator::Trait>`, and can be used to helps getting to
-a compliant `message::Trait` concrete type implementation easily.
+the `validator::ValidatorName` and `estimmator::Estimator` traits must be
+implemented.
 
 We also present a basic blockchain implementation heavily under developement.
 You can also find another implementation of an integer consensus in `tests/`.
 
 But in order to get started using the library, the best way is to study the
-examples folder (under development). It is also instructive to run the tests.
+examples in the documentation and in the examples folder (under development).
+It is also instructive to read and run the tests.
 
 ### Cargo
 
-The library is not yet published on crates.io but you can use it in your
-dependencies with
+You can use this library in your dependencies with
 
 ```
 [dependencies]
-casper = { git = "https://github.com/TrueLevelSA/cbc-casper-msg" }
+core_cbc_casper = "0.1"
 ```
 
 ## Example
 
 We present an example of naive consensus protocol: a ternary consensus that uses
-the generic type `message::Message<Estimator, validator::Trait>` implementation to
+the generic type `message::Message<estimator::Estimator>` implementation to
 generate the protocol.
 
 ## Known limitations
@@ -63,9 +58,15 @@ generate the protocol.
 As mentioned earlier, our current focus is on the correctness of the
 implementation rather than on performance.
 
+### Error handling
+
+The error handling has had poor focus for now. Potential points of failure must be
+properly studied and fixed if necessary before the library can be considered to be
+ready for production.
+
 ## Tests
 
-We use the crate `proptest` to generate properties tests. The library has a
+We use the crate `proptest` to generate property tests. The library has a
 feature `integration_test` used by the proptest framework. To run specifically
 the `proptest` tests use:
 
