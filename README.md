@@ -109,3 +109,16 @@ contribute please contact one of the authors of the library (see Cargo.toml).
 
 We use `rustfmt` default configuration to ensure a coherent code format in the
 entire project. Install `rustfmt` with `rustup component add rustfmt`.
+
+### Code Linting
+
+We use `clippy` to ensure the code base is as clean and functional as possible.
+Install it with `rustup component add clippy` and run it with `cargo clippy --all-targets
+--all-features -- -D warnings`.
+
+## More on CBC Casper
+
+To read more about CBC Casper:
+* [Casper CBC, Simplified!](
+https://medium.com/@aditya.asgaonkar/casper-cbc-simplified-2370922f9aa6),
+by Aditya Asgaonkar.
